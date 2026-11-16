@@ -1,0 +1,188 @@
+namespace LesMudOS.Api;
+
+/// <summary>
+/// Base class of every mudlib object. It carries two things:
+///
+///   * Applies: virtual methods the driver calls into the object
+///     (Create, Init, HeartBeat, ...). Override them.
+///   * Efuns: protected methods the object calls into the driver
+///     (CloneObject, MoveObject, Write, ...). They are protected so that
+///     "this object" is always known to the driver and so that one object
+///     cannot invoke an efun on behalf of another through Call().
+///
+/// Objects are created only by the driver (LoadObject / CloneObject).
+/// Do the setup work in Create(), not in a constructor.
+/// </summary>
+public abstract class MudObject
+{
+    protected MudObject()
+    {
+        Self = DriverHost.Services.ClaimPendingRef(this);
+    }
+
+    /// <summary>The handle to this object. Pass this to other objects, never `this`.</summary>
+    public ObjectRef Self { get; }
+
+    // =====================================================================
+    // Applies (driver -> object)
+    // =====================================================================
+
+    /// <summary>Called once, right after the object is loaded or cloned.</summary>
+    public virtual void Create() { }
+
+    /// <summary>
+    /// Called when a living object comes within reach of this object (it
+    /// enters this object, enters the same environment, or this object is
+    /// moved next to it). ThisPlayer() is that living object. This is where
+    /// an object offers commands with AddAction.
+    /// </summary>
+    public virtual void Init() { }
+
+    /// <summary>Called every heartbeat interval while SetHeartBeat(true) is in effect.</summary>
+    public virtual void HeartBeat() { }
+
+    /// <summary>Does this object answer to the given name? Used by Present().</summary>
+    public virtual bool Id(string id) => false;
+
+    /// <summary>One-line description, or null if the object is invisible.</summary>
+    public virtual string? Short() => null;
+
+    /// <summary>Full description shown when the object is looked at.</summary>
+    public virtual string Long() => (Short() ?? "You see nothing special") + ".\n";
+
+    /// <summary>
+    /// Receives all text sent to this object. The default sends it down the
+    /// network connection if the object is interactive. NPCs can override this
+    /// to react to what they hear.
+    /// </summary>
+    public virtual void CatchTell(string message) => DriverHost.Services.Receive(Self, message);
+
+    /// <summary>Called on an interactive object when its connection drops.</summary>
+    public virtual void NetDead() { }
+
+    /// <summary>Called just before the object is destructed.</summary>
+    public virtual void OnDestruct() { }
+
+    // =====================================================================
+    // Efuns (object -> driver)
+    // =====================================================================
+
+    private static IDriverServices D => DriverHost.Services;
+
+    // ---- Objects and programs ----
+
+    /// <summary>Return the blueprint object for a path, compiling and creating it if needed.</summary>
+    protected ObjectRef LoadObject(string path) => D.LoadObject(path);
+
+    /// <summary>Create a new clone from the current program for a path.</summary>
+    protected ObjectRef CloneObject(string path) => D.CloneObject(path);
+
+    /// <summary>Find a loaded object by name ("/path" or "/path#id"), or null.</summary>
+    protected ObjectRef? FindObject(string name) => D.FindObject(name);
+
+    /// <summary>Destruct an object (this object if omitted). Its contents move to its environment.</summary>
+    protected void Destruct(ObjectRef? ob = null) => D.Destruct(Self, ob ?? Self);
+
+    /// <summary>
+    /// Discard the compiled program for a path and for every program that
+    /// inherits or uses it, then recompile the path. Existing objects keep
+    /// running the code they were created with. Returns the invalidated paths.
+    /// Throws with the compiler diagnostics if the new source does not compile.
+    /// Subject to master.ValidOperation("update", ...).
+    /// </summary>
+    protected IReadOnlyList<string> UpdateProgram(string path) => D.UpdateProgram(Self, path);
+
+    // ---- Containment ----
+
+    /// <summary>Move this object into a destination object.</summary>
+    protected void MoveObject(ObjectRef destination) => D.Move(Self, destination);
+
+    /// <summary>Move another object into a destination object.</summary>
+    protected void MoveObject(ObjectRef what, ObjectRef destination) => D.Move(what, destination);
+
+    /// <summary>The object that contains ob (or this object), or null.</summary>
+    protected ObjectRef? Environment(ObjectRef? ob = null) => (ob ?? Self).Environment;
+
+    /// <summary>Snapshot of the objects directly inside ob (or this object).</summary>
+    protected IReadOnlyList<ObjectRef> AllInventory(ObjectRef? ob = null) => (ob ?? Self).Inventory.ToArray();
+
+    /// <summary>First object inside the container (this object if omitted) whose Id() accepts the name.</summary>
+    protected ObjectRef? Present(string id, ObjectRef? container = null) => D.Present(id, container ?? Self);
+
+    // ---- Living and interactive objects ----
+
+    /// <summary>The living object whose command, heartbeat or arrival caused the current execution.</summary>
+    protected ObjectRef? ThisPlayer() => D.ThisPlayer;
+
+    /// <summary>The verb of the command being executed.</summary>
+    protected string QueryVerb() => D.Verb;
+
+    /// <summary>Mark this object as living: it can receive Init() offers and run commands. Sets ThisPlayer() to this object.</summary>
+    protected void EnableCommands() => D.EnableCommands(Self);
+
+    protected bool Living(ObjectRef ob) => ob.Living && ob.IsAlive;
+
+    /// <summary>True if the object has a network connection attached.</summary>
+    protected bool Interactive(ObjectRef ob) => ob.Connection is not null && ob.IsAlive;
+
+    /// <summary>All interactive objects.</summary>
+    protected IReadOnlyList<ObjectRef> Users() => D.Users();
+
+    /// <summary>Move the network connection from one object to another (login object to player body).</summary>
+    protected void Exec(ObjectRef to, ObjectRef from) => D.Exec(Self, to, from);
+
+    /// <summary>Offer a command to ThisPlayer(). The binding disappears when this object and the player part ways.</summary>
+    protected void AddAction(string verb, ActionHandler handler) => D.AddAction(Self, verb, handler);
+
+    /// <summary>Set the message shown if no action handles the current command. Default is "What?".</summary>
+    protected void NotifyFail(string message) => D.NotifyFail(message);
+
+    /// <summary>Send the next line typed by ThisPlayer() to a handler instead of the command parser.</summary>
+    protected void InputTo(Action<string> handler) => D.InputTo(Self, handler);
+
+    // ---- Communication ----
+
+    /// <summary>Send text to ThisPlayer().</summary>
+    protected void Write(string message) => D.Write(message);
+
+    /// <summary>Send text to one object.</summary>
+    protected void TellObject(ObjectRef ob, string message) => D.TellObject(ob, message);
+
+    /// <summary>Send text to every living object inside a room, except those excluded.</summary>
+    protected void TellRoom(ObjectRef room, string message, params ObjectRef[] exclude) => D.TellRoom(room, message, exclude);
+
+    /// <summary>Send text to everyone in the same room as ThisPlayer() (or this object), except that object.</summary>
+    protected void Say(string message) => D.Say(Self, message);
+
+    // ---- Time ----
+
+    /// <summary>Run a function after a delay in seconds. Returns an id for RemoveCallOut. Skipped if this object is destructed first.</summary>
+    protected int CallOut(Action function, double delaySeconds) => D.CallOut(Self, function, delaySeconds);
+
+    protected bool RemoveCallOut(int id) => D.RemoveCallOut(Self, id);
+
+    /// <summary>Turn the HeartBeat() apply on or off for this object.</summary>
+    protected void SetHeartBeat(bool on) => D.SetHeartBeat(Self, on);
+
+    /// <summary>Seconds since the Unix epoch.</summary>
+    protected long Time() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+    /// <summary>Random integer in [0, n).</summary>
+    protected int Random(int n) => n <= 0 ? 0 : System.Random.Shared.Next(n);
+
+    // ---- Persistence ----
+
+    /// <summary>Write every [Saved] field of this object to a save file. Subject to master.ValidWrite.</summary>
+    protected bool SaveObject(string path) => D.SaveObject(Self, path);
+
+    /// <summary>Load [Saved] fields from a save file. Returns false if it does not exist. Subject to master.ValidRead.</summary>
+    protected bool RestoreObject(string path) => D.RestoreObject(Self, path);
+
+    // ---- Administration ----
+
+    /// <summary>Human-readable driver statistics: object count, program versions loaded and unloaded.</summary>
+    protected string DriverStatus() => D.Status();
+
+    /// <summary>Stop the driver. Subject to master.ValidOperation("shutdown", ...).</summary>
+    protected void Shutdown() => D.Shutdown(Self);
+}

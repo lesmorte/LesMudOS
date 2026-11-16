@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    This project is NOT used at runtime. The driver compiles each .cs file in
+    this directory on demand with Roslyn. The project exists so that an IDE
+    gives IntelliSense for mudlib code, and so that `dotnet build` catches
+    compile errors across the whole mudlib in one pass.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>$(NoWarn);CS8618;CS8603;CS8602;CS8604;CS8600;CS8601;CS8625</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Mirrors the global usings the driver injects into every mudlib file. -->
+    <Using Include="System" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Text" />
+    <Using Include="LesMudOS.Api" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\src\LesMudOS.Api\LesMudOS.Api.csproj" />
+  </ItemGroup>
+</Project>

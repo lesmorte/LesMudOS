@@ -1,0 +1,23 @@
+[Unit]
+Description=LesMudOS game driver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=lesmudos
+Group=lesmudos
+WorkingDirectory=/opt/lesmudos
+ExecStart=/opt/lesmudos/bin/LesMudOS.Driver --mudlib /opt/lesmudos/mudlib --save /opt/lesmudos/save --port 4000
+Restart=on-failure
+RestartSec=5
+
+# Confine the process: the mudlib sandbox is not a security boundary.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/lesmudos/save
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target
