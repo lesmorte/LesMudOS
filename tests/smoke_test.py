@@ -19,7 +19,7 @@ import tempfile
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PORT = 4777
+PORT = int(os.environ.get("LESMUDOS_TEST_PORT", "4777"))
 SECRET = "correct horse battery staple"
 failures = []
 
