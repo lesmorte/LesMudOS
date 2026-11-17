@@ -180,6 +180,13 @@ public abstract class MudObject
     /// <summary>Seconds since the Unix epoch.</summary>
     protected long Time() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
+    /// <summary>
+    /// Milliseconds since the Unix epoch: the same clock that call-outs run on, so
+    /// intervals measured with it match the delays given to CallOut. Use it where
+    /// whole seconds are too coarse (combat timing).
+    /// </summary>
+    protected long TimeMs() => D.TimeMs();
+
     /// <summary>Random integer in [0, n).</summary>
     protected int Random(int n) => n <= 0 ? 0 : System.Random.Shared.Next(n);
 

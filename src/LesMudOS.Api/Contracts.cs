@@ -94,6 +94,7 @@ internal interface IDriverServices
     void TellRoom(ObjectRef room, string message, ObjectRef[] exclude);
     void Say(ObjectRef caller, string message);
 
+    long TimeMs();
     int CallOut(ObjectRef owner, Action function, double delaySeconds);
     bool RemoveCallOut(ObjectRef owner, int id);
     void SetHeartBeat(ObjectRef ob, bool on);
