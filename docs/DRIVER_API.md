@@ -133,7 +133,7 @@ Protected methods on `MudObject`. `ob` parameters default to this object where m
 | `void Exec(ObjectRef to, ObjectRef from)` | Move a connection between objects. Needs `ValidOperation("exec")`. |
 | `void AddAction(string verb, ActionHandler handler)` | Bind a verb for `ThisPlayer()`, owned by this object. `ActionHandler` is `bool (string args)`; return true if handled. Rebinding the same verb from the same object replaces the old binding. |
 | `void NotifyFail(string message)` | Message shown if no handler accepts the command |
-| `void InputTo(Action<string> handler)` | Route the player's next line to a handler instead of the command parser |
+| `void InputTo(Action<string> handler, bool noEcho = false)` | Route the player's next line to a handler instead of the command parser. With `noEcho` the driver sends telnet IAC WILL ECHO, so the client stops echoing what is typed; when the line arrives it sends IAC WONT ECHO and a newline before calling the handler. Use it for passwords. |
 
 ### Communication
 
@@ -169,6 +169,17 @@ Messages are not newline-terminated for you; include `\n`.
 ```
 
 Saved fields may be numbers, strings, booleans, and lists, arrays or dictionaries of those.
+
+### Passwords
+
+Mudlib code cannot use `System.Security.Cryptography`, so password hashing is done by the driver.
+
+| Efun | Description |
+|---|---|
+| `string HashPassword(string password)` | A hash for storage: PBKDF2-HMAC-SHA256, a random 16-byte salt, 210,000 iterations. The result describes itself: `pbkdf2-sha256$<iterations>$<salt base64>$<hash base64>`. Takes some tens of milliseconds on the game thread. |
+| `bool VerifyPassword(string password, string hash)` | Recompute and compare in constant time. False if the password does not match, or if the hash is empty or malformed (it never throws for a bad hash). |
+
+Neither efun needs the master's permission: a hash is useless without the save file it is stored in, which the master protects. The driver never logs a password or a hash, and builds no error message from either.
 
 ### Administration
 
@@ -255,7 +266,31 @@ After `a`, `i` or `c`, every line typed or pasted goes into the file, indentatio
 
 Below the required level a command answers `What?`, the same as a verb that does not exist. Levels are checked on every use, so a demotion takes effect immediately.
 
-## 7. Errors
+## 7. Login in the sample mudlib
+
+Accounts and passwords are mudlib policy too. `/secure/login` owns a new connection and asks for a name (2 to 16 letters; a name already online is refused). Only a player body may read player save files, so it then clones `/std/player` and asks the body about the account:
+
+| Body function | Called by the login object to |
+|---|---|
+| `string BeginLogin(string name)` | Take the name and restore its save file, once. Returns `"new"` (no save file), `"password"`, or `"unset"` (an account saved before passwords existed); `""` if refused. |
+| `bool CheckPassword(string password)` | Check the password of a `"password"` account. Fails for good after three wrong tries. |
+| `string? CheckNewPassword(string password)` | Why a password may not be used (fewer than 8 characters, or the player's name in any case), or null. Changes nothing. |
+| `bool SetPassword(string password)` | Store the hash for a `"new"` or `"unset"` account and save at once, so a new name is reserved with its password. |
+| `void SetupPlayer(string name)` | Enter the game, after `Exec` has moved the connection to the body. Needs a successful `CheckPassword` or `SetPassword`. |
+
+Every one of these except `CheckNewPassword` checks `PreviousObject()`: `BeginLogin` accepts only a clone of `/secure/login` that has a connection, and records it; the others accept only that same login object. All of them do nothing once the player is in the game, so other mudlib objects cannot use them to test or set a password or to take over a body. The hash is a `[Saved]` field of the body, stored in `save/players/<name>.json`, and no command shows it.
+
+The prompts, all password lines with echo off:
+
+- New name: `Creating a new account for <Name>.`, then `Choose a password (at least 8 characters):` and `Type it again:`. A refused or mismatched password goes back to the first prompt.
+- Account with a password: `Password:`. After three wrong passwords in all: `Wrong password. Goodbye.` and the connection is closed.
+- Account without a password: `<Name>, your account has no password. You must set one before you can play.`, then the same two prompts as for a new account.
+
+Two connections cannot set up the same new name at once, and the name is checked against the players online again just before the hand-over. If the login fails or the connection drops, the login object destructs the body it cloned; the sample master allows a `/secure/login` clone to destruct a player body that has no connection, and nothing else.
+
+In the game, `password` asks for the current password, then the new one twice, with the same rules.
+
+## 8. Errors
 
 | Exception | Raised when |
 |---|---|
@@ -266,7 +301,7 @@ Below the required level a command answers `What?`, the same as a verb that does
 
 Any exception that reaches the driver aborts the current execution, is logged, and is shown to `ThisPlayer()` prefixed with `***`. Mudlib code may catch exceptions, but cannot use that to outrun the tick limit.
 
-## 8. Planned additions
+## 9. Planned additions
 
 Not in the proof of concept; names are provisional.
 

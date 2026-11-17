@@ -86,7 +86,7 @@ internal interface IDriverServices
     void Exec(ObjectRef caller, ObjectRef to, ObjectRef from);
     void AddAction(ObjectRef owner, string verb, ActionHandler handler);
     void NotifyFail(string message);
-    void InputTo(ObjectRef caller, Action<string> handler);
+    void InputTo(ObjectRef caller, Action<string> handler, bool noEcho);
 
     void Receive(ObjectRef ob, string message);
     void Write(string message);
@@ -102,6 +102,8 @@ internal interface IDriverServices
     bool RestoreObject(ObjectRef caller, string path);
 
     bool CheckAdminSecret(ObjectRef caller, string candidate);
+    string HashPassword(string password);
+    bool VerifyPassword(string password, string hash);
     IReadOnlyList<DirEntry>? GetDir(ObjectRef caller, string path);
     string? ReadFile(ObjectRef caller, string path);
     void WriteFile(ObjectRef caller, string path, string content);

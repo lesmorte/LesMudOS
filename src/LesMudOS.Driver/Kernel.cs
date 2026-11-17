@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -208,6 +209,14 @@ internal sealed class Kernel : IDriverServices
     public void OnLine(Connection connection, string line)
     {
         if (connection.Owner is not { IsAlive: true } owner) return;
+        if (connection.EchoSuppressed)
+        {
+            // The line was typed with echo off (a password): hand echo back to
+            // the client and end the line the user could not see.
+            connection.EchoSuppressed = false;
+            connection.SendRaw(TelnetWontEcho);
+            connection.Send("\n");
+        }
         Execute(owner, () =>
         {
             if (owner.InputTo is { } handler)
@@ -529,12 +538,22 @@ internal sealed class Kernel : IDriverServices
         if (_thisPlayer is not null) _thisPlayer.NotifyFail = message.TrimEnd('\n');
     }
 
-    public void InputTo(ObjectRef caller, Action<string> handler)
+    // Telnet IAC WILL ECHO / IAC WONT ECHO. "Will echo" makes the client stop
+    // echoing locally; the driver never actually echoes, so the line is hidden.
+    private static readonly byte[] TelnetWillEcho = [255, 251, 1];
+    private static readonly byte[] TelnetWontEcho = [255, 252, 1];
+
+    public void InputTo(ObjectRef caller, Action<string> handler, bool noEcho)
     {
         var target = _thisPlayer ?? caller;
-        if (target.Connection is null) throw new MudRuntimeException("InputTo: no interactive player");
+        if (target.Connection is not Connection connection) throw new MudRuntimeException("InputTo: no interactive player");
         target.InputTo = handler;
         target.InputToOwner = caller;
+        if (noEcho && !connection.EchoSuppressed)
+        {
+            connection.EchoSuppressed = true;
+            connection.SendRaw(TelnetWillEcho);
+        }
     }
 
     // =====================================================================
@@ -756,6 +775,63 @@ internal sealed class Kernel : IDriverServices
         if (_adminSecretFailures >= MaxAdminSecretFailures)
             Log.Info("admin secret disabled until the driver is restarted");
         return false;
+    }
+
+    // ---- Passwords ----
+    // Nothing here logs, and no exception message is built from the password
+    // or the hash: a failure inside the hash function is replaced by a fixed message.
+
+    private const string PasswordScheme = "pbkdf2-sha256";
+    private const int PasswordIterations = 210_000;
+    private const int MaxPasswordIterations = 10_000_000; // bounds the cost of a doctored hash
+    private const int PasswordSaltBytes = 16;
+    private const int PasswordHashBytes = 32;
+
+    public string HashPassword(string password)
+    {
+        if (password is null) throw new MudRuntimeException("HashPassword: no password given");
+        var salt = RandomNumberGenerator.GetBytes(PasswordSaltBytes);
+        byte[] hash;
+        try
+        {
+            hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, PasswordIterations, HashAlgorithmName.SHA256, PasswordHashBytes);
+        }
+        catch (Exception)
+        {
+            // An encoder error message can quote a character of the password.
+            throw new MudRuntimeException("HashPassword: the password could not be hashed");
+        }
+        return string.Join('$', PasswordScheme, PasswordIterations.ToString(CultureInfo.InvariantCulture),
+            Convert.ToBase64String(salt), Convert.ToBase64String(hash));
+    }
+
+    public bool VerifyPassword(string password, string hash)
+    {
+        if (password is null || string.IsNullOrEmpty(hash)) return false;
+        var parts = hash.Split('$');
+        if (parts.Length != 4 || parts[0] != PasswordScheme) return false;
+        if (!int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var iterations)
+            || iterations < 1 || iterations > MaxPasswordIterations) return false;
+        byte[] salt, expected;
+        try
+        {
+            salt = Convert.FromBase64String(parts[2]);
+            expected = Convert.FromBase64String(parts[3]);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+        if (salt.Length == 0 || expected.Length < 16 || expected.Length > 64) return false;
+        try
+        {
+            var actual = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, expected.Length);
+            return CryptographicOperations.FixedTimeEquals(actual, expected);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     public string Status()

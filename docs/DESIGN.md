@@ -185,7 +185,7 @@ LPC is safe by construction: the only way to reach the outside world is through 
 2. **Allow-list analyzer.** `System.Private.CoreLib` cannot be left out and contains file I/O, reflection and threading, so after compilation `SandboxAnalyzer` walks the semantic model and checks every referenced symbol and the type of every expression. A type must belong to the mudlib or to an allowed namespace (`System`, `System.Collections`, `System.Collections.Generic`, `System.Linq`, `System.Text`, `LesMudOS.Api`) and must not be on a short deny-list within those (`Type`, `Activator`, `Environment`, `GC`, `AppDomain` and similar). `GetType()`, `typeof`, `goto`, finalizers, `lock`, `await` and unsafe code are rejected outright.
 3. **Operating system.** Run the driver as an unprivileged user with a read-only mudlib directory, as in the sample systemd unit.
 
-**In-game editing raises the stakes.** With `WriteFile`, a wizard who can reach the game port can put new code on the server, and that code runs inside the driver process with only the allow-list between it and the machine. The file efuns confine paths to the mudlib (absolute, no `.` or `..`, no hidden names, no symlink is ever created), the master limits them to player bodies, the sample mudlib requires level 5 (level 10 for `/secure` and `/std`), and every write is logged. None of that helps if an attacker can become a wizard, and until there are player passwords, logging in under a wizard's name is enough.
+**In-game editing raises the stakes.** With `WriteFile`, a wizard who can reach the game port can put new code on the server, and that code runs inside the driver process with only the allow-list between it and the machine. The file efuns confine paths to the mudlib (absolute, no `.` or `..`, no hidden names, no symlink is ever created), the master limits them to player bodies, the sample mudlib requires level 5 (level 10 for `/secure` and `/std`), and every write is logged. None of that helps if an attacker can become a wizard, so the whole arrangement rests on player passwords (below) and on the telnet port, which carries them in plain text.
 
 **Threat model.** This stops honest mistakes and casual misuse. It is not proof against a determined attacker who can write mudlib code: an allow-list over a library as large as CoreLib will have holes. Treat everyone with write access to the mudlib as trusted to the level of the account the driver runs under. Supporting untrusted authors would need a real isolation boundary, which means moving the scripting language off the CLR (for example into a WebAssembly runtime) or running each domain in a separate, confined process.
 
@@ -205,6 +205,21 @@ Wizard levels (0 to 10) are implemented in the sample mudlib by `/secure/wizlist
 - **Guessing** is limited to five wrong attempts per boot, after which the check returns false until the driver is restarted. Attempts are logged. The cost is that any player can use up the attempts and block the bootstrap until a restart, which is acceptable because the bootstrap is needed once.
 
 The secret is typed as a command, so it crosses the network in plain text and may be echoed by the client. Do the bootstrap from the server itself (`telnet localhost`) and then unset the variable.
+
+### Passwords
+
+Every account has a password; the sample login flow is described in DRIVER_API.md section 7. The pieces that concern the driver:
+
+- **Hashing** is done by two efuns, `HashPassword` and `VerifyPassword`, because mudlib code cannot reach the cryptography classes. The hash is PBKDF2-HMAC-SHA256 with a random 16-byte salt and 210,000 iterations, stored as `pbkdf2-sha256$<iterations>$<salt>$<hash>` so the parameters can be raised later without breaking old hashes. Comparison is constant-time. The hash is a `[Saved]` field of the player body and lives in the player's save file, outside the mudlib, where wizard file commands cannot reach it.
+- **No echo.** `InputTo(handler, noEcho: true)` sends telnet IAC WILL ECHO after the prompt, so the client stops echoing; when the line arrives the driver sends IAC WONT ECHO and a newline. Raw telnet bytes go through the same outbound channel as text, so they stay in order with the prompt.
+- **Logging.** The driver logs no password and no hash, and error messages are never built from either.
+- **Ownership.** The login object never sees a hash. It clones the player body and calls guarded functions on it (`BeginLogin`, `CheckPassword`, `SetPassword`, `SetupPlayer`), which accept calls only from the login object that started the login, identified with `PreviousObject()`, and do nothing once the player is in the game.
+
+**Known limitations**
+
+- Telnet is plain text, so passwords cross the network unencrypted, and anyone who can watch the traffic can read them. TLS is on the roadmap; until then, do not let wizards log in over an untrusted network.
+- Hashing runs on the single game thread. At 210,000 iterations each login, new password or `password` command stalls the whole game for some tens of milliseconds. That is acceptable for a small game, but a burst of logins (or of deliberate wrong guesses from many connections) is felt by everyone. Moving the hash to the thread pool would need an asynchronous efun.
+- Wrong guesses are limited to three per connection; nothing stops an attacker from reconnecting. There is no per-account or per-address throttling yet, and no idle timeout at the password prompt.
 
 ## 9. Resource limits
 
@@ -237,7 +252,9 @@ The world itself is not persisted. As in a classic LPmud, rooms and their conten
 
 A plain TCP listener speaks enough telnet to be used with `telnet`, `nc` or a MUD client: it strips IAC negotiation sequences, assembles lines, handles backspace, and converts `\n` to `\r\n` on output. Each connection has an unbounded outbound channel drained by its own task, so a slow client cannot block the game thread.
 
-**Not yet implemented:** telnet option negotiation (echo off for passwords, NAWS, GMCP), TLS, WebSocket transport, per-connection output limits, idle timeouts and connection throttling.
+The only option the driver negotiates is echo: it sends IAC WILL ECHO before a line read with `InputTo(handler, noEcho: true)` and IAC WONT ECHO when it arrives, which hides passwords in `telnet` and in MUD clients. Client replies to that are discarded like any other negotiation.
+
+**Not yet implemented:** other telnet option negotiation (NAWS, GMCP), TLS, WebSocket transport, per-connection output limits, idle timeouts and connection throttling.
 
 ## 12. Deployment
 
@@ -269,13 +286,14 @@ Implemented and covered by `tests/smoke_test.py`:
 - Caller tracking with `PreviousObject()`
 - Mudlib file efuns (`GetDir`, `ReadFile`, `WriteFile`, `CopyFile`, `RenameFile`, `MakeDir`) with wizard commands `pwd`, `cd`, `list`, `cat`, `mkdir`, `copy`, `move`, `rename` and a line editor, `edit`
 - Wizard levels 0 to 10, level-gated commands, `promote`, and the one-time level-10 bootstrap by admin secret
+- Player passwords: PBKDF2 hashing efuns, echo off at password prompts, account creation, three attempts per connection, forced password for accounts saved before passwords existed, and the `password` command
 
-Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, deleting mudlib files and directories in-game, renaming directories, per-domain privileges (wizard levels are global), and player passwords (anyone can log in under any name, including a wizard's).
+Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, deleting mudlib files and directories in-game, renaming directories, and per-domain privileges (wizard levels are global). Passwords cross the network in plain text (section 8).
 
 ## 14. Roadmap
 
 1. **Authoring loop:** in-game delete, an editor command that saves and updates in one step, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
-2. **Safety:** player passwords, per-domain privileges, instrumenting expression-bodied lambdas, a wall-clock watchdog, a cap on per-connection output.
+2. **Safety:** TLS for passwords in transit, login throttling, hashing off the game thread, per-domain privileges, instrumenting expression-bodied lambdas, a wall-clock watchdog, a cap on per-connection output.
 3. **World lifecycle:** `Reset()`, clean-up of unused objects, graceful shutdown that saves players.
 4. **Protocol:** telnet negotiation, TLS, WebSocket.
 5. **Language features:** `async` scripts on a single-threaded scheduler, so that `await Prompt("Name: ")` can replace `InputTo` chains.

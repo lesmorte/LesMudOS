@@ -26,6 +26,10 @@ telnet localhost 4000
 
 ```
 By what name are you known? keith
+Creating a new account for Keith.
+Choose a password (at least 8 characters):
+Type it again:
+Account created.
 
 Welcome, Keith. Type 'help' for commands.
 
@@ -143,7 +147,7 @@ dotnet build
 python3 tests/smoke_test.py
 ```
 
-The test starts the driver on port 4777 against a temporary copy of the mudlib, logs in two players, and checks movement, object-supplied verbs, heartbeats, call-outs, wizard levels and promotion, live update of a room and of a base class, compile-error handling, the sandbox, the evaluation-cost limit, the recursion guard, unloading of old program versions, and save/restore.
+The test starts the driver on port 4777 against a temporary copy of the mudlib, logs in two players, and checks account creation and passwords, movement, object-supplied verbs, heartbeats, call-outs, wizard levels and promotion, live update of a room and of a base class, compile-error handling, the sandbox, the evaluation-cost limit, the recursion guard, unloading of old program versions, and save/restore.
 
 ## Deploying to a Linux VM
 
@@ -158,9 +162,8 @@ Copy `publish/` to `/opt/lesmudos/bin` and `mudlib/` to `/opt/lesmudos/mudlib` o
 ## Limitations to know about
 
 - The sandbox is a guard rail for trusted builders, not a security boundary. Do not give mudlib write access to people you would not give a shell account.
-- There are no player passwords yet. Anyone who logs in under a wizard's name gets that wizard's level, and a level-5 wizard can write code onto the server with `edit`. Do not expose the port to the internet.
-- With in-game editing, the mudlib directory must be writable by the driver. The sample systemd unit keeps it read-only; add it to `ReadWritePaths` if you want `edit` and `mkdir` to work there.
-- Traffic is plain-text telnet.
+- Telnet is plain text, so passwords cross the network unencrypted. A wizard's password is what stands between an attacker and `edit`, which writes code onto the server. Until there is TLS, do not let wizards log in over a network you do not trust.
+- With in-game editing, the mudlib directory must be writable by the driver. The sample systemd unit keeps it read-only; add it to `ReadWritePaths` if you want `edit`, `mkdir`, `copy`, `move` and `rename` to work there.
 
 The full list is in [DESIGN.md](docs/DESIGN.md#13-proof-of-concept-status).
 

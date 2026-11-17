@@ -39,11 +39,17 @@ public class Master : MudObject, IMaster
             case "write-file":
             case "make-dir":
             case "update":
-            case "shutdown":
-            case "destruct": return IsPlayerBody(caller);
+            case "shutdown": return IsPlayerBody(caller);
+            case "destruct": return IsPlayerBody(caller) || LoginMayDestruct(caller, arg);
             default: return false;
         }
     }
+
+    // The login object destructs the player body it cloned when a login fails
+    // or the connection drops. It may only destruct bodies without a connection.
+    private bool LoginMayDestruct(ObjectRef caller, string? arg)
+        => caller.IsClone && caller.ProgramPath == "/secure/login"
+           && arg != null && FindObject(arg) is { } target && IsPlayerBody(target) && !Interactive(target);
 
     public void LogError(string objectName, string message)
     {
