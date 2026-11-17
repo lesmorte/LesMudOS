@@ -20,12 +20,26 @@ public class Player : Thing
     private const int LevelUpdate = 5;
     private const int LevelShutdown = 10;
 
+    private const int MinPasswordLength = 8;
+    private const int MaxPasswordChecks = 3;
+    private const string LoginProgram = "/secure/login";
+
     [Saved] private string title = "the newcomer";
     [Saved] private int logins;
     [Saved] private long lastLogin;
     [Saved] private string cwd = "/"; // the mudlib directory a wizard is "in"
+    // Made by the HashPassword efun. Empty for accounts saved before passwords
+    // existed. No command may ever show it.
+    [Saved] private string passwordHash = "";
 
     private bool ready;
+
+    // Login hand-shake with /secure/login, used only until the player is ready.
+    private ObjectRef? loginObject; // the login object that called BeginLogin
+    private string accountState = ""; // "new", "password" or "unset" after BeginLogin
+    private bool authenticated;
+    private bool returning; // a save file was restored
+    private int failedChecks;
 
     // Editor session; edLines is null when the player is not in the editor.
     private List<string>? edLines;
@@ -39,14 +53,83 @@ public class Player : Thing
 
     public override string Long() => $"{Name} {title}, who has visited {logins} time(s).\n";
 
-    /// <summary>Called once by /secure/login right after the connection is handed over.</summary>
+    // ---- Login ----
+    // These public methods decide who gets into an account, so each one checks
+    // that it is called by the login object that started this login (or, for
+    // BeginLogin, by a connected login object), and each one does nothing once
+    // the player is set up.
+
+    private static bool IsLoginObject(ObjectRef? ob) => ob != null && ob.IsClone && ob.ProgramPath == LoginProgram;
+
+    private bool CalledByOurLogin() => !ready && loginObject != null && loginObject.IsAlive && PreviousObject() == loginObject;
+
+    /// <summary>
+    /// Step 1, called by /secure/login on a freshly cloned body: take the name
+    /// and restore its save file. Returns "new" (no save file), "password"
+    /// (the account has a password) or "unset" (an account saved before
+    /// passwords existed). Returns "" if the call is refused. Works once.
+    /// </summary>
+    public string BeginLogin(string name)
+    {
+        var caller = PreviousObject();
+        if (ready || loginObject != null || !IsLoginObject(caller) || !Interactive(caller!)) return "";
+        if (name.Length < 2 || name.Length > 16 || !name.All(char.IsLetter)) return "";
+        loginObject = caller;
+        Name = name;
+        returning = RestoreObject(SaveFile);
+        accountState = !returning ? "new" : string.IsNullOrEmpty(passwordHash) ? "unset" : "password";
+        return accountState;
+    }
+
+    /// <summary>
+    /// Step 2 for an account with a password. True if it matches. After
+    /// three wrong passwords every later check fails.
+    /// </summary>
+    public bool CheckPassword(string password)
+    {
+        if (!CalledByOurLogin() || accountState != "password" || authenticated || failedChecks >= MaxPasswordChecks) return false;
+        if (VerifyPassword(password, passwordHash))
+        {
+            authenticated = true;
+            return true;
+        }
+        failedChecks++;
+        return false;
+    }
+
+    /// <summary>
+    /// Step 2 for a new account or one without a password: store the password
+    /// and save at once, so a new name is reserved with its password. False if
+    /// refused, including when the password breaks the rules in CheckNewPassword.
+    /// </summary>
+    public bool SetPassword(string password)
+    {
+        if (!CalledByOurLogin() || authenticated || accountState is not ("new" or "unset")) return false;
+        if (CheckNewPassword(password) != null) return false;
+        passwordHash = HashPassword(password);
+        authenticated = true;
+        SaveObject(SaveFile);
+        return true;
+    }
+
+    /// <summary>Why a password may not be used for this player, or null if it may. Reveals nothing about the account.</summary>
+    public string? CheckNewPassword(string password)
+    {
+        if (password.Length < MinPasswordLength) return $"A password needs at least {MinPasswordLength} characters.";
+        if (string.Equals(password, Name, StringComparison.OrdinalIgnoreCase)) return "Your password cannot be your name.";
+        return null;
+    }
+
+    /// <summary>
+    /// Step 3, called by /secure/login once the connection has been handed
+    /// over to this body: enter the game. Needs a successful step 2.
+    /// </summary>
     public void SetupPlayer(string name)
     {
-        if (ready) return;
+        if (ready || !authenticated || !CalledByOurLogin() || name != Name || !Interactive(Self)) return;
         ready = true;
-        Name = name;
+        loginObject = null;
 
-        var returning = RestoreObject(SaveFile);
         logins++;
         lastLogin = Time();
 
@@ -61,6 +144,7 @@ public class Player : Thing
         AddAction("i", CmdInventory);
         AddAction("who", CmdWho);
         AddAction("title", CmdTitle);
+        AddAction("password", CmdPassword);
         AddAction("save", CmdSave);
         AddAction("quit", CmdQuit);
         AddAction("help", CmdHelp);
@@ -166,6 +250,52 @@ public class Player : Thing
         return true;
     }
 
+    /// <summary>
+    /// "password": change the password. Asks for the current one, then the new
+    /// one twice, with echo off. Nothing typed here is ever written back.
+    /// </summary>
+    private bool CmdPassword(string args)
+    {
+        Write("Current password: ");
+        InputTo(PasswordCurrent, true);
+        return true;
+    }
+
+    private void PasswordCurrent(string current)
+    {
+        if (!VerifyPassword(current, passwordHash))
+        {
+            Write("Wrong password. Your password is unchanged.\n");
+            return;
+        }
+        Write($"New password (at least {MinPasswordLength} characters): ");
+        InputTo(PasswordNew, true);
+    }
+
+    private void PasswordNew(string password)
+    {
+        var problem = CheckNewPassword(password);
+        if (problem != null)
+        {
+            Write(problem + " Your password is unchanged.\n");
+            return;
+        }
+        Write("Type it again: ");
+        InputTo(again => PasswordConfirm(password, again), true);
+    }
+
+    private void PasswordConfirm(string password, string again)
+    {
+        if (again != password)
+        {
+            Write("The passwords do not match. Your password is unchanged.\n");
+            return;
+        }
+        passwordHash = HashPassword(password);
+        SaveObject(SaveFile);
+        Write("Password changed.\n");
+    }
+
     private bool CmdSave(string args)
     {
         SaveObject(SaveFile);
@@ -186,7 +316,7 @@ public class Player : Thing
     {
         Write(
             "Commands: look [at <thing>], say <text>, get <thing>, drop <thing>, inventory,\n" +
-            "          who, title <text>, save, quit, and the exits of the room you are in.\n" +
+            "          who, title <text>, password, save, quit, and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n");
 
         var level = QueryWizLevel();

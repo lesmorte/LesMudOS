@@ -16,7 +16,7 @@ internal sealed class Connection
 
     private readonly TcpClient _client;
     private readonly Kernel _kernel;
-    private readonly Channel<string> _outbox = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Channel<byte[]> _outbox = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { SingleReader = true });
 
     /// <summary>The object this connection is attached to. Read and written on the game thread only.</summary>
     public ObjectRef? Owner;
@@ -30,8 +30,20 @@ internal sealed class Connection
         RemoteAddress = client.Client.RemoteEndPoint?.ToString() ?? "unknown";
     }
 
+    /// <summary>
+    /// True while the driver has told the client it will echo (IAC WILL ECHO),
+    /// so the client is not echoing what the user types. Game thread only.
+    /// </summary>
+    public bool EchoSuppressed;
+
     /// <summary>Queue text for the client. Never blocks the game thread.</summary>
-    public void Send(string text) => _outbox.Writer.TryWrite(text.Replace("\r\n", "\n").Replace("\n", "\r\n"));
+    public void Send(string text) => _outbox.Writer.TryWrite(Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n").Replace("\n", "\r\n")));
+
+    /// <summary>
+    /// Queue raw bytes (telnet commands) for the client, in order with text
+    /// queued by Send. Never blocks the game thread.
+    /// </summary>
+    public void SendRaw(ReadOnlySpan<byte> bytes) => _outbox.Writer.TryWrite(bytes.ToArray());
 
     /// <summary>Flush what is queued, then close the socket.</summary>
     public void Close() => _outbox.Writer.TryComplete();
@@ -43,8 +55,8 @@ internal sealed class Connection
         {
             try
             {
-                await foreach (var text in _outbox.Reader.ReadAllAsync())
-                    await stream.WriteAsync(Encoding.UTF8.GetBytes(text));
+                await foreach (var bytes in _outbox.Reader.ReadAllAsync())
+                    await stream.WriteAsync(bytes);
             }
             catch (IOException) { }
             catch (ObjectDisposedException) { }

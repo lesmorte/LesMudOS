@@ -10,6 +10,7 @@ recursion guard.
 Usage (from the repository root, after `dotnet build`):
     python3 tests/smoke_test.py
 """
+import json
 import os
 import shutil
 import socket
@@ -21,15 +22,75 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = int(os.environ.get("LESMUDOS_TEST_PORT", "4777"))
 SECRET = "correct horse battery staple"
+PASSWORD = "Tr0ub4dor&3"
+IAC_WILL_ECHO = bytes([255, 251, 1])
+IAC_WONT_ECHO = bytes([255, 252, 1])
 failures = []
 
 
 class Client:
-    def __init__(self, name):
+    def __init__(self, name, password=PASSWORD, login=True):
+        """Connect and give the name. With login, also answer the password
+        prompts: once for an existing account, twice for a new one or one
+        that has no password yet. Text read past the name that is not a
+        password prompt (a refusal) is kept for the next read_until."""
+        self.pending = ""
         self.sock = socket.create_connection(("127.0.0.1", PORT), timeout=5)
         self.sock.settimeout(0.2)
         self.read_until("known?")
         self.send(name)
+        if not login:
+            return
+        text = self.read_any(("Password: ", "characters): ", "Another name?"))
+        if "characters): " in text:
+            self.send(password)
+            self.read_until("again: ")
+            self.send(password)
+        elif "Password: " in text:
+            self.send(password)
+        else:
+            self.pending = text
+
+    def read_any(self, markers, timeout=30.0):
+        """Read until any of `markers` appears. Returns everything read."""
+        deadline = time.time() + timeout
+        data = ""
+        while time.time() < deadline and not any(m in data for m in markers):
+            try:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    break
+                data += chunk.decode(errors="replace")
+            except socket.timeout:
+                pass
+        return data
+
+    def read_raw_until(self, marker, timeout=30.0):
+        """Read raw bytes until the bytes `marker` appear. Returns everything read."""
+        deadline = time.time() + timeout
+        data = b""
+        while time.time() < deadline and marker not in data:
+            try:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+            except socket.timeout:
+                pass
+        return data
+
+    def closed(self, timeout=10.0):
+        """True if the server closes the connection within the timeout."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                if not self.sock.recv(65536):
+                    return True
+            except socket.timeout:
+                pass
+            except OSError:
+                return True
+        return False
 
     def send(self, line):
         self.sock.sendall((line + "\r\n").encode())
@@ -37,7 +98,9 @@ class Client:
     def read_until(self, marker, timeout=30.0):
         """Read until `marker` appears. Returns everything read."""
         deadline = time.time() + timeout
-        data = ""
+        data, self.pending = self.pending, ""
+        if marker in data:
+            return data
         while time.time() < deadline:
             try:
                 chunk = self.sock.recv(65536)
@@ -330,6 +393,124 @@ public class Spinner : Item
         check("mudstat", text, "Programs:", "old versions unloaded")
         print("      " + [l for l in text.splitlines() if "Programs" in l][0].strip())
 
+        # ---- passwords ----
+        def object_count():
+            return [l for l in a.command("mudstat").splitlines() if l.startswith("Objects:")][0]
+
+        def save_file(name):
+            with open(os.path.join(work, "save", "players", name + ".json")) as f:
+                return f.read()
+
+        pw_g, pw_g2 = "violet-hour-42", "amber-tide-77"
+        typed_passwords = [PASSWORD, pw_g, pw_g2, "different-pass", "wrong-pass-1", "wrong-pass-2", "wrong-pass-3",
+                           "old-timer-pass", "hijacked-password", "not-my-password"]
+        objects_before = object_count()
+
+        g = Client("gwendolyn", login=False)
+        raw = g.read_raw_until(IAC_WILL_ECHO)
+        check("new name: account creation starts", raw.decode(errors="replace"), "Creating a new account for Gwendolyn", "Choose a password")
+        check("IAC WILL ECHO follows the password prompt", raw, b"characters): " + IAC_WILL_ECHO)
+        g.send("short")
+        raw = g.read_raw_until(b"characters): " + IAC_WILL_ECHO)
+        check("IAC WONT ECHO and a newline when the hidden line arrives", raw[:5], IAC_WONT_ECHO + b"\r\n")
+        check("too-short password refused", raw.decode(errors="replace"), "at least 8 characters", "Choose a password")
+        g.send("GWENDOLYN")
+        check("password equal to the name refused", g.read_until("characters): "), "cannot be your name")
+        g.send(pw_g)
+        raw = g.read_raw_until(b"again: " + IAC_WILL_ECHO)
+        check("confirmation prompt is between WONT ECHO and WILL ECHO", raw, IAC_WONT_ECHO + b"\r\nType it again: " + IAC_WILL_ECHO)
+        g.send("different-pass")
+        check("mismatched confirmation refused", g.read_until("characters): "), "do not match", "Choose a password")
+        g.send(pw_g)
+        g.read_until("again: ")
+        g.send(pw_g)
+        check("matching passwords create the account", g.read_until("> "), "Account created.", "Welcome, Gwendolyn.")
+        saved = save_file("gwendolyn")
+        check("new account is saved at once, with a hash", saved, '"passwordHash": "pbkdf2-sha256$210000$', absent=(pw_g,))
+        g.send("quit")
+        g.read_until("Goodbye")
+
+        g = Client("gwendolyn", password=pw_g)
+        check("relogin with the right password", g.read_until("> "), "Welcome back, Gwendolyn. This is visit number 2.")
+        check("the password command asks for the current password", g.command("password", marker="Current password: "), "Current password: ")
+        check("password command: wrong current password refused", g.command("not-my-password"), "Wrong password. Your password is unchanged.")
+        g.command("password", marker="Current password: ")
+        g.command(pw_g, marker="characters): ")
+        check("password command: too-short new password refused", g.command("tiny"), "at least 8 characters", "unchanged")
+        g.command("password", marker="Current password: ")
+        g.command(pw_g, marker="characters): ")
+        g.command(pw_g2, marker="again: ")
+        check("password command: change succeeds", g.command(pw_g2), "Password changed.")
+        check("help lists the password command", g.command("help"), "password")
+        g.send("quit")
+        g.read_until("Goodbye")
+        check("changed password is saved", save_file("gwendolyn"), "pbkdf2-sha256$", absent=(pw_g, pw_g2))
+
+        c = Client("gwendolyn", login=False)
+        c.read_until("Password: ")
+        c.send(pw_g)
+        check("old password no longer works", c.read_until("Password: "), "Wrong password.")
+        c.send("wrong-pass-2")
+        c.read_until("Password: ")
+        c.send("wrong-pass-3")
+        check("third wrong password: goodbye", c.read_until("Goodbye"), "Wrong password. Goodbye.")
+        check("third wrong password: disconnected", str(c.closed()), "True")
+        g = Client("gwendolyn", password=pw_g2)
+        check("relogin with the new password", g.read_until("> "), "Welcome back, Gwendolyn. This is visit number 3.")
+        g.send("quit")
+        g.read_until("Goodbye")
+
+        c = Client("gwendolyn", login=False)
+        c.read_until("Password: ")
+        c.sock.close()
+        c = Client("ivan", login=False)
+        c.read_until("characters): ")
+        c.sock.close()
+        time.sleep(1)
+        check("failed and abandoned logins leave no objects behind", object_count(), objects_before)
+        check("abandoned new account is not saved", str(os.path.exists(os.path.join(work, "save", "players", "ivan.json"))), "False")
+
+        with open(os.path.join(work, "save", "players", "oldtimer.json"), "w") as f:
+            json.dump({"cwd": "/", "lastLogin": 0, "logins": 4, "title": "the old-timer"}, f)
+        c = Client("oldtimer", login=False)
+        check("account without a password must set one", c.read_until("characters): "), "Oldtimer, your account has no password", "must set one")
+        c.send("old-timer-pass")
+        c.read_until("again: ")
+        c.send("old-timer-pass")
+        check("password set, then into the game", c.read_until("> "), "Password set.", "Welcome back, Oldtimer. This is visit number 5.")
+        check("old save file kept its fields", c.command("who"), "Oldtimer the old-timer")
+        check("old account now has a hash", save_file("oldtimer"), '"passwordHash": "pbkdf2-sha256$', '"title": "the old-timer"', absent=("old-timer-pass",))
+        c.send("quit")
+        c.read_until("Goodbye")
+        c = Client("oldtimer", password="old-timer-pass")
+        check("the password asked for is then required", c.read_until("> "), "Welcome back, Oldtimer")
+        c.send("quit")
+        c.read_until("Goodbye")
+        b.command("look")  # Bob stands in the square: read past the arrivals and departures above
+
+        write(mudlib, "/domains/town/pwimposter", """
+// @inherit /domains/town/imposter
+public class PwImposter : Imposter
+{
+    public override void Create() { base.Create(); Name = "thief"; }
+    public override void Init() { base.Init(); AddAction("hijack", Hijack); }
+    private bool Hijack(string args)
+    {
+        var me = ThisPlayer()!;
+        var fresh = CloneObject("/std/player");
+        Write("hijack: [" + me.Call<string>("BeginLogin", "Alice") + "] [" + fresh.Call<string>("BeginLogin", "Gwendolyn") + "] "
+            + me.Call<bool>("CheckPassword", "x") + " " + fresh.Call<bool>("CheckPassword", "x") + " "
+            + me.Call<bool>("SetPassword", "hijacked-password") + " " + fresh.Call<bool>("SetPassword", "hijacked-password") + "\\n");
+        fresh.Call("SetupPlayer", "Gwendolyn");
+        Write("fresh body: " + fresh.Call<string>("QueryName") + " " + Interactive(fresh) + "\\n");
+        return true;
+    }
+}
+""")
+        check("clone an object that tries the login methods", a.command("clone /domains/town/pwimposter"), "Cloned /domains/town/pwimposter#")
+        check("other objects cannot call the player's login methods", a.command("hijack"), "hijack: [] [] False False False False", "fresh body: thing False")
+        check("the account it went for is untouched", save_file("gwendolyn"), "pbkdf2-sha256$", absent=("hijacked",))
+
         # ---- persistence ----
         a.command("title the tester")
         a.send("quit")
@@ -347,6 +528,9 @@ public class Spinner : Item
         a.send("shutdown")
         driver.wait(timeout=10)
         check("clean shutdown", str(driver.returncode), "0")
+        log.flush()
+        logged = open(os.path.join(work, "driver.log")).read()
+        check("driver log holds no password and no hash", logged, "shutdown requested", absent=tuple(typed_passwords) + ("pbkdf2",))
     finally:
         if driver.poll() is None:
             driver.kill()

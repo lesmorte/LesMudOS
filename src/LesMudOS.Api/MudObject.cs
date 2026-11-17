@@ -145,8 +145,13 @@ public abstract class MudObject
     /// <summary>Set the message shown if no action handles the current command. Default is "What?".</summary>
     protected void NotifyFail(string message) => D.NotifyFail(message);
 
-    /// <summary>Send the next line typed by ThisPlayer() to a handler instead of the command parser.</summary>
-    protected void InputTo(Action<string> handler) => D.InputTo(Self, handler);
+    /// <summary>
+    /// Send the next line typed by ThisPlayer() to a handler instead of the
+    /// command parser. With noEcho the client is asked not to echo that line
+    /// (telnet IAC WILL ECHO), and echo is restored when it arrives. Use it
+    /// for passwords.
+    /// </summary>
+    protected void InputTo(Action<string> handler, bool noEcho = false) => D.InputTo(Self, handler, noEcho);
 
     // ---- Communication ----
 
@@ -196,6 +201,20 @@ public abstract class MudObject
     /// master.ValidOperation("admin-secret", ...).
     /// </summary>
     protected bool CheckAdminSecret(string candidate) => D.CheckAdminSecret(Self, candidate);
+
+    /// <summary>
+    /// Hash a password for storage: PBKDF2-HMAC-SHA256 with a random 16-byte
+    /// salt and 210,000 iterations. The result is self-describing,
+    /// "pbkdf2-sha256$&lt;iterations&gt;$&lt;salt&gt;$&lt;hash&gt;" (base64), and is
+    /// checked with VerifyPassword. Takes some tens of milliseconds.
+    /// </summary>
+    protected string HashPassword(string password) => D.HashPassword(password);
+
+    /// <summary>
+    /// Check a password against a string made by HashPassword, in constant
+    /// time. False if it does not match or the hash is malformed or empty.
+    /// </summary>
+    protected bool VerifyPassword(string password, string hash) => D.VerifyPassword(password, hash);
 
     /// <summary>
     /// List a directory of the mudlib: sub-directories first, then files, each
