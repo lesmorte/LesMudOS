@@ -262,7 +262,8 @@ internal sealed class Kernel : IDriverServices
             if (In(binding.Owner, () => binding.Handler(args))) return;
             if (!player.IsAlive) return;
         }
-        Receive(player, (player.NotifyFail ?? "What?") + "\n");
+        // Through CatchTell, like every other message, so that a player body can render colour tags in it.
+        TellObject(player, (player.NotifyFail ?? "What?") + "\n");
     }
 
     // =====================================================================

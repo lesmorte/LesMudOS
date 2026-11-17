@@ -32,8 +32,12 @@ public class Player : Adventurer
     // Made by the HashPassword efun. Empty for accounts saved before passwords
     // existed. No command may ever show it.
     [Saved] private string passwordHash = "";
+    // ANSI colour. On by default, also for characters saved before this setting existed.
+    [Saved] private bool colour = true;
 
     private bool ready;
+    // True only while WriteRaw is sending file text: CatchTell then passes it on exactly as stored.
+    private bool rawOutput;
 
     // Login hand-shake with /secure/login, used only until the player is ready.
     private ObjectRef? loginObject; // the login object that called BeginLogin
@@ -56,7 +60,26 @@ public class Player : Adventurer
     public override void CatchTell(string message)
     {
         messagesShown++;
-        base.CatchTell(message);
+        base.CatchTell(rawOutput ? message : Render(message));
+    }
+
+    // ---- Colour ----
+    // Every message to a player passes CatchTell, which turns the {tags} of
+    // the colour markup into ANSI sequences, or removes them with colour off.
+    // See "Colour and command highlighting" in docs/BUILDING.md.
+
+    /// <summary>The message as this player's connection should get it.</summary>
+    private string Render(string text) => Markup(text, colour);
+
+    /// <summary>
+    /// Send text exactly as it is, with no rendering: for the contents of
+    /// files, which a builder needs to see as stored.
+    /// </summary>
+    private void WriteRaw(string text)
+    {
+        rawOutput = true;
+        try { Write(text); }
+        finally { rawOutput = false; }
     }
 
     private string SaveFile => "/players/" + Name.ToLower();
@@ -76,9 +99,9 @@ public class Player : Adventurer
         SaveObject(SaveFile);
     }
 
-    public override string? Short() => $"{Name} {title}";
+    public override string? Short() => $"{Name} {Esc(title)}";
 
-    public override string Long() => $"{Name} {title}, who has visited {logins} time(s).\n" + HealthLine();
+    public override string Long() => $"{Name} {Esc(title)}, who has visited {logins} time(s).\n" + HealthLine();
 
     // ---- Login ----
     // These public methods decide who gets into an account, so each one checks
@@ -169,6 +192,9 @@ public class Player : Adventurer
         AddAction("save", CmdSave);
         AddAction("quit", CmdQuit);
         AddAction("help", CmdHelp);
+        AddAction("ansi", CmdAnsi);
+        AddAction("color", CmdAnsi);
+        AddAction("colour", CmdAnsi);
         // Wizard commands. Each handler checks the caller's level on every use
         // and declines below it, so to a non-wizard these verbs do not exist.
         AddAction("promote", CmdPromote);
@@ -190,7 +216,7 @@ public class Player : Adventurer
         AddAction("mudstat", CmdMudstat);
         AddAction("shutdown", CmdShutdown);
 
-        Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type 'help' for commands.\n\n");
+        Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type '{{cmd}}help{{/}}' for commands.\n\n");
         EnterWorld(StartRoom);
         ClaimLostProperty();
         Say($"{Name} enters the game.\n");
@@ -205,6 +231,8 @@ public class Player : Adventurer
     private bool CmdSay(string args)
     {
         if (args == "") { NotifyFail("Say what?"); return false; }
+        // What a player types is shown as typed: braces are escaped so that it cannot carry tags.
+        args = Esc(args);
         Write($"You say: {args}\n");
         Say($"{Name} says: {args}\n");
         return true;
@@ -222,7 +250,7 @@ public class Player : Adventurer
 
     private bool CmdTitle(string args)
     {
-        if (args == "" || args.Length > 40) { NotifyFail("Usage: title <up to 40 characters>"); return false; }
+        if (args == "" || args.Length > 40) { NotifyFail("Usage: {cmd}title{/} <up to 40 characters>"); return false; }
         title = args;
         Write($"You are now {Short()}.\n");
         return true;
@@ -294,42 +322,58 @@ public class Player : Adventurer
     private bool CmdHelp(string args)
     {
         Write(
-            "Commands: look [at THING], say TEXT, get THING, drop THING, inventory (i),\n" +
-            "          who, title TEXT, password, save, quit, and the exits of the room you are in.\n" +
+            "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} THING, {cmd}drop{/} THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
+            "          {cmd}who{/}, {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
-            "Fighting:  kill (or attack) TARGET, flee, consider TARGET, hp, score (sc)\n" +
-            "Corpses:   loot [CORPSE], get THING (or all) from CORPSE, look in CORPSE\n" +
-            "Gear:      wield THING, unwield, wear THING, remove THING, eat/drink THING\n" +
-            "People:    talk (or greet) NPC, ask NPC about TOPIC, read THING\n" +
-            "Town:      browse, buy THING, sell THING, value THING (in a shop), quests,\n" +
-            "           accept QUEST and report (in the Adventurers Guild)\n");
+            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/}, {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/})\n" +
+            "Corpses:   {cmd}loot{/} [CORPSE], {cmd}get{/} THING (or all) from CORPSE, {cmd}look in{/} CORPSE\n" +
+            "Gear:      {cmd}wield{/} THING, {cmd}unwield{/}, {cmd}wear{/} THING, {cmd}remove{/} THING, {cmd}eat{/}/{cmd}drink{/} THING\n" +
+            "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING\n" +
+            "Town:      {cmd}browse{/}, {cmd}buy{/} THING, {cmd}sell{/} THING, {cmd}value{/} THING (in a shop), {cmd}quests{/},\n" +
+            "           {cmd}accept{/} QUEST and {cmd}report{/} (in the Adventurers Guild)\n" +
+            "Colour:    command names like these are highlighted; {cmd}ansi off{/} turns colour off, {cmd}ansi on{/} turns it on.\n");
 
         var level = QueryWizLevel();
         if (level < 1) return true;
         Write($"Wizard commands at your level ({level}):\n" +
-              "          promote <player> <level>   set a lower wizard's level, up to your own\n" +
-              "          wizards                    list all wizards\n" +
-              "          pwd                        show the mudlib directory you are in\n" +
-              "          cd [<dir>]                 change directory (.. goes up, no argument goes to /)\n" +
-              "          list [<dir>]               list a directory (also: ls)\n" +
-              "          cat <file>                 show a file with line numbers\n" +
-              "          goto <room path or player> move yourself to a room or to a player\n" +
-              "          stat <thing|me|here>       show the numbers of a creature, item or room\n");
-        if (level >= LevelMudstat) Write("          mudstat                    driver statistics\n");
-        if (level >= LevelClone) Write("          clone <path>               clone an object into your inventory or room\n");
+              "          {cmd}promote{/} <player> <level>   set a lower wizard's level, up to your own\n" +
+              "          {cmd}wizards{/}                    list all wizards\n" +
+              "          {cmd}pwd{/}                        show the mudlib directory you are in\n" +
+              "          {cmd}cd{/} [<dir>]                 change directory (.. goes up, no argument goes to /)\n" +
+              "          {cmd}list{/} [<dir>]               list a directory (also: ls)\n" +
+              "          {cmd}cat{/} <file>                 show a file with line numbers\n" +
+              "          {cmd}goto{/} <room path or player> move yourself to a room or to a player\n" +
+              "          {cmd}stat{/} <thing|me|here>       show the numbers of a creature, item or room\n");
+        if (level >= LevelMudstat) Write("          {cmd}mudstat{/}                    driver statistics\n");
+        if (level >= LevelClone) Write("          {cmd}clone{/} <path>               clone an object into your inventory or room\n");
         if (level >= LevelEdit) Write(
-              "          mkdir <dir>                create a directory\n" +
-              "          edit <file>                create or change a file in the line editor\n" +
-              "          copy <from> <to>           copy a file (into a directory: same name)\n" +
-              "          move <from> <to>           move a file to a new name or directory\n" +
-              "          rename <file> <newname>    rename a file within its directory\n" +
-              "          delete <file>              delete a file, after you confirm (cannot be undone)\n" +
-              "          rmdir <dir>                remove an empty directory\n" +
+              "          {cmd}mkdir{/} <dir>                create a directory\n" +
+              "          {cmd}edit{/} <file>                create or change a file in the line editor\n" +
+              "          {cmd}copy{/} <from> <to>           copy a file (into a directory: same name)\n" +
+              "          {cmd}move{/} <from> <to>           move a file to a new name or directory\n" +
+              "          {cmd}rename{/} <file> <newname>    rename a file within its directory\n" +
+              "          {cmd}delete{/} <file>              delete a file, after you confirm (cannot be undone)\n" +
+              "          {cmd}rmdir{/} <dir>                remove an empty directory\n" +
               "                                     (level 10 for files under /secure and /std)\n");
-        if (level >= 5) Write("          heal [<target>]            restore a creature (or yourself) to full HP\n");
-        if (level >= 10) Write("          smite <target>             kill a creature at once, with kill credit\n");
-        if (level >= LevelUpdate) Write("          update <path>              recompile a file and replace the loaded object\n");
-        if (level >= LevelShutdown) Write("          shutdown                   stop the driver\n");
+        if (level >= 5) Write("          {cmd}heal{/} [<target>]            restore a creature (or yourself) to full HP\n");
+        if (level >= 10) Write("          {cmd}smite{/} <target>             kill a creature at once, with kill credit\n");
+        if (level >= LevelUpdate) Write("          {cmd}update{/} <path>              recompile a file and replace the loaded object\n");
+        if (level >= LevelShutdown) Write("          {cmd}shutdown{/}                   stop the driver\n");
+        return true;
+    }
+
+    /// <summary>"ansi" shows the colour setting; "ansi on" and "ansi off" change it. Also answers to "color" and "colour".</summary>
+    private bool CmdAnsi(string args)
+    {
+        var word = args.Trim().ToLowerInvariant();
+        if (word == "")
+        {
+            Write(colour ? "ANSI colour is on. Type {cmd}ansi off{/} to turn it off.\n" : "ANSI colour is off. Type {cmd}ansi on{/} to turn it on.\n");
+            return true;
+        }
+        if (word != "on" && word != "off") { NotifyFail("Usage: {cmd}ansi{/} [{cmd}on{/}|{cmd}off{/}]"); return false; }
+        colour = word == "on";
+        Write(colour ? "ANSI colour is now on. Commands you can type, like {cmd}help{/}, are highlighted.\n" : "ANSI colour is now off.\n");
         return true;
     }
 
@@ -352,17 +396,17 @@ public class Player : Adventurer
         // Anything that is not "<player> <number>" is treated as the secret, spaces and all.
         if (!isPromotion && args != "" && registry.Call<bool>("Bootstrap", args))
         {
-            Write("The secret is accepted. You are now a level 10 wizard. Type 'help'.\n");
+            Write("The secret is accepted. You are now a level 10 wizard. Type '{cmd}help{/}'.\n");
             return true;
         }
         if (!IsWizard(1)) return false;
         if (!isPromotion)
         {
-            NotifyFail("Usage: promote <player> <level>");
+            NotifyFail("Usage: {cmd}promote{/} <player> <level>");
             return false;
         }
         var refusal = registry.Call<string>("Promote", words[0], level);
-        Write(refusal == null ? $"{words[0]} is now wizard level {level}.\n" : refusal + "\n");
+        Write(refusal == null ? $"{Esc(words[0])} is now wizard level {level}.\n" : Esc(refusal) + "\n");
         return true;
     }
 
@@ -387,7 +431,7 @@ public class Player : Adventurer
     private bool CmdPwd(string args)
     {
         if (!IsWizard(LevelFiles)) return false;
-        Write(cwd + "\n");
+        Write(Esc(cwd) + "\n");
         return true;
     }
 
@@ -395,9 +439,9 @@ public class Player : Adventurer
     {
         if (!IsWizard(LevelFiles)) return false;
         var target = ResolvePath(args == "" ? "/" : args);
-        if (GetDir(target) == null) { Write($"{target}: no such directory.\n"); return true; }
+        if (GetDir(target) == null) { Write($"{Esc(target)}: no such directory.\n"); return true; }
         cwd = target;
-        Write(cwd + "\n");
+        Write(Esc(cwd) + "\n");
         return true;
     }
 
@@ -406,11 +450,11 @@ public class Player : Adventurer
         if (!IsWizard(LevelFiles)) return false;
         var target = ResolvePath(args);
         var entries = GetDir(target);
-        if (entries == null) { Write($"{target}: no such directory.\n"); return true; }
+        if (entries == null) { Write($"{Esc(target)}: no such directory.\n"); return true; }
 
-        var text = new StringBuilder($"{target}:\n");
+        var text = new StringBuilder($"{Esc(target)}:\n");
         foreach (var entry in entries)
-            text.Append(entry.IsDirectory ? $"  {entry.Name}/\n" : $"  {entry.Name,-28} {entry.Size,8}\n");
+            text.Append(entry.IsDirectory ? $"  {Esc(entry.Name)}/\n" : $"  {Esc(entry.Name),-28} {entry.Size,8}\n");
         if (entries.Count == 0) text.Append("  (empty)\n");
         Write(text.ToString());
         return true;
@@ -451,22 +495,22 @@ public class Player : Adventurer
     private bool CmdCat(string args)
     {
         if (!IsWizard(LevelFiles)) return false;
-        if (args == "") { NotifyFail("Usage: cat <file>"); return false; }
+        if (args == "") { NotifyFail("Usage: {cmd}cat{/} <file>"); return false; }
         var file = ResolveFile(args);
         var text = ReadFile(file);
-        if (text == null) { Write($"{file}: no such file.\n"); return true; }
+        if (text == null) { Write($"{Esc(file)}: no such file.\n"); return true; }
         var lines = SplitLines(text);
-        Write($"{file} ({lines.Count} lines):\n" + Numbered(lines, 1, lines.Count));
+        WriteRaw($"{file} ({lines.Count} lines):\n" + Numbered(lines, 1, lines.Count));
         return true;
     }
 
     private bool CmdMkdir(string args)
     {
         if (!IsWizard(LevelEdit)) return false;
-        if (args == "") { NotifyFail("Usage: mkdir <dir>"); return false; }
+        if (args == "") { NotifyFail("Usage: {cmd}mkdir{/} <dir>"); return false; }
         var target = ResolvePath(args);
         if (!IsWizard(LevelToWrite(target))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
-        Write(MakeDir(target) ? $"Created {target}/\n" : $"{target} already exists.\n");
+        Write(MakeDir(target) ? $"Created {Esc(target)}/\n" : $"{Esc(target)} already exists.\n");
         return true;
     }
 
@@ -485,7 +529,7 @@ public class Player : Adventurer
         if (!IsWizard(LevelEdit)) return false;
         var verb = move ? "move" : "copy";
         var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length != 2) { NotifyFail($"Usage: {verb} <from> <to>"); return false; }
+        if (words.Length != 2) { NotifyFail($"Usage: {{cmd}}{verb}{{/}} <from> <to>"); return false; }
         try
         {
             var from = ResolveFile(words[0]);
@@ -494,11 +538,11 @@ public class Player : Adventurer
             var level = move ? Math.Max(LevelToWrite(from), LevelToWrite(to)) : LevelToWrite(to);
             if (!IsWizard(level)) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
             var done = move ? RenameFile(from, to) : CopyFile(from, to);
-            Write(done ? $"{(move ? "Moved" : "Copied")} {from} to {to}.\n" : $"{from}: no such file.\n");
+            Write(done ? $"{(move ? "Moved" : "Copied")} {Esc(from)} to {Esc(to)}.\n" : $"{Esc(from)}: no such file.\n");
         }
         catch (MudRuntimeException refusal)
         {
-            Write(refusal.Message + "\n");
+            Write(Esc(refusal.Message) + "\n");
         }
         return true;
     }
@@ -511,8 +555,8 @@ public class Player : Adventurer
     {
         if (!IsWizard(LevelEdit)) return false;
         var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length != 2) { NotifyFail("Usage: rename <file> <newname>"); return false; }
-        if (words[1].Contains('/')) { Write("The new name cannot contain '/'. Use move to change directory.\n"); return true; }
+        if (words.Length != 2) { NotifyFail("Usage: {cmd}rename{/} <file> <newname>"); return false; }
+        if (words[1].Contains('/')) { Write("The new name cannot contain '/'. Use {cmd}move{/} to change directory.\n"); return true; }
         try
         {
             var from = ResolveFile(words[0]);
@@ -520,11 +564,11 @@ public class Player : Adventurer
             // into a parent directory; the driver refuses dot names itself.
             var to = from.Substring(0, from.LastIndexOf('/') + 1) + (words[1].Contains('.') ? words[1] : words[1] + ".cs");
             if (!IsWizard(Math.Max(LevelToWrite(from), LevelToWrite(to)))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
-            Write(RenameFile(from, to) ? $"Renamed {from} to {to}.\n" : $"{from}: no such file.\n");
+            Write(RenameFile(from, to) ? $"Renamed {Esc(from)} to {Esc(to)}.\n" : $"{Esc(from)}: no such file.\n");
         }
         catch (MudRuntimeException refusal)
         {
-            Write(refusal.Message + "\n");
+            Write(Esc(refusal.Message) + "\n");
         }
         return true;
     }
@@ -538,7 +582,7 @@ public class Player : Adventurer
     {
         if (!IsWizard(LevelEdit)) return false;
         args = args.Trim();
-        if (args == "") { NotifyFail("Usage: delete <file>"); return false; }
+        if (args == "") { NotifyFail("Usage: {cmd}delete{/} <file>"); return false; }
         try
         {
             var file = ResolveFile(args);
@@ -547,16 +591,16 @@ public class Player : Adventurer
             {
                 // "delete sub" looks for sub.cs, but the wizard may have meant the directory sub.
                 var directory = GetDir(file) != null ? file : GetDir(ResolvePath(args)) != null ? ResolvePath(args) : null;
-                Write(directory != null ? $"{directory} is a directory; use rmdir to remove an empty directory.\n" : $"{file}: no such file.\n");
+                Write(directory != null ? $"{Esc(directory)} is a directory; use {{cmd}}rmdir{{/}} to remove an empty directory.\n" : $"{Esc(file)}: no such file.\n");
                 return true;
             }
-            Write($"Delete {file}? This cannot be undone. (y/n) ");
+            Write($"Delete {Esc(file)}? This cannot be undone. ({{cmd}}y{{/}}/{{cmd}}n{{/}}) ");
             var asked = messagesShown;
             InputTo(answer => DeleteConfirmed(file, answer, asked));
         }
         catch (MudRuntimeException refusal)
         {
-            Write(refusal.Message + "\n");
+            Write(Esc(refusal.Message) + "\n");
         }
         return true;
     }
@@ -567,18 +611,18 @@ public class Player : Adventurer
         if (reply != "y" && reply != "yes") { Write("Not deleted.\n"); return; }
         // Checked again here: the level may have changed while the question was open.
         if (!IsWizard(LevelToWrite(file))) { Write("You may no longer delete that file. Not deleted.\n"); return; }
-        if (messagesShown != asked) { Write($"Other messages arrived after the question, so {file} was not deleted. Type delete again.\n"); return; }
+        if (messagesShown != asked) { Write($"Other messages arrived after the question, so {Esc(file)} was not deleted. Type {{cmd}}delete{{/}} again.\n"); return; }
         try
         {
-            if (!RemoveFile(file)) { Write($"{file}: no such file.\n"); return; }
-            Write($"Deleted {file}.\n");
+            if (!RemoveFile(file)) { Write($"{Esc(file)}: no such file.\n"); return; }
+            Write($"Deleted {Esc(file)}.\n");
             var objectPath = file.EndsWith(".cs") ? file.Substring(0, file.Length - 3) : null;
             if (objectPath != null && FindObject(objectPath) != null)
-                Write($"{objectPath} is still loaded and will stay until it is destructed or the driver restarts.\n");
+                Write($"{Esc(objectPath)} is still loaded and will stay until it is destructed or the driver restarts.\n");
         }
         catch (MudRuntimeException refusal)
         {
-            Write(refusal.Message + "\n");
+            Write(Esc(refusal.Message) + "\n");
         }
     }
 
@@ -603,7 +647,7 @@ public class Player : Adventurer
     {
         if (!IsWizard(LevelEdit)) return false;
         args = args.Trim();
-        if (args == "") { NotifyFail("Usage: rmdir <dir>"); return false; }
+        if (args == "") { NotifyFail("Usage: {cmd}rmdir{/} <dir>"); return false; }
         var target = ResolvePath(args);
         if (!IsWizard(LevelToWrite(target))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
         // The root is left to the driver, which refuses it with its own message.
@@ -611,11 +655,11 @@ public class Player : Adventurer
         if (target != "/" && cwd.StartsWith(target + "/")) { Write("You are inside that directory.\n"); return true; }
         try
         {
-            Write(RemoveDir(target) ? $"Removed {target}/\n" : $"{target}: no such directory.\n");
+            Write(RemoveDir(target) ? $"Removed {Esc(target)}/\n" : $"{Esc(target)}: no such directory.\n");
         }
         catch (MudRuntimeException refusal)
         {
-            Write(refusal.Message + "\n");
+            Write(Esc(refusal.Message) + "\n");
         }
         return true;
     }
@@ -627,7 +671,7 @@ public class Player : Adventurer
     private bool CmdEdit(string args)
     {
         if (!IsWizard(LevelEdit)) return false;
-        if (args == "") { NotifyFail("Usage: edit <file>"); return false; }
+        if (args == "") { NotifyFail("Usage: {cmd}edit{/} <file>"); return false; }
         var file = ResolveFile(args);
         if (!IsWizard(LevelToWrite(file))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
 
@@ -635,7 +679,7 @@ public class Player : Adventurer
         var slash = file.LastIndexOf('/');
         if (text == null && GetDir(slash == 0 ? "/" : file.Substring(0, slash)) == null)
         {
-            Write($"{file}: no such directory. Create it with mkdir first.\n");
+            Write($"{Esc(file)}: no such directory. Create it with {{cmd}}mkdir{{/}} first.\n");
             return true;
         }
 
@@ -643,24 +687,24 @@ public class Player : Adventurer
         edPath = file;
         edDirty = false;
         edInsertAt = -1;
-        Write(text == null ? $"New file {file}.\n" : $"Editing {file}, {edLines.Count} lines.\n");
-        Write("You are in the editor. h for help, a to add text, x to save and leave.\n");
+        Write(text == null ? $"New file {Esc(file)}.\n" : $"Editing {Esc(file)}, {edLines.Count} lines.\n");
+        Write("You are in the editor. {cmd}h{/} for help, {cmd}a{/} to add text, {cmd}x{/} to save and leave.\n");
         EdPrompt();
         return true;
     }
 
     private const string EdHelp =
         "Editor commands (n and m are line numbers):\n" +
-        "  p [n [m]]   print the file, one line, or lines n to m\n" +
-        "  a [n]       add lines after line n (default: at the end)\n" +
-        "  i [n]       insert lines before line n (default: at the top)\n" +
-        "  c n [m]     replace line n, or lines n to m, with new lines\n" +
-        "  d n [m]     delete line n, or lines n to m\n" +
-        "  w           write the file\n" +
-        "  x           write the file and leave\n" +
-        "  q           leave (q! to discard unsaved changes)\n" +
+        "  {cmd}p{/} [n [m]]   print the file, one line, or lines n to m\n" +
+        "  {cmd}a{/} [n]       add lines after line n (default: at the end)\n" +
+        "  {cmd}i{/} [n]       insert lines before line n (default: at the top)\n" +
+        "  {cmd}c{/} n [m]     replace line n, or lines n to m, with new lines\n" +
+        "  {cmd}d{/} n [m]     delete line n, or lines n to m\n" +
+        "  {cmd}w{/}           write the file\n" +
+        "  {cmd}x{/}           write the file and leave\n" +
+        "  {cmd}q{/}           leave (q! to discard unsaved changes)\n" +
         "While adding lines, everything you type or paste goes into the file.\n" +
-        "A line containing only a full stop ends the input.\n";
+        "A line containing only a full stop ({cmd}.{/}) ends the input.\n";
 
     private void EdPrompt()
     {
@@ -689,7 +733,7 @@ public class Player : Adventurer
         var hasFirst = words.Length > 1 && int.TryParse(words[1], out first);
         if (!(words.Length > 2 && int.TryParse(words[2], out last))) last = first;
         var validRange = hasFirst && first >= 1 && last >= first && last <= count;
-        const string BadRange = "No such line. p shows the line numbers.\n";
+        const string BadRange = "No such line. {cmd}p{/} shows the line numbers.\n";
 
         switch (command)
         {
@@ -707,20 +751,20 @@ public class Player : Adventurer
                 if (!hasFirst) first = count;
                 if (first < 0 || first > count) { Write(BadRange); break; }
                 edInsertAt = first;
-                Write("Adding lines. End with a line containing only .\n");
+                Write("Adding lines. End with a line containing only {cmd}.{/}\n");
                 break;
             case "i":
                 if (!hasFirst) first = 1;
                 if (first < 1 || first > count + 1) { Write(BadRange); break; }
                 edInsertAt = first - 1;
-                Write("Inserting lines. End with a line containing only .\n");
+                Write("Inserting lines. End with a line containing only {cmd}.{/}\n");
                 break;
             case "c":
                 if (!validRange) { Write(BadRange); break; }
                 edLines.RemoveRange(first - 1, last - first + 1);
                 edDirty = true;
                 edInsertAt = first - 1;
-                Write("Replacing. End with a line containing only .\n");
+                Write("Replacing. End with a line containing only {cmd}.{/}\n");
                 break;
             case "d":
                 if (!validRange) { Write(BadRange); break; }
@@ -736,13 +780,13 @@ public class Player : Adventurer
                 break;
             case "q":
                 if (!edDirty) { EdQuit(); return; }
-                Write("There are unsaved changes: w to save, q! to discard them.\n");
+                Write("There are unsaved changes: {cmd}w{/} to save, {cmd}q!{/} to discard them.\n");
                 break;
             case "q!":
                 EdQuit();
                 return;
             default:
-                Write("Unknown editor command. h for help.\n");
+                Write("Unknown editor command. {cmd}h{/} for help.\n");
                 break;
         }
         EdPrompt();
@@ -759,12 +803,12 @@ public class Player : Adventurer
         }
         catch (MudRuntimeException refusal)
         {
-            Write(refusal.Message + "\n");
+            Write(Esc(refusal.Message) + "\n");
             return false;
         }
         edDirty = false;
-        Write($"Wrote {edPath}, {edLines.Count} lines.\n");
-        if (edPath.EndsWith(".cs")) Write($"Load it with: update {edPath.Substring(0, edPath.Length - 3)}\n");
+        Write($"Wrote {Esc(edPath)}, {edLines.Count} lines.\n");
+        if (edPath.EndsWith(".cs")) Write($"Load it with: {{cmd}}update {Esc(edPath.Substring(0, edPath.Length - 3))}{{/}}\n");
         return true;
     }
 
@@ -779,7 +823,7 @@ public class Player : Adventurer
     {
         if (!IsWizard(1)) return false;
         var wizards = LoadObject(WizList).Call<List<string>>("QueryWizards") ?? new List<string>();
-        Write("Wizards: " + (wizards.Count == 0 ? "none" : string.Join(", ", wizards)) + "\n");
+        Write("Wizards: " + (wizards.Count == 0 ? "none" : Esc(string.Join(", ", wizards))) + "\n");
         return true;
     }
 
@@ -792,12 +836,12 @@ public class Player : Adventurer
     private bool CmdUpdate(string args)
     {
         if (!IsWizard(LevelUpdate)) return false;
-        if (args == "") { NotifyFail("Usage: update <path>"); return false; }
+        if (args == "") { NotifyFail("Usage: {cmd}update{/} <path>"); return false; }
 
         args = ResolvePath(args); // relative to the current directory
         var old = FindObject(args);
         var stale = UpdateProgram(args); // throws with compiler errors; nothing has been touched yet
-        Write($"Recompiled {args}; {stale.Count} program(s) invalidated: {string.Join(", ", stale)}\n");
+        Write($"Recompiled {Esc(args)}; {stale.Count} program(s) invalidated: {Esc(string.Join(", ", stale))}\n");
         if (old == null) return true;
 
         // Only the people go through the Void; creatures and objects are rebuilt with the room.
@@ -809,18 +853,18 @@ public class Player : Adventurer
         var fresh = LoadObject(args);
         foreach (var ob in occupants)
             if (ob.IsAlive) MoveObject(ob, fresh);
-        Write($"Replaced {fresh.Name}; moved {occupants.Count} occupant(s) back in.\n");
+        Write($"Replaced {Esc(fresh.Name)}; moved {occupants.Count} occupant(s) back in.\n");
         return true;
     }
 
     private bool CmdClone(string args)
     {
         if (!IsWizard(LevelClone)) return false;
-        if (args == "") { NotifyFail("Usage: clone <path>"); return false; }
+        if (args == "") { NotifyFail("Usage: {cmd}clone{/} <path>"); return false; }
         var ob = CloneObject(ResolvePath(args));
         var room = Environment();
         MoveObject(ob, ob.Call<bool>("CanGet") || room == null ? Self : room);
-        Write($"Cloned {ob.Name}.\n");
+        Write($"Cloned {Esc(ob.Name)}.\n");
         return true;
     }
 

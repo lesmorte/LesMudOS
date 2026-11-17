@@ -260,7 +260,7 @@ def quiet(c, seconds):
             chunk = c.sock.recv(65536)
             if not chunk:
                 break
-            data += chunk.decode(errors="replace")
+            data += c.rx(chunk)
         except socket.timeout:
             pass
     return data

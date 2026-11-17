@@ -12,6 +12,7 @@ Usage (from the repository root, after `dotnet build`):
 """
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -27,6 +28,12 @@ IAC_WILL_ECHO = bytes([255, 251, 1])
 IAC_WONT_ECHO = bytes([255, 252, 1])
 failures = []
 
+# Colour is on by default, so the game sends ANSI sequences. Client strips them
+# (SGR sequences only: ESC [ digits and semicolons m) so that every check reads
+# plain text; the raw text is kept in Client.raw for the colour checks.
+ANSI = re.compile("\x1b\\[[0-9;]*m")
+ANSI_TAIL = re.compile("\x1b(\\[[0-9;]*)?$")
+
 
 class Client:
     def __init__(self, name, password=PASSWORD, login=True):
@@ -35,6 +42,8 @@ class Client:
         that has no password yet. Text read past the name that is not a
         password prompt (a refusal) is kept for the next read_until."""
         self.pending = ""
+        self.raw = ""  # everything received since the last raw_reset(), with escape sequences
+        self._carry = ""  # an escape sequence cut by the end of a chunk
         self.sock = socket.create_connection(("127.0.0.1", PORT), timeout=5)
         self.sock.settimeout(0.2)
         self.read_until("known?")
@@ -51,6 +60,24 @@ class Client:
         else:
             self.pending = text
 
+    def rx(self, chunk):
+        """Decode a received chunk, keep it in self.raw, and return it without ANSI sequences."""
+        text = self._carry + chunk.decode(errors="replace")
+        tail = ANSI_TAIL.search(text)
+        self._carry = text[tail.start():] if tail else ""
+        text = text[:tail.start()] if tail else text
+        self.raw = (self.raw + text)[-200000:]
+        return ANSI.sub("", text)
+
+    def raw_reset(self):
+        self.raw = ""
+
+    def raw_command(self, line, marker="> ", timeout=30.0):
+        """Send a command and return what it printed with the escape sequences left in."""
+        self.raw_reset()
+        self.command(line, marker, timeout)
+        return self.raw
+
     def read_any(self, markers, timeout=30.0):
         """Read until any of `markers` appears. Returns everything read."""
         deadline = time.time() + timeout
@@ -60,7 +87,7 @@ class Client:
                 chunk = self.sock.recv(65536)
                 if not chunk:
                     break
-                data += chunk.decode(errors="replace")
+                data += self.rx(chunk)
             except socket.timeout:
                 pass
         return data
@@ -106,7 +133,7 @@ class Client:
                 chunk = self.sock.recv(65536)
                 if not chunk:
                     break
-                data += chunk.decode(errors="replace")
+                data += self.rx(chunk)
                 if marker in data:
                     return data
             except socket.timeout:
@@ -120,7 +147,7 @@ class Client:
         data = ""
         while time.time() < deadline and not data.endswith(":"):
             try:
-                data += self.sock.recv(65536).decode(errors="replace")
+                data += self.rx(self.sock.recv(65536))
             except socket.timeout:
                 pass
         return data
