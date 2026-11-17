@@ -89,7 +89,7 @@ internal sealed class Connection
                         if (line.Count > 0) line.RemoveAt(line.Count - 1);
                         break;
                     case TelnetState.Data:
-                        if (line.Count < MaxLineLength && b >= 32) line.Add(b);
+                        if (line.Count < MaxLineLength && (b >= 32 || b == 9)) line.Add(b);
                         break;
 
                     // Telnet negotiation is recognised and discarded.

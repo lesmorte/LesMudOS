@@ -205,6 +205,29 @@ public abstract class MudObject
     /// </summary>
     protected IReadOnlyList<DirEntry>? GetDir(string path) => D.GetDir(Self, path);
 
+    /// <summary>
+    /// The text of a mudlib file, or null if there is no such file. The path
+    /// is absolute and includes the extension ("/std/room.cs"). Files over
+    /// 256 KB are refused. Subject to master.ValidOperation("read-file", caller, path).
+    /// </summary>
+    protected string? ReadFile(string path) => D.ReadFile(Self, path);
+
+    /// <summary>
+    /// Create or replace a mudlib file. The directory must exist. The write is
+    /// atomic: readers see the old file or the new one, never half of each.
+    /// Content over 256 KB is refused. Writing a file does not recompile it;
+    /// call UpdateProgram for that. Subject to
+    /// master.ValidOperation("write-file", caller, path).
+    /// </summary>
+    protected void WriteFile(string path, string content) => D.WriteFile(Self, path, content);
+
+    /// <summary>
+    /// Create a mudlib directory. The parent must exist. Returns false if
+    /// something with that name is already there. Subject to
+    /// master.ValidOperation("make-dir", caller, path).
+    /// </summary>
+    protected bool MakeDir(string path) => D.MakeDir(Self, path);
+
     /// <summary>Human-readable driver statistics: object count, program versions loaded and unloaded.</summary>
     protected string DriverStatus() => D.Status();
 

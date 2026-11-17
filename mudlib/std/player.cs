@@ -11,7 +11,10 @@ public class Player : Thing
     private const string WizList = "/secure/wizlist";
 
     // Wizard level needed for each wizard command. Level 0 has none of them.
-    private const int LevelFiles = 1; // pwd, cd, list
+    private const int LevelFiles = 1; // pwd, cd, list, cat
+    private const int LevelEdit = 5; // mkdir, edit
+    private const int LevelSystemFiles = 10; // mkdir and edit under /secure and /std
+    private const int MaxEditLines = 5000;
     private const int LevelMudstat = 1;
     private const int LevelClone = 3;
     private const int LevelUpdate = 5;
@@ -23,6 +26,12 @@ public class Player : Thing
     [Saved] private string cwd = "/"; // the mudlib directory a wizard is "in"
 
     private bool ready;
+
+    // Editor session; edLines is null when the player is not in the editor.
+    private List<string>? edLines;
+    private string edPath = "";
+    private bool edDirty;
+    private int edInsertAt = -1; // >= 0 while typed lines are being inserted at that index
 
     private string SaveFile => "/players/" + Name.ToLower();
 
@@ -63,6 +72,9 @@ public class Player : Thing
         AddAction("cd", CmdCd);
         AddAction("list", CmdList);
         AddAction("ls", CmdList);
+        AddAction("cat", CmdCat);
+        AddAction("mkdir", CmdMkdir);
+        AddAction("edit", CmdEdit);
         AddAction("update", CmdUpdate);
         AddAction("clone", CmdClone);
         AddAction("mudstat", CmdMudstat);
@@ -184,9 +196,14 @@ public class Player : Thing
               "          wizards                    list all wizards\n" +
               "          pwd                        show the mudlib directory you are in\n" +
               "          cd [<dir>]                 change directory (.. goes up, no argument goes to /)\n" +
-              "          list [<dir>]               list a directory (also: ls)\n");
+              "          list [<dir>]               list a directory (also: ls)\n" +
+              "          cat <file>                 show a file with line numbers\n");
         if (level >= LevelMudstat) Write("          mudstat                    driver statistics\n");
         if (level >= LevelClone) Write("          clone <path>               clone an object into your inventory or room\n");
+        if (level >= LevelEdit) Write(
+              "          mkdir <dir>                create a directory\n" +
+              "          edit <file>                create or change a file in the line editor\n" +
+              "                                     (level 10 for files under /secure and /std)\n");
         if (level >= LevelUpdate) Write("          update <path>              recompile a file and replace the loaded object\n");
         if (level >= LevelShutdown) Write("          shutdown                   stop the driver\n");
         return true;
@@ -273,6 +290,214 @@ public class Player : Thing
         if (entries.Count == 0) text.Append("  (empty)\n");
         Write(text.ToString());
         return true;
+    }
+
+    // ---- Wizard commands: files ----
+
+    /// <summary>A file name as typed, as an absolute mudlib path. ".cs" is assumed if no extension is given.</summary>
+    private string ResolveFile(string name)
+    {
+        var path = ResolvePath(name);
+        var last = path.Substring(path.LastIndexOf('/') + 1);
+        return last == "" || last.Contains('.') ? path : path + ".cs";
+    }
+
+    /// <summary>
+    /// The level needed to change a path. The code under /secure and /std is
+    /// what enforces wizard levels, so only the top level may change it.
+    /// </summary>
+    private static int LevelToWrite(string path)
+        => (path + "/").StartsWith("/secure/") || (path + "/").StartsWith("/std/") ? LevelSystemFiles : LevelEdit;
+
+    private static List<string> SplitLines(string text)
+    {
+        var lines = text.Replace("\r\n", "\n").Split('\n').ToList();
+        if (lines.Count > 0 && lines[lines.Count - 1] == "") lines.RemoveAt(lines.Count - 1);
+        return lines;
+    }
+
+    private static string Numbered(List<string> lines, int first, int last)
+    {
+        var text = new StringBuilder();
+        for (var i = first; i <= last; i++) text.Append($"{i,4}  {lines[i - 1]}\n");
+        return text.ToString();
+    }
+
+    private bool CmdCat(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        if (args == "") { NotifyFail("Usage: cat <file>"); return false; }
+        var file = ResolveFile(args);
+        var text = ReadFile(file);
+        if (text == null) { Write($"{file}: no such file.\n"); return true; }
+        var lines = SplitLines(text);
+        Write($"{file} ({lines.Count} lines):\n" + Numbered(lines, 1, lines.Count));
+        return true;
+    }
+
+    private bool CmdMkdir(string args)
+    {
+        if (!IsWizard(LevelEdit)) return false;
+        if (args == "") { NotifyFail("Usage: mkdir <dir>"); return false; }
+        var target = ResolvePath(args);
+        if (!IsWizard(LevelToWrite(target))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+        Write(MakeDir(target) ? $"Created {target}/\n" : $"{target} already exists.\n");
+        return true;
+    }
+
+    /// <summary>
+    /// A small line editor. While it is active every line the player types
+    /// goes to EdInput instead of the command parser.
+    /// </summary>
+    private bool CmdEdit(string args)
+    {
+        if (!IsWizard(LevelEdit)) return false;
+        if (args == "") { NotifyFail("Usage: edit <file>"); return false; }
+        var file = ResolveFile(args);
+        if (!IsWizard(LevelToWrite(file))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+
+        var text = ReadFile(file);
+        var slash = file.LastIndexOf('/');
+        if (text == null && GetDir(slash == 0 ? "/" : file.Substring(0, slash)) == null)
+        {
+            Write($"{file}: no such directory. Create it with mkdir first.\n");
+            return true;
+        }
+
+        edLines = text == null ? new List<string>() : SplitLines(text);
+        edPath = file;
+        edDirty = false;
+        edInsertAt = -1;
+        Write(text == null ? $"New file {file}.\n" : $"Editing {file}, {edLines.Count} lines.\n");
+        Write("You are in the editor. h for help, a to add text, x to save and leave.\n");
+        EdPrompt();
+        return true;
+    }
+
+    private const string EdHelp =
+        "Editor commands (n and m are line numbers):\n" +
+        "  p [n [m]]   print the file, one line, or lines n to m\n" +
+        "  a [n]       add lines after line n (default: at the end)\n" +
+        "  i [n]       insert lines before line n (default: at the top)\n" +
+        "  c n [m]     replace line n, or lines n to m, with new lines\n" +
+        "  d n [m]     delete line n, or lines n to m\n" +
+        "  w           write the file\n" +
+        "  x           write the file and leave\n" +
+        "  q           leave (q! to discard unsaved changes)\n" +
+        "While adding lines, everything you type or paste goes into the file.\n" +
+        "A line containing only a full stop ends the input.\n";
+
+    private void EdPrompt()
+    {
+        if (edInsertAt < 0) Write(":");
+        InputTo(EdInput);
+    }
+
+    private void EdInput(string line)
+    {
+        if (edLines == null) return;
+
+        if (edInsertAt >= 0)
+        {
+            if (line.Trim() == ".") edInsertAt = -1;
+            else if (edLines.Count >= MaxEditLines) { Write($"The editor holds at most {MaxEditLines} lines.\n"); edInsertAt = -1; }
+            else { edLines.Insert(edInsertAt++, line.TrimEnd()); edDirty = true; }
+            EdPrompt();
+            return;
+        }
+
+        var words = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var command = words.Length == 0 ? "" : words[0];
+        var count = edLines.Count;
+        var first = 0;
+        var last = 0;
+        var hasFirst = words.Length > 1 && int.TryParse(words[1], out first);
+        if (!(words.Length > 2 && int.TryParse(words[2], out last))) last = first;
+        var validRange = hasFirst && first >= 1 && last >= first && last <= count;
+        const string BadRange = "No such line. p shows the line numbers.\n";
+
+        switch (command)
+        {
+            case "":
+                break;
+            case "h":
+                Write(EdHelp);
+                break;
+            case "p":
+                if (!hasFirst) Write(count == 0 ? "(empty)\n" : Numbered(edLines, 1, count));
+                else if (validRange) Write(Numbered(edLines, first, last));
+                else Write(BadRange);
+                break;
+            case "a":
+                if (!hasFirst) first = count;
+                if (first < 0 || first > count) { Write(BadRange); break; }
+                edInsertAt = first;
+                Write("Adding lines. End with a line containing only .\n");
+                break;
+            case "i":
+                if (!hasFirst) first = 1;
+                if (first < 1 || first > count + 1) { Write(BadRange); break; }
+                edInsertAt = first - 1;
+                Write("Inserting lines. End with a line containing only .\n");
+                break;
+            case "c":
+                if (!validRange) { Write(BadRange); break; }
+                edLines.RemoveRange(first - 1, last - first + 1);
+                edDirty = true;
+                edInsertAt = first - 1;
+                Write("Replacing. End with a line containing only .\n");
+                break;
+            case "d":
+                if (!validRange) { Write(BadRange); break; }
+                edLines.RemoveRange(first - 1, last - first + 1);
+                edDirty = true;
+                Write($"Deleted {last - first + 1} line(s).\n");
+                break;
+            case "w":
+                EdSave();
+                break;
+            case "x":
+                if (EdSave()) { EdQuit(); return; }
+                break;
+            case "q":
+                if (!edDirty) { EdQuit(); return; }
+                Write("There are unsaved changes: w to save, q! to discard them.\n");
+                break;
+            case "q!":
+                EdQuit();
+                return;
+            default:
+                Write("Unknown editor command. h for help.\n");
+                break;
+        }
+        EdPrompt();
+    }
+
+    private bool EdSave()
+    {
+        if (edLines == null) return false;
+        // Checked again here: the level may have changed since the editor was opened.
+        if (!IsWizard(LevelToWrite(edPath))) { Write("You may no longer write that file.\n"); return false; }
+        try
+        {
+            WriteFile(edPath, string.Join("\n", edLines) + "\n");
+        }
+        catch (MudRuntimeException refusal)
+        {
+            Write(refusal.Message + "\n");
+            return false;
+        }
+        edDirty = false;
+        Write($"Wrote {edPath}, {edLines.Count} lines.\n");
+        if (edPath.EndsWith(".cs")) Write($"Load it with: update {edPath.Substring(0, edPath.Length - 3)}\n");
+        return true;
+    }
+
+    private void EdQuit()
+    {
+        edLines = null;
+        edInsertAt = -1;
+        Write("Left the editor.\n");
     }
 
     private bool CmdWizards(string args)

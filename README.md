@@ -64,8 +64,22 @@ This works only while no level-10 wizard exists, and stops working after five wr
 |---|---|
 | 1 | `promote`, `wizards`, `mudstat`, `pwd`, `cd`, `list` (browse the mudlib directories) |
 | 3 | `clone` |
-| 5 | `update` |
+| 1 | `cat` (view a file) |
+| 5 | `update`, `mkdir`, `edit` (line editor; level 10 for files under `/secure` and `/std`) |
 | 10 | `shutdown` |
+
+### Create a file from inside the game
+
+```
+> cd /domains
+> mkdir lab
+> cd lab
+> edit widget
+New file /domains/lab/widget.cs.
+:a
+```
+
+Paste the source, finish with a line containing only `.`, then `x` to save and leave. `update widget` compiles it and `clone widget` makes one. Type `h` in the editor for its commands.
 
 ### Try a live update
 
@@ -144,7 +158,8 @@ Copy `publish/` to `/opt/lesmudos/bin` and `mudlib/` to `/opt/lesmudos/mudlib` o
 ## Limitations to know about
 
 - The sandbox is a guard rail for trusted builders, not a security boundary. Do not give mudlib write access to people you would not give a shell account.
-- There are no player passwords yet. Anyone who logs in under a wizard's name gets that wizard's level, so do not expose the port to the internet.
+- There are no player passwords yet. Anyone who logs in under a wizard's name gets that wizard's level, and a level-5 wizard can write code onto the server with `edit`. Do not expose the port to the internet.
+- With in-game editing, the mudlib directory must be writable by the driver. The sample systemd unit keeps it read-only; add it to `ReadWritePaths` if you want `edit` and `mkdir` to work there.
 - Traffic is plain-text telnet.
 
 The full list is in [DESIGN.md](docs/DESIGN.md#13-proof-of-concept-status).

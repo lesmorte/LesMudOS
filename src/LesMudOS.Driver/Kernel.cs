@@ -608,18 +608,31 @@ internal sealed class Kernel : IDriverServices
         return _saves.Restore(caller.Target!, path);
     }
 
-    public IReadOnlyList<DirEntry>? GetDir(ObjectRef caller, string path)
+    // ---- Mudlib file access ----
+
+    private const int MaxFileBytes = 256 * 1024;
+
+    /// <summary>
+    /// Check a mudlib path, ask the master, and map it to the real file system.
+    /// Accepts only "/" or "/a/b": absolute, no "." or ".." segments, no hidden
+    /// names, so the result cannot lie outside the mudlib root.
+    /// </summary>
+    private (string MudPath, string FullPath, string[] Segments) ResolveMudlibPath(ObjectRef caller, string operation, string path)
     {
-        // "/" or "/a/b": absolute, no "." or ".." segments, no hidden entries.
         path = path.Trim();
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (!path.StartsWith('/') || segments.Any(s => s.StartsWith('.') || s.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || s.Contains('\\')))
+        if (!path.StartsWith('/') || segments.Any(s => s.StartsWith('.') || s.EndsWith('.') || s.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || s.IndexOfAny(['\\', ':', '*', '?', '"', '<', '>', '|']) >= 0))
             throw new MudRuntimeException($"Illegal path '{path}'");
-        path = "/" + string.Join('/', segments);
-        if (!AskMaster(m => m.ValidOperation("get-dir", caller, path)))
-            throw new MudRuntimeException($"{caller.Name} may not list {path}");
+        var mudPath = "/" + string.Join('/', segments);
+        if (!AskMaster(m => m.ValidOperation(operation, caller, mudPath)))
+            throw new MudRuntimeException($"{caller.Name} may not {operation} {mudPath}");
+        return (mudPath, Path.Combine([_mudlibRoot, .. segments]), segments);
+    }
 
-        var directory = new DirectoryInfo(Path.Combine([_mudlibRoot, .. segments]));
+    public IReadOnlyList<DirEntry>? GetDir(ObjectRef caller, string path)
+    {
+        var (_, fullPath, segments) = ResolveMudlibPath(caller, "get-dir", path);
+        var directory = new DirectoryInfo(fullPath);
         if (!directory.Exists) return null;
 
         // Hide dot-files and the build output that `dotnet build` leaves beside Mudlib.csproj.
@@ -632,6 +645,39 @@ internal sealed class Kernel : IDriverServices
             .OrderBy(f => f.Name, StringComparer.Ordinal)
             .Select(f => new DirEntry(f.Name, false, f.Length));
         return directories.Concat(files).ToList();
+    }
+
+    public string? ReadFile(ObjectRef caller, string path)
+    {
+        var (mudPath, fullPath, _) = ResolveMudlibPath(caller, "read-file", path);
+        var file = new FileInfo(fullPath);
+        if (!file.Exists) return null;
+        if (file.Length > MaxFileBytes) throw new MudRuntimeException($"{mudPath} is too large to read ({file.Length} bytes)");
+        return File.ReadAllText(fullPath);
+    }
+
+    public void WriteFile(ObjectRef caller, string path, string content)
+    {
+        var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "write-file", path);
+        if (segments.Length == 0 || Directory.Exists(fullPath)) throw new MudRuntimeException($"{mudPath} is a directory");
+        if (!Directory.Exists(Path.GetDirectoryName(fullPath))) throw new MudRuntimeException($"No such directory for {mudPath}");
+        if (Encoding.UTF8.GetByteCount(content) > MaxFileBytes) throw new MudRuntimeException($"Content for {mudPath} is too large");
+
+        // The temporary name starts with a dot, so it is invisible to GetDir and cannot be addressed.
+        var temp = Path.Combine(Path.GetDirectoryName(fullPath)!, $".{segments[^1]}.{Guid.NewGuid():N}.tmp");
+        File.WriteAllText(temp, content, new UTF8Encoding(false));
+        File.Move(temp, fullPath, overwrite: true);
+        Log.Info($"file written: {mudPath} by {caller.Name} ({content.Length} chars)");
+    }
+
+    public bool MakeDir(ObjectRef caller, string path)
+    {
+        var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "make-dir", path);
+        if (segments.Length == 0 || Directory.Exists(fullPath) || File.Exists(fullPath)) return false;
+        if (!Directory.Exists(Path.GetDirectoryName(fullPath))) throw new MudRuntimeException($"No such parent directory for {mudPath}");
+        Directory.CreateDirectory(fullPath);
+        Log.Info($"directory created: {mudPath} by {caller.Name}");
+        return true;
     }
 
     private const int MaxAdminSecretFailures = 5;

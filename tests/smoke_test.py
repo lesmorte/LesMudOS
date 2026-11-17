@@ -3,7 +3,7 @@
 
 Starts the driver against a temporary copy of the mudlib, logs two players in
 over TCP, and checks: movement, object-supplied verbs, call_out, heartbeat,
-persistence, wizard levels and promotion, live update of a room and of a base
+persistence, wizard levels and promotion, in-game file editing, live update of a room and of a base
 class, compile-error handling, the sandbox, the evaluation-cost limit and the
 recursion guard.
 
@@ -46,6 +46,18 @@ class Client:
                 data += chunk.decode(errors="replace")
                 if marker in data:
                     return data
+            except socket.timeout:
+                pass
+        return data
+
+    def ed(self, line, timeout=30.0):
+        """Send a line to the in-game editor and read until its ':' prompt."""
+        self.send(line)
+        deadline = time.time() + timeout
+        data = ""
+        while time.time() < deadline and not data.endswith(":"):
+            try:
+                data += self.sock.recv(65536).decode(errors="replace")
             except socket.timeout:
                 pass
         return data
@@ -127,6 +139,7 @@ def main():
         check("level 0: mudstat does not exist", a.command("mudstat"), "What?", absent=("Objects",))
         check("level 0: shutdown does not exist", a.command("shutdown"), "What?")
         check("level 0: pwd, cd, list do not exist", a.command("pwd") + a.command("cd /std") + a.command("list") + a.command("ls"), "What?", absent=("/std", "secure"))
+        check("level 0: cat, mkdir, edit do not exist", a.command("cat /std/room") + a.command("mkdir /x") + a.command("edit /x.cs"), "What?", absent=("Room", "Created", "editor"))
         check("level 0: promote does not exist", a.command("promote bob 5"), "What?")
         check("level 0: help lists no wizard commands", a.command("help"), "Commands:", absent=("Wizard", "promote"))
         check("wrong secret is indistinguishable from no command", a.command("promote not-the-secret"), "What?")
@@ -149,7 +162,8 @@ def main():
 public class Imposter : Item
 {
     public override void Create() { Name = "imposter"; }
-    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); AddAction("peek", Peek); }
+    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); AddAction("peek", Peek); AddAction("scribble", Scribble); }
+    private bool Scribble(string args) { WriteFile("/domains/town/hack.cs", "x"); return true; }
     private bool Peek(string args) { Write(GetDir("/secure").Count.ToString()); return true; }
     private bool Usurp(string args)
     {
@@ -186,9 +200,70 @@ public class Imposter : Item
         check("pwd unchanged after failed cd", a.command("pwd"), "/\r\n")
         check("hidden names are refused", a.command("list /.git"), "Illegal path")
         check("level 5 wizard can use pwd", b.command("pwd"), "/\r\n")
-        check("other objects cannot list directories", b.command("peek"), "may not list /secure")
+        check("other objects cannot list directories", b.command("peek"), "may not get-dir /secure")
         a.command("cd /domains/town")
         check("cd with no argument returns to the root", a.command("cd"), "/\r\n")
+        a.command("cd /domains/town")
+
+        # ---- mkdir, cat and the line editor ----
+        a.command("cd /domains")
+        check("mkdir", a.command("mkdir lab"), "Created /domains/lab/")
+        check("mkdir of an existing directory", a.command("mkdir lab"), "/domains/lab already exists")
+        check("mkdir needs an existing parent", a.command("mkdir /no/such"), "No such parent directory")
+        check("new directory is listed", a.command("list"), "lab/", "town/")
+        a.command("cd lab")
+        check("edit a file in a missing directory", a.command("edit /nowhere/thing"), "no such directory")
+
+        check("edit starts a new file", a.ed("edit widget"), "New file /domains/lab/widget.cs", "You are in the editor")
+        check("editor help", a.ed("h"), "Editor commands", "write the file and leave")
+        a.command("a", marker="only .")
+        for line in ["// @inherit /std/item", "public class Widget : Item", "{", "    public override void Create()", "    {",
+                     '        Name = "widget";', '\tLongDesc = "A widget made in-game.";', "    }", "}"]:
+            a.send(line)
+        check("pasted lines are stored with their indentation", (a.ed("."), a.ed("p"))[1],
+              "   1  // @inherit /std/item", '   6          Name = "widget";', '   7  \tLongDesc', "   9  }")
+        check("print a range", a.ed("p 2 3"), "   2  public class Widget", "   3  {", absent=("   1  ", "   4  "))
+        check("bad line number", a.ed("d 99"), "No such line")
+        check("leaving with unsaved changes is refused", a.ed("q"), "unsaved changes")
+        check("save and leave", a.command("x"), "Wrote /domains/lab/widget.cs, 9 lines", "update /domains/lab/widget", "Left the editor")
+        check("back at the command prompt", a.command("pwd"), "/domains/lab")
+        check("cat shows the new file", a.command("cat widget"), "/domains/lab/widget.cs (9 lines)", "   2  public class Widget")
+        check("file created in-game compiles and clones", a.command("clone widget"), "Cloned /domains/lab/widget#")
+        check("object from the new file works", a.command("look at widget"), "A widget made in-game.")
+
+        check("edit an existing file", a.ed("edit widget.cs"), "Editing /domains/lab/widget.cs, 9 lines")
+        a.command("c 7", marker="only .")
+        a.send('        LongDesc = "A widget edited live.";')
+        check("replace a line", (a.ed("."), a.ed("p 7"))[1], "   7          LongDesc = \"A widget edited live.\";")
+        a.command("i 1", marker="only .")
+        a.send("// first line")
+        check("insert before a line", (a.ed("."), a.ed("p 1 2"))[1], "   1  // first line", "   2  // @inherit")
+        check("delete a line", a.ed("d 1"), "Deleted 1 line(s).")
+        check("write keeps the editor open", a.ed("w"), "Wrote /domains/lab/widget.cs, 9 lines")
+        check("leave", a.command("q"), "Left the editor")
+        check("update picks up the edited file", a.command("update widget"), "Recompiled /domains/lab/widget")
+        a.command("drop widget")
+        a.command("clone widget")
+        check("new clone runs the edited code", a.command("look at widget"), "A widget edited live.")
+        a.command("drop widget")
+
+        check("discard changes with q!", (a.ed("edit widget"), a.ed("d 1 9"), a.command("q!"), a.command("cat widget"))[3], "(9 lines)", "edited live")
+        check("paths cannot leave the mudlib", a.command("cat ../../../../etc/passwd"), "/etc/passwd.cs: no such file", absent=("root:",))
+
+        check("level 5 cannot edit /std", b.command("edit /std/room"), "need wizard level 10")
+        check("level 5 cannot mkdir in /secure", b.command("mkdir /secure/x"), "need wizard level 10")
+        check("level 5 can edit elsewhere", b.ed("edit /domains/lab/notes.txt"), "New file /domains/lab/notes.txt")
+        b.command("a", marker="only .")
+        b.send("remember the milk")
+        b.ed(".")
+        check("level 5 can save", b.command("x"), "Wrote /domains/lab/notes.txt, 1 lines", absent=("update",))
+        check("other objects cannot write files", b.command("scribble"), "may not write-file /domains/town/hack.cs")
+        a.command("promote bob 1")
+        b.read_until("level is now")
+        check("level 1 can read files", b.command("cat /domains/lab/notes.txt"), "remember the milk")
+        check("level 1 cannot edit or mkdir", b.command("edit /domains/lab/notes.txt") + b.command("mkdir /domains/lab/x"), "What?", absent=("editor", "Created"))
+        with open(os.path.join(mudlib, "domains", "lab", "widget.cs")) as f:
+            check("file on disk matches", f.read(), "// @inherit /std/item\n", "edited live", absent=("\r",))
         a.command("cd /domains/town")
 
         check("demote to 0", a.command("promote bob 0"), "bob is now wizard level 0")

@@ -175,6 +175,9 @@ Saved fields may be numbers, strings, booleans, and lists, arrays or dictionarie
 | Efun | Description |
 |---|---|
 | `IReadOnlyList<DirEntry>? GetDir(string path)` | List a mudlib directory: sub-directories first, then files, in name order. `DirEntry` has `Name`, `IsDirectory` and `Size` (bytes; 0 for directories). The path must be absolute and clean (`/` is the mudlib root; no `.` or `..` segments, no names starting with a dot), so it cannot leave the mudlib. Returns null if it is not a directory. Needs `ValidOperation("get-dir")` (arg: path). |
+| `string? ReadFile(string path)` | The text of a mudlib file, or null if it does not exist. Paths here include the extension (`/std/room.cs`) and follow the same rules as `GetDir`. Files over 256 KB are refused. Needs `ValidOperation("read-file")` (arg: path). |
+| `void WriteFile(string path, string content)` | Create or replace a mudlib file, atomically. The directory must exist; content over 256 KB is refused. Writing does not recompile: call `UpdateProgram`. Every write is logged by the driver. Needs `ValidOperation("write-file")` (arg: path). |
+| `bool MakeDir(string path)` | Create a mudlib directory whose parent exists. False if the name is taken. Needs `ValidOperation("make-dir")` (arg: path). |
 | `string DriverStatus()` | Object, user, timer, program-version and memory statistics |
 | `bool CheckAdminSecret(string candidate)` | Compare a candidate with the secret in the driver's `LESMUDOS_ADMIN_SECRET` environment variable. The secret is never readable from mudlib code. Always false if none is configured, or after five wrong guesses since boot. Needs `ValidOperation("admin-secret")`. |
 | `void Shutdown()` | Stop the driver. Needs `ValidOperation("shutdown")`. |
@@ -189,7 +192,7 @@ Saved fields may be numbers, strings, booleans, and lists, arrays or dictionarie
 | `IEnumerable<string> Preload()` | Paths to load at boot |
 | `bool ValidRead(string path, ObjectRef caller)` | Gate for `RestoreObject` |
 | `bool ValidWrite(string path, ObjectRef caller)` | Gate for `SaveObject` |
-| `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"`, `"admin-secret"`, `"get-dir"` (arg: path) |
+| `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"`, `"admin-secret"`, `"get-dir"`, `"read-file"`, `"write-file"`, `"make-dir"` (arg: path) |
 | `void LogError(string objectName, string message)` | Called after any error in an execution |
 
 ## 6. Wizard levels in the sample mudlib
@@ -218,13 +221,35 @@ Commands in `/std/player` and the level each needs:
 |---|---|
 | `promote <player> <level>`, `wizards` | 1 |
 | `mudstat` | 1 |
-| `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`) | 1 |
+| `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`), `cat <file>` | 1 |
+| `mkdir <dir>`, `edit <file>` outside `/secure` and `/std` | 5 |
+| `mkdir <dir>`, `edit <file>` under `/secure` and `/std` | 10 |
 | `clone <path>` | 3 |
 | `update <path>` | 5 |
 | `shutdown` | 10 |
 | `promote <secret>` | Any, but only works while there is no level-10 wizard |
 
 Each wizard has a current mudlib directory, saved with the player. `cd` and `list` take absolute or relative paths, with `.` and `..`; `cd` alone returns to `/`. `update` and `clone` resolve relative paths against it too.
+
+File names given to `cat` and `edit` get `.cs` appended if they have no extension. Changing `/secure` and `/std` needs level 10 because that code is what enforces wizard levels: a wizard who could edit `/std/player.cs` could grant themselves anything.
+
+#### The editor
+
+`edit <file>` opens a line editor on an existing or new file. While it is open, everything the player types goes to the editor, which prompts with `:`.
+
+| Command | Effect |
+|---|---|
+| `p [n [m]]` | Print the file, line n, or lines n to m, with line numbers |
+| `a [n]` | Add lines after line n (default: at the end) |
+| `i [n]` | Insert lines before line n (default: at the top) |
+| `c n [m]` | Replace line n, or lines n to m, with new lines |
+| `d n [m]` | Delete line n, or lines n to m |
+| `w` | Write the file |
+| `x` | Write the file and leave |
+| `q`, `q!` | Leave; `q!` discards unsaved changes |
+| `h` | Help |
+
+After `a`, `i` or `c`, every line typed or pasted goes into the file, indentation included, until a line containing only `.`. Saving does not load the code; the editor prints the `update` command to run.
 
 Below the required level a command answers `What?`, the same as a verb that does not exist. Levels are checked on every use, so a demotion takes effect immediately.
 
@@ -245,7 +270,7 @@ Not in the proof of concept; names are provisional.
 
 | Efun or apply | Purpose |
 |---|---|
-| `ReadFile`, `WriteFile`, `RemoveFile` | In-game viewing and editing, gated by the master |
+| `RemoveFile`, `RemoveDir`, `Rename` | The rest of in-game file management |
 | `Reset()` apply and `SetResetInterval` | Periodic restocking |
 | `CleanUp()` apply | Unload idle objects |
 | `Command(string)` | Force a living object to execute a command |

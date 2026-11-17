@@ -20,7 +20,7 @@ public interface IMaster
     /// <summary>May the caller write this save path?</summary>
     bool ValidWrite(string path, ObjectRef caller);
 
-    /// <summary>May the caller perform a privileged operation: "update", "shutdown", "destruct", "exec", "admin-secret", "get-dir"? arg is the target, if any.</summary>
+    /// <summary>May the caller perform a privileged operation: "update", "shutdown", "destruct", "exec", "admin-secret", "get-dir", "read-file", "write-file", "make-dir"? arg is the target, if any.</summary>
     bool ValidOperation(string operation, ObjectRef caller, string? arg);
 
     /// <summary>A runtime or compile error occurred during an execution started by or for the given object.</summary>
@@ -103,6 +103,9 @@ internal interface IDriverServices
 
     bool CheckAdminSecret(ObjectRef caller, string candidate);
     IReadOnlyList<DirEntry>? GetDir(ObjectRef caller, string path);
+    string? ReadFile(ObjectRef caller, string path);
+    void WriteFile(ObjectRef caller, string path, string content);
+    bool MakeDir(ObjectRef caller, string path);
     string Status();
     void Shutdown(ObjectRef caller);
 }
