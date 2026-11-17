@@ -5,9 +5,8 @@ public class GiantRat : Monster
 {
     public override void Create()
     {
-        Name = "rat";
+        Name = "Giant Rat";
         Ids.Add("rat");
-        Ids.Add("giant rat");
         ShortDesc = "a giant rat";
         LongDesc = "A rat as long as your forearm, with a pointed grey snout, bald pink tail and teeth worn yellow from gnawing on rubble. It shuffles toward you without any fear at all.";
         Level = 1;

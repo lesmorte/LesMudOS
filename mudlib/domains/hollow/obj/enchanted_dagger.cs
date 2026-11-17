@@ -5,9 +5,8 @@ public class EnchantedDagger : Weapon
 {
     public override void Create()
     {
-        Name = "dagger";
+        Name = "Enchanted Dagger";
         Ids.Add("dagger");
-        Ids.Add("enchanted dagger");
         ShortDesc = "an enchanted dagger";
         LongDesc = "A slender dagger of dark steel, its blade faintly etched with lines that catch the light like frost. It balances perfectly in the hand and seems to want to be used.";
         DamageMin = 3;

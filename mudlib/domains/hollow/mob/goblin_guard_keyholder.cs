@@ -5,10 +5,9 @@ public class GoblinGuardKeyholder : Monster
 {
     public override void Create()
     {
-        Name = "guard";
+        Name = "Goblin Guard";
         Ids.Add("goblin");
         Ids.Add("guard");
-        Ids.Add("goblin guard");
         ShortDesc = "a goblin guard";
         LongDesc = "A broad, scarred goblin in a dented iron breastplate, with a spiked shield strapped to one arm and a short-handled hammer in the other hand. A heavy ring of keys hangs from its belt, and it keeps one hand on them whenever you come near.";
         Level = 2;

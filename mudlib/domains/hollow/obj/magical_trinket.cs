@@ -5,9 +5,8 @@ public class MagicalTrinket : Armor
 {
     public override void Create()
     {
-        Name = "trinket";
+        Name = "Magical Trinket";
         Ids.Add("trinket");
-        Ids.Add("magical trinket");
         ShortDesc = "a magical trinket";
         LongDesc = "A small silver disc on a cord, warm to the touch and engraved with a crow that seems to shift its wings when you look away. It makes you feel steadier on your feet.";
         Slot = "trinket";

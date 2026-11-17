@@ -6,7 +6,6 @@ public class WanderingWolf : Monster
     {
         Name = "Wandering Wolf";
         Ids.Add("wolf");
-        Ids.Add("wandering wolf");
         ShortDesc = "a wandering wolf";
         LongDesc = "A lean grey wolf with a ragged coat and a scarred muzzle. It moves along the edge of the road with its head low, and its yellow eyes never leave you.";
         Level = 2;

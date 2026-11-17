@@ -4,8 +4,8 @@ public class TravelingMerchant : Shopkeeper
 {
     public override void Create()
     {
-        Name = "Merchant";
-        Ids.Add("traveling merchant");
+        Name = "Traveling Merchant";
+        Ids.Add("merchant");
         Ids.Add("trader");
         ShortDesc = "a traveling merchant";
         LongDesc = "A cheerful, dusty man with a pack twice his size, hung with pots, coils of rope and bundles of dried herbs. He will sell you what you need for the road.";

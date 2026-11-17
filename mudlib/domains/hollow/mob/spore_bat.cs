@@ -5,9 +5,8 @@ public class SporeBat : Monster
 {
     public override void Create()
     {
-        Name = "bat";
+        Name = "Spore Bat";
         Ids.Add("bat");
-        Ids.Add("spore bat");
         ShortDesc = "a spore bat";
         LongDesc = "A bat with leathery wings the colour of old mould and a glowing blue dust clinging to its fur. It flits in and out of the light, so that you are never quite sure where its next bite will come from.";
         Level = 2;

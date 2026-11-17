@@ -4,9 +4,8 @@ public class DrunkenProspector : Npc
 {
     public override void Create()
     {
-        Name = "Prospector";
+        Name = "Drunken Prospector";
         Ids.Add("prospector");
-        Ids.Add("drunken prospector");
         Ids.Add("drunk");
         ShortDesc = "a drunken prospector";
         LongDesc = "A grizzled old man with a sunburnt nose, a battered pick leaning against his stool, and a tankard that never seems to empty. His eyes are bloodshot but sharp when they settle on you.";

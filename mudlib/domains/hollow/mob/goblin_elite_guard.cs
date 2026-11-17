@@ -5,11 +5,10 @@ public class GoblinEliteGuard : Monster
 {
     public override void Create()
     {
-        Name = "elite guard";
+        Name = "Goblin Elite Guard";
         Ids.Add("goblin");
         Ids.Add("elite");
         Ids.Add("elite guard");
-        Ids.Add("goblin elite guard");
         ShortDesc = "a goblin elite guard";
         LongDesc = "A goblin twice the size of its kin, wearing a helm of black iron and a breastplate studded with bone. It carries a long-hafted axe in both hands and stands between you and the Overseer's door as if it has been waiting all its life for you to try.";
         Level = 4;

@@ -5,10 +5,9 @@ public class GoblinWarrior : Monster
 {
     public override void Create()
     {
-        Name = "warrior";
+        Name = "Goblin Warrior";
         Ids.Add("goblin");
         Ids.Add("warrior");
-        Ids.Add("goblin warrior");
         ShortDesc = "a goblin warrior";
         LongDesc = "A lean goblin with a chipped spear, a patched leather jerkin and a crow's feather tied into its hair. It has the look of a soldier rather than a scavenger, and it steps to one side so that its friends can reach you too.";
         Level = 3;

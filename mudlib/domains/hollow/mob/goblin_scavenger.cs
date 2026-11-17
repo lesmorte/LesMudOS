@@ -5,10 +5,9 @@ public class GoblinScavenger : Monster
 {
     public override void Create()
     {
-        Name = "scavenger";
+        Name = "Goblin Scavenger";
         Ids.Add("goblin");
         Ids.Add("scavenger");
-        Ids.Add("goblin scavenger");
         ShortDesc = "a goblin scavenger";
         LongDesc = "A thin, quick goblin with a sack slung over one shoulder and a bent knife in each hand. Its eyes dart to your purse and then to the nearest exit, as if it is weighing which it would rather have.";
         Level = 2;
