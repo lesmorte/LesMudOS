@@ -47,6 +47,17 @@ public class Player : Thing
     private bool edDirty;
     private int edInsertAt = -1; // >= 0 while typed lines are being inserted at that index
 
+    // Counts every message sent to this player. delete compares it before and
+    // after its question, so a "y" typed after anything else was shown (which
+    // may have been another object's question) does not delete.
+    private int messagesShown;
+
+    public override void CatchTell(string message)
+    {
+        messagesShown++;
+        base.CatchTell(message);
+    }
+
     private string SaveFile => "/players/" + Name.ToLower();
 
     public override string? Short() => $"{Name} {title}";
@@ -447,7 +458,8 @@ public class Player : Thing
     /// what enforces wizard levels, so only the top level may change it.
     /// </summary>
     private static int LevelToWrite(string path)
-        => (path + "/").StartsWith("/secure/") || (path + "/").StartsWith("/std/") ? LevelSystemFiles : LevelEdit;
+        // Compared without case: on a case-insensitive file system /STD is /std.
+        => (path + "/").ToUpperInvariant().StartsWith("/SECURE/") || (path + "/").ToUpperInvariant().StartsWith("/STD/") ? LevelSystemFiles : LevelEdit;
 
     private static List<string> SplitLines(string text)
     {
@@ -566,7 +578,8 @@ public class Player : Thing
                 return true;
             }
             Write($"Delete {file}? This cannot be undone. (y/n) ");
-            InputTo(answer => DeleteConfirmed(file, answer));
+            var asked = messagesShown;
+            InputTo(answer => DeleteConfirmed(file, answer, asked));
         }
         catch (MudRuntimeException refusal)
         {
@@ -575,12 +588,13 @@ public class Player : Thing
         return true;
     }
 
-    private void DeleteConfirmed(string file, string answer)
+    private void DeleteConfirmed(string file, string answer, int asked)
     {
         var reply = answer.Trim().ToLowerInvariant();
         if (reply != "y" && reply != "yes") { Write("Not deleted.\n"); return; }
         // Checked again here: the level may have changed while the question was open.
         if (!IsWizard(LevelToWrite(file))) { Write("You may no longer delete that file. Not deleted.\n"); return; }
+        if (messagesShown != asked) { Write($"Other messages arrived after the question, so {file} was not deleted. Type delete again.\n"); return; }
         try
         {
             if (!RemoveFile(file)) { Write($"{file}: no such file.\n"); return; }

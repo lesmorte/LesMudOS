@@ -379,6 +379,28 @@ public class Imposter : Item
         a.command("copy widget doomed")
         a.command("delete doomed.cs", marker="(y/n) ")
         check("delete answered yes", a.command("YES"), "Deleted /domains/lab/doomed.cs.")
+        write(mudlib, "/domains/lab/lure", """
+// @inherit /std/item
+public class Lure : Item
+{
+    public override void Create() { Name = "lure"; }
+    public override void Init() { AddAction("tempt", Tempt); }
+    private bool Tempt(string args)
+    {
+        CallOut(() => Write("Lure: would you like a cookie? (y/n) "), 1);
+        return true;
+    }
+}
+""")
+        a.command("copy widget doomed")
+        a.command("clone lure")
+        a.command("tempt")
+        a.command("delete doomed", marker="(y/n) ")
+        a.read_until("cookie? (y/n) ", timeout=10)
+        check("a y meant for another object's question does not delete", a.command("y"), "Other messages arrived after the question, so /domains/lab/doomed.cs was not deleted.", absent=("Deleted",))
+        check("so the file is still on disk", str(os.path.exists(os.path.join(lab, "doomed.cs"))), "True")
+        a.command("delete doomed", marker="(y/n) ")
+        a.command("y")
         check("delete of a missing file", a.command("delete nothing"), "/domains/lab/nothing.cs: no such file.", absent=("(y/n)",))
         check("delete of a directory is refused", a.command("delete sub"), "/domains/lab/sub is a directory; use rmdir", absent=("(y/n)",))
         check("delete of the root is refused", a.command("delete /"), "/ is a directory", absent=("(y/n)",))
@@ -444,6 +466,11 @@ public class Beacon : Item
         check("level 5 cannot delete under /std", b.command("delete /std/room"), "need wizard level 10", absent=("(y/n)",))
         check("level 5 cannot delete under /secure", b.command("delete /secure/master"), "need wizard level 10", absent=("(y/n)",))
         check("level 5 cannot rmdir /std or under /secure", b.command("rmdir /std") + b.command("rmdir /secure/x"), "need wizard level 10", absent=("Removed", "not empty", "no such"))
+        os.mkdir(os.path.join(mudlib, "STD"))
+        open(os.path.join(mudlib, "STD", "room.cs"), "w").close()
+        check("level 5 cannot delete under /std in another case", b.command("delete /STD/room") + b.command("rmdir /Secure"), "need wizard level 10", absent=("(y/n)", "Removed", "no such"))
+        check("so it is still on disk", str(os.path.exists(os.path.join(mudlib, "STD", "room.cs"))), "True")
+        shutil.rmtree(os.path.join(mudlib, "STD"))
         check("/std/room.cs is still on disk", str(os.path.exists(os.path.join(mudlib, "std", "room.cs"))), "True")
         b.command("delete /domains/lab/sub/hall", marker="(y/n) ")
         check("level 5 can delete elsewhere", b.command("y"), "Deleted /domains/lab/sub/hall.cs.")
