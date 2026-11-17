@@ -160,6 +160,8 @@ Error reporting happens after the catch block has finished, not inside it. A .NE
 
 Bindings are removed when the owner and the player stop being neighbours (either one moves away or is destructed). A binding owned by an item the player is carrying stays in force as the player moves.
 
+**The prompt.** After the kernel has run a line (a command, or an `InputTo` handler) it queues `> ` for that player, unless the player is now waiting for an `InputTo` line or is gone. Everything the command itself wrote, to the player or to anybody else, was queued before the prompt, in order. Text from other executions is queued when it happens, so it can arrive right after a prompt, and the driver does not redraw the prompt for it: combat rounds and NPC emotes (heartbeats), an aggressive creature's attack two seconds after you walk in (a call-out), and what other players do. A heartbeat that fires within milliseconds of an arrival or a login looks as if it belonged to that command. Clients, and the tests, must not assume that text after a prompt belongs to the last command.
+
 ### Init
 
 When object A moves into D, in this order:
@@ -287,6 +289,8 @@ Implemented and covered by `tests/smoke_test.py`:
 - Mudlib file efuns (`GetDir`, `ReadFile`, `WriteFile`, `CopyFile`, `RenameFile`, `MakeDir`, `RemoveFile`, `RemoveDir`) with wizard commands `pwd`, `cd`, `list`, `cat`, `mkdir`, `copy`, `move`, `rename`, `delete` (with confirmation), `rmdir` (empty directories only) and a line editor, `edit`
 - Wizard levels 0 to 10, level-gated commands, `promote`, and the one-time level-10 bootstrap by admin secret
 - Player passwords: PBKDF2 hashing efuns, echo off at password prompts, account creation, three attempts per connection, forced password for accounts saved before passwords existed, and the `password` command
+
+The sample mudlib also holds a game: the gameplay layer in `/std` and the starter area Vincent's Hollow under `/domains/hollow` (see [GAME_SYSTEMS.md](GAME_SYSTEMS.md)), next to the small `/domains/town` demo that the smoke test uses. It is covered by `tests/area_test.py` (systems and content, with test rooms and wizard help), `tests/playthrough_test.py` (a new character plays the whole area against an unmodified mudlib) and `tests/load_check.py` (every area file compiles and loads).
 
 Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, renaming or moving directories, and per-domain privileges (wizard levels are global). Passwords cross the network in plain text (section 8). Recursive delete is deliberately not provided: a directory has to be emptied file by file before `rmdir` removes it, and nothing deleted can be recovered.
 

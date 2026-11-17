@@ -33,20 +33,43 @@ Account created.
 
 Welcome, Keith. Type 'help' for commands.
 
-Town Square
-Cobblestones spread out around a dry fountain. A tavern door stands open to the north.
-Obvious exits: north
-A brass lantern is here.
-> get lantern
-You take a brass lantern.
-> north
-The Compiled Griffin
-A low-beamed tavern that smells of woodsmoke. The square lies to the south.
-Obvious exits: south
-A ginger tavern cat is here.
-> pet cat
-The cat purrs like a small engine.
+Village Square
+The center of Vincent's Hollow bustles with life. A large stone well marks the center of the square while merchants display goods from temporary stalls. Locals gather around benches exchanging news while children dart between travelers.
+Obvious exits: north, west, east, south
+Old Farmer Benson is here.
+A traveling merchant is here.
+> talk benson
+Benson says: "Vincent founded this place. Brave man... but he went lookin' for somethin' beneath the earth and never returned."
+> east
+Ironoak Arms
+The smell of hot metal and burning coal fills this small but impressive smithy. Weapon racks cover the walls while a roaring forge illuminates newly finished blades.
+Obvious exits: west
+Blacksmith Torren is here.
+> browse
+Torren has these for sale:
+  A rusty sword                      10 gold
+  A training spear                    8 gold
+  An iron dagger                      6 gold
+  A woodcutter axe                   18 gold
+  A small shield                     12 gold
+> buy sword
+You buy a rusty sword for 10 gold.
+> wield sword
+You wield a rusty sword.
 ```
+
+Later, in the Tavern Cellar below the Hollowman's Rest:
+
+```
+> kill rat
+You attack a large rat.
+A large rat attacks you!
+You hit a large rat hard.
+A large rat dies.
+You gain 8 experience.
+```
+
+The first-time walk-through of the whole area (about 15 minutes of real fighting) is what `tests/playthrough_test.py` does.
 
 ### Become a wizard
 
@@ -145,7 +168,9 @@ public class Lantern : Item
 | `mudlib` | Sample mudlib: `/secure` (master, login, wizard registry), `/std` (thing, item, room, living, npc, monster, shopkeeper, weapon, armor, consumable, coins, corpse, adventurer, player, void), `/secure/vault` (lost-property vault), `/domains/town` (technical demo), `/domains/hollow` (Vincent's Hollow) |
 | `mudlib/Mudlib.csproj` | Not used at run time. Gives IntelliSense for mudlib files and lets `dotnet build` check the whole mudlib. |
 | `tests/smoke_test.py` | End-to-end test of the driver over TCP (port 4811 in the examples below) |
-| `tests/area_test.py` | End-to-end test of the game systems and the Hollow (port 4812) |
+| `tests/area_test.py` | End-to-end test of the game systems and of the Hollow's content, with test rooms and wizard help (port 4812, about 8 minutes) |
+| `tests/playthrough_test.py` | A brand-new level 1 character plays the finished area from the start to the end of both quests, against an unmodified mudlib (port 4813, 10 to 25 minutes) |
+| `tests/load_check.py` | Quick check that every area file compiles and loads (port 4821, under a minute) |
 | `tests/balance_sim.py` | Standalone combat balance simulation |
 | `deploy/lesmudos.service` | Sample systemd unit (a starting point; not yet tested on a server) |
 | `docs` | Design and API reference |
@@ -156,6 +181,8 @@ public class Lantern : Item
 dotnet build
 LESMUDOS_TEST_PORT=4811 python3 tests/smoke_test.py
 LESMUDOS_TEST_PORT=4812 python3 tests/area_test.py
+LESMUDOS_TEST_PORT=4813 python3 tests/playthrough_test.py
+LESMUDOS_TEST_PORT=4821 python3 tests/load_check.py
 python3 tests/balance_sim.py
 ```
 

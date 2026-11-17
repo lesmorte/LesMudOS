@@ -83,6 +83,8 @@ public class ExampleVault : Room
 }
 ```
 
+`BlockExit(direction, message)` is the same idea for a way nobody can use yet (a road into the wilderness): the direction is not listed among the obvious exits, and typing it shows the message.
+
 ### A room with random encounters
 
 `AddEncounter(path, percent)`: each time a player walks in there is that chance that the creature wanders in, if none from this room is still alive and a minute has passed since the last. An encounter that is not fighting wanders off at the next reset.
@@ -107,7 +109,7 @@ public class ExampleTrail : Room
 
 ### A peaceful NPC: chat, topics, emotes
 
-An `Npc` cannot be attacked. `AddChat` lines are given in turn by `talk <npc>` (and wrap round); the first is its main line. `AddTopic(keywords, line)` answers `ask <npc> about <keyword>` for any of the comma-separated keywords. `AddEmote(line, percent)` is an idle action shown while a player is present (percent chance per two-second heartbeat). Give it `Ids` so players can type short names.
+An `Npc` cannot be attacked. `AddChat` lines are given in turn by `talk <npc>` (and wrap round); the first is its main line. `AddTopic(keywords, line)` answers `ask <npc> about <keyword>` for any of the comma-separated keywords. `AddEmote(line, percent)` is an idle action shown while a player is present (percent chance per two-second heartbeat). Give it `Ids` so players can type short names. `AddChatAfterQuest(questId, line)` replaces the main line for a player who has completed that quest (Harland thanks the player this way).
 
 ```csharp
 // File: /domains/example/villager.cs

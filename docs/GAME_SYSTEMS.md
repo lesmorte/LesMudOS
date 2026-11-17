@@ -4,7 +4,7 @@ The sample mudlib so far has rooms, items and wizard tools, but no game. This do
 
 Everything here is mudlib code under `/std`. The one driver change is small and generic, and is recorded in DRIVER_API.md: a creature that calls `EnableCommands` in its constructor no longer changes `ThisPlayer()` for the object that cloned it.
 
-Status: **implemented** (sections 2 to 10 and the corpses). Where the implementation differs from the first design, this document has been corrected to describe what the code does. The list of differences is at the end of section 11.
+Status: **implemented and played through.** Sections 2 to 10 and the corpses are built, and the whole of Vincent's Hollow (eight village rooms, ten dungeon rooms, every creature, item and NPC) exists and has been played from level 1 to the end of both quests by `tests/playthrough_test.py` (section 13). Where the implementation differs from the first design, this document has been corrected to describe what the code does. The list of differences is at the end of section 11.
 
 ## 1. Principles
 
@@ -34,8 +34,8 @@ mudlib/std/
 mudlib/secure/
   vault.cs        the lost-property vault (section 9, Corpses)
 mudlib/domains/hollow/
-  village/        the village rooms built so far (square, guest_rooms, ironoak, guild)
-  cellars/        the dungeon rooms built so far (overseer_chamber)
+  village/        the eight village rooms (north_road, gate, square, guild, ironoak, tavern, guest_rooms, cellar)
+  cellars/        the ten dungeon rooms (collapsed_passage to overseer_chamber)
   npc/            villagers
   mob/            hostile creatures
   obj/            weapons, armor, potions, keys, quest items
@@ -54,7 +54,7 @@ New protected members on `Room`, all optional:
 | `AddSpawn(string path, int count = 1)` | Creatures or items this room should contain. Cloned in at creation and topped up at each reset: the room keeps the handles it spawned and replaces the ones that are no longer alive or, for items, no longer in the room. |
 | `AddEncounter(string path, int percent)` | Each time a player walks in, each encounter has `percent` chance to appear, if none spawned by this room is still alive and at least 60 seconds have passed since the last one. Encounter creatures that are not in combat leave ("wanders off") at the next reset. |
 | `LockExit(string direction, string keyId, string refusal)` | The exit can be used only by someone carrying an object whose `Id(keyId)` is true. Others get `refusal`. The key is not consumed. |
-| `BlockExit(string direction, string message)` | An exit nobody can use (the wilderness road). It is listed and gives the message. |
+| `BlockExit(string direction, string message)` | A way nobody can use yet (the wilderness road). It is not listed among the exits (the brief lists only south), but typing the direction gives the message. |
 | `Safe` | No combat can start or continue here. |
 | `ResetSeconds` | Default 300. Each room re-arms a call-out to its own `Reset()`. `Reset()` tops up spawns and calls `OnReset` on the creatures it spawned (a shopkeeper rerolls its rare stock there); override it (and call `base.Reset()`) for anything else. Corpses are not touched by a reset. |
 
@@ -104,6 +104,7 @@ Equipment slots: `weapon`, `shield`, `body`, `head`, `trinket`. One item per slo
 
 - `Peaceful = true` by default: cannot be attacked ("... is no threat to you" style refusal).
 - `AddChat(string line)`: what the NPC says to `talk <npc>` (alias `talk to <npc>`, `greet <npc>`). Lines are given in order; each `talk` gives the next line and wraps round. The first line added is the NPC's main dialogue.
+- `AddChatAfterQuest(string questId, string line)`: once a player has completed the quest, the main (first) chat line is replaced for that player by this one. Harland uses it to thank the player for clearing the cellar.
 - `AddTopic(string keywords, string line)`: reply to `ask <npc> about <keyword>`. Unknown topics get a shrug line.
 - `AddEmote(string line, int percent)`: idle action shown to the room on heartbeat, only while a player is present. The NPC turns its own heartbeat off when the room has no players.
 - Speech is shown as `Harland says: "..."`.
@@ -144,7 +145,7 @@ Goblin Overseer abilities:
 - **Power Strike:** each round, 20% chance that the attack does double damage, with its own message.
 - **Summon Goblin Minion:** the first time his HP falls to half or below, one Goblin Minion is cloned into the room and joins the fight. Once per life.
 
-These are the final numbers after the balance simulation (section 12). The first draft made the Barracks, the Hall and the boss unwinnable for a solo player; HP, damage and armor were lowered as shown. The Large Rat, Giant Rat, Wolf, Goblin Minion and Overseer have mudlib files; the others are in the table for the builders of the remaining rooms and are used by the simulation. The Overseer is aggressive (it attacks anyone who enters its chamber). Gold from monsters is in the corpse. The Guard with the Rusty Key is not built yet.
+These are the final numbers after the balance simulation (section 12). The first draft made the Barracks, the Hall and the boss unwinnable for a solo player; HP, damage and armor were lowered as shown. Every creature of the table has a mudlib file (the Guard Post keeps one plain Goblin Guard and one `goblin_guard_keyholder` that is identical except that its corpse always holds the Rusty Key). The Overseer is aggressive (it attacks anyone who enters its chamber). Gold from monsters is in the corpse. Creature names are capitalised (`Name = "Goblin Guard"`, used by `stat` and by shopkeepers and NPCs when they speak); what players read in fights and on corpses is the short description with its article ("a goblin guard", "the corpse of a goblin guard").
 
 ## 7. Items
 
@@ -172,7 +173,7 @@ These are the final numbers after the balance simulation (section 12). The first
 | Leather Commander's Vest | armor, body | 3 | 60 | Boss, always |
 | Bag of Coins | coins | 60-100 | | Boss, always |
 | Overseer's Orders | quest item | readable | 0 | Boss, always |
-| Rusty Key | key | | 0 | One Goblin Guard's corpse, always (not built yet) |
+| Rusty Key | key | | 0 | The corpse of one of the two Goblin Guards, always |
 | Minor Healing Potion | consumable, drink | heals 20 | 15 | Storage Chamber; merchant |
 | Magical Trinket | armor, trinket | max HP +5 | 40 | Hidden Cache, always |
 | Rare Enchanted Dagger | weapon | 3-6, to hit +2 | 80 | Hidden Cache, 25% |
@@ -192,7 +193,7 @@ Services use the same class with a different stock:
 - **Harland the Innkeeper** sells food and drink (consumables) and a bed. Buying the bed restores the buyer to full HP and takes them upstairs to the Guest Rooms.
 - **Traveling Merchant** sells Minor Healing Potions and trail rations.
 
-`Shopkeeper` has `protected virtual bool OnBuy(ObjectRef buyer, string path)` so a service can do something other than hand over an item. Stock samples are kept inside the shopkeeper so that `buy sword` and `value sword` find them by name. The Traveling Merchant is built (potion 15, ration 5). Harland and his bed are not built yet.
+`Shopkeeper` has `protected virtual bool OnBuy(ObjectRef buyer, string path)` so a service can do something other than hand over an item. Stock samples are kept inside the shopkeeper so that `buy sword` and `value sword` find them by name. The Traveling Merchant sells potions at 15 and rations at 5. Harland sells stew (4), ale (2) and the bed (5); buying the bed heals the buyer fully and takes them up to the Guest Rooms.
 
 ## 9. The player character
 
@@ -272,7 +273,7 @@ Kills count only if they happened while the quest was active or before it was ac
 ## 11. Area notes that the brief leaves open
 
 - The Traveling Merchant is a fixed NPC in the Village Square and also a possible encounter on the North Road, as the brief lists him in both. They are two separate merchants; nothing coordinates them.
-- North Road has an exit north in prose only. `north` gives a message that the wilderness road is not yet open.
+- North Road has an exit north in prose only, and the brief's exit list names only south. `north` is not listed among the obvious exits, but typing it gives a message that the wilderness road is not yet open.
 - Tavern Cellar: the brief asks for 2-3 Large Rats; spawn 3.
 - Guard Post: of the two Goblin Guards, one is a variant that always drops the Rusty Key.
 - Hidden Cache: the north exit of the Mushroom Cavern is locked with the Rusty Key. Its loot is placed at creation and is not restocked by reset; it returns only when the driver restarts.
@@ -286,11 +287,11 @@ Kills count only if they happened while the quest was active or before it was ac
 
 - Extra room helpers: `BlockExit`, `MoveThrough`, `CanUseExit`, `LongFor(viewer)`, `Stat()`; `AddReadable` has an optional third argument.
 - `Npc`'s constructor calls `EnableCommands`; a builder does not. The driver change that makes this safe is in DRIVER_API.md.
-- Rowan offers the second quest automatically when the first is completed, and `report` also completes a quest that is finished but was never accepted. The quest title in messages is the quest id made readable.
+- Rowan offers the second quest automatically when the first is completed, and `report` also completes a quest that is finished but was never accepted. The quest log shows the title that the quest giver passed to `SetQuest(id, state, title)` ("Clear the Cellar", "Recover the Overseer's Orders"); without a title the id is made readable.
 - Spawned creatures get an `OnReset` hook (used by the shopkeeper's rare stock).
 - The `update` command rebuilds only interactive occupants of the room, so NPCs are not duplicated.
 - Monsters do not regenerate. The Overseer is aggressive. The Traveling Merchant is built.
-- The Tavern is expected at `village/tavern.cs` and the Tavern Cellar at `village/cellar.cs`; neither exists yet, so those exits answer "not open yet".
+- A creature's heartbeat order is the order in which heartbeats were switched on, so a player who logged in before a fight starts usually acts first in a round. `kill <name>` picks the first match in the room, in the order the room lists things; if the player is already fighting, `kill <other>` turns on the other (it is attacked first from then on). There is no numbering (`kill 2.goblin`).
 - Combat details: one attack per heartbeat, the player acts first; fleeing picks a random usable exit.
 - Corpses and the vault were added after the first design (section 9).
 
@@ -299,3 +300,27 @@ Kills count only if they happened while the quest was active or before it was ac
 - `tests/smoke_test.py` keeps testing the driver and wizard tools against `/domains/town`. Because new players now start in Vincent's Hollow, the smoke test patches the start room in its temporary copy of the mudlib. Its existing checks must keep passing.
 - `tests/area_test.py` is a new end-to-end test for the gameplay systems and the area: movement through every exit of the area, look/read on the brief's objects, each NPC's quoted dialogue, buying and equipping, a real fight with a weak creature, corpses and looting, death and respawn, a driver restart and a crash with the lost-property vault, the locked cache, the boss abilities (using `smite` and `heal` where luck would make the test flaky), both quests through to the ending, and persistence of the character across logout.
 - A simulation script, `tests/balance_sim.py`, plays the combat rules outside the driver with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
+- `tests/playthrough_test.py` (port 4813, `LESMUDOS_TEST_PORT`) is the first-player test. It copies the mudlib unmodified (no stub rooms), makes a brand-new non-wizard level 1 character and plays the whole area: every exit of all 18 rooms in both directions, the sign, plaque and quest board, the brief's objects, every NPC's quoted lines word for word, the shop and the tavern (including the bed and logging out in the Guest Rooms), a deliberate death with corpse recovery and the locked-corpse message for a second player, then both quests with a fight loop (flee, rest, bed, potions, looting, the Hidden Cache, levelling) up to the Goblin Overseer, `report`, the rewards and the ending speech. A warden wizard account is used only to peek at state; if the solo character cannot finish, the test records a finding and falls back to `heal`, clearly labelled. It takes 9 to 17 minutes.
+- `tests/load_check.py` (port 4821) compiles and loads every mudlib file.
+
+## 13. What was verified by play
+
+The area was played from a fresh level 1 character, solo, with village gear only. Two consecutive clean runs (294 checks each): 9.0 and 12.4 minutes, one deliberate death each, final level 5, no wizard help. The Overseer's door was reached at level 4 after 8.0 and 7.3 minutes and the boss took 2 to 3 engagements with 2 retreats. Natural deaths: none in the recorded runs.
+
+Bugs and clumsy points that only play showed (fixed):
+
+- `BlockExit` did not work: typing `north` on the North Road answered "What?" because the blocked direction was never bound as a command. It now gives the room's refusal text and is not listed among the exits.
+- Creatures and some items had lower-case names ("giant rat"), which read badly in combat, corpse and death messages next to capitalised NPC names. Names are now capitalised ("Giant Rat", "Village Guard", "Traveling Merchant"); ids stay lower case.
+- Quest log titles came out as readable ids ("Overseers orders"). `SetQuest` takes an optional title and the log shows "Clear the Cellar" and "Recover the Overseer's Orders".
+- Harland's changed thanks line after the first quest was missing; `AddChatAfterQuest` adds it.
+- The guard's stockade topic named the wrong place.
+- `kill <name>` during a fight was ignored; it now turns on the named enemy.
+
+Behaviour that was examined and left as it is:
+
+- Targeting is by first match with no numbering. A Village Guard and a Goblin Guard (and a Large Rat and a Giant Rat) are never in the same room, so `kill guard` and `kill rat` are unambiguous in this area. In a room with two Goblin Warriors the first listed is attacked, and `kill goblin` while fighting turns to the next.
+- Late text after a prompt is not an ordering bug: a command's own output is always queued before its "> ". What arrives afterwards is asynchronous by design (NPC emotes, ambushes, combat rounds, other players' actions). See DESIGN.md section 7.
+- The balance simulation matches the code once the minion's timing and the level-up heal mid-fight were corrected in the script. It predicts a Level 4-5 player with a longsword and two potions beats the Overseer 57-78% of the time; the real runs agree (two to three engagements). No numbers in the area were changed.
+
+Not verified: the Traveling Merchant's North Road appearance and the wolf are random and seen only by chance in some runs; the rare longsword is a 30% roll; recovery after a natural death was only tested through the deliberate death.
+
