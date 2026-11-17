@@ -65,7 +65,7 @@ This works only while no level-10 wizard exists, and stops working after five wr
 | 1 | `promote`, `wizards`, `mudstat`, `pwd`, `cd`, `list` (browse the mudlib directories) |
 | 3 | `clone` |
 | 1 | `cat` (view a file) |
-| 5 | `update`, `mkdir`, `edit` (line editor; level 10 for files under `/secure` and `/std`) |
+| 5 | `update`, `mkdir`, `edit` (line editor), `copy`, `move`, `rename` (level 10 for files under `/secure` and `/std`) |
 | 10 | `shutdown` |
 
 ### Create a file from inside the game

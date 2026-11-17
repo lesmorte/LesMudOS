@@ -140,6 +140,7 @@ def main():
         check("level 0: shutdown does not exist", a.command("shutdown"), "What?")
         check("level 0: pwd, cd, list do not exist", a.command("pwd") + a.command("cd /std") + a.command("list") + a.command("ls"), "What?", absent=("/std", "secure"))
         check("level 0: cat, mkdir, edit do not exist", a.command("cat /std/room") + a.command("mkdir /x") + a.command("edit /x.cs"), "What?", absent=("Room", "Created", "editor"))
+        check("level 0: copy, move, rename do not exist", a.command("copy /std/room /x") + a.command("move /std/room /x") + a.command("rename /std/room x"), "What?", absent=("Copied", "Moved", "Renamed", "Usage"))
         check("level 0: promote does not exist", a.command("promote bob 5"), "What?")
         check("level 0: help lists no wizard commands", a.command("help"), "Commands:", absent=("Wizard", "promote"))
         check("wrong secret is indistinguishable from no command", a.command("promote not-the-secret"), "What?")
@@ -162,8 +163,10 @@ def main():
 public class Imposter : Item
 {
     public override void Create() { Name = "imposter"; }
-    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); AddAction("peek", Peek); AddAction("scribble", Scribble); }
+    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); AddAction("peek", Peek); AddAction("scribble", Scribble); AddAction("duplicate", Duplicate); AddAction("shuffle", Shuffle); }
     private bool Scribble(string args) { WriteFile("/domains/town/hack.cs", "x"); return true; }
+    private bool Duplicate(string args) { CopyFile("/domains/town/square.cs", "/domains/town/hack.cs"); return true; }
+    private bool Shuffle(string args) { RenameFile("/domains/town/square.cs", "/domains/town/hack.cs"); return true; }
     private bool Peek(string args) { Write(GetDir("/secure").Count.ToString()); return true; }
     private bool Usurp(string args)
     {
@@ -258,6 +261,38 @@ public class Imposter : Item
         b.ed(".")
         check("level 5 can save", b.command("x"), "Wrote /domains/lab/notes.txt, 1 lines", absent=("update",))
         check("other objects cannot write files", b.command("scribble"), "may not write-file /domains/town/hack.cs")
+
+        # ---- copy, move and rename ----
+        check("copy a file", a.command("copy widget gadget"), "Copied /domains/lab/widget.cs to /domains/lab/gadget.cs.")
+        check("cat the copy", a.command("cat gadget"), "/domains/lab/gadget.cs (9 lines)", "edited live")
+        a.command("mkdir sub")
+        check("copy into a directory keeps the name", a.command("copy widget sub"), "Copied /domains/lab/widget.cs to /domains/lab/sub/widget.cs.")
+        check("copied file is in the directory", a.command("list sub"), "/domains/lab/sub:", "widget.cs")
+        check("copy refuses to overwrite", a.command("copy widget gadget"), "/domains/lab/gadget.cs already exists", absent=("Copied",))
+        check("copy of a missing file", a.command("copy nothing other"), "/domains/lab/nothing.cs: no such file.")
+        check("copy into a missing directory", a.command("copy widget /nowhere/widget"), "No such directory for /nowhere/widget.cs")
+        check("copy onto itself", a.command("copy widget widget.cs"), "are the same file")
+        # Usage messages contain "> ", so wait for the end of the line and the real prompt.
+        check("copy needs two arguments", a.command("copy widget", marker="<to>\r\n> "), "Usage: copy <from> <to>")
+        check("move across directories", a.command("move gadget /domains/town"), "Moved /domains/lab/gadget.cs to /domains/town/gadget.cs.")
+        check("moved file is gone from the source", a.command("cat gadget"), "/domains/lab/gadget.cs: no such file.")
+        check("moved file is at the destination", a.command("cat /domains/town/gadget"), "/domains/town/gadget.cs (9 lines)")
+        check("move refuses to overwrite", a.command("move /domains/town/gadget sub/widget"), "/domains/lab/sub/widget.cs already exists", absent=("Moved",))
+        check("rename a file", a.command("rename /domains/town/gadget gizmo"), "Renamed /domains/town/gadget.cs to /domains/town/gizmo.cs.")
+        check("renamed file has the new name", a.command("cat /domains/town/gizmo") + a.command("cat /domains/town/gadget"), "/domains/town/gizmo.cs (9 lines)", "/domains/town/gadget.cs: no such file.")
+        check("rename refuses a name with a slash", a.command("rename /domains/town/gizmo ../gizmo"), "cannot contain '/'", absent=("Renamed",))
+        check("rename cannot climb with ..", a.command("rename /domains/town/gizmo .."), "Illegal path", absent=("Renamed",))
+        check("rename needs two arguments", a.command("rename widget", marker="<newname>\r\n> "), "Usage: rename <file> <newname>")
+        a.command("move /domains/town/gizmo sub")
+        check("level 5 cannot copy into /std", b.command("copy /domains/lab/notes.txt /std"), "need wizard level 10", absent=("Copied",))
+        check("level 5 cannot move out of /std", b.command("move /std/room /domains/lab"), "need wizard level 10", absent=("Moved",))
+        check("level 5 cannot move into /secure", b.command("move /domains/lab/notes.txt /secure"), "need wizard level 10", absent=("Moved",))
+        check("level 5 cannot rename in /std", b.command("rename /std/room hall"), "need wizard level 10", absent=("Renamed",))
+        check("level 5 can copy from /std elsewhere", b.command("copy /std/room /domains/lab"), "Copied /std/room.cs to /domains/lab/room.cs.")
+        check("level 5 can move elsewhere", b.command("move /domains/lab/room.cs /domains/lab/sub/hall.cs"), "Moved /domains/lab/room.cs to /domains/lab/sub/hall.cs.")
+        check("source under /std is untouched", a.command("list /std"), "room.cs")
+        check("other objects cannot copy files", b.command("duplicate"), "may not read-file /domains/town/square.cs")
+        check("other objects cannot rename files", b.command("shuffle"), "may not write-file /domains/town/square.cs")
         a.command("promote bob 1")
         b.read_until("level is now")
         check("level 1 can read files", b.command("cat /domains/lab/notes.txt"), "remember the milk")

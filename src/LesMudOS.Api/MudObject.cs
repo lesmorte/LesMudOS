@@ -222,6 +222,26 @@ public abstract class MudObject
     protected void WriteFile(string path, string content) => D.WriteFile(Self, path, content);
 
     /// <summary>
+    /// Copy a mudlib file. Both paths are absolute and include the extension.
+    /// Returns false if the source does not exist. Throws if the source is a
+    /// directory, the destination directory does not exist, the destination
+    /// already exists (nothing is ever overwritten), both paths are the same,
+    /// or the file is over 256 KB. Subject to
+    /// master.ValidOperation("read-file", caller, from) and
+    /// master.ValidOperation("write-file", caller, to).
+    /// </summary>
+    protected bool CopyFile(string from, string to) => D.CopyFile(Self, from, to);
+
+    /// <summary>
+    /// Move or rename a mudlib file, within a directory or to another one.
+    /// Returns false if the source does not exist. Throws under the same
+    /// conditions as CopyFile, except that there is no size limit. Moving a
+    /// file does not unload its program. Subject to
+    /// master.ValidOperation("write-file", caller, path) for both paths.
+    /// </summary>
+    protected bool RenameFile(string from, string to) => D.RenameFile(Self, from, to);
+
+    /// <summary>
     /// Create a mudlib directory. The parent must exist. Returns false if
     /// something with that name is already there. Subject to
     /// master.ValidOperation("make-dir", caller, path).

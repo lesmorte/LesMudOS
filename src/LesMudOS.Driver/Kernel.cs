@@ -670,6 +670,63 @@ internal sealed class Kernel : IDriverServices
         Log.Info($"file written: {mudPath} by {caller.Name} ({content.Length} chars)");
     }
 
+    public bool CopyFile(ObjectRef caller, string from, string to)
+    {
+        var source = ResolveMudlibPath(caller, "read-file", from);
+        var target = ResolveMudlibPath(caller, "write-file", to);
+        if (!CheckFileTransfer(source, target)) return false;
+        var length = new FileInfo(source.FullPath).Length;
+        if (length > MaxFileBytes) throw new MudRuntimeException($"{source.MudPath} is too large to copy ({length} bytes)");
+
+        // Copy under a hidden temporary name, then move it into place without
+        // overwriting, so readers never see half a file.
+        var temp = Path.Combine(Path.GetDirectoryName(target.FullPath)!, $".{target.Segments[^1]}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.Copy(source.FullPath, temp);
+            File.Move(temp, target.FullPath, overwrite: false);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            File.Delete(temp);
+            throw new MudRuntimeException($"Could not copy {source.MudPath} to {target.MudPath}");
+        }
+        Log.Info($"file copied: {source.MudPath} to {target.MudPath} by {caller.Name} ({length} bytes)");
+        return true;
+    }
+
+    public bool RenameFile(ObjectRef caller, string from, string to)
+    {
+        var source = ResolveMudlibPath(caller, "write-file", from);
+        var target = ResolveMudlibPath(caller, "write-file", to);
+        if (!CheckFileTransfer(source, target)) return false;
+        try
+        {
+            File.Move(source.FullPath, target.FullPath, overwrite: false);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw new MudRuntimeException($"Could not move {source.MudPath} to {target.MudPath}");
+        }
+        Log.Info($"file renamed: {source.MudPath} to {target.MudPath} by {caller.Name}");
+        return true;
+    }
+
+    /// <summary>
+    /// The checks shared by CopyFile and RenameFile. False if the source does
+    /// not exist; throws for every other problem. Never allows an overwrite.
+    /// </summary>
+    private static bool CheckFileTransfer((string MudPath, string FullPath, string[] Segments) source, (string MudPath, string FullPath, string[] Segments) target)
+    {
+        if (source.MudPath == target.MudPath) throw new MudRuntimeException($"{source.MudPath} and {target.MudPath} are the same file");
+        if (source.Segments.Length == 0 || Directory.Exists(source.FullPath)) throw new MudRuntimeException($"{source.MudPath} is a directory");
+        if (!File.Exists(source.FullPath)) return false;
+        if (target.Segments.Length == 0 || File.Exists(target.FullPath) || Directory.Exists(target.FullPath))
+            throw new MudRuntimeException($"{target.MudPath} already exists");
+        if (!Directory.Exists(Path.GetDirectoryName(target.FullPath))) throw new MudRuntimeException($"No such directory for {target.MudPath}");
+        return true;
+    }
+
     public bool MakeDir(ObjectRef caller, string path)
     {
         var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "make-dir", path);

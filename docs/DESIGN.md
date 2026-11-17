@@ -267,14 +267,14 @@ Implemented and covered by `tests/smoke_test.py`:
 - Save and restore of `[Saved]` fields
 - Master-object policy hooks
 - Caller tracking with `PreviousObject()`
-- Mudlib file efuns (`GetDir`, `ReadFile`, `WriteFile`, `MakeDir`) with wizard commands `pwd`, `cd`, `list`, `cat`, `mkdir` and a line editor, `edit`
+- Mudlib file efuns (`GetDir`, `ReadFile`, `WriteFile`, `CopyFile`, `RenameFile`, `MakeDir`) with wizard commands `pwd`, `cd`, `list`, `cat`, `mkdir`, `copy`, `move`, `rename` and a line editor, `edit`
 - Wizard levels 0 to 10, level-gated commands, `promote`, and the one-time level-10 bootstrap by admin secret
 
-Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, deleting and renaming mudlib files in-game, per-domain privileges (wizard levels are global), and player passwords (anyone can log in under any name, including a wizard's).
+Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, deleting mudlib files and directories in-game, renaming directories, per-domain privileges (wizard levels are global), and player passwords (anyone can log in under any name, including a wizard's).
 
 ## 14. Roadmap
 
-1. **Authoring loop:** in-game delete and rename, an editor command that saves and updates in one step, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
+1. **Authoring loop:** in-game delete, an editor command that saves and updates in one step, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
 2. **Safety:** player passwords, per-domain privileges, instrumenting expression-bodied lambdas, a wall-clock watchdog, a cap on per-connection output.
 3. **World lifecycle:** `Reset()`, clean-up of unused objects, graceful shutdown that saves players.
 4. **Protocol:** telnet negotiation, TLS, WebSocket.

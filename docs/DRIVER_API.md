@@ -177,6 +177,8 @@ Saved fields may be numbers, strings, booleans, and lists, arrays or dictionarie
 | `IReadOnlyList<DirEntry>? GetDir(string path)` | List a mudlib directory: sub-directories first, then files, in name order. `DirEntry` has `Name`, `IsDirectory` and `Size` (bytes; 0 for directories). The path must be absolute and clean (`/` is the mudlib root; no `.` or `..` segments, no names starting with a dot), so it cannot leave the mudlib. Returns null if it is not a directory. Needs `ValidOperation("get-dir")` (arg: path). |
 | `string? ReadFile(string path)` | The text of a mudlib file, or null if it does not exist. Paths here include the extension (`/std/room.cs`) and follow the same rules as `GetDir`. Files over 256 KB are refused. Needs `ValidOperation("read-file")` (arg: path). |
 | `void WriteFile(string path, string content)` | Create or replace a mudlib file, atomically. The directory must exist; content over 256 KB is refused. Writing does not recompile: call `UpdateProgram`. Every write is logged by the driver. Needs `ValidOperation("write-file")` (arg: path). |
+| `bool CopyFile(string from, string to)` | Copy a mudlib file. Paths follow the same rules as `ReadFile`. False if the source does not exist. Throws if the source is a directory, the destination directory does not exist, the destination already exists (nothing is ever overwritten), both paths are the same, or the file is over 256 KB. Logged by the driver. Needs `ValidOperation("read-file")` (arg: from) and `ValidOperation("write-file")` (arg: to). |
+| `bool RenameFile(string from, string to)` | Move or rename a mudlib file, in the same directory or another. Same rules as `CopyFile`, without the size limit. Does not unload the program compiled from the old path. Logged by the driver. Needs `ValidOperation("write-file")` for both paths. |
 | `bool MakeDir(string path)` | Create a mudlib directory whose parent exists. False if the name is taken. Needs `ValidOperation("make-dir")` (arg: path). |
 | `string DriverStatus()` | Object, user, timer, program-version and memory statistics |
 | `bool CheckAdminSecret(string candidate)` | Compare a candidate with the secret in the driver's `LESMUDOS_ADMIN_SECRET` environment variable. The secret is never readable from mudlib code. Always false if none is configured, or after five wrong guesses since boot. Needs `ValidOperation("admin-secret")`. |
@@ -222,8 +224,8 @@ Commands in `/std/player` and the level each needs:
 | `promote <player> <level>`, `wizards` | 1 |
 | `mudstat` | 1 |
 | `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`), `cat <file>` | 1 |
-| `mkdir <dir>`, `edit <file>` outside `/secure` and `/std` | 5 |
-| `mkdir <dir>`, `edit <file>` under `/secure` and `/std` | 10 |
+| `mkdir <dir>`, `edit <file>`, `copy <from> <to>`, `move <from> <to>`, `rename <file> <newname>` outside `/secure` and `/std` | 5 |
+| The same, under `/secure` and `/std` | 10 |
 | `clone <path>` | 3 |
 | `update <path>` | 5 |
 | `shutdown` | 10 |
@@ -231,7 +233,7 @@ Commands in `/std/player` and the level each needs:
 
 Each wizard has a current mudlib directory, saved with the player. `cd` and `list` take absolute or relative paths, with `.` and `..`; `cd` alone returns to `/`. `update` and `clone` resolve relative paths against it too.
 
-File names given to `cat` and `edit` get `.cs` appended if they have no extension. Changing `/secure` and `/std` needs level 10 because that code is what enforces wizard levels: a wizard who could edit `/std/player.cs` could grant themselves anything.
+File names given to `cat`, `edit`, `copy`, `move` and `rename` get `.cs` appended if they have no extension. If the destination of `copy` or `move` is an existing directory, the file keeps its name inside it. `rename` takes a bare new name and keeps the file in its directory. None of them overwrites an existing file. `copy` needs the level to write the destination; `move` and `rename` change both places, so they need the level to write both. Changing `/secure` and `/std` needs level 10 because that code is what enforces wizard levels: a wizard who could edit `/std/player.cs` could grant themselves anything.
 
 #### The editor
 
@@ -270,7 +272,7 @@ Not in the proof of concept; names are provisional.
 
 | Efun or apply | Purpose |
 |---|---|
-| `RemoveFile`, `RemoveDir`, `Rename` | The rest of in-game file management |
+| `RemoveFile`, `RemoveDir` | Deleting files and directories in-game |
 | `Reset()` apply and `SetResetInterval` | Periodic restocking |
 | `CleanUp()` apply | Unload idle objects |
 | `Command(string)` | Force a living object to execute a command |

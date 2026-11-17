@@ -105,6 +105,8 @@ internal interface IDriverServices
     IReadOnlyList<DirEntry>? GetDir(ObjectRef caller, string path);
     string? ReadFile(ObjectRef caller, string path);
     void WriteFile(ObjectRef caller, string path, string content);
+    bool CopyFile(ObjectRef caller, string from, string to);
+    bool RenameFile(ObjectRef caller, string from, string to);
     bool MakeDir(ObjectRef caller, string path);
     string Status();
     void Shutdown(ObjectRef caller);

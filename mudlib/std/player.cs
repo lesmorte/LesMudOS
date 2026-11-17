@@ -12,8 +12,8 @@ public class Player : Thing
 
     // Wizard level needed for each wizard command. Level 0 has none of them.
     private const int LevelFiles = 1; // pwd, cd, list, cat
-    private const int LevelEdit = 5; // mkdir, edit
-    private const int LevelSystemFiles = 10; // mkdir and edit under /secure and /std
+    private const int LevelEdit = 5; // mkdir, edit, copy, move, rename
+    private const int LevelSystemFiles = 10; // mkdir, edit, copy, move, rename under /secure and /std
     private const int MaxEditLines = 5000;
     private const int LevelMudstat = 1;
     private const int LevelClone = 3;
@@ -75,6 +75,9 @@ public class Player : Thing
         AddAction("cat", CmdCat);
         AddAction("mkdir", CmdMkdir);
         AddAction("edit", CmdEdit);
+        AddAction("copy", CmdCopy);
+        AddAction("move", CmdMove);
+        AddAction("rename", CmdRename);
         AddAction("update", CmdUpdate);
         AddAction("clone", CmdClone);
         AddAction("mudstat", CmdMudstat);
@@ -203,6 +206,9 @@ public class Player : Thing
         if (level >= LevelEdit) Write(
               "          mkdir <dir>                create a directory\n" +
               "          edit <file>                create or change a file in the line editor\n" +
+              "          copy <from> <to>           copy a file (into a directory: same name)\n" +
+              "          move <from> <to>           move a file to a new name or directory\n" +
+              "          rename <file> <newname>    rename a file within its directory\n" +
               "                                     (level 10 for files under /secure and /std)\n");
         if (level >= LevelUpdate) Write("          update <path>              recompile a file and replace the loaded object\n");
         if (level >= LevelShutdown) Write("          shutdown                   stop the driver\n");
@@ -342,6 +348,65 @@ public class Player : Thing
         var target = ResolvePath(args);
         if (!IsWizard(LevelToWrite(target))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
         Write(MakeDir(target) ? $"Created {target}/\n" : $"{target} already exists.\n");
+        return true;
+    }
+
+    private bool CmdCopy(string args) => TransferFile(args, false);
+
+    private bool CmdMove(string args) => TransferFile(args, true);
+
+    /// <summary>
+    /// "copy <from> <to>" and "move <from> <to>". If the destination is an
+    /// existing directory the file keeps its name inside it. The driver never
+    /// overwrites a file. Copying needs the level to write the destination;
+    /// moving changes both places, so it needs the level to write both.
+    /// </summary>
+    private bool TransferFile(string args, bool move)
+    {
+        if (!IsWizard(LevelEdit)) return false;
+        var verb = move ? "move" : "copy";
+        var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length != 2) { NotifyFail($"Usage: {verb} <from> <to>"); return false; }
+        try
+        {
+            var from = ResolveFile(words[0]);
+            var to = ResolvePath(words[1]);
+            to = GetDir(to) != null ? (to == "/" ? "" : to) + from.Substring(from.LastIndexOf('/')) : ResolveFile(words[1]);
+            var level = move ? Math.Max(LevelToWrite(from), LevelToWrite(to)) : LevelToWrite(to);
+            if (!IsWizard(level)) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+            var done = move ? RenameFile(from, to) : CopyFile(from, to);
+            Write(done ? $"{(move ? "Moved" : "Copied")} {from} to {to}.\n" : $"{from}: no such file.\n");
+        }
+        catch (MudRuntimeException refusal)
+        {
+            Write(refusal.Message + "\n");
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// "rename <file> <newname>": a new name in the same directory. ".cs" is
+    /// assumed for a new name with no extension, as for every file name.
+    /// </summary>
+    private bool CmdRename(string args)
+    {
+        if (!IsWizard(LevelEdit)) return false;
+        var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length != 2) { NotifyFail("Usage: rename <file> <newname>"); return false; }
+        if (words[1].Contains('/')) { Write("The new name cannot contain '/'. Use move to change directory.\n"); return true; }
+        try
+        {
+            var from = ResolveFile(words[0]);
+            // Built directly rather than with ResolvePath, so ".." cannot turn
+            // into a parent directory; the driver refuses dot names itself.
+            var to = from.Substring(0, from.LastIndexOf('/') + 1) + (words[1].Contains('.') ? words[1] : words[1] + ".cs");
+            if (!IsWizard(Math.Max(LevelToWrite(from), LevelToWrite(to)))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+            Write(RenameFile(from, to) ? $"Renamed {from} to {to}.\n" : $"{from}: no such file.\n");
+        }
+        catch (MudRuntimeException refusal)
+        {
+            Write(refusal.Message + "\n");
+        }
         return true;
     }
 
