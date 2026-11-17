@@ -150,10 +150,11 @@ Messages are not newline-terminated for you; include `\n`.
 
 | Efun | Description |
 |---|---|
-| `int CallOut(Action function, double delaySeconds)` | Schedule a call. Returns an id. Skipped if this object is destructed first. `ThisPlayer()` during the call is whoever it was at scheduling time, if still alive. |
+| `int CallOut(Action function, double delaySeconds)` | Schedule a call. Returns an id. Skipped if this object is destructed first. `ThisPlayer()` during the call is whoever it was at scheduling time, if still alive. The delay may be fractional and is honoured to the millisecond: the game loop sleeps exactly until the earliest call-out is due (it is not rounded up to a second or to the 2-second heartbeat), so a call-out runs within a few milliseconds of its time unless another execution is running. The combat clock (docs/COMBAT_TIMING.md) is built on this. |
 | `bool RemoveCallOut(int id)` | Cancel a pending call-out owned by this object |
 | `void SetHeartBeat(bool on)` | |
 | `long Time()` | Unix time in seconds |
+| `long TimeMs()` | Unix time in milliseconds, from the same clock as the call-out queue. For measuring and scheduling intervals shorter than a second; the combat engine stamps every action with it. |
 | `int Random(int n)` | Uniform in `[0, n)` |
 
 ### Persistence
