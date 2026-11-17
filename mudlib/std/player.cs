@@ -1,13 +1,14 @@
-// @inherit /std/thing
+// @inherit /std/adventurer
 
 /// <summary>
 /// The player body. Its own commands are ordinary AddAction bindings, added
 /// once at login. Everything else a player can do is offered by the room and
 /// the objects around them.
 /// </summary>
-public class Player : Thing
+public class Player : Adventurer
 {
-    private const string StartRoom = "/domains/town/square";
+    // Where a new character, or one who did not quit in a logout room, enters the game.
+    private const string StartRoom = "/domains/hollow/village/square";
     private const string WizList = "/secure/wizlist";
 
     // Wizard level needed for each wizard command. Level 0 has none of them.
@@ -60,9 +61,16 @@ public class Player : Thing
 
     private string SaveFile => "/players/" + Name.ToLower();
 
+    /// <summary>Record the carried items and the logout room, then write the save file.</summary>
+    private void Save()
+    {
+        PrepareSave();
+        SaveObject(SaveFile);
+    }
+
     public override string? Short() => $"{Name} {title}";
 
-    public override string Long() => $"{Name} {title}, who has visited {logins} time(s).\n";
+    public override string Long() => $"{Name} {title}, who has visited {logins} time(s).\n" + HealthLine();
 
     // ---- Login ----
     // These public methods decide who gets into an account, so each one checks
@@ -119,7 +127,7 @@ public class Player : Thing
         if (CheckNewPassword(password) != null) return false;
         passwordHash = HashPassword(password);
         authenticated = true;
-        SaveObject(SaveFile);
+        Save();
         return true;
     }
 
@@ -145,14 +153,8 @@ public class Player : Thing
         lastLogin = Time();
 
         EnableCommands();
-        AddAction("look", CmdLook);
-        AddAction("l", CmdLook);
+        BeginAdventure();
         AddAction("say", CmdSay);
-        AddAction("get", CmdGet);
-        AddAction("take", CmdGet);
-        AddAction("drop", CmdDrop);
-        AddAction("inventory", CmdInventory);
-        AddAction("i", CmdInventory);
         AddAction("who", CmdWho);
         AddAction("title", CmdTitle);
         AddAction("password", CmdPassword);
@@ -181,70 +183,21 @@ public class Player : Thing
         AddAction("shutdown", CmdShutdown);
 
         Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type 'help' for commands.\n\n");
-        MoveObject(LoadObject(StartRoom));
+        EnterWorld(StartRoom);
         Say($"{Name} enters the game.\n");
         Look();
     }
 
     /// <summary>This player's wizard level, 0 to 10, as held by the wizard registry.</summary>
-    public int QueryWizLevel() => LoadObject(WizList).Call<int>("QueryLevel", Name);
-
-    private bool IsWizard(int level) => QueryWizLevel() >= level;
-
-    public void Look()
-    {
-        var room = Environment();
-        TellObject(Self, room == null ? "You are nowhere.\n" : room.Call<string>("Long") ?? "You see nothing.\n");
-    }
+    public override int QueryWizLevel() => LoadObject(WizList).Call<int>("QueryLevel", Name);
 
     // ---- Player commands ----
-
-    private bool CmdLook(string args)
-    {
-        if (args.StartsWith("at ")) args = args.Substring(3);
-        if (args == "") { Look(); return true; }
-        var room = Environment();
-        var target = Present(args) ?? (room == null ? null : Present(args, room));
-        if (target == null) { NotifyFail($"You see no '{args}' here."); return false; }
-        Write(target.Call<string>("Long") ?? "You see nothing special.\n");
-        return true;
-    }
 
     private bool CmdSay(string args)
     {
         if (args == "") { NotifyFail("Say what?"); return false; }
         Write($"You say: {args}\n");
         Say($"{Name} says: {args}\n");
-        return true;
-    }
-
-    private bool CmdGet(string args)
-    {
-        var room = Environment();
-        var item = room == null ? null : Present(args, room);
-        if (item == null || item == Self) { NotifyFail("Get what?"); return false; }
-        if (!item.Call<bool>("CanGet")) { Write("You can't take that.\n"); return true; }
-        MoveObject(item, Self);
-        Write($"You take {item.Call<string>("Short")}.\n");
-        Say($"{Name} takes {item.Call<string>("Short")}.\n");
-        return true;
-    }
-
-    private bool CmdDrop(string args)
-    {
-        var room = Environment();
-        var item = Present(args);
-        if (item == null || room == null) { NotifyFail("Drop what?"); return false; }
-        MoveObject(item, room);
-        Write($"You drop {item.Call<string>("Short")}.\n");
-        Say($"{Name} drops {item.Call<string>("Short")}.\n");
-        return true;
-    }
-
-    private bool CmdInventory(string args)
-    {
-        var items = AllInventory().Select(i => i.Call<string>("Short")).Where(s => s != null).ToList();
-        Write(items.Count == 0 ? "You are empty-handed.\n" : "You are carrying: " + string.Join(", ", items) + ".\n");
         return true;
     }
 
@@ -308,32 +261,38 @@ public class Player : Thing
             return;
         }
         passwordHash = HashPassword(password);
-        SaveObject(SaveFile);
+        Save();
         Write("Password changed.\n");
     }
 
     private bool CmdSave(string args)
     {
-        SaveObject(SaveFile);
+        Save();
         Write("Saved.\n");
         return true;
     }
 
     private bool CmdQuit(string args)
     {
-        SaveObject(SaveFile);
+        Save();
         Write("Goodbye.\n");
         Say($"{Name} leaves the game.\n");
-        Destruct(); // carried items fall to the floor; the connection closes
+        ReleaseInventory(); // the carried items are saved by path and come back at the next login
+        Destruct(); // the connection closes
         return true;
     }
 
     private bool CmdHelp(string args)
     {
         Write(
-            "Commands: look [at <thing>], say <text>, get <thing>, drop <thing>, inventory,\n" +
-            "          who, title <text>, password, save, quit, and the exits of the room you are in.\n" +
-            "          Objects nearby add their own verbs (try the lantern and the cat).\n");
+            "Commands: look [at THING], say TEXT, get THING, drop THING, inventory (i),\n" +
+            "          who, title TEXT, password, save, quit, and the exits of the room you are in.\n" +
+            "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
+            "Fighting:  kill (or attack) TARGET, flee, consider TARGET, hp, score (sc)\n" +
+            "Gear:      wield THING, unwield, wear THING, remove THING, eat/drink THING\n" +
+            "People:    talk (or greet) NPC, ask NPC about TOPIC, read THING\n" +
+            "Town:      browse, buy THING, sell THING, value THING (in a shop), quests,\n" +
+            "           accept QUEST and report (in the Adventurers Guild)\n");
 
         var level = QueryWizLevel();
         if (level < 1) return true;
@@ -343,7 +302,9 @@ public class Player : Thing
               "          pwd                        show the mudlib directory you are in\n" +
               "          cd [<dir>]                 change directory (.. goes up, no argument goes to /)\n" +
               "          list [<dir>]               list a directory (also: ls)\n" +
-              "          cat <file>                 show a file with line numbers\n");
+              "          cat <file>                 show a file with line numbers\n" +
+              "          goto <room path or player> move yourself to a room or to a player\n" +
+              "          stat <thing|me|here>       show the numbers of a creature, item or room\n");
         if (level >= LevelMudstat) Write("          mudstat                    driver statistics\n");
         if (level >= LevelClone) Write("          clone <path>               clone an object into your inventory or room\n");
         if (level >= LevelEdit) Write(
@@ -355,6 +316,8 @@ public class Player : Thing
               "          delete <file>              delete a file, after you confirm (cannot be undone)\n" +
               "          rmdir <dir>                remove an empty directory\n" +
               "                                     (level 10 for files under /secure and /std)\n");
+        if (level >= 5) Write("          heal [<target>]            restore a creature (or yourself) to full HP\n");
+        if (level >= 10) Write("          smite <target>             kill a creature at once, with kill credit\n");
         if (level >= LevelUpdate) Write("          update <path>              recompile a file and replace the loaded object\n");
         if (level >= LevelShutdown) Write("          shutdown                   stop the driver\n");
         return true;
@@ -398,7 +361,7 @@ public class Player : Thing
     /// start from the current directory, and "." and ".." are resolved here so
     /// that the driver only ever sees a clean absolute path.
     /// </summary>
-    private string ResolvePath(string path)
+    protected override string ResolvePath(string path)
     {
         var parts = new List<string>();
         var start = path.StartsWith("/") ? "" : cwd;
@@ -827,7 +790,8 @@ public class Player : Thing
         Write($"Recompiled {args}; {stale.Count} program(s) invalidated: {string.Join(", ", stale)}\n");
         if (old == null) return true;
 
-        var occupants = AllInventory(old).Where(Living).ToList();
+        // Only the people go through the Void; creatures and objects are rebuilt with the room.
+        var occupants = AllInventory(old).Where(Interactive).ToList();
         var limbo = LoadObject("/std/void");
         foreach (var ob in occupants) MoveObject(ob, limbo);
         Destruct(old);
@@ -868,8 +832,9 @@ public class Player : Thing
     public override void NetDead()
     {
         if (!ready) return;
-        SaveObject(SaveFile);
+        Save();
         Say($"{Name} disconnects.\n");
+        ReleaseInventory();
         Destruct();
     }
 }

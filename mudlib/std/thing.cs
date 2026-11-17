@@ -16,4 +16,10 @@ public abstract class Thing : MudObject
 
     /// <summary>May a player pick this up?</summary>
     public virtual bool CanGet() => false;
+
+    /// <summary>The numbers a builder wants to see: shown by the wizard command "stat".</summary>
+    public virtual string Stat() => $"{Self.Name}: {Name}\n";
+
+    /// <summary>The text with its first letter in upper case.</summary>
+    protected static string Cap(string text) => text.Length == 0 ? text : char.ToUpper(text[0]) + text.Substring(1);
 }

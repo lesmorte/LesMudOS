@@ -153,10 +153,24 @@ def edit(mudlib, path, old, new):
         f.write(source.replace(old, new))
 
 
+def copy_mudlib(destination):
+    """Copy the mudlib for a test run, leaving out the build output beside Mudlib.csproj
+    (only at the top: domains may have an obj/ directory of their own)."""
+    source = os.path.join(ROOT, "mudlib")
+
+    def skip(directory, names):
+        top = os.path.abspath(directory) == os.path.abspath(source)
+        return [n for n in names if (top and n in ("bin", "obj")) or n.endswith(".csproj")]
+
+    shutil.copytree(source, destination, ignore=skip)
+
+
 def main():
     work = tempfile.mkdtemp(prefix="lesmudos-test-")
     mudlib = os.path.join(work, "mudlib")
-    shutil.copytree(os.path.join(ROOT, "mudlib"), mudlib, ignore=shutil.ignore_patterns("bin", "obj", "*.csproj"))
+    copy_mudlib(mudlib)
+    # New players start in Vincent's Hollow; this test is about the driver and the Town demo, so start them there.
+    edit(mudlib, "/std/player", '"/domains/hollow/village/square"', '"/domains/town/square"')
     driver_dll = os.path.join(ROOT, "src", "LesMudOS.Driver", "bin", "Debug", "net10.0", "LesMudOS.Driver.dll")
     log = open(os.path.join(work, "driver.log"), "w")
     driver = subprocess.Popen(
@@ -680,9 +694,11 @@ public class PwImposter : Imposter
         a.send("quit")
         check("quit", a.read_until("Goodbye"), "Goodbye.")
         check("quit is announced", b.read_until("leaves the game"), "Alice leaves the game.")
-        check("carried items dropped on quit", b.command("look"), "Spinner is here.", absent=("Alice",))
+        # Changed from "carried items dropped on quit": items now stay with the character (saved by path).
+        check("carried items do not drop on quit", b.command("look"), "Town Square", absent=("Spinner", "Alice"))
         a = Client("alice")
         check("save file restored", a.read_until("> "), "Welcome back, Alice. This is visit number 2.")
+        check("carried items return at login", a.command("i"), "spinner")
         check("saved field and wizard level restored", a.command("who"), "Alice the tester [wizard 10]", "Bob the newcomer", absent=("Bob the newcomer [",))
         check("current directory restored", a.command("pwd"), "/domains/town")
         registry = open(os.path.join(work, "save", "secure", "wizlist.json")).read()

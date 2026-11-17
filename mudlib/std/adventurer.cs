@@ -1,0 +1,553 @@
+// @inherit /std/living
+
+/// <summary>
+/// Everything about playing the game: the character sheet, gameplay commands,
+/// death and respawn, quests and the saved character. /std/player inherits this
+/// and adds accounts, wizard tools and files.
+/// </summary>
+public abstract class Adventurer : Living
+{
+    private const string RespawnRoom = "/domains/hollow/village/guest_rooms";
+    private const int MaxLevel = 5;
+    private const int BaseHp = 30;
+    private const int HpPerLevel = 8;
+    private const int RegenBeats = 5; // one regeneration step per 10 seconds
+    private const int LevelGoto = 1;
+    private const int LevelStat = 1;
+    private const int LevelHeal = 5;
+    private const int LevelSmite = 10;
+
+    // Experience needed to reach level n is XpForLevel[n].
+    private static readonly int[] XpForLevel = { 0, 0, 100, 250, 500, 900 };
+
+    [Saved] private int xp;
+    [Saved] private Dictionary<string, int> quests = new();
+    [Saved] private List<string> killed = new();
+    [Saved] private List<string> carried = new();
+    [Saved] private List<int> carriedEquipped = new();
+    [Saved] private string logoutRoom = "";
+
+    private int regenBeats;
+    private bool dying;
+    private bool inventoryRestored;
+
+    public override void Create()
+    {
+        Level = 1;
+        DamageMin = 1;
+        DamageMax = 3;
+        Gold = 25;
+    }
+
+    public override int QueryMaxHp() => BaseHp + HpPerLevel * (Level - 1) + EquipmentHpBonus();
+
+    public override bool QueryPeaceful() => true; // no fighting between players
+
+    public override string QueryLabel() => Name;
+
+    /// <summary>Wizard level; /std/player overrides this with the registry's answer.</summary>
+    public virtual int QueryWizLevel() => 0;
+
+    protected bool IsWizard(int level) => QueryWizLevel() >= level;
+
+    /// <summary>Turn a typed path into an absolute one; /std/player knows the wizard's current directory.</summary>
+    protected virtual string ResolvePath(string path) => path;
+
+    // ---- Public API for other objects ----
+
+    public int QueryXp() => xp;
+
+    /// <summary>Add gold, or take it with a negative amount. Refuses (false) to go below zero.</summary>
+    public bool AddGold(int amount)
+    {
+        if (Gold + amount < 0) return false;
+        Gold += amount;
+        return true;
+    }
+
+    public void AddXp(int amount)
+    {
+        if (amount <= 0) return;
+        xp += amount;
+        Tell($"You gain {amount} experience.\n");
+        while (Level < MaxLevel && xp >= XpForLevel[Level + 1])
+        {
+            Level++;
+            Hp = QueryMaxHp();
+            Tell($"You have reached level {Level}! You feel stronger and fully healed. Maximum HP is now {QueryMaxHp()}.\n");
+        }
+    }
+
+    public int QueryQuest(string id) => quests.TryGetValue(id, out var state) ? state : 0;
+
+    public void SetQuest(string id, int state) => quests[id] = state;
+
+    public void NotifyKill(string programPath)
+    {
+        if (!killed.Contains(programPath)) killed.Add(programPath);
+    }
+
+    public bool QueryKilled(string programPath) => killed.Contains(programPath);
+
+    // ---- Saving ----
+
+    /// <summary>Record the carried items and the logout room just before the player is saved.</summary>
+    protected void PrepareSave()
+    {
+        if (!inventoryRestored) return;
+        carried.Clear();
+        carriedEquipped.Clear();
+        foreach (var item in AllInventory())
+        {
+            carried.Add(item.ProgramPath);
+            if (IsEquipped(item)) carriedEquipped.Add(carried.Count - 1);
+        }
+        var room = Environment();
+        logoutRoom = room != null && room.Call<bool>("QueryLogoutRoom") ? room.Name : "";
+    }
+
+    /// <summary>Remove the carried items from the game, as the player leaves. They return at the next login.</summary>
+    protected void ReleaseInventory()
+    {
+        foreach (var item in AllInventory()) item.Call("Vanish");
+    }
+
+    /// <summary>Bind the gameplay commands, start the heartbeat and bring the carried items back.</summary>
+    protected void BeginAdventure()
+    {
+        AddAction("look", CmdLook);
+        AddAction("l", CmdLook);
+        AddAction("get", CmdGet);
+        AddAction("take", CmdGet);
+        AddAction("drop", CmdDrop);
+        AddAction("inventory", CmdInventory);
+        AddAction("i", CmdInventory);
+        AddAction("kill", CmdKill);
+        AddAction("attack", CmdKill);
+        AddAction("flee", CmdFlee);
+        AddAction("consider", CmdConsider);
+        AddAction("wield", CmdWield);
+        AddAction("unwield", CmdUnwield);
+        AddAction("wear", CmdWear);
+        AddAction("remove", CmdRemove);
+        AddAction("eat", CmdUse);
+        AddAction("drink", CmdUse);
+        AddAction("quaff", CmdUse);
+        AddAction("talk", CmdTalk);
+        AddAction("greet", CmdTalk);
+        AddAction("ask", CmdAsk);
+        AddAction("read", CmdRead);
+        AddAction("score", CmdScore);
+        AddAction("sc", CmdScore);
+        AddAction("hp", CmdHp);
+        AddAction("quests", CmdQuests);
+        // Builder tools. Each handler checks the wizard level on every use and
+        // declines below it, so to everyone else these verbs do not exist.
+        AddAction("goto", CmdGoto);
+        AddAction("stat", CmdStat);
+        AddAction("heal", CmdHeal);
+        AddAction("smite", CmdSmite);
+
+        SetHeartBeat(true);
+
+        for (var i = 0; i < carried.Count; i++)
+        {
+            try
+            {
+                var item = CloneObject(carried[i]);
+                MoveObject(item, Self);
+                if (carriedEquipped.Contains(i)) Equip(item);
+            }
+            catch (MudRuntimeException)
+            {
+                // The file is gone or no longer compiles; the item is lost.
+            }
+        }
+        inventoryRestored = true;
+    }
+
+    /// <summary>Move the player into the world: the saved logout room, if there is one, else the start room.</summary>
+    protected void EnterWorld(string startRoom)
+    {
+        var destination = logoutRoom != "" ? logoutRoom : startRoom;
+        logoutRoom = "";
+        try
+        {
+            MoveObject(LoadObject(destination));
+        }
+        catch (MudRuntimeException) when (destination != startRoom)
+        {
+            MoveObject(LoadObject(startRoom));
+        }
+    }
+
+    public void Look()
+    {
+        var room = Environment();
+        Tell(room == null ? "You are nowhere.\n" : room.Call<string>("Long") ?? "You see nothing.\n");
+    }
+
+    protected override bool NeedsHeartBeat() => true;
+
+    protected override void Tick()
+    {
+        if (++regenBeats < RegenBeats) return;
+        regenBeats = 0;
+        if (QueryInCombat() || Hp >= QueryMaxHp()) return;
+        var room = Environment();
+        Heal(room != null && room.Call<bool>("QuerySafe") ? 3 : 1);
+    }
+
+    // ---- Death ----
+
+    /// <summary>
+    /// A player does not stay dead: they lose a tenth of their gold, forget
+    /// their enemies, and wake in the Guest Rooms at full health.
+    /// </summary>
+    public override void Die(ObjectRef? killer)
+    {
+        if (dying) return;
+        dying = true;
+        try
+        {
+            Tell("You have died!\n");
+            var room = Environment();
+            if (room != null) TellRoom(room, $"{Name} collapses and dies.\n", Self);
+            var lost = Gold / 10;
+            Gold -= lost;
+            ClearEnemies();
+            Hp = QueryMaxHp();
+            MoveObject(LoadObject(RespawnRoom));
+            TellRoom(Environment()!, $"{Name} appears, looking battered.\n", Self);
+            Tell($"You wake in the Guest Rooms, bruised but alive. The healer's fee costs you {lost} gold.\n");
+            Look();
+        }
+        finally
+        {
+            dying = false;
+        }
+    }
+
+    // ---- Commands: looking and carrying ----
+
+    private bool CmdLook(string args)
+    {
+        if (args.StartsWith("at ")) args = args.Substring(3);
+        if (args == "") { Look(); return true; }
+        var room = Environment();
+        var target = Present(args) ?? (room == null ? null : Present(args, room));
+        if (target != null)
+        {
+            Write(target.Call<string>("Long") ?? "You see nothing special.\n");
+            return true;
+        }
+        var detail = room?.Call<string>("QueryDetail", args);
+        if (detail == null) { NotifyFail($"You see no '{args}' here."); return false; }
+        Write(detail.EndsWith("\n") ? detail : detail + "\n");
+        return true;
+    }
+
+    private bool CmdGet(string args)
+    {
+        var room = Environment();
+        var item = room == null ? null : Present(args, room);
+        if (item == null || item == Self) { NotifyFail("Get what?"); return false; }
+        if (!item.Call<bool>("CanGet")) { Write("You can't take that.\n"); return true; }
+        var description = item.Call<string>("Short");
+        MoveObject(item, Self);
+        Write($"You take {description}.\n");
+        Say($"{Name} takes {description}.\n");
+        item.Call("Taken", Self);
+        return true;
+    }
+
+    private bool CmdDrop(string args)
+    {
+        var room = Environment();
+        var item = Present(args);
+        if (item == null || room == null) { NotifyFail("Drop what?"); return false; }
+        var description = item.Call<string>("Short");
+        MoveObject(item, room);
+        Write($"You drop {description}.\n");
+        Say($"{Name} drops {description}.\n");
+        return true;
+    }
+
+    private bool CmdInventory(string args)
+    {
+        var items = AllInventory()
+            .Where(i => i.Call<string>("Short") != null)
+            .Select(i => i.Call<string>("Short") + (IsEquipped(i) ? (i.Call<string>("QuerySlot") == "weapon" ? " (wielded)" : " (worn)") : ""))
+            .ToList();
+        Write(items.Count == 0 ? "You are empty-handed.\n" : "You are carrying: " + string.Join(", ", items) + ".\n");
+        return true;
+    }
+
+    private bool CmdRead(string args)
+    {
+        if (args == "") { NotifyFail("Read what?"); return false; }
+        var room = Environment();
+        var thing = Present(args) ?? (room == null ? null : Present(args, room));
+        var text = thing?.Call<string>("QueryReadText") ?? room?.Call<string>("QueryReadable", args);
+        if (text == null)
+        {
+            if (thing != null) { Write("There is nothing to read on that.\n"); return true; }
+            NotifyFail($"You see no '{args}' to read.");
+            return false;
+        }
+        Write(text.EndsWith("\n") ? text : text + "\n");
+        return true;
+    }
+
+    // ---- Commands: fighting ----
+
+    private bool CmdKill(string args)
+    {
+        var room = Environment();
+        var target = args == "" || room == null ? null : Present(args, room);
+        if (target == null) { NotifyFail("Kill what?"); return false; }
+        if (QueryFightingWith(target) && target.IsAlive) { Write("You are already fighting that.\n"); return true; }
+        var refusal = CanFight(target);
+        if (refusal != null) { Write(refusal + "\n"); return true; }
+        StartFight(target);
+        return true;
+    }
+
+    private bool CmdFlee(string args)
+    {
+        var room = Environment();
+        if (room == null || !QueryInCombat()) { Write("You are not fighting anyone.\n"); return true; }
+        if (Random(4) == 0) { Write("You try to flee, but cannot get away!\n"); return true; }
+        var exits = (room.Call<List<string>>("QueryExits") ?? new List<string>()).Where(d => room.Call<bool>("CanUseExit", Self, d)).ToList();
+        if (exits.Count > 0)
+        {
+            var direction = exits[Random(exits.Count)];
+            Write($"You flee {direction}!\n");
+            room.Call("MoveThrough", Self, direction);
+            return true;
+        }
+        Write("There is no way out!\n");
+        return true;
+    }
+
+    private bool CmdConsider(string args)
+    {
+        var room = Environment();
+        var target = args == "" || room == null ? null : Present(args, room);
+        if (target == null) { NotifyFail("Consider whom?"); return false; }
+        if (!target.Call<bool>("IsCreature")) { Write("You can't fight that.\n"); return true; }
+        var label = Cap(target.Call<string>("QueryLabel") ?? "It");
+        var difference = target.Call<int>("QueryLevel") - Level;
+        var verdict = difference <= -2 ? "looks like an easy fight"
+            : difference == -1 ? "looks a little weaker than you"
+            : difference == 0 ? "looks like an even match"
+            : difference == 1 ? "looks tougher than you"
+            : "would crush you";
+        Write($"{label} {verdict}.\n" + (target.Call<bool>("QueryPeaceful") ? "It will not fight you.\n" : ""));
+        return true;
+    }
+
+    // ---- Commands: equipment and consumables ----
+
+    private bool CmdWield(string args)
+    {
+        var item = args == "" ? null : Present(args);
+        if (item == null) { NotifyFail("Wield what?"); return false; }
+        if (item.Call<string>("QuerySlot") != "weapon") { Write("You can't wield that.\n"); return true; }
+        return PutOn(item, "You wield", "wields");
+    }
+
+    private bool CmdWear(string args)
+    {
+        var item = args == "" ? null : Present(args);
+        if (item == null) { NotifyFail("Wear what?"); return false; }
+        var slot = item.Call<string>("QuerySlot");
+        if (string.IsNullOrEmpty(slot) || slot == "weapon") { Write("You can't wear that.\n"); return true; }
+        return PutOn(item, "You put on", "puts on");
+    }
+
+    private bool PutOn(ObjectRef item, string you, string they)
+    {
+        var slot = item.Call<string>("QuerySlot")!;
+        var description = item.Call<string>("Short");
+        if (IsEquipped(item)) { Write("You already have that on.\n"); return true; }
+        var old = QueryEquipped(slot);
+        if (old != null)
+        {
+            Unequip(slot);
+            Write($"You stop using {old.Call<string>("Short")}.\n");
+        }
+        Equip(item);
+        Write($"{you} {description}.\n");
+        Say($"{Name} {they} {description}.\n");
+        return true;
+    }
+
+    private bool CmdUnwield(string args)
+    {
+        var weapon = QueryEquipped("weapon");
+        if (weapon == null) { Write("You are not wielding anything.\n"); return true; }
+        Unequip("weapon");
+        Write($"You stop wielding {weapon.Call<string>("Short")}.\n");
+        return true;
+    }
+
+    private bool CmdRemove(string args)
+    {
+        var item = args == "" ? null : Present(args);
+        if (item == null) { NotifyFail("Remove what?"); return false; }
+        var slot = item.Call<string>("QuerySlot");
+        if (string.IsNullOrEmpty(slot) || !IsEquipped(item)) { Write("You are not wearing or wielding that.\n"); return true; }
+        Unequip(slot);
+        Write($"You {(slot == "weapon" ? "stop wielding" : "take off")} {item.Call<string>("Short")}.\n");
+        return true;
+    }
+
+    private bool CmdUse(string args)
+    {
+        var verb = QueryVerb();
+        var item = args == "" ? null : Present(args);
+        if (item == null) { NotifyFail($"{Cap(verb)} what?"); return false; }
+        var kind = item.Call<string>("QueryUseVerb");
+        if (kind == null || (kind == "eat") != (verb == "eat")) { Write($"You can't {verb} that.\n"); return true; }
+        item.Call("Consume", Self);
+        return true;
+    }
+
+    // ---- Commands: talking ----
+
+    private bool CmdTalk(string args)
+    {
+        if (args.StartsWith("to ")) args = args.Substring(3);
+        var room = Environment();
+        var npc = args == "" || room == null ? null : Present(args, room);
+        if (npc == null) { NotifyFail("Talk to whom?"); return false; }
+        var line = npc.Call<string>("Talk", Self);
+        Write(line == null ? $"{Cap(npc.Call<string>("QueryLabel") ?? "It")} does not answer.\n" : line + "\n");
+        return true;
+    }
+
+    private bool CmdAsk(string args)
+    {
+        var split = args.IndexOf(" about ", StringComparison.Ordinal);
+        if (split < 0) { NotifyFail("Usage: ask NPC about TOPIC"); return false; }
+        var room = Environment();
+        var npc = room == null ? null : Present(args.Substring(0, split).Trim(), room);
+        if (npc == null) { NotifyFail("Ask whom?"); return false; }
+        var reply = npc.Call<string>("Ask", Self, args.Substring(split + 7).Trim());
+        Write(reply == null ? $"{Cap(npc.Call<string>("QueryLabel") ?? "It")} does not answer.\n" : reply + "\n");
+        return true;
+    }
+
+    // ---- Commands: the character ----
+
+    private bool CmdScore(string args)
+    {
+        var text = new StringBuilder();
+        text.Append($"{Short()}\n");
+        text.Append($"Level {Level}   Experience {xp}");
+        text.Append(Level >= MaxLevel ? " (highest level)\n" : $" ({XpForLevel[Level + 1] - xp} more for level {Level + 1})\n");
+        text.Append($"HP {Hp}/{QueryMaxHp()}   Gold {Gold}\n");
+        text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}   To hit +{Level + QueryToHit()}   Armor {QueryArmor()}\n");
+        var gear = new List<string>();
+        foreach (var slot in new[] { "weapon", "shield", "body", "head", "trinket" })
+            if (QueryEquipped(slot) is { } item) gear.Add($"{slot}: {item.Call<string>("Short")}");
+        text.Append(gear.Count == 0 ? "You have nothing equipped.\n" : "Equipment: " + string.Join(", ", gear) + "\n");
+        text.Append(QuestLog());
+        Write(text.ToString());
+        return true;
+    }
+
+    private bool CmdHp(string args)
+    {
+        Write($"HP {Hp}/{QueryMaxHp()}\n");
+        return true;
+    }
+
+    private bool CmdQuests(string args)
+    {
+        Write(QuestLog());
+        return true;
+    }
+
+    private string QuestLog()
+    {
+        var active = quests.Where(q => q.Value == 1).Select(q => QuestTitle(q.Key)).ToList();
+        var done = quests.Where(q => q.Value == 2).Select(q => QuestTitle(q.Key)).ToList();
+        if (active.Count == 0 && done.Count == 0) return "You have no quests.\n";
+        return (active.Count > 0 ? "Active quests: " + string.Join(", ", active) + "\n" : "") +
+               (done.Count > 0 ? "Completed quests: " + string.Join(", ", done) + "\n" : "");
+    }
+
+    private static string QuestTitle(string id) => Cap(id.Replace('-', ' '));
+
+    // ---- Builder tools ----
+
+    private ObjectRef? FindHere(string name)
+    {
+        var room = Environment();
+        if (name == "me" || name == "self") return Self;
+        if (name == "here") return room;
+        return Present(name) ?? (room == null ? null : Present(name, room));
+    }
+
+    private bool CmdGoto(string args)
+    {
+        if (!IsWizard(LevelGoto)) return false;
+        args = args.Trim();
+        if (args == "") { NotifyFail("Usage: goto ROOM-PATH or goto PLAYER"); return false; }
+        ObjectRef destination;
+        try
+        {
+            var player = Users().FirstOrDefault(u => string.Equals(u.Call<string>("QueryName"), args, StringComparison.OrdinalIgnoreCase));
+            var place = player == null ? null : Environment(player);
+            destination = place ?? LoadObject(ResolvePath(args));
+        }
+        catch (MudRuntimeException problem)
+        {
+            Write(problem.Message + "\n");
+            return true;
+        }
+        Say($"{Name} vanishes in a puff of smoke.\n");
+        MoveObject(destination);
+        Say($"{Name} appears in a puff of smoke.\n");
+        Look();
+        return true;
+    }
+
+    private bool CmdStat(string args)
+    {
+        if (!IsWizard(LevelStat)) return false;
+        var thing = args.Trim() == "" ? null : FindHere(args.Trim());
+        if (thing == null) { NotifyFail("Stat what? (a name, me, or here)"); return false; }
+        Write(thing.Call<string>("Stat") ?? thing.Name + "\n");
+        return true;
+    }
+
+    private bool CmdHeal(string args)
+    {
+        if (!IsWizard(LevelHeal)) return false;
+        var target = args.Trim() == "" ? Self : FindHere(args.Trim());
+        if (target == null || !target.Call<bool>("IsCreature")) { NotifyFail("Heal whom?"); return false; }
+        target.Call("Heal", 100000);
+        if (target == Self) Write("You are restored to full health.\n");
+        else
+        {
+            Write($"You restore {target.Call<string>("QueryLabel")} to full health.\n");
+            TellObject(target, "A warm light restores you to full health.\n");
+        }
+        return true;
+    }
+
+    private bool CmdSmite(string args)
+    {
+        if (!IsWizard(LevelSmite)) return false;
+        var target = args.Trim() == "" ? null : FindHere(args.Trim());
+        if (target == null || target == Self || !target.Call<bool>("IsCreature")) { NotifyFail("Smite whom?"); return false; }
+        var room = Environment();
+        Write($"You smite {target.Call<string>("QueryLabel")}!\n");
+        if (room != null) TellRoom(room, $"{Name} smites {target.Call<string>("QueryLabel")}!\n", Self, target);
+        target.Call("Die", Self);
+        return true;
+    }
+}

@@ -314,6 +314,10 @@ internal sealed class Kernel : IDriverServices
         }
 
         _objects[name] = handle;
+        // Create() may call EnableCommands(), which makes the new object ThisPlayer().
+        // Whoever is creating it (a command, a room stocking itself) must keep
+        // their own ThisPlayer() for the rest of the execution.
+        var creator = _thisPlayer;
         try
         {
             In(handle, () => handle.Target!.Create());
@@ -322,6 +326,10 @@ internal sealed class Kernel : IDriverServices
         {
             Destroy(handle);
             throw;
+        }
+        finally
+        {
+            _thisPlayer = creator;
         }
         return handle;
     }

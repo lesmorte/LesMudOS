@@ -1,5 +1,6 @@
 bin/
 obj/
+!mudlib/domains/*/obj/
 .vs/
 .idea/
 *.user
