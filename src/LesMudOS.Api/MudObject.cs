@@ -261,6 +261,24 @@ public abstract class MudObject
     protected bool RenameFile(string from, string to) => D.RenameFile(Self, from, to);
 
     /// <summary>
+    /// Delete one mudlib file. The path is absolute and includes the extension.
+    /// Returns false if nothing exists at the path. Throws if the path is a
+    /// directory or "/", or goes through a symbolic link. This cannot be
+    /// undone. Deleting a file does not unload its program or its objects.
+    /// Subject to master.ValidOperation("remove-file", caller, path).
+    /// </summary>
+    protected bool RemoveFile(string path) => D.RemoveFile(Self, path);
+
+    /// <summary>
+    /// Remove one empty mudlib directory. Returns false if nothing exists at
+    /// the path. Throws if the path is a file or "/", goes through a symbolic
+    /// link, or the directory is not empty on disk: hidden files count, even
+    /// though GetDir does not show them. Never recursive. Subject to
+    /// master.ValidOperation("remove-dir", caller, path).
+    /// </summary>
+    protected bool RemoveDir(string path) => D.RemoveDir(Self, path);
+
+    /// <summary>
     /// Create a mudlib directory. The parent must exist. Returns false if
     /// something with that name is already there. Subject to
     /// master.ValidOperation("make-dir", caller, path).

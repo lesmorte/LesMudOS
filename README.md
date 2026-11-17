@@ -69,7 +69,7 @@ This works only while no level-10 wizard exists, and stops working after five wr
 | 1 | `promote`, `wizards`, `mudstat`, `pwd`, `cd`, `list` (browse the mudlib directories) |
 | 3 | `clone` |
 | 1 | `cat` (view a file) |
-| 5 | `update`, `mkdir`, `edit` (line editor), `copy`, `move`, `rename` (level 10 for files under `/secure` and `/std`) |
+| 5 | `update`, `mkdir`, `edit` (line editor), `copy`, `move`, `rename`, `delete`, `rmdir` (level 10 for files under `/secure` and `/std`) |
 | 10 | `shutdown` |
 
 ### Create a file from inside the game
@@ -163,7 +163,7 @@ Copy `publish/` to `/opt/lesmudos/bin` and `mudlib/` to `/opt/lesmudos/mudlib` o
 
 - The sandbox is a guard rail for trusted builders, not a security boundary. Do not give mudlib write access to people you would not give a shell account.
 - Telnet is plain text, so passwords cross the network unencrypted. A wizard's password is what stands between an attacker and `edit`, which writes code onto the server. Until there is TLS, do not let wizards log in over a network you do not trust.
-- With in-game editing, the mudlib directory must be writable by the driver. The sample systemd unit keeps it read-only; add it to `ReadWritePaths` if you want `edit`, `mkdir`, `copy`, `move` and `rename` to work there.
+- With in-game editing, the mudlib directory must be writable by the driver. The sample systemd unit keeps it read-only; add it to `ReadWritePaths` if you want `edit`, `mkdir`, `copy`, `move`, `rename`, `delete` and `rmdir` to work there. `delete` and `rmdir` cannot be undone, so keep the mudlib in version control.
 
 The full list is in [DESIGN.md](docs/DESIGN.md#13-proof-of-concept-status).
 

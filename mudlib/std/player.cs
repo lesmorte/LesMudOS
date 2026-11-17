@@ -12,8 +12,8 @@ public class Player : Thing
 
     // Wizard level needed for each wizard command. Level 0 has none of them.
     private const int LevelFiles = 1; // pwd, cd, list, cat
-    private const int LevelEdit = 5; // mkdir, edit, copy, move, rename
-    private const int LevelSystemFiles = 10; // mkdir, edit, copy, move, rename under /secure and /std
+    private const int LevelEdit = 5; // mkdir, edit, copy, move, rename, delete, rmdir
+    private const int LevelSystemFiles = 10; // mkdir, edit, copy, move, rename, delete, rmdir under /secure and /std
     private const int MaxEditLines = 5000;
     private const int LevelMudstat = 1;
     private const int LevelClone = 3;
@@ -162,6 +162,8 @@ public class Player : Thing
         AddAction("copy", CmdCopy);
         AddAction("move", CmdMove);
         AddAction("rename", CmdRename);
+        AddAction("delete", CmdDelete);
+        AddAction("rmdir", CmdRmdir);
         AddAction("update", CmdUpdate);
         AddAction("clone", CmdClone);
         AddAction("mudstat", CmdMudstat);
@@ -339,6 +341,8 @@ public class Player : Thing
               "          copy <from> <to>           copy a file (into a directory: same name)\n" +
               "          move <from> <to>           move a file to a new name or directory\n" +
               "          rename <file> <newname>    rename a file within its directory\n" +
+              "          delete <file>              delete a file, after you confirm (cannot be undone)\n" +
+              "          rmdir <dir>                remove an empty directory\n" +
               "                                     (level 10 for files under /secure and /std)\n");
         if (level >= LevelUpdate) Write("          update <path>              recompile a file and replace the loaded object\n");
         if (level >= LevelShutdown) Write("          shutdown                   stop the driver\n");
@@ -532,6 +536,95 @@ public class Player : Thing
             var to = from.Substring(0, from.LastIndexOf('/') + 1) + (words[1].Contains('.') ? words[1] : words[1] + ".cs");
             if (!IsWizard(Math.Max(LevelToWrite(from), LevelToWrite(to)))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
             Write(RenameFile(from, to) ? $"Renamed {from} to {to}.\n" : $"{from}: no such file.\n");
+        }
+        catch (MudRuntimeException refusal)
+        {
+            Write(refusal.Message + "\n");
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// "delete <file>": delete one file. It cannot be undone, so the wizard
+    /// must answer y or yes first; anything else keeps the file. Directories
+    /// are removed with rmdir instead.
+    /// </summary>
+    private bool CmdDelete(string args)
+    {
+        if (!IsWizard(LevelEdit)) return false;
+        args = args.Trim();
+        if (args == "") { NotifyFail("Usage: delete <file>"); return false; }
+        try
+        {
+            var file = ResolveFile(args);
+            if (!IsWizard(LevelToWrite(file))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+            if (!IsFile(file))
+            {
+                // "delete sub" looks for sub.cs, but the wizard may have meant the directory sub.
+                var directory = GetDir(file) != null ? file : GetDir(ResolvePath(args)) != null ? ResolvePath(args) : null;
+                Write(directory != null ? $"{directory} is a directory; use rmdir to remove an empty directory.\n" : $"{file}: no such file.\n");
+                return true;
+            }
+            Write($"Delete {file}? This cannot be undone. (y/n) ");
+            InputTo(answer => DeleteConfirmed(file, answer));
+        }
+        catch (MudRuntimeException refusal)
+        {
+            Write(refusal.Message + "\n");
+        }
+        return true;
+    }
+
+    private void DeleteConfirmed(string file, string answer)
+    {
+        var reply = answer.Trim().ToLowerInvariant();
+        if (reply != "y" && reply != "yes") { Write("Not deleted.\n"); return; }
+        // Checked again here: the level may have changed while the question was open.
+        if (!IsWizard(LevelToWrite(file))) { Write("You may no longer delete that file. Not deleted.\n"); return; }
+        try
+        {
+            if (!RemoveFile(file)) { Write($"{file}: no such file.\n"); return; }
+            Write($"Deleted {file}.\n");
+            var objectPath = file.EndsWith(".cs") ? file.Substring(0, file.Length - 3) : null;
+            if (objectPath != null && FindObject(objectPath) != null)
+                Write($"{objectPath} is still loaded and will stay until it is destructed or the driver restarts.\n");
+        }
+        catch (MudRuntimeException refusal)
+        {
+            Write(refusal.Message + "\n");
+        }
+    }
+
+    /// <summary>
+    /// True if the path names a file. Looked up in the directory listing, so
+    /// files too large for ReadFile are found as well.
+    /// </summary>
+    private bool IsFile(string path)
+    {
+        var slash = path.LastIndexOf('/');
+        var name = path.Substring(slash + 1);
+        var entries = GetDir(slash == 0 ? "/" : path.Substring(0, slash));
+        return name != "" && entries != null && entries.Any(e => !e.IsDirectory && e.Name == name);
+    }
+
+    /// <summary>
+    /// "rmdir <dir>": remove one empty directory. The driver refuses a
+    /// directory with anything in it, hidden files included, and is never
+    /// recursive.
+    /// </summary>
+    private bool CmdRmdir(string args)
+    {
+        if (!IsWizard(LevelEdit)) return false;
+        args = args.Trim();
+        if (args == "") { NotifyFail("Usage: rmdir <dir>"); return false; }
+        var target = ResolvePath(args);
+        if (!IsWizard(LevelToWrite(target))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+        // The root is left to the driver, which refuses it with its own message.
+        if (target == cwd && target != "/") { Write("You are in that directory.\n"); return true; }
+        if (target != "/" && cwd.StartsWith(target + "/")) { Write("You are inside that directory.\n"); return true; }
+        try
+        {
+            Write(RemoveDir(target) ? $"Removed {target}/\n" : $"{target}: no such directory.\n");
         }
         catch (MudRuntimeException refusal)
         {

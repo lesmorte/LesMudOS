@@ -185,7 +185,7 @@ LPC is safe by construction: the only way to reach the outside world is through 
 2. **Allow-list analyzer.** `System.Private.CoreLib` cannot be left out and contains file I/O, reflection and threading, so after compilation `SandboxAnalyzer` walks the semantic model and checks every referenced symbol and the type of every expression. A type must belong to the mudlib or to an allowed namespace (`System`, `System.Collections`, `System.Collections.Generic`, `System.Linq`, `System.Text`, `LesMudOS.Api`) and must not be on a short deny-list within those (`Type`, `Activator`, `Environment`, `GC`, `AppDomain` and similar). `GetType()`, `typeof`, `goto`, finalizers, `lock`, `await` and unsafe code are rejected outright.
 3. **Operating system.** Run the driver as an unprivileged user with a read-only mudlib directory, as in the sample systemd unit.
 
-**In-game editing raises the stakes.** With `WriteFile`, a wizard who can reach the game port can put new code on the server, and that code runs inside the driver process with only the allow-list between it and the machine. The file efuns confine paths to the mudlib (absolute, no `.` or `..`, no hidden names, no symlink is ever created), the master limits them to player bodies, the sample mudlib requires level 5 (level 10 for `/secure` and `/std`), and every write is logged. None of that helps if an attacker can become a wizard, so the whole arrangement rests on player passwords (below) and on the telnet port, which carries them in plain text.
+**In-game editing raises the stakes.** With `WriteFile`, a wizard who can reach the game port can put new code on the server, and that code runs inside the driver process with only the allow-list between it and the machine. The file efuns confine paths to the mudlib (absolute, no `.` or `..`, no hidden names, no symlink is ever created), the master limits them to player bodies, the sample mudlib requires level 5 (level 10 for `/secure` and `/std`), and every write and removal is logged. The two removal efuns also refuse any path that goes through a symbolic link, and `RemoveDir` removes only directories that are empty on disk. None of that helps if an attacker can become a wizard, so the whole arrangement rests on player passwords (below) and on the telnet port, which carries them in plain text.
 
 **Threat model.** This stops honest mistakes and casual misuse. It is not proof against a determined attacker who can write mudlib code: an allow-list over a library as large as CoreLib will have holes. Treat everyone with write access to the mudlib as trusted to the level of the account the driver runs under. Supporting untrusted authors would need a real isolation boundary, which means moving the scripting language off the CLR (for example into a WebAssembly runtime) or running each domain in a separate, confined process.
 
@@ -284,15 +284,15 @@ Implemented and covered by `tests/smoke_test.py`:
 - Save and restore of `[Saved]` fields
 - Master-object policy hooks
 - Caller tracking with `PreviousObject()`
-- Mudlib file efuns (`GetDir`, `ReadFile`, `WriteFile`, `CopyFile`, `RenameFile`, `MakeDir`) with wizard commands `pwd`, `cd`, `list`, `cat`, `mkdir`, `copy`, `move`, `rename` and a line editor, `edit`
+- Mudlib file efuns (`GetDir`, `ReadFile`, `WriteFile`, `CopyFile`, `RenameFile`, `MakeDir`, `RemoveFile`, `RemoveDir`) with wizard commands `pwd`, `cd`, `list`, `cat`, `mkdir`, `copy`, `move`, `rename`, `delete` (with confirmation), `rmdir` (empty directories only) and a line editor, `edit`
 - Wizard levels 0 to 10, level-gated commands, `promote`, and the one-time level-10 bootstrap by admin secret
 - Player passwords: PBKDF2 hashing efuns, echo off at password prompts, account creation, three attempts per connection, forced password for accounts saved before passwords existed, and the `password` command
 
-Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, deleting mudlib files and directories in-game, renaming directories, and per-domain privileges (wizard levels are global). Passwords cross the network in plain text (section 8).
+Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, renaming or moving directories, and per-domain privileges (wizard levels are global). Passwords cross the network in plain text (section 8). Recursive delete is deliberately not provided: a directory has to be emptied file by file before `rmdir` removes it, and nothing deleted can be recovered.
 
 ## 14. Roadmap
 
-1. **Authoring loop:** in-game delete, an editor command that saves and updates in one step, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
+1. **Authoring loop:** renaming directories, an editor command that saves and updates in one step, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
 2. **Safety:** TLS for passwords in transit, login throttling, hashing off the game thread, per-domain privileges, instrumenting expression-bodied lambdas, a wall-clock watchdog, a cap on per-connection output.
 3. **World lifecycle:** `Reset()`, clean-up of unused objects, graceful shutdown that saves players.
 4. **Protocol:** telnet negotiation, TLS, WebSocket.

@@ -746,6 +746,71 @@ internal sealed class Kernel : IDriverServices
         return true;
     }
 
+    public bool RemoveFile(ObjectRef caller, string path)
+    {
+        var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "remove-file", path);
+        if (segments.Length == 0) throw new MudRuntimeException("/ is the mudlib root and cannot be removed");
+        RefuseLinks(mudPath, segments);
+        if (Directory.Exists(fullPath)) throw new MudRuntimeException($"{mudPath} is a directory");
+        if (!File.Exists(fullPath)) return false;
+        try
+        {
+            File.Delete(fullPath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw new MudRuntimeException($"Could not remove {mudPath}");
+        }
+        Log.Info($"file removed: {mudPath} by {caller.Name}");
+        return true;
+    }
+
+    public bool RemoveDir(ObjectRef caller, string path)
+    {
+        var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "remove-dir", path);
+        if (segments.Length == 0) throw new MudRuntimeException("/ is the mudlib root and cannot be removed");
+        RefuseLinks(mudPath, segments);
+        if (File.Exists(fullPath)) throw new MudRuntimeException($"{mudPath} is not a directory");
+        if (!Directory.Exists(fullPath)) return false;
+        try
+        {
+            // Empty means empty on disk. Hidden entries (dot-files, the temporary
+            // files of WriteFile and CopyFile) count, though GetDir does not show them.
+            var entries = Directory.EnumerateFileSystemEntries(fullPath).Select(Path.GetFileName).ToList();
+            if (entries.Count > 0)
+                throw new MudRuntimeException(entries.All(e => e!.StartsWith('.'))
+                    ? $"{mudPath} is not empty (it holds hidden files)"
+                    : $"{mudPath} is not empty");
+            // Never recursive: this fails rather than remove anything inside.
+            Directory.Delete(fullPath, recursive: false);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw new MudRuntimeException($"Could not remove {mudPath}");
+        }
+        Log.Info($"directory removed: {mudPath} by {caller.Name}");
+        return true;
+    }
+
+    /// <summary>
+    /// Refuse a path any part of which, below the mudlib root, is a symbolic
+    /// link or other reparse point, so that a removal can neither follow a link
+    /// out of the mudlib nor remove the link itself.
+    /// </summary>
+    private void RefuseLinks(string mudPath, string[] segments)
+    {
+        var current = _mudlibRoot;
+        foreach (var segment in segments)
+        {
+            current = Path.Combine(current, segment);
+            var info = new FileInfo(current);
+            // LinkTarget is set for a link even when what it points to is missing.
+            if (info.LinkTarget != null) throw new MudRuntimeException($"{mudPath} goes through a symbolic link and cannot be removed");
+            if (!info.Exists && !Directory.Exists(current)) return; // nothing further down exists either
+            if (info.Attributes.HasFlag(FileAttributes.ReparsePoint)) throw new MudRuntimeException($"{mudPath} goes through a symbolic link and cannot be removed");
+        }
+    }
+
     public bool MakeDir(ObjectRef caller, string path)
     {
         var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "make-dir", path);

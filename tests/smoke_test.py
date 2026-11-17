@@ -204,6 +204,7 @@ def main():
         check("level 0: pwd, cd, list do not exist", a.command("pwd") + a.command("cd /std") + a.command("list") + a.command("ls"), "What?", absent=("/std", "secure"))
         check("level 0: cat, mkdir, edit do not exist", a.command("cat /std/room") + a.command("mkdir /x") + a.command("edit /x.cs"), "What?", absent=("Room", "Created", "editor"))
         check("level 0: copy, move, rename do not exist", a.command("copy /std/room /x") + a.command("move /std/room /x") + a.command("rename /std/room x"), "What?", absent=("Copied", "Moved", "Renamed", "Usage"))
+        check("level 0: delete, rmdir do not exist", a.command("delete /std/room") + a.command("rmdir /std"), "What?", absent=("(y/n)", "Deleted", "Removed", "not empty", "Usage"))
         check("level 0: promote does not exist", a.command("promote bob 5"), "What?")
         check("level 0: help lists no wizard commands", a.command("help"), "Commands:", absent=("Wizard", "promote"))
         check("wrong secret is indistinguishable from no command", a.command("promote not-the-secret"), "What?")
@@ -226,7 +227,9 @@ def main():
 public class Imposter : Item
 {
     public override void Create() { Name = "imposter"; }
-    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); AddAction("peek", Peek); AddAction("scribble", Scribble); AddAction("duplicate", Duplicate); AddAction("shuffle", Shuffle); }
+    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); AddAction("peek", Peek); AddAction("scribble", Scribble); AddAction("duplicate", Duplicate); AddAction("shuffle", Shuffle); AddAction("erase", Erase); AddAction("prune", Prune); }
+    private bool Erase(string args) { RemoveFile("/domains/town/square.cs"); return true; }
+    private bool Prune(string args) { RemoveDir("/domains/lab/ghost"); return true; }
     private bool Scribble(string args) { WriteFile("/domains/town/hack.cs", "x"); return true; }
     private bool Duplicate(string args) { CopyFile("/domains/town/square.cs", "/domains/town/hack.cs"); return true; }
     private bool Shuffle(string args) { RenameFile("/domains/town/square.cs", "/domains/town/hack.cs"); return true; }
@@ -356,6 +359,105 @@ public class Imposter : Item
         check("source under /std is untouched", a.command("list /std"), "room.cs")
         check("other objects cannot copy files", b.command("duplicate"), "may not read-file /domains/town/square.cs")
         check("other objects cannot rename files", b.command("shuffle"), "may not write-file /domains/town/square.cs")
+
+        # ---- delete and rmdir ----
+        lab = os.path.join(mudlib, "domains", "lab")
+        sentinel = os.path.join(work, "sentinel.txt")  # beside the mudlib, outside it
+        with open(sentinel, "w") as f:
+            f.write("keep me")
+        a.command("copy widget doomed")
+        # The question ends without a prompt, so wait for its own last words.
+        check("delete asks for confirmation", a.command("delete doomed", marker="(y/n) "), "Delete /domains/lab/doomed.cs? This cannot be undone. (y/n) ")
+        check("delete answered n", a.command("n"), "Not deleted.", absent=("Deleted",))
+        check("file kept after n", a.command("cat doomed"), "/domains/lab/doomed.cs (9 lines)")
+        a.command("delete doomed", marker="(y/n) ")
+        check("any answer but y or yes keeps the file", a.command("yeah"), "Not deleted.")
+        a.command("delete doomed", marker="(y/n) ")
+        check("delete answered y", a.command(" Y "), "Deleted /domains/lab/doomed.cs.", absent=("still loaded",))
+        check("deleted file is gone", a.command("cat doomed"), "/domains/lab/doomed.cs: no such file.")
+        check("deleted file is gone from disk", str(os.path.exists(os.path.join(lab, "doomed.cs"))), "False")
+        a.command("copy widget doomed")
+        a.command("delete doomed.cs", marker="(y/n) ")
+        check("delete answered yes", a.command("YES"), "Deleted /domains/lab/doomed.cs.")
+        check("delete of a missing file", a.command("delete nothing"), "/domains/lab/nothing.cs: no such file.", absent=("(y/n)",))
+        check("delete of a directory is refused", a.command("delete sub"), "/domains/lab/sub is a directory; use rmdir", absent=("(y/n)",))
+        check("delete of the root is refused", a.command("delete /"), "/ is a directory", absent=("(y/n)",))
+        check("delete needs an argument", a.command("delete", marker="<file>\r\n> "), "Usage: delete <file>")
+        write(mudlib, "/domains/lab/beacon", """
+// @inherit /std/item
+public class Beacon : Item
+{
+    public override void Create() { Name = "beacon"; }
+    public override void Init() { AddAction("beckon", Beckon); }
+    private bool Beckon(string args) { Write("Loaded " + LoadObject("/domains/lab/beacon").Name + ".\\n"); return true; }
+}
+""")
+        a.command("clone beacon")
+        check("load a blueprint", a.command("beckon"), "Loaded /domains/lab/beacon.")
+        a.command("delete beacon", marker="(y/n) ")
+        check("deleting a loaded file says it stays loaded", a.command("y"), "Deleted /domains/lab/beacon.cs.",
+              "/domains/lab/beacon is still loaded and will stay until it is destructed or the driver restarts.")
+        check("loaded file is gone from disk", str(os.path.exists(os.path.join(lab, "beacon.cs"))), "False")
+
+        a.command("mkdir empty")
+        check("rmdir of an empty directory", a.command("rmdir empty"), "Removed /domains/lab/empty/")
+        check("removed directory is gone from disk", str(os.path.exists(os.path.join(lab, "empty"))), "False")
+        check("rmdir of a missing directory", a.command("rmdir empty"), "/domains/lab/empty: no such directory.")
+        check("rmdir of a non-empty directory is refused", a.command("rmdir sub"), "/domains/lab/sub is not empty", absent=("Removed",))
+        check("refused directory and its contents are still on disk", " ".join(sorted(os.listdir(os.path.join(lab, "sub")))), "gizmo.cs", "hall.cs", "widget.cs")
+        a.command("mkdir ghost")
+        open(os.path.join(lab, "ghost", ".hidden"), "w").close()
+        check("a directory with only a hidden file lists as empty", a.command("list ghost"), "(empty)")
+        check("rmdir counts hidden files", a.command("rmdir ghost"), "/domains/lab/ghost is not empty (it holds hidden files)", absent=("Removed",))
+        check("hidden file is still on disk", str(os.path.exists(os.path.join(lab, "ghost", ".hidden"))), "True")
+        check("rmdir of a file is refused", a.command("rmdir widget.cs"), "/domains/lab/widget.cs is not a directory")
+        check("widget is still on disk", str(os.path.exists(os.path.join(lab, "widget.cs"))), "True")
+        a.command("mkdir here")
+        a.command("cd here")
+        check("rmdir of the current directory is refused", a.command("rmdir /domains/lab/here"), "You are in that directory.")
+        check("rmdir . is refused", a.command("rmdir ."), "You are in that directory.")
+        check("rmdir of a parent of the current directory is refused", a.command("rmdir .."), "You are inside that directory.")
+        a.command("cd ..")
+        check("rmdir after leaving the directory", a.command("rmdir here"), "Removed /domains/lab/here/")
+        check("rmdir needs an argument", a.command("rmdir", marker="<dir>\r\n> "), "Usage: rmdir <dir>")
+        check("rmdir of the root is refused", a.command("rmdir /"), "/ is the mudlib root and cannot be removed")
+        a.command("cd /")
+        check("rmdir .. from the root is the root", a.command("rmdir .."), "/ is the mudlib root and cannot be removed")
+        a.command("cd /domains/lab")
+        check("delete cannot climb out of the mudlib", a.command("delete ../../../../etc/passwd"), "/etc/passwd.cs: no such file.", absent=("(y/n)",))
+        check("delete cannot reach a file beside the mudlib", a.command("delete ../../../sentinel.txt"), "/sentinel.txt: no such file.", absent=("(y/n)",))
+        check("rmdir cannot reach the mudlib itself", a.command("rmdir ../../../../mudlib"), "/mudlib: no such directory.")
+        check("hidden names are refused by delete", a.command("delete ghost/.hidden"), "Illegal path", absent=("(y/n)",))
+        os.symlink(sentinel, os.path.join(lab, "link.txt"))
+        outside = os.path.join(work, "outside")
+        os.mkdir(outside)
+        os.symlink(outside, os.path.join(lab, "linkdir"))
+        a.command("delete link.txt", marker="(y/n) ")
+        check("delete refuses a symbolic link", a.command("y"), "/domains/lab/link.txt goes through a symbolic link", absent=("Deleted",))
+        check("rmdir refuses a symbolic link", a.command("rmdir linkdir"), "/domains/lab/linkdir goes through a symbolic link", absent=("Removed",))
+        check("links and their targets are untouched",
+              str([os.path.islink(os.path.join(lab, "link.txt")), os.path.islink(os.path.join(lab, "linkdir")), os.path.isdir(outside)]), "[True, True, True]")
+        os.remove(os.path.join(lab, "link.txt"))
+        os.remove(os.path.join(lab, "linkdir"))
+        check("sentinel outside the mudlib still exists", open(sentinel).read(), "keep me")
+
+        check("level 5 cannot delete under /std", b.command("delete /std/room"), "need wizard level 10", absent=("(y/n)",))
+        check("level 5 cannot delete under /secure", b.command("delete /secure/master"), "need wizard level 10", absent=("(y/n)",))
+        check("level 5 cannot rmdir /std or under /secure", b.command("rmdir /std") + b.command("rmdir /secure/x"), "need wizard level 10", absent=("Removed", "not empty", "no such"))
+        check("/std/room.cs is still on disk", str(os.path.exists(os.path.join(mudlib, "std", "room.cs"))), "True")
+        b.command("delete /domains/lab/sub/hall", marker="(y/n) ")
+        check("level 5 can delete elsewhere", b.command("y"), "Deleted /domains/lab/sub/hall.cs.")
+        b.command("delete /domains/lab/sub/gizmo", marker="(y/n) ")
+        a.command("promote bob 4")
+        b.read_until("level is now")
+        check("level is checked again when the answer comes", b.command("y"), "You may no longer delete that file. Not deleted.")
+        check("so the file is still on disk", str(os.path.exists(os.path.join(lab, "sub", "gizmo.cs"))), "True")
+        check("level 4 cannot delete or rmdir", b.command("delete /domains/lab/sub/gizmo") + b.command("rmdir /domains/lab/ghost"), "What?", absent=("(y/n)", "not empty"))
+        a.command("promote bob 5")
+        b.read_until("level is now")
+        check("other objects cannot delete files", b.command("erase"), "may not remove-file /domains/town/square.cs")
+        check("other objects cannot remove directories", b.command("prune"), "may not remove-dir /domains/lab/ghost")
+        check("their targets are still on disk", str([os.path.exists(os.path.join(mudlib, "domains", "town", "square.cs")), os.path.isdir(os.path.join(lab, "ghost"))]), "[True, True]")
         a.command("promote bob 1")
         b.read_until("level is now")
         check("level 1 can read files", b.command("cat /domains/lab/notes.txt"), "remember the milk")

@@ -38,6 +38,8 @@ public class Master : MudObject, IMaster
             case "read-file":
             case "write-file":
             case "make-dir":
+            case "remove-file":
+            case "remove-dir":
             case "update":
             case "shutdown": return IsPlayerBody(caller);
             case "destruct": return IsPlayerBody(caller) || LoginMayDestruct(caller, arg);

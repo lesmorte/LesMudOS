@@ -190,6 +190,8 @@ Neither efun needs the master's permission: a hash is useless without the save f
 | `void WriteFile(string path, string content)` | Create or replace a mudlib file, atomically. The directory must exist; content over 256 KB is refused. Writing does not recompile: call `UpdateProgram`. Every write is logged by the driver. Needs `ValidOperation("write-file")` (arg: path). |
 | `bool CopyFile(string from, string to)` | Copy a mudlib file. Paths follow the same rules as `ReadFile`. False if the source does not exist. Throws if the source is a directory, the destination directory does not exist, the destination already exists (nothing is ever overwritten), both paths are the same, or the file is over 256 KB. Logged by the driver. Needs `ValidOperation("read-file")` (arg: from) and `ValidOperation("write-file")` (arg: to). |
 | `bool RenameFile(string from, string to)` | Move or rename a mudlib file, in the same directory or another. Same rules as `CopyFile`, without the size limit. Does not unload the program compiled from the old path. Logged by the driver. Needs `ValidOperation("write-file")` for both paths. |
+| `bool RemoveFile(string path)` | Delete one mudlib file. Paths follow the same rules as `ReadFile`. False if nothing exists at the path. Throws if the path is a directory or `/`, or if it or any directory on the way to it is a symbolic link. Cannot be undone, and does not unload the program or objects made from the file. Logged by the driver. Needs `ValidOperation("remove-file")` (arg: path). |
+| `bool RemoveDir(string path)` | Remove one empty mudlib directory. False if nothing exists at the path. Throws if the path is a file or `/`, if it or any directory on the way to it is a symbolic link, or if the directory is not empty. Empty means empty on disk: hidden files (dot-files, and the temporary files of `WriteFile` and `CopyFile`) count, although `GetDir` does not show them. Never recursive. Logged by the driver. Needs `ValidOperation("remove-dir")` (arg: path). |
 | `bool MakeDir(string path)` | Create a mudlib directory whose parent exists. False if the name is taken. Needs `ValidOperation("make-dir")` (arg: path). |
 | `string DriverStatus()` | Object, user, timer, program-version and memory statistics |
 | `bool CheckAdminSecret(string candidate)` | Compare a candidate with the secret in the driver's `LESMUDOS_ADMIN_SECRET` environment variable. The secret is never readable from mudlib code. Always false if none is configured, or after five wrong guesses since boot. Needs `ValidOperation("admin-secret")`. |
@@ -205,7 +207,7 @@ Neither efun needs the master's permission: a hash is useless without the save f
 | `IEnumerable<string> Preload()` | Paths to load at boot |
 | `bool ValidRead(string path, ObjectRef caller)` | Gate for `RestoreObject` |
 | `bool ValidWrite(string path, ObjectRef caller)` | Gate for `SaveObject` |
-| `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"`, `"admin-secret"`, `"get-dir"`, `"read-file"`, `"write-file"`, `"make-dir"` (arg: path) |
+| `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"`, `"admin-secret"`, `"get-dir"`, `"read-file"`, `"write-file"`, `"make-dir"`, `"remove-file"`, `"remove-dir"` (arg: path) |
 | `void LogError(string objectName, string message)` | Called after any error in an execution |
 
 ## 6. Wizard levels in the sample mudlib
@@ -235,7 +237,7 @@ Commands in `/std/player` and the level each needs:
 | `promote <player> <level>`, `wizards` | 1 |
 | `mudstat` | 1 |
 | `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`), `cat <file>` | 1 |
-| `mkdir <dir>`, `edit <file>`, `copy <from> <to>`, `move <from> <to>`, `rename <file> <newname>` outside `/secure` and `/std` | 5 |
+| `mkdir <dir>`, `edit <file>`, `copy <from> <to>`, `move <from> <to>`, `rename <file> <newname>`, `delete <file>`, `rmdir <dir>` outside `/secure` and `/std` | 5 |
 | The same, under `/secure` and `/std` | 10 |
 | `clone <path>` | 3 |
 | `update <path>` | 5 |
@@ -244,7 +246,9 @@ Commands in `/std/player` and the level each needs:
 
 Each wizard has a current mudlib directory, saved with the player. `cd` and `list` take absolute or relative paths, with `.` and `..`; `cd` alone returns to `/`. `update` and `clone` resolve relative paths against it too.
 
-File names given to `cat`, `edit`, `copy`, `move` and `rename` get `.cs` appended if they have no extension. If the destination of `copy` or `move` is an existing directory, the file keeps its name inside it. `rename` takes a bare new name and keeps the file in its directory. None of them overwrites an existing file. `copy` needs the level to write the destination; `move` and `rename` change both places, so they need the level to write both. Changing `/secure` and `/std` needs level 10 because that code is what enforces wizard levels: a wizard who could edit `/std/player.cs` could grant themselves anything.
+File names given to `cat`, `edit`, `copy`, `move`, `rename` and `delete` get `.cs` appended if they have no extension. If the destination of `copy` or `move` is an existing directory, the file keeps its name inside it. `rename` takes a bare new name and keeps the file in its directory. None of them overwrites an existing file. `copy` needs the level to write the destination; `move` and `rename` change both places, so they need the level to write both. Changing `/secure` and `/std` needs level 10 because that code is what enforces wizard levels: a wizard who could edit `/std/player.cs` could grant themselves anything.
+
+`delete` and `rmdir` are the only commands that destroy anything, and nothing they remove can be recovered. `delete <file>` asks `Delete <path>? This cannot be undone. (y/n)`; only `y` or `yes` (in any case) deletes, and anything else answers `Not deleted.` The level is checked again when the answer arrives. If the file was a `.cs` file whose object is loaded, the object stays loaded until it is destructed or the driver restarts, and `delete` says so. `delete` on a directory says to use `rmdir`. `rmdir <dir>` removes an empty directory without asking. It refuses a directory with anything in it, hidden files included, and the directory you are in or one above it. There is no recursive delete: empty a directory file by file first.
 
 #### The editor
 
@@ -307,7 +311,6 @@ Not in the proof of concept; names are provisional.
 
 | Efun or apply | Purpose |
 |---|---|
-| `RemoveFile`, `RemoveDir` | Deleting files and directories in-game |
 | `Reset()` apply and `SetResetInterval` | Periodic restocking |
 | `CleanUp()` apply | Unload idle objects |
 | `Command(string)` | Force a living object to execute a command |
