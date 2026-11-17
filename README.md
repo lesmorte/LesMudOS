@@ -125,9 +125,13 @@ Introduce a syntax error and update again: the error comes back with file and li
 
 New characters now start in the Village Square of Vincent's Hollow (the start room is the `StartRoom` constant in `mudlib/std/player.cs`; `/domains/town` stays as the small technical demo). The gameplay systems are described in [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md), and builders should read [docs/BUILDING.md](docs/BUILDING.md).
 
-Player commands: `kill`/`attack`, `flee`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
+Player commands: `ansi`, `kill`/`attack`, `flee`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
 
 Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `heal [TARGET]` (5), `smite TARGET` (10), plus `update` and `clone` as before.
+
+### Colour
+
+Text that tells you what to type, such as the exits of a room, the commands in help and the hints from shopkeepers, is shown in bold bright cyan when your terminal understands ANSI colour, and room names in bold. Colour is on by default. `ansi` shows the setting, `ansi off` turns it off (and `ansi on` back on; `color` and `colour` work as well). The setting is saved with the character. Builders mark commands with `{cmd}...{/}` in their text; see [docs/BUILDING.md](docs/BUILDING.md#colour-and-command-highlighting). `cat` and the editor show files with their tags as written.
 
 ## What a mudlib file looks like
 
@@ -170,6 +174,7 @@ public class Lantern : Item
 | `tests/smoke_test.py` | End-to-end test of the driver over TCP (port 4811 in the examples below) |
 | `tests/area_test.py` | End-to-end test of the game systems and of the Hollow's content, with test rooms and wizard help (port 4812, about 8 minutes) |
 | `tests/playthrough_test.py` | A brand-new level 1 character plays the finished area from the start to the end of both quests, against an unmodified mudlib (port 4813, 10 to 25 minutes) |
+| `tests/ansi_test.py` | Colour: tag rendering, `ansi on/off`, raw `cat`, escaping of player input (port 4814, about 30 seconds) |
 | `tests/load_check.py` | Quick check that every area file compiles and loads (port 4821, under a minute) |
 | `tests/balance_sim.py` | Standalone combat balance simulation |
 | `deploy/lesmudos.service` | Sample systemd unit (a starting point; not yet tested on a server) |
@@ -183,6 +188,7 @@ LESMUDOS_TEST_PORT=4811 python3 tests/smoke_test.py
 LESMUDOS_TEST_PORT=4812 python3 tests/area_test.py
 LESMUDOS_TEST_PORT=4813 python3 tests/playthrough_test.py
 LESMUDOS_TEST_PORT=4821 python3 tests/load_check.py
+LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
 python3 tests/balance_sim.py
 ```
 

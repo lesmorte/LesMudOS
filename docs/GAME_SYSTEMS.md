@@ -2,7 +2,7 @@
 
 The sample mudlib so far has rooms, items and wizard tools, but no game. This document specifies the gameplay layer needed for the first real area, [Vincent's Hollow](areas/vincents-hollow.md): living things, combat, equipment, NPC dialogue, shops, quests, spawning and encounters.
 
-Everything here is mudlib code under `/std`. The one driver change is small and generic, and is recorded in DRIVER_API.md: a creature that calls `EnableCommands` in its constructor no longer changes `ThisPlayer()` for the object that cloned it.
+Everything here is mudlib code under `/std`. Driver changes are small and generic, and recorded in DRIVER_API.md (colour support added one more: `NotifyFail` texts now arrive through `CatchTell`, see section 14): a creature that calls `EnableCommands` in its constructor no longer changes `ThisPlayer()` for the object that cloned it.
 
 Status: **implemented and played through.** Sections 2 to 10 and the corpses are built, and the whole of Vincent's Hollow (eight village rooms, ten dungeon rooms, every creature, item and NPC) exists and has been played from level 1 to the end of both quests by `tests/playthrough_test.py` (section 13). Where the implementation differs from the first design, this document has been corrected to describe what the code does. The list of differences is at the end of section 11.
 
@@ -223,6 +223,7 @@ Commands, available to every player:
 | `loot [<corpse>]`, `get <thing> from <corpse>`, `get all from <corpse>`, `look in <corpse>` | Corpses, see below |
 | `browse`, `buy`, `sell`, `value` | In a shop |
 | `accept`, `report` | In the Adventurers Guild |
+| `ansi [on\|off]` (also `color`, `colour`) | Show or change ANSI colour (section 14) |
 | `score` (also `sc`) | Level, experience and what the next level needs, HP, gold, equipment, quests |
 | `hp` | One-line health |
 | `quests` | Quest log |
@@ -302,6 +303,7 @@ Kills count only if they happened while the quest was active or before it was ac
 - A simulation script, `tests/balance_sim.py`, plays the combat rules outside the driver with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
 - `tests/playthrough_test.py` (port 4813, `LESMUDOS_TEST_PORT`) is the first-player test. It copies the mudlib unmodified (no stub rooms), makes a brand-new non-wizard level 1 character and plays the whole area: every exit of all 18 rooms in both directions, the sign, plaque and quest board, the brief's objects, every NPC's quoted lines word for word, the shop and the tavern (including the bed and logging out in the Guest Rooms), a deliberate death with corpse recovery and the locked-corpse message for a second player, then both quests with a fight loop (flee, rest, bed, potions, looting, the Hidden Cache, levelling) up to the Goblin Overseer, `report`, the rewards and the ending speech. A warden wizard account is used only to peek at state; if the solo character cannot finish, the test records a finding and falls back to `heal`, clearly labelled. It takes 9 to 17 minutes.
 - `tests/load_check.py` (port 4821) compiles and loads every mudlib file.
+- `tests/ansi_test.py` (port 4814) tests colour: rendering, `ansi off`, persistence, raw `cat` and editor output, escaping of player input, unclosed tags, shop columns and what a non-player object is told (section 14). `Client` in `smoke_test.py` strips ANSI sequences by default so that all other tests read plain text; `Client.raw` and `raw_command()` give the bytes.
 
 ## 13. What was verified by play
 
@@ -324,3 +326,22 @@ Behaviour that was examined and left as it is:
 
 Not verified: the Traveling Merchant's North Road appearance and the wolf are random and seen only by chance in some runs; the rare longsword is a 30% roll; recovery after a natural death was only tested through the deliberate death.
 
+## 14. Colour and command highlighting
+
+The point of the feature: wherever the game says what the player can type, that text is shown in a colour, so a new player can see what is a command and what is only description.
+
+**Markup.** Game text may contain tags in braces: `{cmd}` ... `{/}` (a command the player can type; bold bright cyan, `ESC[1;96m`), `{title}` (a room name; bold, `ESC[1m`), the plain styles `{b}`, `{u}`, `{red}` `{green}` `{yellow}` `{blue}` `{magenta}` `{cyan}` `{white}` and the bright forms `{bred}` to `{bwhite}`, and `{/}` (reset, `ESC[0m`). `{{` is a literal `{`. Any other brace sequence (`{0}`, `{foo}`, C# source) is left exactly as written. The builder rules are in [BUILDING.md](BUILDING.md#colour-and-command-highlighting).
+
+**Where it is rendered.** In one place: `Player.CatchTell` in `/std/player`, which every message to a player passes through (`Write`, `Say`, `TellRoom`, `TellObject`, and, since the driver change below, the `NotifyFail` text and `What?`). The renderer is `Thing.Markup(text, colour)` in `/std/thing`. With colour on, known tags become ANSI sequences; with colour off they are removed. In both cases `{{` becomes `{` and unknown sequences are kept. A style still open at the end of a line gets an `ESC[0m` before the newline (and at the end of a message that has no newline), so colour cannot leak into later lines or into the prompt. The existing message counter in `CatchTell` (used by `delete`) is unchanged and counts the same messages as before, plus the `What?` and `NotifyFail` texts, which now pass through `CatchTell`.
+
+**Non-players.** NPCs, monsters and the login object are not rendered for: they get the text with the tags as written. Nothing in the mudlib reads such text. Tags are never put in `Name`, `Ids` or `ShortDesc`; the shop's `browse` pads its columns by the width of the visible text (`Markup(text, false)`) in case a name does carry one. The login dialogue runs before a player body exists and stays plain text.
+
+**Setting.** `ansi` shows the setting, `ansi on` and `ansi off` change it; `color` and `colour` are aliases of the command. It is a `[Saved]` field of the player (`colour`) that defaults to on, so new characters and characters saved before the setting existed have colour. It is listed in `help`.
+
+**Raw output.** `cat` and the line editor's `p` show file text exactly as stored. They send through the private `WriteRaw` of `/std/player`, which sets a private flag around the `Write` so that `CatchTell` passes the text on unrendered; nothing outside the player body can set it. Everything else, including `list`, whose names are escaped, is rendered.
+
+**Text typed by players.** A player must not be able to colour their own speech or put tags in front of others. Every piece of player input that is shown or stored is passed through `Thing.Esc`, which turns `{` into `{{`, before it enters game text; the renderer shows `{{` as `{`, so the text appears as typed. This is done for `say` (to the speaker and to the room), `title` (escaped wherever `Short()` or `Long()` show it, so an old save is covered too), `look at X` and `read X` failures, `get X from corpse`, the shop's "does not sell 'X'", and for every wizard message that repeats a typed path, file name or player name (`cd`, `list`, `cat`, `mkdir`, `copy`, `move`, `rename`, `delete`, `rmdir`, `edit`, `update`, `clone`, `promote`, `goto`) and the driver's exception messages they show. The talk/ask commands echo nothing the player typed (NPC and topic names come from the builders). Raw ESC bytes cannot be typed at all: the telnet reader drops every byte below 32 except tab (`TelnetServer.ReadLinesAsync`), so a player cannot send `ESC[31m`; the test types one and sees `[31m` arrive as plain characters.
+
+**Driver change.** `Kernel.Command` used to write the `NotifyFail` message straight to the connection. It now calls `TellObject` on the player, so it reaches `CatchTell` like all other text. The prompt and the driver's `***` error lines still go straight to the connection and are never rendered, so they show tags as typed.
+
+**Clients.** Colour is on by default and is plain ANSI SGR (no 256-colour or truecolour codes). A client that does not understand ANSI shows `ESC[1;96m` as junk; such a player types `ansi off`. Nothing is negotiated with the client (no TTYPE or MTTS detection).

@@ -13,8 +13,42 @@ You need wizard level 3 or more to `clone`, 1 to `goto` and `stat`, 5 to `update
 5. **Set everything in `Create()`.** No constructors with arguments. Names of rooms, fields and helpers are all in the templates.
 6. **Sandbox limits.** Mudlib code may use `System`, `System.Collections.Generic`, `System.Linq`, `System.Text` and the mudlib's own types. It cannot use files, threads, reflection, `typeof`, `GetType()`, `async`, `goto`, `lock`, `Console`, `Environment`. An error shows up when the file loads. A runaway loop is stopped by the evaluation-cost limit.
 7. **Exits name rooms by path**, without `.cs`: `Exits["north"] = "/domains/hollow/village/gate";`. Any single word works as a direction (`up`, `down`, `west`); one-letter abbreviations are added automatically. If the destination file does not exist yet, players are told the way is not open yet.
-8. **Say things the way the setting does.** Long descriptions are plain text; give a creature a `Name` for speech and `ShortDesc` with its article ("a large rat") for room lists and fights.
-9. **Test it in the game.** See the last section.
+8. **Say things the way the setting does.** Long descriptions are plain text apart from the colour tags described in the next section; give a creature a `Name` for speech and `ShortDesc` with its article ("a large rat") for room lists and fights.
+9. **Tag the commands.** Wherever your text tells the player something to type, wrap it in `{cmd}` ... `{/}`. See the next section.
+10. **Test it in the game.** See the last section.
+
+## Colour and command highlighting
+
+Text that reaches a player can carry tags in braces. Write them in ordinary strings. The player's body turns them into ANSI colour when the player has colour on (the default) and removes them when it is off, so you never need to care which.
+
+| Tag | Meaning | Rendered as |
+|---|---|---|
+| `{cmd}` ... `{/}` | something the player can type | bold bright cyan (`ESC[1;96m`) |
+| `{title}` ... `{/}` | a room name | bold (`ESC[1m`) |
+| `{b}`, `{u}` | bold, underline | `ESC[1m`, `ESC[4m` |
+| `{red}` `{green}` `{yellow}` `{blue}` `{magenta}` `{cyan}` `{white}` | colours | `ESC[31m` to `ESC[37m` |
+| `{bred}` `{bgreen}` ... `{bwhite}` | bright colours | `ESC[91m` to `ESC[97m` |
+| `{/}` | end every style | `ESC[0m` |
+| `{{` | a literal `{` | `{` |
+
+Anything else in braces, such as `{0}` or `{foo}`, is left exactly as written. A style that is still open at the end of a line is closed there automatically, so a forgotten `{/}` cannot colour the rest of the screen. Styles can be stacked (`{b}{red}Danger{/}`); `{/}` resets all of them.
+
+**The rule: tag what the player can literally type.** Room exits and the words of the standard messages are done for you. In your own text, tag the exact word or phrase a player would type: `{cmd}browse{/}`, `{cmd}accept cellar{/}`, `{cmd}read{/}` in "You could {cmd}read{/} it". Do not tag ordinary words that merely resemble a command ("a long read"), words typed with a different spelling ("Browse" at the start of a sentence is not what the player types), or placeholders ("ask NPC about TOPIC": tag `ask` and `about`, not `NPC`).
+
+**Never put tags in `Name`, `Ids` or `ShortDesc`.** Those are used for matching and for lists (`Present`, the merged "Two giant rats are here.", shop columns, corpse names, combat messages), and other objects read them as plain strings. Tags belong in text that is only shown: `LongDesc`, details, readables, NPC chat, topics and emotes, refusals, `Write` and `Say` calls. A non-player object (an NPC, a monster) that is told something with `CatchTell` receives the text with the tags as written, neither rendered nor removed.
+
+Two more rules for code:
+
+- Text a player typed must have `{` doubled before it goes into game text, or they could colour their own speech and everyone else's screen. In a class derived from `Thing` call `Esc(text)`: `Write($"You see no '{Esc(args)}' here.\n");`. The standard commands already do this for `say`, `title`, and for every message that repeats an argument.
+- `cat` and the editor's `p` show files exactly as stored, so you see your own tags when you edit a room. Everything else is rendered.
+
+```
+LongDesc = "A notice hangs by the door. You could {cmd}read{/} it.";
+AddChat("Buy, {cmd}sell{/} or just {cmd}browse{/}.");
+AddTopic("bed", "Five gold a night. Just {cmd}buy bed{/}.");
+```
+
+The first player-facing line of a room, its name, is tagged by `Room` itself; do not tag `ShortDesc`.
 
 ## Rooms
 
@@ -38,7 +72,7 @@ public class ExampleHall : Room
         ResetSeconds = 120;
 
         AddDetail("floor,flagstones,flagstone", "The flagstones are chipped and swept clean.");
-        AddReadable("notice,sign", "The notice reads:\n\"Beware of rats.\"", "A hand-lettered notice. You could read it.");
+        AddReadable("notice,sign", "The notice reads:\n\"Beware of rats.\"", "A hand-lettered notice. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/example/rat", 2);
         AddSpawn("/domains/example/potion");
@@ -153,6 +187,7 @@ public class ExampleShopkeeper : Shopkeeper
         Level = 2;
         MaxHp = 25;
         AddChat("Everything is priced fairly. Mostly.");
+        AddChat("Try {cmd}browse{/} to see what I have.");
         AddStock("/domains/example/sword", 10);
         AddStock("/domains/example/potion", 15);
         AddRareStock("/domains/example/helm", 40, 30);
@@ -326,4 +361,4 @@ heal                              restore your HP (level 5); heal <creature> too
 smite rat                         kill something at once with normal death (level 10)
 ```
 
-A good loop: edit the file with `edit`, `update` it, `goto` the room, then try it as a player would: `look`, `look at` every detail, `read`, `talk`, `ask ... about`, `browse`/`buy`, `kill`, `loot`. Compile errors and sandbox complaints are shown when the file loads. `update` of a room rebuilds its non-player occupants; to refresh a creature, `update` its file and then `update` the room that spawns it. Rooms re-spawn creatures at their reset time; set `ResetSeconds = 10` while testing.
+A good loop: edit the file with `edit`, `update` it, `goto` the room, then try it as a player would (`ansi off` shows the plain text, `cat` shows your tags as you wrote them): `look`, `look at` every detail, `read`, `talk`, `ask ... about`, `browse`/`buy`, `kill`, `loot`. Compile errors and sandbox complaints are shown when the file loads. `update` of a room rebuilds its non-player occupants; to refresh a creature, `update` its file and then `update` the room that spawns it. Rooms re-spawn creatures at their reset time; set `ResetSeconds = 10` while testing.

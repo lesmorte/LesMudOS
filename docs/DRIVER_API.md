@@ -85,7 +85,7 @@ Virtual methods on `MudObject` that the driver calls. Override the ones you need
 | `bool Id(string id)` | `Present()` asks whether this object answers to a name (lower-cased) | Unchanged |
 | `string? Short()` | By mudlib convention; null means invisible | Unchanged |
 | `string Long()` | By mudlib convention | Unchanged |
-| `void CatchTell(string message)` | Text is sent to this object. The default writes it to the object's connection. | Unchanged |
+| `void CatchTell(string message)` | Text is sent to this object: `Write`, `TellObject`, `TellRoom`, `Say` and the `NotifyFail` message (or `What?`) all arrive here. The default writes it to the object's connection. `/std/player` overrides it to render colour tags. | Unchanged |
 | `void NetDead()` | The object's connection dropped | This object |
 | `void OnDestruct()` | Just before this object is destructed by `Destruct` | Unchanged |
 
@@ -132,7 +132,7 @@ Protected methods on `MudObject`. `ob` parameters default to this object where m
 | `IReadOnlyList<ObjectRef> Users()` | All interactive objects |
 | `void Exec(ObjectRef to, ObjectRef from)` | Move a connection between objects. Needs `ValidOperation("exec")`. |
 | `void AddAction(string verb, ActionHandler handler)` | Bind a verb for `ThisPlayer()`, owned by this object. `ActionHandler` is `bool (string args)`; return true if handled. Rebinding the same verb from the same object replaces the old binding. |
-| `void NotifyFail(string message)` | Message shown if no handler accepts the command |
+| `void NotifyFail(string message)` | Message shown if no handler accepts the command. Like every other message it is delivered with `CatchTell` on the player's object (before colour support it was written straight to the connection, which a player body could not intercept). The `> ` prompt and the driver's own `*** error` lines still go straight to the connection. |
 | `void InputTo(Action<string> handler, bool noEcho = false)` | Route the player's next line to a handler instead of the command parser. With `noEcho` the driver sends telnet IAC WILL ECHO, so the client stops echoing what is typed; when the line arrives it sends IAC WONT ECHO and a newline before calling the handler. Use it for passwords. |
 
 ### Communication
