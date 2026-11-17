@@ -1078,6 +1078,7 @@ class Run:
         # food and drink at full health, if not tried before
         hero.score()
         check("buy a bowl of stew", hero.cmd("buy stew"), "You buy a bowl of stew for 4 gold.")
+        hero.settle(9.0)  # a fight or a potion just before leaves the hero on a Recovery
         check("eat it", hero.cmd("eat stew"), "You spoon up the hot stew until the bowl is empty.")
         hero.go(START)
         check("buy a trail ration", hero.cmd("buy ration"), "You buy a trail ration for 5 gold.")
