@@ -4,22 +4,42 @@
 /// </summary>
 public class Master : MudObject, IMaster
 {
+    private const string WizList = "/secure/wizlist";
+
     public ObjectRef Connect() => CloneObject("/secure/login");
 
-    public IEnumerable<string> Preload() => new[] { "/std/void", "/domains/town/square" };
+    public IEnumerable<string> Preload() => new[] { WizList, "/std/void", "/domains/town/square" };
 
-    // Save files: only player bodies may touch /players/*.
-    public bool ValidRead(string path, ObjectRef caller) => IsPlayerFile(path, caller);
-    public bool ValidWrite(string path, ObjectRef caller) => IsPlayerFile(path, caller);
+    // Save files: player bodies own /players/*, the wizard registry owns its own file.
+    public bool ValidRead(string path, ObjectRef caller) => OwnsSaveFile(path, caller);
+    public bool ValidWrite(string path, ObjectRef caller) => OwnsSaveFile(path, caller);
 
-    private static bool IsPlayerFile(string path, ObjectRef caller)
-        => path.StartsWith("/players/") && caller.ProgramPath == "/std/player";
+    private static bool OwnsSaveFile(string path, ObjectRef caller)
+    {
+        if (path == WizList) return IsWizList(caller);
+        return path.StartsWith("/players/") && IsPlayerBody(caller);
+    }
 
-    // Privileged efuns: only code under /secure and /std may use them.
-    // (In this proof of concept every player is a wizard; a real mudlib would
-    // check a wizard level inside /std/player before it calls these.)
+    private static bool IsPlayerBody(ObjectRef ob) => ob.IsClone && ob.ProgramPath == "/std/player";
+
+    // Only the registry blueprint counts. A clone of it has no authority.
+    private static bool IsWizList(ObjectRef ob) => !ob.IsClone && ob.ProgramPath == WizList;
+
+    // Privileged efuns. This says which code may call them at all; whether a
+    // particular player may use the command that leads here is decided by
+    // wizard level, in /std/player and /secure/wizlist.
     public bool ValidOperation(string operation, ObjectRef caller, string? arg)
-        => caller.ProgramPath.StartsWith("/secure/") || caller.ProgramPath.StartsWith("/std/");
+    {
+        switch (operation)
+        {
+            case "admin-secret": return IsWizList(caller);
+            case "exec": return caller.ProgramPath == "/secure/login";
+            case "update":
+            case "shutdown":
+            case "destruct": return IsPlayerBody(caller);
+            default: return false;
+        }
+    }
 
     public void LogError(string objectName, string message)
     {

@@ -20,7 +20,7 @@ public interface IMaster
     /// <summary>May the caller write this save path?</summary>
     bool ValidWrite(string path, ObjectRef caller);
 
-    /// <summary>May the caller perform a privileged operation: "update", "shutdown", "destruct", "exec"? arg is the target, if any.</summary>
+    /// <summary>May the caller perform a privileged operation: "update", "shutdown", "destruct", "exec", "admin-secret"? arg is the target, if any.</summary>
     bool ValidOperation(string operation, ObjectRef caller, string? arg);
 
     /// <summary>A runtime or compile error occurred during an execution started by or for the given object.</summary>
@@ -75,6 +75,7 @@ internal interface IDriverServices
     void Move(ObjectRef what, ObjectRef destination);
     ObjectRef? Present(string id, ObjectRef container);
 
+    ObjectRef? PreviousObject(ObjectRef self);
     ObjectRef? ThisPlayer { get; }
     string Verb { get; }
     void EnableCommands(ObjectRef ob);
@@ -97,6 +98,7 @@ internal interface IDriverServices
     bool SaveObject(ObjectRef caller, string path);
     bool RestoreObject(ObjectRef caller, string path);
 
+    bool CheckAdminSecret(ObjectRef caller, string candidate);
     string Status();
     void Shutdown(ObjectRef caller);
 }

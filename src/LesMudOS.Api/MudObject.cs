@@ -114,6 +114,14 @@ public abstract class MudObject
     /// <summary>The living object whose command, heartbeat or arrival caused the current execution.</summary>
     protected ObjectRef? ThisPlayer() => D.ThisPlayer;
 
+    /// <summary>
+    /// The object whose code called into this object: through Call(), through
+    /// an efun that triggered one of this object's applies, or directly. Null
+    /// if the driver called this object at top level (heartbeat, call-out,
+    /// command). Use it for security checks instead of trusting an argument.
+    /// </summary>
+    protected ObjectRef? PreviousObject() => D.PreviousObject(Self);
+
     /// <summary>The verb of the command being executed.</summary>
     protected string QueryVerb() => D.Verb;
 
@@ -179,6 +187,15 @@ public abstract class MudObject
     protected bool RestoreObject(string path) => D.RestoreObject(Self, path);
 
     // ---- Administration ----
+
+    /// <summary>
+    /// Compare a candidate against the admin secret the driver was started
+    /// with (environment variable LESMUDOS_ADMIN_SECRET). The secret itself is
+    /// never visible to mudlib code. Always false if no secret is configured,
+    /// or after five wrong guesses since boot. Subject to
+    /// master.ValidOperation("admin-secret", ...).
+    /// </summary>
+    protected bool CheckAdminSecret(string candidate) => D.CheckAdminSecret(Self, candidate);
 
     /// <summary>Human-readable driver statistics: object count, program versions loaded and unloaded.</summary>
     protected string DriverStatus() => D.Status();

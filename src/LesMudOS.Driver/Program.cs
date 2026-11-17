@@ -23,7 +23,13 @@ if (!Directory.Exists(mudlib))
 }
 
 Log.Info($"LesMudOS driver starting; mudlib={Path.GetFullPath(mudlib)} save={Path.GetFullPath(save)}");
-var kernel = new Kernel(mudlib, save);
+// The bootstrap secret comes from the environment, never from the mudlib or the
+// command line (which other users of the machine can read from the process list).
+var adminSecret = Environment.GetEnvironmentVariable("LESMUDOS_ADMIN_SECRET");
+Log.Info(string.IsNullOrEmpty(adminSecret)
+    ? "no LESMUDOS_ADMIN_SECRET set: the first level-10 wizard cannot be created"
+    : "admin secret configured");
+var kernel = new Kernel(mudlib, save, adminSecret);
 var server = new TelnetServer(kernel, port);
 
 // The game loop gets a dedicated thread with a generous stack, so the

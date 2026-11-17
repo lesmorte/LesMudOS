@@ -61,6 +61,7 @@ public sealed class ObjectRef
     internal object? Connection;
     internal readonly List<ActionBinding> Actions = new();
     internal Action<string>? InputTo;
+    internal ObjectRef? InputToOwner;
     internal string? NotifyFail;
 }
 

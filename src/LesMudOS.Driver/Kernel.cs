@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using LesMudOS.Api;
 using LesMudOS.Driver.Compilation;
@@ -34,6 +35,10 @@ internal sealed class Kernel : IDriverServices
     private readonly List<Connection> _connections = new();
     private readonly ConditionalWeakTable<Type, Dictionary<(string, int), MethodInfo?>> _methodCache = new();
 
+    private readonly List<ObjectRef> _callStack = new();
+    private readonly byte[]? _adminSecretHash;
+    private int _adminSecretFailures;
+
     private (ObjectRef Ref, Type Type)? _pending;
     private ObjectRef? _master;
     private ObjectRef? _thisPlayer;
@@ -45,14 +50,35 @@ internal sealed class Kernel : IDriverServices
 
     private sealed record CallOutEntry(int Id, ObjectRef Owner, ObjectRef? Player, Action Function);
 
-    public Kernel(string mudlibRoot, string saveRoot)
+    public Kernel(string mudlibRoot, string saveRoot, string? adminSecret = null)
     {
+        if (!string.IsNullOrEmpty(adminSecret))
+            _adminSecretHash = SHA256.HashData(Encoding.UTF8.GetBytes(adminSecret));
         _compiler = new ProgramCompiler(mudlibRoot);
         _saves = new SaveStore(saveRoot);
         DriverHost.Services = this;
     }
 
-    private IMaster Master => _master?.Target as IMaster ?? throw new MudRuntimeException("No master object");
+    private IMaster MasterObject => _master?.Target as IMaster ?? throw new MudRuntimeException("No master object");
+
+    /// <summary>Ask the master object a question, with the master on the call stack.</summary>
+    private T AskMaster<T>(Func<IMaster, T> question) => In(_master!, () => question(MasterObject));
+
+    // ---- Call stack: which object's code is running, for PreviousObject() ----
+
+    private void In(ObjectRef ob, Action work)
+    {
+        _callStack.Add(ob);
+        try { work(); }
+        finally { if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1); }
+    }
+
+    private T In<T>(ObjectRef ob, Func<T> work)
+    {
+        _callStack.Add(ob);
+        try { return work(); }
+        finally { if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1); }
+    }
 
     // =====================================================================
     // Game loop
@@ -81,7 +107,7 @@ internal sealed class Kernel : IDriverServices
     {
         _master = LoadObject(MasterPath);
         if (_master.Target is not IMaster) throw new MudRuntimeException($"{MasterPath} must implement IMaster");
-        foreach (var path in Master.Preload())
+        foreach (var path in AskMaster(m => m.Preload().ToList()))
             Execute(null, () => LoadObject(path));
         Log.Info($"boot complete, {_objects.Count} objects loaded");
     }
@@ -93,14 +119,14 @@ internal sealed class Kernel : IDriverServices
         {
             _callOuts.Dequeue();
             if (_cancelledCallOuts.Remove(entry.Id) || !entry.Owner.IsAlive) continue;
-            Execute(entry.Player is { IsAlive: true } ? entry.Player : null, entry.Function);
+            Execute(entry.Player is { IsAlive: true } ? entry.Player : null, () => In(entry.Owner, entry.Function));
         }
         if (now >= _nextHeartBeat)
         {
             _nextHeartBeat = now + HeartBeatInterval;
             foreach (var ob in _heartBeats.ToArray())
                 if (ob is { IsAlive: true, HeartBeat: true })
-                    Execute(ob.Living ? ob : null, () => ob.Target?.HeartBeat());
+                    Execute(ob.Living ? ob : null, () => In(ob, () => ob.Target?.HeartBeat()));
         }
     }
 
@@ -114,6 +140,7 @@ internal sealed class Kernel : IDriverServices
         Runtime.Ticks = 0;
         _thisPlayer = player;
         _verb = "";
+        _callStack.Clear();
         Exception? failure = null;
         try
         {
@@ -127,6 +154,7 @@ internal sealed class Kernel : IDriverServices
         {
             _thisPlayer = null;
             _pending = null;
+            _callStack.Clear();
         }
         // Reported here, not inside the catch block: a catch handler still runs
         // on top of the faulting stack, which after runaway recursion is nearly full.
@@ -148,7 +176,7 @@ internal sealed class Kernel : IDriverServices
         try
         {
             if (player is { IsAlive: true }) Receive(player, $"*** {message}\n");
-            if (_master is { IsAlive: true }) Master.LogError(player?.Name ?? "driver", text);
+            if (_master is { IsAlive: true }) AskMaster(m => { m.LogError(player?.Name ?? "driver", text); return true; });
         }
         catch (Exception nested)
         {
@@ -165,7 +193,7 @@ internal sealed class Kernel : IDriverServices
         _connections.Add(connection);
         Execute(null, () =>
         {
-            var login = Master.Connect();
+            var login = AskMaster(m => m.Connect());
             if (!login.IsAlive) throw new MudRuntimeException("master.Connect() returned a dead object");
             login.Connection = connection;
             connection.Owner = login;
@@ -182,8 +210,10 @@ internal sealed class Kernel : IDriverServices
         {
             if (owner.InputTo is { } handler)
             {
+                var inputOwner = owner.InputToOwner is { IsAlive: true } o ? o : owner;
                 owner.InputTo = null;
-                handler(line);
+                owner.InputToOwner = null;
+                In(inputOwner, () => handler(line));
             }
             else
             {
@@ -200,7 +230,7 @@ internal sealed class Kernel : IDriverServices
         if (connection.Owner is not { IsAlive: true } owner) return;
         connection.Owner = null;
         owner.Connection = null;
-        Execute(owner, () => owner.Target?.NetDead());
+        Execute(owner, () => In(owner, () => owner.Target?.NetDead()));
     }
 
     private void Command(ObjectRef player, string line)
@@ -218,7 +248,7 @@ internal sealed class Kernel : IDriverServices
         {
             var binding = bindings[i];
             if (binding.Verb != _verb || !binding.Owner.IsAlive || !player.Actions.Contains(binding)) continue;
-            if (binding.Handler(args)) return;
+            if (In(binding.Owner, () => binding.Handler(args))) return;
             if (!player.IsAlive) return;
         }
         Receive(player, (player.NotifyFail ?? "What?") + "\n");
@@ -256,6 +286,7 @@ internal sealed class Kernel : IDriverServices
 
         var handle = new ObjectRef(name, program.Path, isClone);
         _pending = (handle, program.ObjectType);
+        _callStack.Add(handle);
         try
         {
             Activator.CreateInstance(program.ObjectType);
@@ -268,12 +299,13 @@ internal sealed class Kernel : IDriverServices
         finally
         {
             _pending = null;
+            if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1);
         }
 
         _objects[name] = handle;
         try
         {
-            handle.Target!.Create();
+            In(handle, () => handle.Target!.Create());
         }
         catch
         {
@@ -293,10 +325,10 @@ internal sealed class Kernel : IDriverServices
     public void Destruct(ObjectRef caller, ObjectRef target)
     {
         if (!target.IsAlive) return;
-        if (caller != target && !Master.ValidOperation("destruct", caller, target.Name))
+        if (caller != target && !AskMaster(m => m.ValidOperation("destruct", caller, target.Name)))
             throw new MudRuntimeException($"{caller.Name} may not destruct {target.Name}");
         if (target == _master) throw new MudRuntimeException("The master object cannot be destructed");
-        target.Target!.OnDestruct();
+        In(target, () => target.Target!.OnDestruct());
         Destroy(target);
     }
 
@@ -336,7 +368,7 @@ internal sealed class Kernel : IDriverServices
     public IReadOnlyList<string> UpdateProgram(ObjectRef caller, string path)
     {
         path = ProgramCompiler.NormalizePath(path);
-        if (!Master.ValidOperation("update", caller, path))
+        if (!AskMaster(m => m.ValidOperation("update", caller, path)))
             throw new MudRuntimeException($"{caller.Name} may not update {path}");
         var stale = _compiler.Invalidate(path);
         _compiler.Get(path); // recompile now so that errors reach whoever asked for the update
@@ -357,7 +389,7 @@ internal sealed class Kernel : IDriverServices
         if (method is null) return null;
         try
         {
-            return method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, args, null);
+            return In(target, () => method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, args, null));
         }
         catch (ArgumentException mismatch)
         {
@@ -395,7 +427,7 @@ internal sealed class Kernel : IDriverServices
             if (what.Living)
             {
                 _thisPlayer = what;
-                destination.Target?.Init();
+                In(destination, () => destination.Target?.Init());
             }
             foreach (var other in destination.Inventory.ToArray())
             {
@@ -404,18 +436,18 @@ internal sealed class Kernel : IDriverServices
                 if (what.Living)
                 {
                     _thisPlayer = what;
-                    other.Target?.Init();
+                    In(other, () => other.Target?.Init());
                 }
                 if (other.Living && StillThere())
                 {
                     _thisPlayer = other;
-                    what.Target?.Init();
+                    In(what, () => what.Target?.Init());
                 }
             }
             if (destination.Living && StillThere())
             {
                 _thisPlayer = destination;
-                what.Target?.Init();
+                In(what, () => what.Target?.Init());
             }
         }
         finally
@@ -436,13 +468,25 @@ internal sealed class Kernel : IDriverServices
         id = id.Trim().ToLowerInvariant();
         if (id.Length == 0) return null;
         foreach (var item in container.Inventory.ToArray())
-            if (item.Target is { } target && target.Id(id)) return item;
+            if (item.Target is { } target && In(item, () => target.Id(id))) return item;
         return null;
     }
 
     // =====================================================================
     // IDriverServices: living and interactive objects
     // =====================================================================
+
+    public ObjectRef? PreviousObject(ObjectRef self)
+    {
+        // The top frame is the object whose public method or apply the driver
+        // entered last. If that is the asker, its caller is one frame down.
+        // If it is not, the asker was reached by a direct C# call from the top
+        // frame's code, so the top frame is the caller.
+        var top = _callStack.Count - 1;
+        if (top < 0) return null;
+        if (_callStack[top] != self) return _callStack[top];
+        return top >= 1 ? _callStack[top - 1] : null;
+    }
 
     public ObjectRef? ThisPlayer => _thisPlayer;
     public string Verb => _verb;
@@ -458,13 +502,14 @@ internal sealed class Kernel : IDriverServices
 
     public void Exec(ObjectRef caller, ObjectRef to, ObjectRef from)
     {
-        if (!Master.ValidOperation("exec", caller, to.Name))
+        if (!AskMaster(m => m.ValidOperation("exec", caller, to.Name)))
             throw new MudRuntimeException($"{caller.Name} may not exec");
         if (!to.IsAlive || from.Connection is not Connection connection)
             throw new MudRuntimeException("exec: source is not interactive or target is dead");
         if (to.Connection is not null) throw new MudRuntimeException("exec: target is already interactive");
         from.Connection = null;
         from.InputTo = null;
+        from.InputToOwner = null;
         to.Connection = connection;
         connection.Owner = to;
         if (_thisPlayer == from) _thisPlayer = to;
@@ -487,6 +532,7 @@ internal sealed class Kernel : IDriverServices
         var target = _thisPlayer ?? caller;
         if (target.Connection is null) throw new MudRuntimeException("InputTo: no interactive player");
         target.InputTo = handler;
+        target.InputToOwner = caller;
     }
 
     // =====================================================================
@@ -497,17 +543,17 @@ internal sealed class Kernel : IDriverServices
 
     public void Write(string message)
     {
-        if (_thisPlayer is { IsAlive: true } player) player.Target!.CatchTell(message);
+        if (_thisPlayer is { IsAlive: true } player) In(player, () => player.Target!.CatchTell(message));
         else Log.Info($"write: {message.TrimEnd()}");
     }
 
-    public void TellObject(ObjectRef ob, string message) => ob.Target?.CatchTell(message);
+    public void TellObject(ObjectRef ob, string message) => In(ob, () => ob.Target?.CatchTell(message));
 
     public void TellRoom(ObjectRef room, string message, ObjectRef[] exclude)
     {
         foreach (var listener in room.Inventory.ToArray())
             if (listener.Living && Array.IndexOf(exclude, listener) < 0)
-                listener.Target?.CatchTell(message);
+                In(listener, () => listener.Target?.CatchTell(message));
     }
 
     public void Say(ObjectRef caller, string message)
@@ -548,7 +594,7 @@ internal sealed class Kernel : IDriverServices
     public bool SaveObject(ObjectRef caller, string path)
     {
         path = ProgramCompiler.NormalizePath(path);
-        if (!Master.ValidWrite(path, caller)) throw new MudRuntimeException($"{caller.Name} may not write {path}");
+        if (!AskMaster(m => m.ValidWrite(path, caller))) throw new MudRuntimeException($"{caller.Name} may not write {path}");
         _saves.Save(caller.Target!, path);
         return true;
     }
@@ -556,8 +602,29 @@ internal sealed class Kernel : IDriverServices
     public bool RestoreObject(ObjectRef caller, string path)
     {
         path = ProgramCompiler.NormalizePath(path);
-        if (!Master.ValidRead(path, caller)) throw new MudRuntimeException($"{caller.Name} may not read {path}");
+        if (!AskMaster(m => m.ValidRead(path, caller))) throw new MudRuntimeException($"{caller.Name} may not read {path}");
         return _saves.Restore(caller.Target!, path);
+    }
+
+    private const int MaxAdminSecretFailures = 5;
+
+    public bool CheckAdminSecret(ObjectRef caller, string candidate)
+    {
+        if (!AskMaster(m => m.ValidOperation("admin-secret", caller, null)))
+            throw new MudRuntimeException($"{caller.Name} may not check the admin secret");
+        if (_adminSecretHash is null || _adminSecretFailures >= MaxAdminSecretFailures) return false;
+
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(candidate));
+        if (CryptographicOperations.FixedTimeEquals(hash, _adminSecretHash))
+        {
+            Log.Info($"admin secret accepted (asked by {caller.Name}, player {_thisPlayer?.Name ?? "none"})");
+            return true;
+        }
+        _adminSecretFailures++;
+        Log.Info($"admin secret REJECTED, attempt {_adminSecretFailures} of {MaxAdminSecretFailures} (player {_thisPlayer?.Name ?? "none"})");
+        if (_adminSecretFailures >= MaxAdminSecretFailures)
+            Log.Info("admin secret disabled until the driver is restarted");
+        return false;
     }
 
     public string Status()
@@ -577,7 +644,7 @@ internal sealed class Kernel : IDriverServices
 
     public void Shutdown(ObjectRef caller)
     {
-        if (!Master.ValidOperation("shutdown", caller, null))
+        if (!AskMaster(m => m.ValidOperation("shutdown", caller, null)))
             throw new MudRuntimeException($"{caller.Name} may not shut the driver down");
         Log.Info($"shutdown requested by {caller.Name}");
         _shutdown = true;

@@ -7,6 +7,9 @@ Wants=network-online.target
 User=lesmudos
 Group=lesmudos
 WorkingDirectory=/opt/lesmudos
+# Optional: a root-only file containing LESMUDOS_ADMIN_SECRET=..., needed once
+# to create the first level-10 wizard. Remove it afterwards.
+EnvironmentFile=-/etc/lesmudos.env
 ExecStart=/opt/lesmudos/bin/LesMudOS.Driver --mudlib /opt/lesmudos/mudlib --save /opt/lesmudos/save --port 4000
 Restart=on-failure
 RestartSec=5

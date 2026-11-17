@@ -3,8 +3,9 @@
 
 Starts the driver against a temporary copy of the mudlib, logs two players in
 over TCP, and checks: movement, object-supplied verbs, call_out, heartbeat,
-persistence, live update of a room and of a base class, compile-error
-handling, the sandbox, the evaluation-cost limit and the recursion guard.
+persistence, wizard levels and promotion, live update of a room and of a base
+class, compile-error handling, the sandbox, the evaluation-cost limit and the
+recursion guard.
 
 Usage (from the repository root, after `dotnet build`):
     python3 tests/smoke_test.py
@@ -19,6 +20,7 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = 4777
+SECRET = "correct horse battery staple"
 failures = []
 
 
@@ -84,7 +86,7 @@ def main():
     log = open(os.path.join(work, "driver.log"), "w")
     driver = subprocess.Popen(
         ["dotnet", driver_dll, "--mudlib", mudlib, "--save", os.path.join(work, "save"), "--port", str(PORT)],
-        stdout=log, stderr=subprocess.STDOUT)
+        stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "LESMUDOS_ADMIN_SECRET": SECRET})
     try:
         for _ in range(100):
             try:
@@ -119,6 +121,57 @@ def main():
         check("inventory", a.command("i"), "a brass lantern (lit)")
         check("call_out fires", a.read_until("goes dark", timeout=30), "Your lantern sputters")
         a.command("s")
+
+        # ---- wizard levels ----
+        check("level 0: update does not exist", a.command("update /domains/town/square"), "What?", absent=("Recompiled",))
+        check("level 0: mudstat does not exist", a.command("mudstat"), "What?", absent=("Objects",))
+        check("level 0: shutdown does not exist", a.command("shutdown"), "What?")
+        check("level 0: promote does not exist", a.command("promote bob 5"), "What?")
+        check("level 0: help lists no wizard commands", a.command("help"), "Commands:", absent=("Wizard", "promote"))
+        check("wrong secret is indistinguishable from no command", a.command("promote not-the-secret"), "What?")
+        check("secret creates the first level-10 wizard", a.command("promote " + SECRET), "You are now a level 10 wizard")
+        check("secret refused once a level-10 wizard exists", b.command("promote " + SECRET), "What?")
+        # The wizard help text itself contains "> ", so wait for its last line instead of the prompt.
+        check("help now lists wizard commands", a.command("help", marker="stop the driver"), "Wizard commands at your level (10)", "shutdown")
+        a.read_until("> ")
+        check("promote above own level refused", a.command("promote bob 11"), "from 0 to 10")
+        check("promote unknown player refused", a.command("promote carol 3"), "No player of that name is online")
+        check("promote self refused", a.command("promote alice 5"), "cannot change your own level")
+        check("promote to level 5", a.command("promote bob 5"), "bob is now wizard level 5")
+        check("promoted player is told", b.read_until("level is now"), "Your wizard level is now 5.")
+        check("level 5 can use mudstat", b.command("mudstat"), "Objects:")
+        check("level 5 cannot shut down", b.command("shutdown"), "What?")
+        check("level 5 cannot promote past own level", b.command("promote alice 6"), "from 0 to 5")
+        check("level 5 cannot demote a superior", b.command("promote alice 0"), "below your own level")
+        write(mudlib, "/domains/town/imposter", """
+// @inherit /std/item
+public class Imposter : Item
+{
+    public override void Create() { Name = "imposter"; }
+    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); }
+    private bool Usurp(string args)
+    {
+        Write("usurp: " + LoadObject("/secure/wizlist").Call<string>("Promote", "bob", 10) + "\\n");
+        return true;
+    }
+    private bool Guess(string args)
+    {
+        Write("guess: " + LoadObject("/secure/wizlist").Call<bool>("Bootstrap", args) + " " + CheckAdminSecret(args) + "\\n");
+        return true;
+    }
+    private bool Forge(string args) { SaveObject("/secure/wizlist"); return true; }
+}
+""")
+        check("level 5 can clone", b.command("clone /domains/town/imposter"), "Cloned /domains/town/imposter#")
+        check("other objects cannot promote on a wizard's behalf", b.command("usurp"), "usurp: Only a player can do that.")
+        check("other objects cannot write the registry", b.command("forge"), "may not write /secure/wizlist")
+        check("other objects cannot test the secret", b.command("guess " + SECRET), "may not check the admin secret")
+        check("wizards lists levels", a.command("wizards"), "alice (10)", "bob (5)")
+        check("who shows wizard level", b.command("who"), "Alice the newcomer [wizard 10]", "Bob the newcomer [wizard 5]")
+        check("demote to 0", a.command("promote bob 0"), "bob is now wizard level 0")
+        b.read_until("level is now")
+        check("demoted player loses commands at once", b.command("mudstat"), "What?", absent=("Objects",))
+        b.command("drop imposter")
 
         # ---- live update of a room, with players standing in it ----
         edit(mudlib, "/domains/town/square", "a dry fountain", "a fountain that now runs with wine")
@@ -187,7 +240,9 @@ public class Spinner : Item
         check("carried items dropped on quit", b.command("look"), "Spinner is here.", absent=("Alice",))
         a = Client("alice")
         check("save file restored", a.read_until("> "), "Welcome back, Alice. This is visit number 2.")
-        check("saved field restored", a.command("who"), "Alice the tester", "Bob the newcomer")
+        check("saved field and wizard level restored", a.command("who"), "Alice the tester [wizard 10]", "Bob the newcomer", absent=("Bob the newcomer [",))
+        registry = open(os.path.join(work, "save", "secure", "wizlist.json")).read()
+        check("registry saved to disk", registry, '"alice": 10', absent=("bob",))
 
         # ---- shutdown ----
         a.send("shutdown")

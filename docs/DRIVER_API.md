@@ -124,6 +124,7 @@ Protected methods on `MudObject`. `ob` parameters default to this object where m
 | Efun | Description |
 |---|---|
 | `ObjectRef? ThisPlayer()` | The living object the current execution is for |
+| `ObjectRef? PreviousObject()` | The object whose code called into this one: through `Call`, through an efun that triggered one of this object's applies, or directly. Null if the driver entered this object at top level (command, heartbeat, call-out). Use it for security checks instead of trusting an argument. |
 | `string QueryVerb()` | The verb of the command being executed |
 | `void EnableCommands()` | Mark this object living. Also makes it `ThisPlayer()` for the rest of the execution, so it can bind its own commands. |
 | `bool Living(ObjectRef ob)` | |
@@ -174,6 +175,7 @@ Saved fields may be numbers, strings, booleans, and lists, arrays or dictionarie
 | Efun | Description |
 |---|---|
 | `string DriverStatus()` | Object, user, timer, program-version and memory statistics |
+| `bool CheckAdminSecret(string candidate)` | Compare a candidate with the secret in the driver's `LESMUDOS_ADMIN_SECRET` environment variable. The secret is never readable from mudlib code. Always false if none is configured, or after five wrong guesses since boot. Needs `ValidOperation("admin-secret")`. |
 | `void Shutdown()` | Stop the driver. Needs `ValidOperation("shutdown")`. |
 
 ## 5. The master object
@@ -186,10 +188,43 @@ Saved fields may be numbers, strings, booleans, and lists, arrays or dictionarie
 | `IEnumerable<string> Preload()` | Paths to load at boot |
 | `bool ValidRead(string path, ObjectRef caller)` | Gate for `RestoreObject` |
 | `bool ValidWrite(string path, ObjectRef caller)` | Gate for `SaveObject` |
-| `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"` |
+| `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"`, `"admin-secret"` |
 | `void LogError(string objectName, string message)` | Called after any error in an execution |
 
-## 6. Errors
+## 6. Wizard levels in the sample mudlib
+
+Wizard levels are mudlib policy, not a driver feature. The driver contributes only `PreviousObject()` and `CheckAdminSecret()`.
+
+`/secure/wizlist` is the registry. It maps player names to levels 1 to 10; anyone not listed is level 0. Its public functions:
+
+| Function | Description |
+|---|---|
+| `int QueryLevel(string name)` | 0 if not a wizard |
+| `List<string> QueryWizards()` | `name (level)`, highest first |
+| `string? Promote(string target, int level)` | Set a level. Returns null on success or the reason for refusing. The actor is taken from `PreviousObject()` and must be the body of the player issuing the current command. |
+| `bool Bootstrap(string secret)` | Make the calling player level 10 if the admin secret matches and no level-10 wizard exists |
+
+Rules enforced by `Promote`:
+
+- The actor must be at least level 1.
+- The new level must be between 0 and the actor's own level.
+- The target must currently be below the actor's level, and cannot be the actor.
+- The target must be online or already in the registry.
+
+Commands in `/std/player` and the level each needs:
+
+| Command | Level |
+|---|---|
+| `promote <player> <level>`, `wizards` | 1 |
+| `mudstat` | 1 |
+| `clone <path>` | 3 |
+| `update <path>` | 5 |
+| `shutdown` | 10 |
+| `promote <secret>` | Any, but only works while there is no level-10 wizard |
+
+Below the required level a command answers `What?`, the same as a verb that does not exist. Levels are checked on every use, so a demotion takes effect immediately.
+
+## 7. Errors
 
 | Exception | Raised when |
 |---|---|
@@ -200,14 +235,13 @@ Saved fields may be numbers, strings, booleans, and lists, arrays or dictionarie
 
 Any exception that reaches the driver aborts the current execution, is logged, and is shown to `ThisPlayer()` prefixed with `***`. Mudlib code may catch exceptions, but cannot use that to outrun the tick limit.
 
-## 7. Planned additions
+## 8. Planned additions
 
 Not in the proof of concept; names are provisional.
 
 | Efun or apply | Purpose |
 |---|---|
 | `ReadFile`, `WriteFile`, `GetDir`, `FileSize`, `RemoveFile` | In-game editing, gated by `ValidRead` / `ValidWrite` |
-| `PreviousObject()` | Caller identification for mudlib-level security checks |
 | `Reset()` apply and `SetResetInterval` | Periodic restocking |
 | `CleanUp()` apply | Unload idle objects |
 | `Command(string)` | Force a living object to execute a command |

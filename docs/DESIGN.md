@@ -189,6 +189,21 @@ LPC is safe by construction: the only way to reach the outside world is through 
 
 Policy that LPmud puts in the master object stays there: `ValidRead`, `ValidWrite` and `ValidOperation` gate save files, `update`, `exec`, `shutdown` and destructing other objects.
 
+### Caller identity
+
+The kernel keeps a stack of the objects whose code it has entered: every apply, every `Call`, every action handler, call-out and `InputTo` handler pushes its object. `PreviousObject()` reads that stack, so a security-sensitive function can ask who is calling instead of trusting an argument. The master's checks say which program may use a privileged efun; `PreviousObject()` lets mudlib code such as the wizard registry say which object may call a function.
+
+Direct C# calls between objects (through `As<T>()`) do not push a frame. In that case `PreviousObject()` returns the object the driver entered last, which is the code that made the direct call.
+
+### Wizard levels and the admin secret
+
+Wizard levels (0 to 10) are implemented in the sample mudlib by `/secure/wizlist`, described in DRIVER_API.md section 6. Two points concern the driver:
+
+- **The first level-10 wizard** is created with `promote <secret>`. The secret is read from the `LESMUDOS_ADMIN_SECRET` environment variable at boot and held only as a hash. Mudlib code cannot read it; it can only ask `CheckAdminSecret(candidate)`, and the master restricts that efun to the registry. The registry refuses the bootstrap once any level-10 wizard exists. The secret is kept out of the mudlib because the mudlib is source code in a repository.
+- **Guessing** is limited to five wrong attempts per boot, after which the check returns false until the driver is restarted. Attempts are logged. The cost is that any player can use up the attempts and block the bootstrap until a restart, which is acceptable because the bootstrap is needed once.
+
+The secret is typed as a command, so it crosses the network in plain text and may be echoed by the client. Do the bootstrap from the server itself (`telnet localhost`) and then unset the variable.
+
 ## 9. Resource limits
 
 The CLR has no instruction counter and no safe way to abort a thread, so the limit is built into the code at compile time. `TickInjector` inserts a call to `Runtime.Tick()`:
@@ -249,13 +264,15 @@ Implemented and covered by `tests/smoke_test.py`:
 - Evaluation-cost limit and recursion guard
 - Save and restore of `[Saved]` fields
 - Master-object policy hooks
+- Caller tracking with `PreviousObject()`
+- Wizard levels 0 to 10, level-gated commands, `promote`, and the one-time level-10 bootstrap by admin secret
 
-Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus `previous_object()`-style caller tracking (privileged efuns pass the calling object, but there is no general call-chain inspection), shadows, a file-access efun set for in-game editing (`ReadFile`, `WriteFile`, `GetDir`), and wizard levels in the sample mudlib (every player can use the wizard commands).
+Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, a file-access efun set for in-game editing (`ReadFile`, `WriteFile`, `GetDir`), per-domain privileges (wizard levels are global), and player passwords (anyone can log in under any name, including a wizard's).
 
 ## 14. Roadmap
 
 1. **Authoring loop:** in-game file efuns gated by `ValidRead` / `ValidWrite`, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
-2. **Safety:** instrument expression-bodied lambdas, add a wall-clock watchdog, cap per-connection output, add wizard levels and per-domain privileges to the sample mudlib.
+2. **Safety:** player passwords, per-domain privileges, instrumenting expression-bodied lambdas, a wall-clock watchdog, a cap on per-connection output.
 3. **World lifecycle:** `Reset()`, clean-up of unused objects, graceful shutdown that saves players.
 4. **Protocol:** telnet negotiation, TLS, WebSocket.
 5. **Language features:** `async` scripts on a single-threaded scheduler, so that `await Prompt("Name: ")` can replace `InputTo` chains.

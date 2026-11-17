@@ -44,9 +44,32 @@ A ginger tavern cat is here.
 The cat purrs like a small engine.
 ```
 
+### Become a wizard
+
+New players are wizard level 0 and have no wizard commands. The first level-10 wizard is created with a secret that you give the driver in an environment variable:
+
+```
+LESMUDOS_ADMIN_SECRET='pick something long' dotnet run --project src/LesMudOS.Driver -- --mudlib mudlib --port 4000
+```
+
+(PowerShell: `$env:LESMUDOS_ADMIN_SECRET = 'pick something long'` on its own line first.) Then, in the game:
+
+```
+> promote pick something long
+```
+
+This works only while no level-10 wizard exists, and stops working after five wrong guesses until the driver is restarted. After that, wizards promote each other with `promote <player> <level>`, up to their own level. Levels are stored in `save/secure/wizlist.json`.
+
+| Level | Commands |
+|---|---|
+| 1 | `promote`, `wizards`, `mudstat` |
+| 3 | `clone` |
+| 5 | `update` |
+| 10 | `shutdown` |
+
 ### Try a live update
 
-While connected, edit `mudlib/domains/town/square.cs` (change the description), then in the game:
+As a wizard of level 5 or more, edit `mudlib/domains/town/square.cs` (change the description), then in the game:
 
 ```
 > update /domains/town/square
@@ -93,7 +116,7 @@ public class Lantern : Item
 |---|---|
 | `src/LesMudOS.Api` | The contract mudlib code compiles against: `MudObject` (applies and efuns), `ObjectRef`, `IMaster`, `[Saved]` |
 | `src/LesMudOS.Driver` | The host: kernel and game loop, Roslyn compiler, tick injector, sandbox analyzer, telnet server, save store |
-| `mudlib` | Sample mudlib: `/secure` (master, login), `/std` (thing, item, room, player, void), `/domains/town` |
+| `mudlib` | Sample mudlib: `/secure` (master, login, wizard registry), `/std` (thing, item, room, player, void), `/domains/town` |
 | `mudlib/Mudlib.csproj` | Not used at run time. Gives IntelliSense for mudlib files and lets `dotnet build` check the whole mudlib. |
 | `tests/smoke_test.py` | End-to-end test over TCP |
 | `deploy/lesmudos.service` | Sample systemd unit (a starting point; not yet tested on a server) |
@@ -106,7 +129,7 @@ dotnet build
 python3 tests/smoke_test.py
 ```
 
-The test starts the driver on port 4777 against a temporary copy of the mudlib, logs in two players, and checks movement, object-supplied verbs, heartbeats, call-outs, live update of a room and of a base class, compile-error handling, the sandbox, the evaluation-cost limit, the recursion guard, unloading of old program versions, and save/restore.
+The test starts the driver on port 4777 against a temporary copy of the mudlib, logs in two players, and checks movement, object-supplied verbs, heartbeats, call-outs, wizard levels and promotion, live update of a room and of a base class, compile-error handling, the sandbox, the evaluation-cost limit, the recursion guard, unloading of old program versions, and save/restore.
 
 ## Deploying to a Linux VM
 
@@ -121,7 +144,7 @@ Copy `publish/` to `/opt/lesmudos/bin` and `mudlib/` to `/opt/lesmudos/mudlib` o
 ## Limitations to know about
 
 - The sandbox is a guard rail for trusted builders, not a security boundary. Do not give mudlib write access to people you would not give a shell account.
-- Every player can use the wizard commands in the sample mudlib.
+- There are no player passwords yet. Anyone who logs in under a wizard's name gets that wizard's level, so do not expose the port to the internet.
 - Traffic is plain-text telnet.
 
 The full list is in [DESIGN.md](docs/DESIGN.md#13-proof-of-concept-status).
