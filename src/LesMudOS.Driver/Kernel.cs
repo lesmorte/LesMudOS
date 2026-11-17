@@ -25,6 +25,7 @@ internal sealed class Kernel : IDriverServices
     public const string MasterPath = "/secure/master";
     private static readonly TimeSpan HeartBeatInterval = TimeSpan.FromSeconds(2);
 
+    private readonly string _mudlibRoot;
     private readonly ProgramCompiler _compiler;
     private readonly SaveStore _saves;
     private readonly BlockingCollection<Action> _events = new();
@@ -54,6 +55,7 @@ internal sealed class Kernel : IDriverServices
     {
         if (!string.IsNullOrEmpty(adminSecret))
             _adminSecretHash = SHA256.HashData(Encoding.UTF8.GetBytes(adminSecret));
+        _mudlibRoot = Path.GetFullPath(mudlibRoot).TrimEnd(Path.DirectorySeparatorChar);
         _compiler = new ProgramCompiler(mudlibRoot);
         _saves = new SaveStore(saveRoot);
         DriverHost.Services = this;
@@ -604,6 +606,32 @@ internal sealed class Kernel : IDriverServices
         path = ProgramCompiler.NormalizePath(path);
         if (!AskMaster(m => m.ValidRead(path, caller))) throw new MudRuntimeException($"{caller.Name} may not read {path}");
         return _saves.Restore(caller.Target!, path);
+    }
+
+    public IReadOnlyList<DirEntry>? GetDir(ObjectRef caller, string path)
+    {
+        // "/" or "/a/b": absolute, no "." or ".." segments, no hidden entries.
+        path = path.Trim();
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (!path.StartsWith('/') || segments.Any(s => s.StartsWith('.') || s.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || s.Contains('\\')))
+            throw new MudRuntimeException($"Illegal path '{path}'");
+        path = "/" + string.Join('/', segments);
+        if (!AskMaster(m => m.ValidOperation("get-dir", caller, path)))
+            throw new MudRuntimeException($"{caller.Name} may not list {path}");
+
+        var directory = new DirectoryInfo(Path.Combine([_mudlibRoot, .. segments]));
+        if (!directory.Exists) return null;
+
+        // Hide dot-files and the build output that `dotnet build` leaves beside Mudlib.csproj.
+        var directories = directory.GetDirectories()
+            .Where(d => !d.Name.StartsWith('.') && !(segments.Length == 0 && d.Name is "bin" or "obj"))
+            .OrderBy(d => d.Name, StringComparer.Ordinal)
+            .Select(d => new DirEntry(d.Name, true, 0));
+        var files = directory.GetFiles()
+            .Where(f => !f.Name.StartsWith('.'))
+            .OrderBy(f => f.Name, StringComparer.Ordinal)
+            .Select(f => new DirEntry(f.Name, false, f.Length));
+        return directories.Concat(files).ToList();
     }
 
     private const int MaxAdminSecretFailures = 5;

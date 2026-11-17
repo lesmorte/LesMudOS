@@ -197,6 +197,14 @@ public abstract class MudObject
     /// </summary>
     protected bool CheckAdminSecret(string candidate) => D.CheckAdminSecret(Self, candidate);
 
+    /// <summary>
+    /// List a directory of the mudlib: sub-directories first, then files, each
+    /// in name order. The path is absolute ("/" is the mudlib root). Returns
+    /// null if the path is not a directory. Subject to
+    /// master.ValidOperation("get-dir", caller, path).
+    /// </summary>
+    protected IReadOnlyList<DirEntry>? GetDir(string path) => D.GetDir(Self, path);
+
     /// <summary>Human-readable driver statistics: object count, program versions loaded and unloaded.</summary>
     protected string DriverStatus() => D.Status();
 

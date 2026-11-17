@@ -174,6 +174,7 @@ Saved fields may be numbers, strings, booleans, and lists, arrays or dictionarie
 
 | Efun | Description |
 |---|---|
+| `IReadOnlyList<DirEntry>? GetDir(string path)` | List a mudlib directory: sub-directories first, then files, in name order. `DirEntry` has `Name`, `IsDirectory` and `Size` (bytes; 0 for directories). The path must be absolute and clean (`/` is the mudlib root; no `.` or `..` segments, no names starting with a dot), so it cannot leave the mudlib. Returns null if it is not a directory. Needs `ValidOperation("get-dir")` (arg: path). |
 | `string DriverStatus()` | Object, user, timer, program-version and memory statistics |
 | `bool CheckAdminSecret(string candidate)` | Compare a candidate with the secret in the driver's `LESMUDOS_ADMIN_SECRET` environment variable. The secret is never readable from mudlib code. Always false if none is configured, or after five wrong guesses since boot. Needs `ValidOperation("admin-secret")`. |
 | `void Shutdown()` | Stop the driver. Needs `ValidOperation("shutdown")`. |
@@ -188,7 +189,7 @@ Saved fields may be numbers, strings, booleans, and lists, arrays or dictionarie
 | `IEnumerable<string> Preload()` | Paths to load at boot |
 | `bool ValidRead(string path, ObjectRef caller)` | Gate for `RestoreObject` |
 | `bool ValidWrite(string path, ObjectRef caller)` | Gate for `SaveObject` |
-| `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"`, `"admin-secret"` |
+| `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"`, `"admin-secret"`, `"get-dir"` (arg: path) |
 | `void LogError(string objectName, string message)` | Called after any error in an execution |
 
 ## 6. Wizard levels in the sample mudlib
@@ -217,10 +218,13 @@ Commands in `/std/player` and the level each needs:
 |---|---|
 | `promote <player> <level>`, `wizards` | 1 |
 | `mudstat` | 1 |
+| `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`) | 1 |
 | `clone <path>` | 3 |
 | `update <path>` | 5 |
 | `shutdown` | 10 |
 | `promote <secret>` | Any, but only works while there is no level-10 wizard |
+
+Each wizard has a current mudlib directory, saved with the player. `cd` and `list` take absolute or relative paths, with `.` and `..`; `cd` alone returns to `/`. `update` and `clone` resolve relative paths against it too.
 
 Below the required level a command answers `What?`, the same as a verb that does not exist. Levels are checked on every use, so a demotion takes effect immediately.
 
@@ -241,7 +245,7 @@ Not in the proof of concept; names are provisional.
 
 | Efun or apply | Purpose |
 |---|---|
-| `ReadFile`, `WriteFile`, `GetDir`, `FileSize`, `RemoveFile` | In-game editing, gated by `ValidRead` / `ValidWrite` |
+| `ReadFile`, `WriteFile`, `RemoveFile` | In-game viewing and editing, gated by the master |
 | `Reset()` apply and `SetResetInterval` | Periodic restocking |
 | `CleanUp()` apply | Unload idle objects |
 | `Command(string)` | Force a living object to execute a command |

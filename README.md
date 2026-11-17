@@ -62,7 +62,7 @@ This works only while no level-10 wizard exists, and stops working after five wr
 
 | Level | Commands |
 |---|---|
-| 1 | `promote`, `wizards`, `mudstat` |
+| 1 | `promote`, `wizards`, `mudstat`, `pwd`, `cd`, `list` (browse the mudlib directories) |
 | 3 | `clone` |
 | 5 | `update` |
 | 10 | `shutdown` |

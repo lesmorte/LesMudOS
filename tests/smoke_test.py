@@ -126,6 +126,7 @@ def main():
         check("level 0: update does not exist", a.command("update /domains/town/square"), "What?", absent=("Recompiled",))
         check("level 0: mudstat does not exist", a.command("mudstat"), "What?", absent=("Objects",))
         check("level 0: shutdown does not exist", a.command("shutdown"), "What?")
+        check("level 0: pwd, cd, list do not exist", a.command("pwd") + a.command("cd /std") + a.command("list") + a.command("ls"), "What?", absent=("/std", "secure"))
         check("level 0: promote does not exist", a.command("promote bob 5"), "What?")
         check("level 0: help lists no wizard commands", a.command("help"), "Commands:", absent=("Wizard", "promote"))
         check("wrong secret is indistinguishable from no command", a.command("promote not-the-secret"), "What?")
@@ -148,7 +149,8 @@ def main():
 public class Imposter : Item
 {
     public override void Create() { Name = "imposter"; }
-    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); }
+    public override void Init() { AddAction("usurp", Usurp); AddAction("forge", Forge); AddAction("guess", Guess); AddAction("peek", Peek); }
+    private bool Peek(string args) { Write(GetDir("/secure").Count.ToString()); return true; }
     private bool Usurp(string args)
     {
         Write("usurp: " + LoadObject("/secure/wizlist").Call<string>("Promote", "bob", 10) + "\\n");
@@ -168,6 +170,27 @@ public class Imposter : Item
         check("other objects cannot test the secret", b.command("guess " + SECRET), "may not check the admin secret")
         check("wizards lists levels", a.command("wizards"), "alice (10)", "bob (5)")
         check("who shows wizard level", b.command("who"), "Alice the newcomer [wizard 10]", "Bob the newcomer [wizard 5]")
+        # ---- wizard file commands ----
+        check("pwd starts at the mudlib root", a.command("pwd"), "/\r\n")
+        check("list shows directories", a.command("list"), "/:", "domains/", "secure/", "std/")
+        check("cd into a relative directory", a.command("cd domains/town"), "/domains/town")
+        check("list shows files with sizes", a.command("list"), "/domains/town:", "square.cs", "lantern.cs", "imposter.cs")
+        check("ls is an alias", a.command("ls"), "square.cs")
+        check("cd ..", a.command("cd .."), "/domains\r\n")
+        check("list with a relative argument", a.command("list town"), "/domains/town:", "cat.cs")
+        check("list with an absolute argument", a.command("list /std"), "/std:", "player.cs", "room.cs")
+        check("cd cannot climb out of the mudlib", a.command("cd ../../../.."), "/\r\n", absent=("etc", "tmp"))
+        check("list cannot climb out of the mudlib", a.command("list ../.."), "/:", "std/", absent=("mudlib",))
+        check("cd to a missing directory", a.command("cd /nowhere"), "/nowhere: no such directory")
+        check("cd to a file is refused", a.command("cd /std/room.cs"), "no such directory")
+        check("pwd unchanged after failed cd", a.command("pwd"), "/\r\n")
+        check("hidden names are refused", a.command("list /.git"), "Illegal path")
+        check("level 5 wizard can use pwd", b.command("pwd"), "/\r\n")
+        check("other objects cannot list directories", b.command("peek"), "may not list /secure")
+        a.command("cd /domains/town")
+        check("cd with no argument returns to the root", a.command("cd"), "/\r\n")
+        a.command("cd /domains/town")
+
         check("demote to 0", a.command("promote bob 0"), "bob is now wizard level 0")
         b.read_until("level is now")
         check("demoted player loses commands at once", b.command("mudstat"), "What?", absent=("Objects",))
@@ -175,8 +198,8 @@ public class Imposter : Item
 
         # ---- live update of a room, with players standing in it ----
         edit(mudlib, "/domains/town/square", "a dry fountain", "a fountain that now runs with wine")
-        text = a.command("update /domains/town/square")
-        check("update replaces a room", text, "Recompiled", "Replaced /domains/town/square")
+        text = a.command("update square")
+        check("update accepts a path relative to the current directory", text, "Recompiled /domains/town/square", "Replaced /domains/town/square")
         check("new code is live", a.command("look"), "runs with wine", "Bob the newcomer is here.")
         check("bystander survived the update", b.command("look"), "runs with wine", "Alice")
 
@@ -241,6 +264,7 @@ public class Spinner : Item
         a = Client("alice")
         check("save file restored", a.read_until("> "), "Welcome back, Alice. This is visit number 2.")
         check("saved field and wizard level restored", a.command("who"), "Alice the tester [wizard 10]", "Bob the newcomer", absent=("Bob the newcomer [",))
+        check("current directory restored", a.command("pwd"), "/domains/town")
         registry = open(os.path.join(work, "save", "secure", "wizlist.json")).read()
         check("registry saved to disk", registry, '"alice": 10', absent=("bob",))
 

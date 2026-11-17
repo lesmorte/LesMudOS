@@ -11,6 +11,7 @@ public class Player : Thing
     private const string WizList = "/secure/wizlist";
 
     // Wizard level needed for each wizard command. Level 0 has none of them.
+    private const int LevelFiles = 1; // pwd, cd, list
     private const int LevelMudstat = 1;
     private const int LevelClone = 3;
     private const int LevelUpdate = 5;
@@ -19,6 +20,7 @@ public class Player : Thing
     [Saved] private string title = "the newcomer";
     [Saved] private int logins;
     [Saved] private long lastLogin;
+    [Saved] private string cwd = "/"; // the mudlib directory a wizard is "in"
 
     private bool ready;
 
@@ -57,6 +59,10 @@ public class Player : Thing
         // and declines below it, so to a non-wizard these verbs do not exist.
         AddAction("promote", CmdPromote);
         AddAction("wizards", CmdWizards);
+        AddAction("pwd", CmdPwd);
+        AddAction("cd", CmdCd);
+        AddAction("list", CmdList);
+        AddAction("ls", CmdList);
         AddAction("update", CmdUpdate);
         AddAction("clone", CmdClone);
         AddAction("mudstat", CmdMudstat);
@@ -175,7 +181,10 @@ public class Player : Thing
         if (level < 1) return true;
         Write($"Wizard commands at your level ({level}):\n" +
               "          promote <player> <level>   set a lower wizard's level, up to your own\n" +
-              "          wizards                    list all wizards\n");
+              "          wizards                    list all wizards\n" +
+              "          pwd                        show the mudlib directory you are in\n" +
+              "          cd [<dir>]                 change directory (.. goes up, no argument goes to /)\n" +
+              "          list [<dir>]               list a directory (also: ls)\n");
         if (level >= LevelMudstat) Write("          mudstat                    driver statistics\n");
         if (level >= LevelClone) Write("          clone <path>               clone an object into your inventory or room\n");
         if (level >= LevelUpdate) Write("          update <path>              recompile a file and replace the loaded object\n");
@@ -216,6 +225,56 @@ public class Player : Thing
         return true;
     }
 
+    /// <summary>
+    /// Turn what a wizard typed into an absolute mudlib path: relative paths
+    /// start from the current directory, and "." and ".." are resolved here so
+    /// that the driver only ever sees a clean absolute path.
+    /// </summary>
+    private string ResolvePath(string path)
+    {
+        var parts = new List<string>();
+        var start = path.StartsWith("/") ? "" : cwd;
+        foreach (var part in (start + "/" + path).Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (part == ".") continue;
+            if (part == "..") { if (parts.Count > 0) parts.RemoveAt(parts.Count - 1); continue; }
+            parts.Add(part);
+        }
+        return "/" + string.Join("/", parts);
+    }
+
+    private bool CmdPwd(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        Write(cwd + "\n");
+        return true;
+    }
+
+    private bool CmdCd(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        var target = ResolvePath(args == "" ? "/" : args);
+        if (GetDir(target) == null) { Write($"{target}: no such directory.\n"); return true; }
+        cwd = target;
+        Write(cwd + "\n");
+        return true;
+    }
+
+    private bool CmdList(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        var target = ResolvePath(args);
+        var entries = GetDir(target);
+        if (entries == null) { Write($"{target}: no such directory.\n"); return true; }
+
+        var text = new StringBuilder($"{target}:\n");
+        foreach (var entry in entries)
+            text.Append(entry.IsDirectory ? $"  {entry.Name}/\n" : $"  {entry.Name,-28} {entry.Size,8}\n");
+        if (entries.Count == 0) text.Append("  (empty)\n");
+        Write(text.ToString());
+        return true;
+    }
+
     private bool CmdWizards(string args)
     {
         if (!IsWizard(1)) return false;
@@ -235,6 +294,7 @@ public class Player : Thing
         if (!IsWizard(LevelUpdate)) return false;
         if (args == "") { NotifyFail("Usage: update <path>"); return false; }
 
+        args = ResolvePath(args); // relative to the current directory
         var old = FindObject(args);
         var stale = UpdateProgram(args); // throws with compiler errors; nothing has been touched yet
         Write($"Recompiled {args}; {stale.Count} program(s) invalidated: {string.Join(", ", stale)}\n");
@@ -256,7 +316,7 @@ public class Player : Thing
     {
         if (!IsWizard(LevelClone)) return false;
         if (args == "") { NotifyFail("Usage: clone <path>"); return false; }
-        var ob = CloneObject(args);
+        var ob = CloneObject(ResolvePath(args));
         var room = Environment();
         MoveObject(ob, ob.Call<bool>("CanGet") || room == null ? Self : room);
         Write($"Cloned {ob.Name}.\n");

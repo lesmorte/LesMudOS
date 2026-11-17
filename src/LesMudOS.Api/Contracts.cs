@@ -20,12 +20,15 @@ public interface IMaster
     /// <summary>May the caller write this save path?</summary>
     bool ValidWrite(string path, ObjectRef caller);
 
-    /// <summary>May the caller perform a privileged operation: "update", "shutdown", "destruct", "exec", "admin-secret"? arg is the target, if any.</summary>
+    /// <summary>May the caller perform a privileged operation: "update", "shutdown", "destruct", "exec", "admin-secret", "get-dir"? arg is the target, if any.</summary>
     bool ValidOperation(string operation, ObjectRef caller, string? arg);
 
     /// <summary>A runtime or compile error occurred during an execution started by or for the given object.</summary>
     void LogError(string objectName, string message);
 }
+
+/// <summary>One entry of a mudlib directory, as returned by GetDir.</summary>
+public sealed record DirEntry(string Name, bool IsDirectory, long Size);
 
 /// <summary>Marks a field that SaveObject / RestoreObject persist.</summary>
 [AttributeUsage(AttributeTargets.Field)]
@@ -99,6 +102,7 @@ internal interface IDriverServices
     bool RestoreObject(ObjectRef caller, string path);
 
     bool CheckAdminSecret(ObjectRef caller, string candidate);
+    IReadOnlyList<DirEntry>? GetDir(ObjectRef caller, string path);
     string Status();
     void Shutdown(ObjectRef caller);
 }

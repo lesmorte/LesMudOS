@@ -265,13 +265,14 @@ Implemented and covered by `tests/smoke_test.py`:
 - Save and restore of `[Saved]` fields
 - Master-object policy hooks
 - Caller tracking with `PreviousObject()`
+- `GetDir`, with wizard commands `pwd`, `cd` and `list` to browse the mudlib
 - Wizard levels 0 to 10, level-gated commands, `promote`, and the one-time level-10 bootstrap by admin secret
 
-Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, a file-access efun set for in-game editing (`ReadFile`, `WriteFile`, `GetDir`), per-domain privileges (wizard levels are global), and player passwords (anyone can log in under any name, including a wizard's).
+Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, efuns to read and write mudlib files in-game (`ReadFile`, `WriteFile`; only directory listing exists), per-domain privileges (wizard levels are global), and player passwords (anyone can log in under any name, including a wizard's).
 
 ## 14. Roadmap
 
-1. **Authoring loop:** in-game file efuns gated by `ValidRead` / `ValidWrite`, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
+1. **Authoring loop:** in-game file reading and editing gated by the master, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
 2. **Safety:** player passwords, per-domain privileges, instrumenting expression-bodied lambdas, a wall-clock watchdog, a cap on per-connection output.
 3. **World lifecycle:** `Reset()`, clean-up of unused objects, graceful shutdown that saves players.
 4. **Protocol:** telnet negotiation, TLS, WebSocket.

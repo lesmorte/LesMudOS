@@ -34,6 +34,7 @@ public class Master : MudObject, IMaster
         {
             case "admin-secret": return IsWizList(caller);
             case "exec": return caller.ProgramPath == "/secure/login";
+            case "get-dir":
             case "update":
             case "shutdown":
             case "destruct": return IsPlayerBody(caller);
