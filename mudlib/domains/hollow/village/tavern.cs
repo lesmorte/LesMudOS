@@ -13,7 +13,7 @@ public class HollowmansRest : Room
 
         AddDetail("portrait,vincent,painting,holloway,picture", "A weathered portrait of Vincent Holloway in a dark wooden frame. The paint has faded and cracked, but his confident smile is still there, as if he knows a secret about the room.");
         AddDetail("fireplace,hearth,fire,fire place", "A wide stone fireplace with a crackling log fire. The mantel is blackened with soot and crowded with candle stubs.");
-        AddDetail("musicians,musician,band,minstrels", "A fiddler and a piper sit on a low stool near the hearth, playing a lively tune that makes the tables tap their feet.");
+        AddDetail("musicians,musician,band,minstrels", "A fiddler and a piper sit on low stools near the hearth, playing a lively tune that has half the room tapping their feet.");
         AddDetail("stairs,staircase,steps", "A narrow wooden staircase climbs to the Guest Rooms above, its treads worn hollow by generations of boots.");
         AddDetail("cellar door,trapdoor,cellar,trap door", "A heavy oak trapdoor set into the floor, with an iron ring for a handle. Cold air seeps up around its edges, smelling of damp earth.");
 

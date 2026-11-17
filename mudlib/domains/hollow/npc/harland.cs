@@ -17,7 +17,7 @@ public class Harland : Shopkeeper
         AddChat("Vincent used to talk about tunnels beneath the village. Nobody believed him.");
         AddTopic("cellar,goblins,goblin,rats,rat", "Rats, then goblins, and now something is organizing the goblins. I've paid two men to look down there, and neither came back up talking.");
         AddTopic("vincent,tunnels,tunnel,underground", "Vincent used to talk about tunnels under the village, always hungry to dig further. Nobody believed him, and I'm not sure I do yet.");
-        AddTopic("bed,room,rest,sleep", "A bed for the night is five gold, and you'll wake up fit as a fiddle. Ask me to browse, and I'll show you the rooms upstairs.");
+        AddTopic("bed,room,rest,sleep", "A bed for the night is five gold, and you'll wake up fit as a fiddle. Say the word and I'll show you upstairs myself.");
         AddTopic("food,drink,ale,stew", "Hot stew, cold ale, and a warm corner by the fire. Browse my shelves and take your pick.");
         AddEmote("Harland polishes a mug with his apron and eyes the trapdoor.", 6);
         AddEmote("Harland calls out to the musicians to play something cheerier.", 4);

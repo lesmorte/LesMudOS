@@ -13,7 +13,7 @@ public class VillageGate : Room
         AddDetail("palisade,stockade,timber,logs", "Sharpened timber logs, each as thick as a man's body, lashed together and set deep in the earth. Weather and years have silvered them, but they stand firm.");
         AddDetail("gates,gate,village gates", "Two heavy timber gates stand wide open on iron hinges. Their bars rest in brackets on the wall, ready to be dropped at nightfall.");
         AddDetail("watchtowers,towers,watchtower,tower", "Two timber watchtowers rise above the palisade, one on either side of the gate. Their platforms give a view of the road for miles.");
-        AddDetail("banners,banner,flags", "Faded banners hang from poles above the gate. Their colors have bleached to a dull grey-green, but a stern holloway-oak crest can still be made out.");
+        AddDetail("banners,banner,flags", "Faded banners hang from poles above the gate. Their colors have bleached to a dull grey-green, but the crest of a spreading oak can still be made out.");
 
         AddSpawn("/domains/hollow/npc/guard");
     }
