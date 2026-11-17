@@ -2,15 +2,20 @@
 
 /// <summary>
 /// Eaten or drunk once. Set HealAmount and UseVerb ("eat" or "drink") in
-/// Create(); UseMessage replaces the default line shown to the user.
+/// Create(); UseMessage replaces the default line shown to the user. Using it is a combat action
+/// whose Recovery is Recovery (default 0.5, time units of 2 seconds).
 /// </summary>
 public class Consumable : Item
 {
     protected int HealAmount;
     protected string UseVerb = "drink";
     protected string? UseMessage;
+    /// <summary>Recovery of the action of using this item.</summary>
+    protected double Recovery = 0.5;
 
     public string QueryUseVerb() => UseVerb;
+
+    public double QueryRecovery() => Recovery;
 
     /// <summary>Called by the eat and drink commands. Heals the user and uses the item up.</summary>
     public void Consume(ObjectRef user)
@@ -25,5 +30,5 @@ public class Consumable : Item
     /// <summary>Extra effects for special consumables.</summary>
     protected virtual void OnUse(ObjectRef user) { }
 
-    public override string Stat() => base.Stat() + $"  Consumable: {UseVerb}, heals {HealAmount}\n";
+    public override string Stat() => base.Stat() + $"  Consumable: {UseVerb}, heals {HealAmount}, recovery {Num(Recovery)}\n";
 }

@@ -15,6 +15,7 @@ public abstract class Adventurer : Living
     private const int LevelGoto = 1;
     private const int LevelStat = 1;
     private const int LevelHeal = 5;
+    private const int LevelSpeed = 5;
     private const int LevelSmite = 10;
 
     // Experience needed to reach level n is XpForLevel[n].
@@ -35,8 +36,8 @@ public abstract class Adventurer : Living
     public override void Create()
     {
         Level = 1;
-        DamageMin = 1;
-        DamageMax = 3;
+        DamageMin = 2;
+        DamageMax = 5;
         Gold = 25;
     }
 
@@ -134,6 +135,7 @@ public abstract class Adventurer : Living
         AddAction("kill", CmdKill);
         AddAction("attack", CmdKill);
         AddAction("flee", CmdFlee);
+        AddAction("stop", CmdStop);
         AddAction("consider", CmdConsider);
         AddAction("wield", CmdWield);
         AddAction("unwield", CmdUnwield);
@@ -156,6 +158,7 @@ public abstract class Adventurer : Living
         AddAction("stat", CmdStat);
         AddAction("heal", CmdHeal);
         AddAction("smite", CmdSmite);
+        AddAction("speed", CmdSpeed);
 
         SetHeartBeat(true);
 
@@ -259,6 +262,7 @@ public abstract class Adventurer : Living
             Gold -= lost;
             LeaveCorpse(room, killer, lost);
             ClearEnemies();
+            ResetCombat(); // a pending attack or potion must not fire after the death
             Hp = QueryMaxHp();
             MoveObject(LoadObject(RespawnRoom));
             TellRoom(Environment()!, $"{Name} appears, looking battered.\n", Self);
@@ -457,8 +461,23 @@ public abstract class Adventurer : Living
             : difference == 0 ? "looks like an even match"
             : difference == 1 ? "looks tougher than you"
             : "would crush you";
-        Write($"{label} {verdict}.\n" + (target.Call<bool>("QueryPeaceful") ? "It will not fight you.\n" : ""));
+        Write($"{label} {verdict}.\n" + (target.Call<bool>("QueryPeaceful") ? "It will not fight you.\n" : SpeedVerdict(target)));
         return true;
+    }
+
+    /// <summary>How often the target acts compared with this player's own basic attack.</summary>
+    private string SpeedVerdict(ObjectRef target)
+    {
+        var theirs = target.Call<double>("QueryTypicalDelay");
+        var mine = QueryTypicalDelay();
+        if (theirs <= 0 || mine <= 0) return "";
+        var ratio = theirs / mine;
+        var line = ratio <= 0.6 ? "It strikes much more often than you can."
+            : ratio < 0.9 ? "It strikes more often than you."
+            : ratio <= 1.1 ? "It strikes about as often as you."
+            : ratio <= 1.7 ? "It strikes less often than you."
+            : "It strikes much less often than you can.";
+        return line + "\n" + (target.Call<bool>("QueryVariedAttacks") ? "It does not always attack the same way.\n" : "");
     }
 
     // ---- Commands: equipment and consumables ----
@@ -524,7 +543,13 @@ public abstract class Adventurer : Living
         if (item == null) { NotifyFail($"{Cap(verb)} what?"); return false; }
         var kind = item.Call<string>("QueryUseVerb");
         if (kind == null || (kind == "eat") != (verb == "eat")) { Write($"You can't {verb} that.\n"); return true; }
-        item.Call("Consume", Self);
+        UseAsAction(item); // an action with its own Recovery: now if ready, else queued for the next Ready Time
+        return true;
+    }
+
+    private bool CmdStop(string args)
+    {
+        Write(ClearQueued() ? "You drop what you were about to do.\n" : "You have nothing planned.\n");
         return true;
     }
 
@@ -567,9 +592,25 @@ public abstract class Adventurer : Living
         foreach (var slot in new[] { "weapon", "shield", "body", "head", "trinket" })
             if (QueryEquipped(slot) is { } item) gear.Add($"{slot}: {item.Call<string>("Short")}");
         text.Append(gear.Count == 0 ? "You have nothing equipped.\n" : "Equipment: " + string.Join(", ", gear) + "\n");
+        text.Append(ReactionReport());
         text.Append(QuestLog());
         Write(text.ToString());
         return true;
+    }
+
+    /// <summary>Reaction Time with every modifier and its source, and how long the basic attack takes.</summary>
+    private string ReactionReport()
+    {
+        var parts = new List<string> { $"base {Num(QueryBaseReaction())}" };
+        foreach (var item in QueryEquipment())
+        {
+            var mod = item.Call<double>("QueryReactionMod");
+            if (mod != 0) parts.Add($"{item.Call<string>("Short")} {(mod > 0 ? "+" : "")}{Num(mod)}");
+        }
+        var speed = QuerySpeedFactor();
+        if (Math.Abs(speed - 1.0) > 0.001) parts.Add($"speed x{Num(speed)}");
+        var delay = QueryTypicalDelay();
+        return $"Reaction Time {Num(QueryReaction())} ({string.Join(", ", parts)}). Your attack takes {Num(delay)} seconds.\n";
     }
 
     private bool CmdHp(string args)
@@ -650,6 +691,29 @@ public abstract class Adventurer : Living
             Write($"You restore {target.Call<string>("QueryLabel")} to full health.\n");
             TellObject(target, "A warm light restores you to full health.\n");
         }
+        return true;
+    }
+
+    private bool CmdSpeed(string args)
+    {
+        if (!IsWizard(LevelSpeed)) return false;
+        var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length < 2 || words.Length > 3 || !int.TryParse(words[1], out var percent) || percent < -90 || percent > 90
+            || (words.Length == 3 && (!int.TryParse(words[2], out var checkSeconds) || checkSeconds < 0)))
+        {
+            NotifyFail("Usage: {cmd}speed{/} TARGET PERCENT [SECONDS]   (positive is haste, negative is slow, 0 clears; at most 90)");
+            return false;
+        }
+        var seconds = words.Length == 3 ? int.Parse(words[2]) : 60;
+        var target = FindHere(words[0]);
+        if (target == null || !target.Call<bool>("IsCreature")) { NotifyFail("Change the speed of whom?"); return false; }
+        if (percent == 0) seconds = 0;
+        target.Call("AddSpeedEffect", "wizard", (100 - percent) / 100.0, seconds);
+        var who = target == Self ? "You are" : $"{target.Call<string>("QueryLabel")} is";
+        Write(percent == 0 ? $"{who} no longer hasted or slowed by you.\n"
+            : $"{who} {(percent > 0 ? "hasted" : "slowed")} by {Math.Abs(percent)}% for {seconds} seconds.\n");
+        if (target != Self) TellObject(target, percent == 0 ? "You feel your pace return to normal.\n"
+            : percent > 0 ? "You feel yourself speed up.\n" : "You feel yourself slow down.\n");
         return true;
     }
 

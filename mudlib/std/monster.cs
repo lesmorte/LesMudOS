@@ -2,13 +2,14 @@
 
 /// <summary>
 /// A hostile creature. Set Level, MaxHp, DamageMin/Max, ToHit, Armor, XpValue,
-/// GoldMin/GoldMax and AddLoot() in Create(). On death the killer receives the
+/// GoldMin/GoldMax and AddLoot() in Create(). Set BaseReaction (1.0 fast to 6.0 slow) and, for something other than
+/// a plain attack, AddCombatAction() calls. On death the killer receives the
 /// experience; a corpse holding the gold and loot is left in the room, and the room's reset brings a
 /// new one.
 /// </summary>
 public class Monster : Npc
 {
-    /// <summary>Attacks any player who enters, after a one-round pause.</summary>
+    /// <summary>Attacks any player who enters, after its Reaction Time x 2 seconds (the player may strike first or leave).</summary>
     protected bool Aggressive;
     /// <summary>Joins a fight when another monster in the room is attacked.</summary>
     protected bool Assist = true;
@@ -38,7 +39,7 @@ public class Monster : Npc
     protected override void Noticed(ObjectRef other)
     {
         base.Noticed(other);
-        if (Aggressive && Interactive(other)) CallOut(() => Ambush(other), 2);
+        if (Aggressive && Interactive(other)) CallOut(() => Ambush(other), QueryReaction() * 2);
     }
 
     private void Ambush(ObjectRef target)
@@ -51,7 +52,7 @@ public class Monster : Npc
     public void JoinFight(ObjectRef attacker, ObjectRef victim)
     {
         if (!Assist || Dead || !victim.Call<bool>("IsMonster") || attacker.Call<bool>("IsMonster")) return;
-        StartFight(attacker);
+        BeginFight(attacker, true); // drawn in by someone else: waits its Reaction Time before the first action
     }
 
     public override string Stat() => base.Stat() + $"  Monster: aggressive {Aggressive}, assist {Assist}, xp {XpValue}, gold {GoldMin}-{GoldMax}, loot {lootPaths.Count}\n";
@@ -60,6 +61,7 @@ public class Monster : Npc
     {
         if (Dead) return;
         Dead = true;
+        ResetCombat();
         var room = Environment();
         var label = Cap(QueryLabel());
         if (room != null) TellRoom(room, (DeathMessage == "" ? $"{label} dies." : DeathMessage) + "\n");
