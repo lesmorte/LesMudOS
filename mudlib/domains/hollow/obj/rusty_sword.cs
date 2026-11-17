@@ -8,8 +8,10 @@ public class RustySword : Weapon
         Ids.Add("sword");
         ShortDesc = "a rusty sword";
         LongDesc = "A short sword, pitted with rust but honed to a decent edge on Torren's wheel.";
-        DamageMin = 3;
-        DamageMax = 5;
+        DamageMin = 9;
+        DamageMax = 14;
+        ReactionMod = 0.5;
+        Recovery = 1.0;
         Value = 10;
     }
 }

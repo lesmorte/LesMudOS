@@ -13,6 +13,7 @@ public class CommandersVest : Armor
         LongDesc = "A supple vest of boiled leather, studded at the shoulders. It was made for a human officer, long ago, and has been worn by goblins since.";
         ArmorValue = 3;
         Slot = "body";
+        ReactionMod = 0.0;
         Value = 60;
     }
 }

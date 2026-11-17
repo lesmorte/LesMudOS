@@ -10,8 +10,10 @@ public class GoblinMinion : Monster
         Ids.Add("goblin");
         ShortDesc = "a goblin minion";
         LongDesc = "A scrawny, wide-eyed goblin in a scrap of armor, clutching a notched blade and plainly more afraid of its master than of you.";
+        BaseReaction = 2.5;
+        AddCombatAction("stab", "Stab", preparation: 0, recovery: 0.5);
         Level = 2;
-        MaxHp = 12;
+        MaxHp = 20;
         DamageMin = 2;
         DamageMax = 4;
         Armor = 1;

@@ -1,6 +1,9 @@
 // @inherit /std/monster
 
-/// <summary>The Overseer's chosen bodyguards: big, well-armoured goblins who guard the trophy hall as a mini-boss.</summary>
+/// <summary>
+/// The Overseer's chosen bodyguards: big, well-armoured goblins who guard the trophy hall as a mini-boss.
+/// Three Slashes and then a Shield Bash it half-winds-up, round and round.
+/// </summary>
 public class GoblinEliteGuard : Monster
 {
     public override void Create()
@@ -12,7 +15,7 @@ public class GoblinEliteGuard : Monster
         ShortDesc = "a goblin elite guard";
         LongDesc = "A goblin twice the size of its kin, wearing a helm of black iron and a breastplate studded with bone. It carries a long-hafted axe in both hands and stands between you and the Overseer's door as if it has been waiting all its life for you to try.";
         Level = 4;
-        MaxHp = 22;
+        MaxHp = 40;
         DamageMin = 3;
         DamageMax = 5;
         ToHit = 2;
@@ -21,5 +24,11 @@ public class GoblinEliteGuard : Monster
         GoldMin = 12;
         GoldMax = 22;
         Aggressive = true;
+        BaseReaction = 3.5;
+        AddCombatAction("slash", "Slash", preparation: 0, recovery: 1.0);
+        AddCombatAction("bash", "Shield Bash", preparation: 0.5, recovery: 1.5, windUp: "drops a shoulder behind the shield", damageMultiplier: 2);
     }
+
+    /// <summary>Slash, Slash, Slash, Shield Bash, and round again.</summary>
+    protected override CombatAction ChooseAction(ObjectRef target) => FindAction(ActionsTaken() % 4 == 3 ? "bash" : "slash")!;
 }

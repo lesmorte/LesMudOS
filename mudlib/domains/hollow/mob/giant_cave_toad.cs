@@ -1,6 +1,9 @@
 // @inherit /std/monster
 
-/// <summary>A huge, slow-looking toad that lurks in the flooded tunnel and takes a great deal of punishment.</summary>
+/// <summary>
+/// A huge, slow-looking toad that lurks in the flooded tunnel and takes a great deal of punishment.
+/// Two actions in a fixed rhythm: two Tongue Lashes, then a Crushing Leap that it winds up for 2 seconds.
+/// </summary>
 public class GiantCaveToad : Monster
 {
     public override void Create()
@@ -11,14 +14,20 @@ public class GiantCaveToad : Monster
         ShortDesc = "a giant cave toad";
         LongDesc = "A toad the size of a sheep, its warty back slick with black water and its throat pulsing slowly. Its pale eyes do not blink, and it waits in the shallows with a patience that is much more unsettling than speed would be.";
         Level = 3;
-        MaxHp = 30;
+        MaxHp = 66;
         DamageMin = 2;
-        DamageMax = 5;
+        DamageMax = 4;
         ToHit = 0;
         Armor = 0;
         XpValue = 50;
         GoldMin = 0;
         GoldMax = 0;
         Aggressive = true;
+        BaseReaction = 4.5;
+        AddCombatAction("lash", "Tongue Lash", preparation: 0, recovery: 1.0);
+        AddCombatAction("leap", "Crushing Leap", preparation: 1.0, recovery: 2.0, windUp: "gathers its legs under it, throat swelling", damageMultiplier: 2);
     }
+
+    /// <summary>Tongue Lash, Tongue Lash, Crushing Leap, and round again.</summary>
+    protected override CombatAction ChooseAction(ObjectRef target) => FindAction(ActionsTaken() % 3 == 2 ? "leap" : "lash")!;
 }

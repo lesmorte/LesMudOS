@@ -9,8 +9,10 @@ public class EnchantedDagger : Weapon
         Ids.Add("dagger");
         ShortDesc = "an enchanted dagger";
         LongDesc = "A slender dagger of dark steel, its blade faintly etched with lines that catch the light like frost. It balances perfectly in the hand and seems to want to be used.";
-        DamageMin = 3;
-        DamageMax = 6;
+        DamageMin = 7;
+        DamageMax = 11;
+        ReactionMod = 0.0;
+        Recovery = 0.5;
         ToHit = 2;
         Value = 80;
     }

@@ -14,6 +14,7 @@ public class GuildHelm : Armor
         LongDesc = "A sturdy iron cap with a nose guard, stamped with the guild's sword-and-banner mark. It is awarded to those who have proved themselves.";
         ArmorValue = 1;
         Slot = "head";
+        ReactionMod = 0.0;
         Value = 15;
     }
 }

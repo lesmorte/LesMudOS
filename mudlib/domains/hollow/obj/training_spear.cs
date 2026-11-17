@@ -8,8 +8,10 @@ public class TrainingSpear : Weapon
         Ids.Add("spear");
         ShortDesc = "a training spear";
         LongDesc = "A long ash spear with a blunted-looking but perfectly serviceable iron head. Good reach and easy to handle.";
-        DamageMin = 2;
-        DamageMax = 5;
+        DamageMin = 8;
+        DamageMax = 12;
+        ReactionMod = 0.5;
+        Recovery = 1.0;
         ToHit = 1;
         Value = 8;
     }
