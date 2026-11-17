@@ -226,9 +226,6 @@ WOLF_MOB = TEST_FILES.pop("wolf")
 TEST_FILES["wolf"] = room("TestWolf", "Wolf Run", OUT, f'        AddEncounter("{TEST}wolf_mob", 100);\n')
 TEST_FILES["wolf_mob"] = WOLF_MOB
 
-TAVERN_STUB = room("TavernStub", "The Hollowman's Rest", {"north": HOLLOW + "village/square", "up": HOLLOW + "village/guest_rooms"})
-
-
 # ---------------------------------------------------------------- helpers
 
 def number(pattern, text, default=None):
@@ -342,14 +339,8 @@ def main():
     os.makedirs(os.path.join(mudlib, "domains", "test"))
     for name, source in TEST_FILES.items():
         h.write(mudlib, TEST + name, source)
-    h.write(mudlib, TEST + "tavern_stub_unused", TAVERN_STUB)
     # The Village Square of the copy gets a door down to the test hub.
     h.edit(mudlib, HOLLOW + "village/square", 'Exits["south"]', f'Exits["down"] = "{TEST}hub";\n        Exits["south"]')
-    # Rooms of the area that other builders have not written yet get a stub, so that players can walk.
-    for stub, exits in (("tavern", TAVERN_STUB),):
-        if not os.path.exists(os.path.join(mudlib, "domains", "hollow", "village", stub + ".cs")):
-            h.write(mudlib, HOLLOW + "village/" + stub, exits.replace("TavernStub", "TavernForTest"))
-    os.remove(os.path.join(mudlib, "domains", "test", "tavern_stub_unused.cs"))
     os.makedirs(os.path.join(mudlib, "domains", "example"))
     for path, source in building_templates().items():
         h.write(mudlib, path, source)
@@ -897,7 +888,7 @@ def run(work, mudlib):
     check("accept needs a known quest", hero.command("accept dancing"), "Which contract?")
     check("accept the orders quest by number", hero.command("accept 2"), "Quest accepted: Recover the Overseer's Orders.")
     check("a quest cannot be accepted twice", hero.command("accept orders"), "You have already taken")
-    check("the quest log", hero.command("quests"), "Active quests: Overseers orders")
+    check("the quest log", hero.command("quests"), "Active quests: Recover the Overseer's Orders")
     check("report with the quest open", hero.command("report"), "Find the Overseer's Orders")
     wiz.command("goto " + HOLLOW + "village/guild")
     wiz.command("clone " + TEST + "fakeorders")
@@ -922,7 +913,7 @@ def run(work, mudlib):
     s_after = score_of(hero)
     check("rewards: 200 experience and 75 gold", f"{s_after['xp'] - s_before['xp']} {s_after['gold'] - s_before['gold']}", "200 75")
     check("the orders were taken", hero.command("i"), absent=("Overseer's Orders",))
-    check("the other quest was not completed by this", hero.command("quests"), "Completed quests: Overseers orders", absent=("Clear the cellar",))
+    check("the other quest was not completed by this", hero.command("quests"), "Completed quests: Recover the Overseer's Orders", absent=("Clear the Cellar",))
     check("Rowan's talk has changed", hero.command("talk rowan"), "The Crow, the Hollow Below, the sealed entrance")
     check("the board shows what is done", hero.command("read board"), "Recover the Overseer's Orders (done)", "Clear the Cellar (open)")
     check("nothing more to hand in", hero.command("report"), "You have nothing to report yet.")
@@ -1035,14 +1026,14 @@ def run(work, mudlib):
     check("rewards: 150 experience and 50 gold", f"{sa['xp'] - sb['xp']} {sa['gold'] - sb['gold']}", "150 50")
     check("the helm was given", wiz.command("i"), "a Guild Initiate's helm")
     check("wear the helm", wiz.command("wear helm"), "You put on a Guild Initiate's helm.")
-    check("the quest log shows one done, one active", wiz.command("quests"), "Active quests: Overseers orders", "Completed quests: Clear the cellar")
+    check("the quest log shows one done, one active", wiz.command("quests"), "Active quests: Recover the Overseer's Orders", "Completed quests: Clear the Cellar")
     check("report again: the second quest is open", wiz.command("report"), "Find the Overseer's Orders")
     wiz.command("goto " + HOLLOW + "cellars/overseer_chamber")
     check("take the orders from the corpse", wiz.command("loot"), "You take the Overseer's Orders from the corpse of the Goblin Overseer.")
     wiz.command("goto " + HOLLOW + "village/guild")
     text = wiz.command("report")
     check("the wizard hears the ending too", text, "Quest complete: Recover the Overseer's Orders!", "The Crow demands progress.", "The Hollow Below")
-    check("both quests are complete", wiz.command("quests"), "Completed quests: Clear the cellar, Overseers orders")
+    check("both quests are complete", wiz.command("quests"), "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
     check("nothing more to hand in", wiz.command("report"), "You have done everything I asked.")
     check("the board shows both done", wiz.command("read board"), "Clear the Cellar (done)", "Recover the Overseer's Orders (done)")
 
@@ -1158,7 +1149,7 @@ def run(work, mudlib):
     wiz2.command("goto " + TEST + "scratch")
     # The wizard's own state came back: level 5 wizard, quests done, equipment.
     s = score_of(wiz2)
-    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 5", "Damage 6-10", "Armor 4", "Completed quests: Clear the cellar, Overseers orders")
+    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 5", "Damage 6-10", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
     wiz2.send("quit")
     wiz2.read_until("Goodbye")
 

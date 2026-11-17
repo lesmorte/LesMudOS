@@ -10,13 +10,15 @@ prints tables for a solo player:
   3. a whole run through the cellars with level-ups, rests and purchases
 
 Rules (identical to the code):
-  * One round per heartbeat (2 s). The player acts first, then every living
-    enemy attacks. The player attacks the first living enemy of the room.
+  * One round per heartbeat (2 s). The player acts first (in the driver this is the order of the
+    heartbeat list: players who logged in before the monsters became active come first), then every
+    living enemy attacks. The player attacks the first living enemy of the room. A Goblin Minion
+    summoned by the Overseer first attacks in the following round.
   * To hit: d20 + level + weapon to-hit >= 10 + defender armor. A natural 20
     always hits, a natural 1 always misses.
   * Damage is uniform in the range, minimum 1.
   * Level n needs 0/100/250/500/900 XP for n = 1..5; each level adds 8 max HP
-    and heals fully. Base HP is 30.
+    and heals fully, in the middle of a fight too (experience is paid at the kill). Base HP is 30.
 
 Usage: python3 tests/balance_sim.py [runs]
 """
@@ -123,8 +125,9 @@ def attack(att, defn, bonus=0, power=False):
     return max(1, dmg)
 
 
-def fight(player, enemies, potions=0, boss=False, drink_at=0.35):
-    """Fight until one side is dead. Mutates player and enemies.
+def fight(player, enemies, potions=0, boss=False, drink_at=0.35, on_kill=None):
+    """Fight until one side is dead. Mutates player and enemies. on_kill(player, enemy), if given, is called
+    when the player's attack kills an enemy (the real game pays the experience then, and a level-up heals fully).
     Returns (player_alive, rounds, potions_left, boss_killed_hp_lost)."""
     rounds = 0
     # Boss state
@@ -143,10 +146,12 @@ def fight(player, enemies, potions=0, boss=False, drink_at=0.35):
         else:
             target = next(e for e in enemies if e.hp > 0)
             target.hp -= attack(player, target)
+            if target.hp <= 0 and on_kill is not None:
+                on_kill(player, target)
         if boss and boss_dead_round is None and enemies[0].hp <= 0:
             boss_dead_round = rounds
             hp_lost_at_boss_death = start_hp - player.hp
-        for e in enemies:
+        for e in enemies[:len(enemies)]:  # a minion summoned this round first attacks next round (its heartbeat starts after the snapshot)
             if e.hp <= 0 or player.hp <= 0:
                 continue
             if boss and e is enemies[0]:
@@ -236,15 +241,18 @@ def full_run(runs=RUNS):
                 gold -= 15
                 potions += 1
 
-        def gain(creatures):
+        def on_kill(p, enemy):
+            """Experience and gold are paid at the kill; a level-up heals fully, even in the middle of a fight."""
             nonlocal xp, gold, level
-            for c in creatures:
-                k = KINDS[c]
-                xp += k.xp
-                if k.gold[1]:
-                    gold += random.randint(*k.gold)
+            k = enemy.kind
+            xp += k.xp
+            if k.gold[1]:
+                gold += random.randint(*k.gold)
             while level < 5 and xp >= XP_FOR_LEVEL[level + 1]:
                 level += 1
+                p.level = level
+                p.max_hp = player_max_hp(level) + trinket
+                p.hp = p.max_hp
 
         def attempt(creatures, hard=False):
             """Potions are saved for the hard rooms (and for a retry after a death)."""
@@ -252,7 +260,7 @@ def full_run(runs=RUNS):
             for tries in range(10):
                 p = make_player(level, weapon, SHIELD, trinket)
                 use = potions if hard or tries > 0 else 0
-                alive, _, left, _ = fight(p, [make_monster(c) for c in creatures], use)
+                alive, _, left, _ = fight(p, [make_monster(c) for c in creatures], use, on_kill=on_kill)
                 potions = potions - use + left
                 if alive:
                     return True
@@ -271,13 +279,11 @@ def full_run(runs=RUNS):
                     break
                 farm += 1
                 shop()
-                if attempt(best[1]):
-                    gain(best[1])
+                attempt(best[1])
             shop()
             if not attempt(creatures, hard=name in ("Goblin Barracks", "Overseer Hall")):
                 failed = True
                 break
-            gain(creatures)
             cleared.append((name, creatures))
             if name == "Storage Chamber":
                 potions += 1  # the potion lying in the room
@@ -297,8 +303,7 @@ def full_run(runs=RUNS):
                 break
             farm += 1
             shop()
-            if attempt(best[1]):
-                gain(best[1])
+            attempt(best[1])
         shop()
         levels[level] = levels.get(level, 0) + 1
         for tries in range(3):
