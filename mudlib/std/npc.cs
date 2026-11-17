@@ -16,6 +16,11 @@ public class Npc : Living
     private readonly List<int> emotePercents = new();
     private readonly Dictionary<string, int> chatIndex = new();
 
+    public Npc()
+    {
+        EnableCommands(); // creatures are living: they are offered commands and receive room messages
+    }
+
     public override bool QueryPeaceful() => Peaceful;
 
     /// <summary>A line for "talk". Lines come in the order added and wrap round; the first is the main dialogue.</summary>

@@ -4,7 +4,6 @@ public class Benson : Npc
 {
     public override void Create()
     {
-        EnableCommands();
         Name = "Benson";
         Ids.Add("farmer");
         Ids.Add("old farmer");

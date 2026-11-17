@@ -176,7 +176,10 @@ public abstract class Room : MudObject
 
     // ---- Description ----
 
-    public override string Long()
+    public override string Long() => LongFor(ThisPlayer());
+
+    /// <summary>The room as seen by one viewer, who is not listed among the occupants.</summary>
+    public string LongFor(ObjectRef? viewer)
     {
         var text = new StringBuilder();
         text.Append(ShortDesc).Append('\n').Append(LongDesc).Append('\n');
@@ -187,7 +190,7 @@ public abstract class Room : MudObject
         var order = new List<string>();
         foreach (var ob in AllInventory())
         {
-            if (ob == ThisPlayer()) continue;
+            if (ob == viewer) continue;
             var desc = ob.Call<string>("Short");
             if (desc == null) continue;
             if (!counts.ContainsKey(desc)) { counts[desc] = 0; order.Add(desc); }

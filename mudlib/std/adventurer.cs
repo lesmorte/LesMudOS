@@ -41,7 +41,7 @@ public abstract class Adventurer : Living
 
     public override int QueryMaxHp() => BaseHp + HpPerLevel * (Level - 1) + EquipmentHpBonus();
 
-    public override bool QueryPeaceful() => true; // no fighting between players
+    public override bool IsPlayerCharacter() => true;
 
     public override string QueryLabel() => Name;
 
@@ -184,7 +184,7 @@ public abstract class Adventurer : Living
     public void Look()
     {
         var room = Environment();
-        Tell(room == null ? "You are nowhere.\n" : room.Call<string>("Long") ?? "You see nothing.\n");
+        Tell(room == null ? "You are nowhere.\n" : room.Call<string>("LongFor", Self) ?? "You see nothing.\n");
     }
 
     protected override bool NeedsHeartBeat() => true;

@@ -4,7 +4,6 @@ public class TravelingMerchant : Shopkeeper
 {
     public override void Create()
     {
-        EnableCommands();
         Name = "Merchant";
         Ids.Add("traveling merchant");
         Ids.Add("trader");

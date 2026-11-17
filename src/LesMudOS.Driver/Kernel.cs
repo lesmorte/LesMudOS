@@ -290,7 +290,25 @@ internal sealed class Kernel : IDriverServices
         return Instantiate(program, $"{program.Path}#{++_nextCloneId}", isClone: true);
     }
 
+    /// <summary>
+    /// A constructor or Create() may call EnableCommands(), which makes the new
+    /// object ThisPlayer(). Whoever is creating it (a command, a room stocking
+    /// itself) keeps their own ThisPlayer() for the rest of the execution.
+    /// </summary>
     private ObjectRef Instantiate(MudProgram program, string name, bool isClone)
+    {
+        var creator = _thisPlayer;
+        try
+        {
+            return InstantiateCore(program, name, isClone);
+        }
+        finally
+        {
+            _thisPlayer = creator;
+        }
+    }
+
+    private ObjectRef InstantiateCore(MudProgram program, string name, bool isClone)
     {
         if (program.ObjectType is null)
             throw new MudRuntimeException($"{program.Path} is abstract: it can be inherited but not loaded or cloned");
@@ -314,10 +332,6 @@ internal sealed class Kernel : IDriverServices
         }
 
         _objects[name] = handle;
-        // Create() may call EnableCommands(), which makes the new object ThisPlayer().
-        // Whoever is creating it (a command, a room stocking itself) must keep
-        // their own ThisPlayer() for the rest of the execution.
-        var creator = _thisPlayer;
         try
         {
             In(handle, () => handle.Target!.Create());
@@ -326,10 +340,6 @@ internal sealed class Kernel : IDriverServices
         {
             Destroy(handle);
             throw;
-        }
-        finally
-        {
-            _thisPlayer = creator;
         }
         return handle;
     }

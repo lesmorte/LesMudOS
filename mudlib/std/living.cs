@@ -47,6 +47,9 @@ public abstract class Living : Thing
 
     public bool IsDead() => Dead;
 
+    /// <summary>True for players; they cannot fight each other.</summary>
+    public virtual bool IsPlayerCharacter() => false;
+
     public int QueryLevel() => Level;
 
     public int QueryHp() => Hp;
@@ -173,6 +176,7 @@ public abstract class Living : Thing
         if (!enemy.IsAlive || enemy.Call<bool>("IsDead")) return "That is already dead.";
         if (!enemy.Call<bool>("IsCreature")) return "You cannot fight that.";
         if (enemy == Self) return "Attacking yourself would not help.";
+        if (IsPlayerCharacter() && enemy.Call<bool>("IsPlayerCharacter")) return "Players cannot fight each other.";
         var room = Environment();
         if (room == null || Environment(enemy) != room) return "That is not here.";
         if (room.Call<bool>("QuerySafe")) return "A calm lies over this place; nobody may fight here.";
