@@ -14,7 +14,7 @@ public class NorthRoad : Room
         AddDetail("ruts,tracks,wagon ruts,horse tracks,hoof prints", "Deep wagon ruts run side by side along the road, and the hoof prints of horses cut through the dust between them.");
         AddDetail("pines,trees,pine trees,tree", "Tall pines crowd the verge of the road, their needles whispering in the breeze. Their trunks are dark with resin.");
         AddDetail("mountains,mountain,peaks,skyline", "Distant mountains rise grey and blue above the forest, their peaks capped with snow even in the late season.");
-        AddReadable("sign,village sign,wooden sign", "The sign reads:\n\"Welcome to Vincent's Hollow\nFounded by Vincent Holloway\nShelter, Ale, and Honest Trade\"", "A carved wooden sign stands beside the road. You could read it.");
+        AddReadable("sign,village sign,wooden sign", "The sign reads:\n\"Welcome to Vincent's Hollow\nFounded by Vincent Holloway\nShelter, Ale, and Honest Trade\"", "A carved wooden sign stands beside the road. You could {cmd}read{/} it.");
 
         AddEncounter("/domains/hollow/npc/traveling_merchant", 15);
         AddEncounter("/domains/hollow/mob/wandering_wolf", 25);

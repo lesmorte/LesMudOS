@@ -25,9 +25,9 @@ public class Rowan : Npc
         MaxHp = 50;
 
         AddChat("Every village has its legends. Ours is Vincent himself. Some believe he found something beneath these lands before he vanished.");
-        AddChat("The board has work for anyone brave enough. Read it, then tell me which contract you want: accept cellar, or accept orders.");
-        AddChat("When your work is done, come back and report. The guild pays its debts.");
-        AddTopic("quest,quests,work,job,contract,board", "Read the board. The cellar quest is the one the village needs. When you've done it, say report.");
+        AddChat("The board has work for anyone brave enough. Read it, then tell me which contract you want: {cmd}accept cellar{/}, or {cmd}accept orders{/}.");
+        AddChat("When your work is done, come back and {cmd}report{/}. The guild pays its debts.");
+        AddTopic("quest,quests,work,job,contract,board", "Read the board. The cellar quest is the one the village needs. When you've done it, say {cmd}report{/}.");
         AddTopic("cellar,goblins,goblin,overseer", "Goblins have taken the old smugglers' tunnels beneath the Hollowman's Rest. Lately they've grown organized. There's an Overseer down there, and he's the one you want.");
         AddTopic("vincent,holloway,founder", "Vincent Holloway built this village. He vanished decades ago, looking for something under the earth. Nobody believed him then.");
         AddTopic("crow", "The Crow? I have never heard the name. If you find it written down somewhere, bring it to me.");
@@ -39,7 +39,7 @@ public class Rowan : Npc
         if (who.Call<int>("QueryQuest", Orders) == 2)
             return "The Crow, the Hollow Below, the sealed entrance... We have learned a great deal, and I like none of it. The guild will have more work for you when you are ready.";
         if (who.Call<int>("QueryQuest", Cellar) == 2)
-            return "You have cleared the cellar, and the village sleeps easier for it. If you still carry the Overseer's Orders, bring them to me and say report.";
+            return "You have cleared the cellar, and the village sleeps easier for it. If you still carry the Overseer's Orders, bring them to me and say {cmd}report{/}.";
         return null;
     }
 
@@ -68,7 +68,7 @@ public class Rowan : Npc
         else if (what is "2" or "orders" or "order" or "recover" or "the orders" or "overseer's orders" or "overseers orders" or "recover the overseer's orders") quest = Orders;
         if (quest == null)
         {
-            Speak("Which contract? Read the board, then say accept cellar, or accept orders.");
+            Speak("Which contract? Read the board, then say {cmd}accept cellar{/}, or {cmd}accept orders{/}.");
             return true;
         }
 
@@ -79,7 +79,7 @@ public class Rowan : Npc
         player.Call("SetQuest", quest, 1, Title(quest));
         Write($"Quest accepted: {Title(quest)}.\n");
         if (quest == Cellar)
-            Speak("Good. Go down through the Hollowman's Rest, past the cellar and into the old smugglers' tunnels. The goblins answer to an Overseer. Kill him, and come back and report.");
+            Speak("Good. Go down through the Hollowman's Rest, past the cellar and into the old smugglers' tunnels. The goblins answer to an Overseer. Kill him, and come back and {cmd}report{/}. Whatever you kill leaves a corpse, so {cmd}loot{/} it for gold and spoils.");
         else
             Speak("The goblins take their orders from somewhere. The Overseer will carry them. Bring me what he carries on him, and we will learn who is behind this.");
         return true;
@@ -87,7 +87,7 @@ public class Rowan : Npc
 
     private string Reminder(string quest)
         => quest == Cellar
-            ? "The Goblin Overseer waits at the end of the Forgotten Cellars. Kill him, then report."
+            ? "The Goblin Overseer waits at the end of the Forgotten Cellars. Kill him, then {cmd}report{/}."
             : "Find the Overseer's Orders in the Forgotten Cellars, and bring them to me.";
 
     private bool CmdReport(string args)

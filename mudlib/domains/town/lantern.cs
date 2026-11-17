@@ -10,7 +10,7 @@ public class Lantern : Item
     {
         Name = "lantern";
         Ids.Add("lamp");
-        LongDesc = "A dented brass lantern. You could light it.";
+        LongDesc = "A dented brass lantern. You could {cmd}light{/} it.";
     }
 
     public override string? Short() => lit ? "a brass lantern (lit)" : "a brass lantern";

@@ -12,9 +12,9 @@ public class TravelingMerchant : Shopkeeper
         Level = 2;
         MaxHp = 18;
 
-        AddChat("Potions for the brave and rations for the hungry! Buy, sell, or just browse, friend.");
+        AddChat("Potions for the brave and rations for the hungry! Buy, {cmd}sell{/}, or just {cmd}browse{/}, friend.");
         AddChat("I've traveled the northern road for twenty years. The wilds grow stranger every season.");
-        AddTopic("potion,potions,healing", "Minor healing potions, fifteen gold a vial. They'll put you back together after a scrap.");
+        AddTopic("potion,potions,healing", "Minor healing potions, fifteen gold a vial. They'll put you back together after a scrap. Try {cmd}buy potion{/}.");
         AddTopic("road,north,wolf,wolves", "Keep a sharp eye on the North Road. A wolf has been seen prowling there.");
         AddEmote("The merchant straightens his stall and hums a tuneless song.", 5);
 

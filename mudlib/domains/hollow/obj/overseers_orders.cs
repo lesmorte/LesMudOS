@@ -10,7 +10,7 @@ public class OverseersOrders : Item
         Ids.Add("notes");
         Ids.Add("bundle");
         ShortDesc = "the Overseer's Orders";
-        LongDesc = "A bundle of poorly translated notes covered in strange symbols and instructions. You could read it.";
+        LongDesc = "A bundle of poorly translated notes covered in strange symbols and instructions. You could {cmd}read{/} it.";
         QuestItem = true;
         ReadText = "You smooth out the notes. Most of it is crude scrawl, but a few lines are legible:\n" +
                    "  \"The Hollow Below\"\n" +

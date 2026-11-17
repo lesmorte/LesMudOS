@@ -19,10 +19,10 @@ public class AdventurersGuild : Room
         AddDetail("tables,table,adventurers", "Adventurers lean over maps and mugs, trading rumors in low voices. Most of the talk is about the cellar below the Hollowman's Rest.");
         AddReadable("board,quest board,notice board,notices",
             "The Quest Board\n" +
-            "  1. CLEAR THE CELLAR. Goblins have made a stronghold in the Forgotten Cellars beneath the Hollowman's Rest, and something is organizing them. Defeat the Goblin Overseer. Reward: experience, gold and a Guild Initiate's Helm. (accept cellar)\n" +
-            "  2. RECOVER THE OVERSEER'S ORDERS. The goblins take their orders from somewhere. Bring the Overseer's Orders to the Guildmaster. Reward: experience and gold. (accept orders)\n" +
-            "Speak to Guildmaster Rowan to accept a quest, and report to him when it is done.",
-            "A large notice board covered in pinned parchments. The two biggest are quest notices. You could read it.");
+            "  1. CLEAR THE CELLAR. Goblins have made a stronghold in the Forgotten Cellars beneath the Hollowman's Rest, and something is organizing them. Defeat the Goblin Overseer. Reward: experience, gold and a Guild Initiate's Helm. ({cmd}accept cellar{/})\n" +
+            "  2. RECOVER THE OVERSEER'S ORDERS. The goblins take their orders from somewhere. Bring the Overseer's Orders to the Guildmaster. Reward: experience and gold. ({cmd}accept orders{/})\n" +
+            "Speak to Guildmaster Rowan to {cmd}accept{/} a quest, and {cmd}report{/} to him when it is done.",
+            "A large notice board covered in pinned parchments. The two biggest are quest notices. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/hollow/npc/rowan");
     }

@@ -16,7 +16,7 @@ public class VillageSquare : Room
         AddDetail("bench,benches", "Rough plank benches, polished by generations of travelers and gossips. A few locals are leaning together over some news or other.");
         AddDetail("stalls,stall,merchants", "Temporary stalls of canvas and trestle tables, piled with tools, cloth and trinkets. Most of it is not for sale to the likes of you, but a traveling merchant seems willing.");
         AddDetail("children", "Children dart between the stalls, shrieking with laughter. Somehow none of them ever collides with a cart.");
-        AddReadable("plaque,small plaque,bronze plaque", "The plaque reads:\n\"This well was dug by Vincent Holloway and his companions during the settlement's first winter.\"", "A small bronze plaque is set into the rim of the well. You could read it.");
+        AddReadable("plaque,small plaque,bronze plaque", "The plaque reads:\n\"This well was dug by Vincent Holloway and his companions during the settlement's first winter.\"", "A small bronze plaque is set into the rim of the well. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/hollow/npc/benson");
         AddSpawn("/domains/hollow/npc/traveling_merchant");
