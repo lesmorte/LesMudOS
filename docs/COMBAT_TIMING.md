@@ -2,7 +2,7 @@
 
 The owner's brief is [specs/combat-timing.md](specs/combat-timing.md). It replaces the 2-second combat round with one event-driven clock that players and every kind of NPC obey identically. This document says how that is built in LesMudOS and in what order.
 
-Status: pass 1 is designed here and not yet implemented.
+Status: pass 1 is implemented (driver efun `TimeMs`, `/std/living`, the Hollow content, `tests/timing_test.py`, the event-clock `tests/balance_sim.py`). Passes 2 to 5 are not. Section 7 lists where the implementation differs from the first design.
 
 ## 1. Passes
 
@@ -10,7 +10,7 @@ The brief is large. It is built in passes so that each one leaves the game playa
 
 | Pass | Contents | Status |
 |---|---|---|
-| 1 | The clock: Reaction Time, per-action Recovery, Preparation, the timing formula, equipment reaction modifiers, haste and slow, an action queue per combatant, creatures and the boss defined as action lists, consumables as actions, the area rebalanced and retested | This document |
+| 1 | The clock: Reaction Time, per-action Recovery, Preparation, the timing formula, equipment reaction modifiers, haste and slow, an action queue per combatant, creatures and the boss defined as action lists, consumables as actions, the area rebalanced and retested | Implemented |
 | 2 | Stamina; item-granted skills (Triple Thrust and the other examples); a `skills` list; critical, dodge and block rolls | Later |
 | 3 | Interrupts during Preparation (stun, knockdown, silence, fear, disarm) and status effects | Later |
 | 4 | Mana and spells | Later |
@@ -89,7 +89,7 @@ When it has no enemy present it does nothing and schedules nothing.
 
 ## 3. Numbers
 
-These are starting values. The implementer tunes them with the simulation and records the final values here and in GAME_SYSTEMS.md.
+The reaction and Recovery values below are the design's and were kept unchanged. HP and damage were tuned with `tests/balance_sim.py`; the final values are in section 3.1 and in GAME_SYSTEMS.md.
 
 ### Players
 
@@ -105,8 +105,8 @@ Base Reaction Time 2.5. Unarmed attack: Recovery 0.5.
 | Training Spear | +0.5 | 1.0 | 8 |
 | Rusty Sword | +0.5 | 1.0 | 8 |
 | Fine Iron Longsword | +1.0 | 1.0 | 9 |
-| Woodcutter Axe | +1.0 | 1.5 | 10 |
-| Goblin Overseer's Axe | +1.5 | 1.5 | 11 |
+| Woodcutter Axe | +1.0 | 1.5 | 11 |
+| Goblin Overseer's Axe | +1.5 | 1.5 | 12 |
 | Small Shield | +0.5 | | |
 | Leather Commander's Vest | 0.0 | | |
 | Guild Initiate's Helm | 0.0 | | |
@@ -148,6 +148,27 @@ Actions are now several seconds apart where rounds were 2 seconds, so with uncha
 - potions and regeneration keep roughly their present value relative to incoming damage;
 - a full solo play-through still fits in about 15 minutes of real time.
 
+### Final numbers (3.1)
+
+Weapons (damage in the old rounds was 2-4 to 6-10; delays are for a base 2.5 player):
+
+| Weapon | Damage (was) | To hit | Delay s | Average DPS vs armor 2 |
+|---|---|---|---|---|
+| Fists | 2-5 (1-3) | 0 | 6 | 0.30 |
+| Iron Dagger | 6-9 (2-4) | +1 | 6 | 0.70 |
+| Rare Enchanted Dagger | 7-11 (3-6) | +2 | 6 | 0.90 |
+| Training Spear | 8-12 (2-5) | +1 | 8 | 0.72 |
+| Rusty Sword | 9-14 (3-5) | 0 | 8 | 0.77 |
+| Fine Iron Longsword | 12-18 (5-9) | 0 | 9 | 0.90 |
+| Woodcutter Axe | 14-21 (4-7) | 0 | 11 | 0.95 |
+| Goblin Overseer's Axe | 17-25 (6-10) | 0 | 12 | 1.05 |
+
+(The delay column in the equipment table assumes a player with no shield; the DPS column assumes a level 3 player with a small shield, which adds 1 s.) Damage per second rises gently from dagger to axe, with the fast daggers better against the evasive and low-HP creatures and when a potion has to be squeezed in. The Overseer's axe is the best weapon in the area.
+
+Creatures: base Reaction Time and actions are exactly the table above. HP (was) and damage (was): Large Rat 12 (6); Giant Rat 15 (8); Wolf 26 (16); Scavenger 13 (10), damage 1-3 (2-3); Spore Bat 9 (6), damage 1-2 (1-3); Guard 26 (16); Toad 66 (30), damage 2-4 (2-5); Warrior 28 (16); Minion 20 (12); Elite Guard 40 (22); Overseer 114 (54), damage 4-7 (4-6). The Crushing Leap and Shield Bash do double damage (the design left the multiplier open). Spawn counts per room are unchanged.
+
+Why: a player action is now 6 to 12 seconds apart instead of 2, so damage per action had to roughly triple for a fight to take 5 to 9 actions; creature HP rose about 1.5 to 2.2 times (more for creatures that only appear alone), and creature damage per action stayed almost the same because creatures also act once every 4 to 12 seconds. The simulation (`python3 tests/balance_sim.py`) gives room win rates of 88 to 99 percent at the right level, and the Overseer 50 to 75 percent for a level 4 to 5 player with a longsword and two potions.
+
 ### Haste and slow
 
 `AddSpeedEffect(string id, double factor, int seconds)` on any living thing; effects with the same id replace each other; they expire by time. Pass 1 content that uses it: none in the area. A wizard command `speed <target> <percent> [<seconds>]` (level 5; positive is haste, negative is slow) exists so the mechanism can be tested and tried.
@@ -157,11 +178,11 @@ Actions are now several seconds apart where rounds were 2 seconds, so with uncha
 A creature lists its actions in `Create()` and, if it has more than one, says how it chooses:
 
 ```csharp
-AddAction("slash", "Axe Slash", preparation: 0, recovery: 1.0);
-AddAction("power", "Power Strike", preparation: 1.0, recovery: 2.0, windUp: "draws his axe far back", damageMultiplier: 2);
+AddCombatAction("slash", "Axe Slash", preparation: 0, recovery: 1.0);
+AddCombatAction("power", "Power Strike", preparation: 1.0, recovery: 2.0, windUp: "draws his axe far back", damageMultiplier: 2);
 ```
 
-with a `ChooseAction()` override for the pattern. A creature with one action needs no override. The exact API is the implementer's to settle; the requirement is that a simple creature stays a few lines of data, and that BUILDING.md shows both cases with compiled templates.
+with a `ChooseAction(target)` override for the pattern (it uses `ActionsTaken()`, the number of actions this combatant has begun in this fight). A creature with one action needs no override. The method is called `AddCombatAction` because `AddAction` is the command binding. BUILDING.md shows both cases with compiled templates.
 
 ## 5. What does not change
 
@@ -175,3 +196,18 @@ To-hit and damage rolls, armor, levels, experience, death, corpses, the vault, l
 - It checks entering a fight: the attacked creature's first action comes after its own reaction delay.
 - The balance simulation is rewritten around the event clock and its numbers kept identical to the code.
 - The existing systems test and play-through are updated for the new rhythm and must pass; the play-through must still finish solo without wizard help.
+
+## 7. Where the implementation differs from this design
+
+- **Action API.** `AddCombatAction`, not `AddAction` (see section 4). The helper types `CombatAction` and `SpeedEffect` are plain public classes in `/std/living`.
+- **Ambush.** An aggressive monster does not start the fight and then hold back: `Noticed` schedules the ambush call-out Reaction Time x 2 seconds ahead, and `StartFight` happens when it fires, if the player is still there. A player who leaves in that time is never attacked.
+- **Who waits.** The initiator of `StartFight` acts at once (if ready); the target, assisting monsters and the summoned minion (`JoinFight`) wait their own Reaction Time x 2 seconds. `AddEnemy` is the path for "drawn in", `AddEnemyCore` for the initiator.
+- **Multipliers.** Crushing Leap and Shield Bash do x2 damage (the design left them open). The Power Strike warning is the wind-up line printed when the action begins; with Preparation 1.0 it lands exactly 2 seconds later.
+- **Pattern details.** The Toad uses its leap as every third action (`ActionsTaken() % 3 == 2`), the Elite Guard its bash as every fourth, the Overseer: Battle Cry first, Summon once at half HP, then slash, slash, power. The cry bonus is a 30 second window from when the cry resolves.
+- **Speed effects** are not retroactive: they change the delay of the next action begun, not one already in progress.
+- **Forgetting enemies.** An enemy who is not present is forgotten 30 seconds after the combatant first notices it is absent (a timer is scheduled when the combatant is idle with absent enemies).
+- **Queue.** An item used while not ready prints "You are not ready yet. You will ... as soon as you can. (stop cancels.)" and runs at the next Ready Time, whether or not the fight is still on; if the item is gone by then the player is told. Death (`ResetCombat`) drops the queue.
+- **Heartbeats.** `Living.HeartBeat` only calls the regeneration tick and turns itself off when it is not needed; combat never depends on it.
+- **score / stat.** `score` reports "Reaction Time X (base ..., item +mod)" and the delay of the basic attack; `stat` appends the timing block (current action, ready time, queue, every action with delay). `consider` adds a speed verdict.
+- **Numbers.** Section 3.1: HP and damage values changed as described, unarmed damage is 2-5, and the axe is 14-21 so that its damage per second does not fall behind the longsword.
+- **Driver.** One generic efun, `TimeMs()` (DRIVER_API.md). Fractional-second call-outs needed no fix: the game loop already waits in milliseconds, and the timing test measures them.

@@ -8,7 +8,7 @@ Status: **implemented and played through.** Sections 2 to 10 and the corpses are
 
 ## 1. Principles
 
-- **Classic and small.** Automatic round-based melee, levels 1 to 5, a handful of numbers per creature. No classes, skills, magic or parties yet.
+- **Classic and small.** Automatic melee on an event clock (Reaction Time and Recovery, no rounds), levels 1 to 5, a handful of numbers per creature. No classes, skills, magic or parties yet.
 - **Data in `Create()`.** An area builder writes a room, creature or item by setting fields in `Create()`, with no logic for the common cases. Logic is only needed for special behaviour (a boss ability, a quest giver).
 - **Late-bound calls between objects.** Objects talk through `ObjectRef.Call`, as elsewhere in this mudlib, so everything survives `update`.
 - **Game state is not a security boundary.** Any mudlib object can call `AddGold` on a player. That is the LPmud norm and is accepted here: builders are trusted. Wizard levels, passwords and files remain guarded as before and must not be weakened.
@@ -83,20 +83,29 @@ Equipment slots: `weapon`, `shield`, `body`, `head`, `trinket`. One item per slo
 
 ### Combat
 
-- `Living.StartFight(ObjectRef enemy)` adds the enemy to the attacker's enemy list and the attacker to the enemy's. Refused if either is dead, they are in different rooms, the room is safe, or the target is peaceful (`QueryPeaceful()`, true for villagers).
-- Each heartbeat (2 seconds) a living thing with enemies present in its room makes one attack against its current target: the first enemy still alive and present.
+Combat has no rounds. Each fighter has its own clock, described fully in [COMBAT_TIMING.md](COMBAT_TIMING.md); this is the summary.
+
+- `Living.StartFight(ObjectRef enemy)` starts a fight. Refused if either is dead, they are in different rooms, the room is safe, or the target is peaceful (`QueryPeaceful()`, true for villagers). The starter may act at once; the target and any monsters that join in must wait their own Reaction Time x 2 seconds before their first action.
+- **Delay between actions** = (final Reaction Time + the action's reaction modifier + the action's Recovery) x 2 seconds. Final Reaction Time = (base + equipment modifiers + encumbrance, 0 for now) x the product of haste and slow effects. Players have base 2.5, so an unarmed attack (Recovery 0.5) comes every 6 seconds.
+- An action with a Preparation shows a wind-up line when it begins and takes effect Preparation x 2 seconds later (inside its delay, not added to it). If the target has died or left in between, the blow is wasted.
+- One call-out per fighter drives the clock. Heartbeats are used only for regeneration and idle NPC behaviour.
+- A player can queue one action (a potion, food) while recovering; it happens at the next ready moment in place of an attack. A newer command replaces it and `stop` clears it.
 - **To hit:** `d20 + attacker level + QueryToHit() >= 10 + defender QueryArmor()`. A natural 20 always hits, a natural 1 always misses.
-- **Damage:** uniform in the attack's damage range, minimum 1.
-- Enemies that are no longer in the room are dropped from the list after 30 seconds, so walking away ends a fight, and a creature does not chase.
-- Messages: the attacker, the defender and bystanders each get a line, varying by damage (miss, scratch, hit, hard hit). Keep each round to one line per attack per observer.
-- `Living.Die(ObjectRef? killer)` is virtual. See monsters, players and corpses below.
+- **Damage:** uniform in the action's damage range (times the action's multiplier), minimum 1.
+- Enemies that are no longer in the room are forgotten after 30 seconds, so walking away ends a fight, and a creature does not chase.
+- Messages: the attacker, the defender and bystanders each get a line, varying by damage (miss, scratch, hit, hard hit). One line per attack per observer.
+- `Living.Die(ObjectRef? killer)` is virtual and calls `ResetCombat()`. See monsters, players and corpses below.
 - Players cannot fight each other: `CanFight` refuses with "Players cannot fight each other." Monsters do not regenerate.
 - `Living.Heal(int amount)`, `Living.TakeDamage(int amount, ObjectRef? from)`.
 
+The creature API is `BaseReaction` and `AddCombatAction(id, name, preparation, recovery, windUp, damageMultiplier, reactionMod, strike, kind)`; see BUILDING.md for compiled templates.
+
 ### Hooks for special behaviour
 
-- `protected virtual void CombatRound(ObjectRef target)`: called once per round before the normal attack. Return value none; a subclass may set `SkipAttack` for the round. Used for boss abilities.
+- `protected virtual CombatAction? ChooseAction(ObjectRef target)`: which action to begin next (default: the first action). Boss patterns are written here, usually with `ActionsTaken()`.
+- `protected virtual void Special(CombatAction action, ObjectRef target)`: what a non-attack action (kind other than "attack") does when it resolves.
 - `protected virtual int ModifyDamage(int damage, ObjectRef target)`: last word on outgoing damage.
+- `protected virtual void FightEnded()`: the enemy list became empty; reset per-fight state here.
 
 ## 5. NPCs
 
@@ -115,7 +124,7 @@ Equipment slots: `weapon`, `shield`, `body`, `head`, `trinket`. One item per slo
 
 | Field | Meaning |
 |---|---|
-| `Aggressive` | Attacks any player who enters, after a one-round pause. |
+| `Aggressive` | Attacks any player who enters, after its own Reaction Time x 2 seconds. |
 | `XpValue` | Experience for the kill. |
 | `GoldMin`, `GoldMax` | Coins given to the killer. |
 | `AddLoot(string path, int percent)` | Items that may be found in the corpse, each with this percent chance. |
@@ -125,27 +134,28 @@ On death: a death line for the room; experience to the killer (the one whose att
 
 ### Creature numbers for the Hollow
 
-| Creature | Level | HP | Damage | To hit | Armor | XP | Gold | Notes |
-|---|---|---|---|---|---|---|---|---|
-| Large Rat | 1 | 6 | 1-2 | 0 | 0 | 8 | 0 | Aggressive |
-| Giant Rat | 1 | 8 | 1-3 | 0 | 0 | 12 | 0 | Aggressive |
-| Wandering Wolf | 2 | 16 | 2-4 | 1 | 1 | 25 | 0 | Aggressive; encounter |
-| Goblin Scavenger | 2 | 10 | 2-3 | 2 | 1 | 22 | 2-8 | Fast but fragile |
-| Spore Bat | 2 | 6 | 1-3 | 1 | 3 | 20 | 0 | Evasive: high armor, low HP |
-| Goblin Guard | 2 | 16 | 2-3 | 0 | 2 | 32 | 4-12 | Defensive; one carries the Rusty Key |
-| Giant Cave Toad | 3 | 30 | 2-5 | 0 | 0 | 50 | 0 | High health |
-| Goblin Warrior | 3 | 16 | 2-4 | 0 | 2 | 42 | 5-14 | Balanced |
-| Goblin Minion | 2 | 12 | 2-4 | 0 | 1 | 15 | 0 | Summoned by the boss only |
-| Goblin Elite Guard | 4 | 22 | 3-5 | 2 | 3 | 85 | 12-22 | Mini-boss |
-| Goblin Overseer | 5 | 54 | 4-6 | 2 | 3 | 250 | 0 | Boss; see below |
+| Creature | Level | HP | Damage | To hit | Armor | XP | Gold | Base Reaction | Actions (Preparation / Recovery) |
+|---|---|---|---|---|---|---|---|---|---|
+| Large Rat | 1 | 12 | 1-2 | 0 | 0 | 8 | 0 | 2.0 | Bite 0 / 0.5; aggressive |
+| Giant Rat | 1 | 15 | 1-3 | 0 | 0 | 12 | 0 | 2.0 | Bite 0 / 0.5; aggressive |
+| Wandering Wolf | 2 | 26 | 2-4 | 1 | 1 | 25 | 0 | 2.0 | Bite 0 / 1.0; aggressive; encounter |
+| Goblin Scavenger | 2 | 13 | 1-3 | 2 | 1 | 22 | 2-8 | 1.5 | Quick Stab 0 / 0.5; fast but fragile |
+| Spore Bat | 2 | 9 | 1-2 | 1 | 3 | 20 | 0 | 1.5 | Swoop 0 / 0.5; evasive |
+| Goblin Guard | 2 | 26 | 2-4 | 0 | 2 | 32 | 4-12 | 3.5 | Spear Jab 0 / 1.0; one carries the Rusty Key |
+| Giant Cave Toad | 3 | 66 | 2-4 | 0 | 0 | 50 | 0 | 4.5 | Tongue Lash 0 / 1.0; Crushing Leap 1.0 / 2.0 (x2 damage) as every third action |
+| Goblin Warrior | 3 | 28 | 2-4 | 0 | 2 | 42 | 5-14 | 3.0 | Slash 0 / 1.0 |
+| Goblin Minion | 2 | 20 | 2-4 | 0 | 1 | 15 | 0 | 2.5 | Stab 0 / 0.5; summoned by the boss only |
+| Goblin Elite Guard | 4 | 40 | 3-5 | 2 | 3 | 85 | 12-22 | 3.5 | Slash 0 / 1.0; Shield Bash 0.5 / 1.5 (x2) as every fourth action |
+| Goblin Overseer | 5 | 114 | 4-7 | 2 | 3 | 250 | 0 | 4.0 | See below |
 
-Goblin Overseer abilities:
+Goblin Overseer actions (delays in seconds are (4.0 + reaction mod + Recovery) x 2):
 
-- **Battle Cry:** on the first round of a fight, instead of attacking. For the next 5 rounds his damage is +2. Once per fight.
-- **Power Strike:** each round, 20% chance that the attack does double damage, with its own message.
-- **Summon Goblin Minion:** the first time his HP falls to half or below, one Goblin Minion is cloned into the room and joins the fight. Once per life.
+- **Battle Cry** (0 / 0.5, 9 s): his first action in a fight. For the next 30 seconds his damage is +2.
+- **Axe Slash** (0 / 1.0, 10 s): the normal attack.
+- **Power Strike** (1.0 / 2.0, 12 s): double damage, announced 2 seconds before it lands; every third attack, in a fixed pattern (slash, slash, power).
+- **Summon Goblin Minion** (0.5 / 1.0, 10 s): his next action once his HP first falls to half or below. Once per life. The minion joins the fight but waits its own Reaction Time (5 s) before acting.
 
-These are the final numbers after the balance simulation (section 12). The first draft made the Barracks, the Hall and the boss unwinnable for a solo player; HP, damage and armor were lowered as shown. Every creature of the table has a mudlib file (the Guard Post keeps one plain Goblin Guard and one `goblin_guard_keyholder` that is identical except that its corpse always holds the Rusty Key). The Overseer is aggressive (it attacks anyone who enters its chamber). Gold from monsters is in the corpse. Creature names are capitalised (`Name = "Goblin Guard"`, used by `stat` and by shopkeepers and NPCs when they speak); what players read in fights and on corpses is the short description with its article ("a goblin guard", "the corpse of a goblin guard").
+These are the final numbers after the event-clock balance simulation (section 12). Compared with the 2-second-round version, HP is about 1.5 to 2.2 times higher and weapon damage about 3 times higher, because a player now strikes every 6 to 11 seconds instead of every 2. Every creature of the table has a mudlib file (the Guard Post keeps one plain Goblin Guard and one `goblin_guard_keyholder` that is identical except that its corpse always holds the Rusty Key). The Overseer is aggressive (it attacks anyone who enters its chamber). Gold from monsters is in the corpse. Creature names are capitalised (`Name = "Goblin Guard"`, used by `stat` and by shopkeepers and NPCs when they speak); what players read in fights and on corpses is the short description with its article ("a goblin guard", "the corpse of a goblin guard").
 
 ## 7. Items
 
@@ -153,30 +163,30 @@ These are the final numbers after the balance simulation (section 12). The first
 
 | Class | Fields | Commands |
 |---|---|---|
-| `Weapon` | `DamageMin`, `DamageMax`, `ToHit` | `wield <weapon>`, `unwield` |
-| `Armor` | `ArmorValue`, `Slot`, optional `MaxHpBonus` | `wear <item>`, `remove <item>` |
-| `Consumable` | `HealAmount`, `UseVerb` (`eat`, `drink`), `UseMessage` | `eat <item>`, `drink <item>` (also `quaff`) |
+| `Weapon` | `DamageMin`, `DamageMax`, `ToHit`, `ReactionMod`, `Recovery` | `wield <weapon>`, `unwield` |
+| `Armor` | `ArmorValue`, `Slot`, `ReactionMod`, optional `MaxHpBonus` | `wear <item>`, `remove <item>` |
+| `Consumable` | `HealAmount`, `UseVerb` (`eat`, `drink`), `UseMessage`, `Recovery` | `eat <item>`, `drink <item>` (also `quaff`); a queued action |
 | `Coins` | `Amount` (or `AmountMin`/`AmountMax`, rolled when first seen), `SetAmount(n)` | Picking it up (or looting it) adds the gold and destructs the item |
 
 ### Equipment for the Hollow
 
 | Item | Type | Numbers | Value | Source |
 |---|---|---|---|---|
-| Rusty Sword | weapon | 3-5 | 10 | Ironoak Arms |
-| Training Spear | weapon | 2-5, to hit +1 | 8 | Ironoak Arms |
-| Iron Dagger | weapon | 2-4, to hit +1 | 6 | Ironoak Arms |
-| Woodcutter Axe | weapon | 4-7 | 18 | Ironoak Arms |
-| Small Shield | armor, shield | 1 | 12 | Ironoak Arms |
-| Fine Iron Longsword | weapon | 5-9 | 60 | Ironoak Arms, rare |
+| Rusty Sword | weapon | 9-14, reaction +0.5, Recovery 1.0 | 10 | Ironoak Arms |
+| Training Spear | weapon | 8-12, to hit +1, reaction +0.5, Recovery 1.0 | 8 | Ironoak Arms |
+| Iron Dagger | weapon | 6-9, to hit +1, Recovery 0.5 | 6 | Ironoak Arms |
+| Woodcutter Axe | weapon | 14-21, reaction +1.0, Recovery 1.5 | 18 | Ironoak Arms |
+| Small Shield | armor, shield | 1, reaction +0.5 | 12 | Ironoak Arms |
+| Fine Iron Longsword | weapon | 12-18, reaction +1.0, Recovery 1.0 | 60 | Ironoak Arms, rare |
 | Guild Initiate's Helm | armor, head | 1 | 15 | Reward, Clear the Cellar |
-| Goblin Overseer's Axe | weapon | 6-10 | 70 | Boss corpse, always |
+| Goblin Overseer's Axe | weapon | 17-25, reaction +1.5, Recovery 1.5 | 70 | Boss corpse, always |
 | Leather Commander's Vest | armor, body | 3 | 60 | Boss, always |
 | Bag of Coins | coins | 60-100 | | Boss, always |
 | Overseer's Orders | quest item | readable | 0 | Boss, always |
 | Rusty Key | key | | 0 | The corpse of one of the two Goblin Guards, always |
-| Minor Healing Potion | consumable, drink | heals 20 | 15 | Storage Chamber; merchant |
+| Minor Healing Potion | consumable, drink | heals 20, Recovery 0.5 | 15 | Storage Chamber; merchant |
 | Magical Trinket | armor, trinket | max HP +5 | 40 | Hidden Cache, always |
-| Rare Enchanted Dagger | weapon | 3-6, to hit +2 | 80 | Hidden Cache, 25% |
+| Rare Enchanted Dagger | weapon | 7-11, to hit +2, Recovery 0.5 | 80 | Hidden Cache, 25% |
 | Random Gold | coins | 30-60 | | Hidden Cache, always |
 
 ## 8. Shops and services
@@ -292,16 +302,17 @@ Kills count only if they happened while the quest was active or before it was ac
 - Spawned creatures get an `OnReset` hook (used by the shopkeeper's rare stock).
 - The `update` command rebuilds only interactive occupants of the room, so NPCs are not duplicated.
 - Monsters do not regenerate. The Overseer is aggressive. The Traveling Merchant is built.
-- A creature's heartbeat order is the order in which heartbeats were switched on, so a player who logged in before a fight starts usually acts first in a round. `kill <name>` picks the first match in the room, in the order the room lists things; if the player is already fighting, `kill <other>` turns on the other (it is attacked first from then on). There is no numbering (`kill 2.goblin`).
-- Combat details: one attack per heartbeat, the player acts first; fleeing picks a random usable exit.
+- There are no rounds, so there is no acting order: every fighter has its own ready time. `kill <name>` picks the first match in the room, in the order the room lists things; if the player is already fighting, `kill <other>` turns on the other (it is attacked first from then on). There is no numbering (`kill 2.goblin`).
+- Combat details: one action per ready time; fleeing picks a random usable exit and is not an action.
 - Corpses and the vault were added after the first design (section 9).
 
 ## 12. Testing
 
 - `tests/smoke_test.py` keeps testing the driver and wizard tools against `/domains/town`. Because new players now start in Vincent's Hollow, the smoke test patches the start room in its temporary copy of the mudlib. Its existing checks must keep passing.
 - `tests/area_test.py` is a new end-to-end test for the gameplay systems and the area: movement through every exit of the area, look/read on the brief's objects, each NPC's quoted dialogue, buying and equipping, a real fight with a weak creature, corpses and looting, death and respawn, a driver restart and a crash with the lost-property vault, the locked cache, the boss abilities (using `smite` and `heal` where luck would make the test flaky), both quests through to the ending, and persistence of the character across logout.
-- A simulation script, `tests/balance_sim.py`, plays the combat rules outside the driver with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
-- `tests/playthrough_test.py` (port 4813, `LESMUDOS_TEST_PORT`) is the first-player test. It copies the mudlib unmodified (no stub rooms), makes a brand-new non-wizard level 1 character and plays the whole area: every exit of all 18 rooms in both directions, the sign, plaque and quest board, the brief's objects, every NPC's quoted lines word for word, the shop and the tavern (including the bed and logging out in the Guest Rooms), a deliberate death with corpse recovery and the locked-corpse message for a second player, then both quests with a fight loop (flee, rest, bed, potions, looting, the Hidden Cache, levelling) up to the Goblin Overseer, `report`, the rewards and the ending speech. A warden wizard account is used only to peek at state; if the solo character cannot finish, the test records a finding and falls back to `heal`, clearly labelled. It takes 9 to 17 minutes.
+- A simulation script, `tests/balance_sim.py`, plays the combat rules on an event clock outside the driver (the same delay formula as the mudlib; `python3 tests/balance_sim.py check` parses the mudlib files and fails if the numbers differ) with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
+- `tests/playthrough_test.py` (port 4813, `LESMUDOS_TEST_PORT`) is the first-player test. It copies the mudlib unmodified (no stub rooms), makes a brand-new non-wizard level 1 character and plays the whole area: every exit of all 18 rooms in both directions, the sign, plaque and quest board, the brief's objects, every NPC's quoted lines word for word, the shop and the tavern (including the bed and logging out in the Guest Rooms), a deliberate death with corpse recovery and the locked-corpse message for a second player, then both quests with a fight loop (flee, rest, bed, potions, looting, the Hidden Cache, levelling) up to the Goblin Overseer, `report`, the rewards and the ending speech. A warden wizard account is used only to peek at state; if the solo character cannot finish, the test records a finding and falls back to `heal`, clearly labelled. It takes 15 to 20 minutes.
+- `tests/timing_test.py` (port 4815) measures real intervals between combat actions against the formula (design section 6): unarmed, sword, shield, haste, slow, fast and slow creatures, the first-action delay of creatures drawn in, the Overseer's pattern and its Power Strike warning, the potion queue and `stop`, and lifetime cases (spamming `kill`, dying with a potion queued, a target quitting during a wind-up).
 - `tests/load_check.py` (port 4821) compiles and loads every mudlib file.
 - `tests/ansi_test.py` (port 4814) tests colour: rendering, `ansi off`, persistence, raw `cat` and editor output, escaping of player input, unclosed tags, shop columns and what a non-player object is told (section 14). `Client` in `smoke_test.py` strips ANSI sequences by default so that all other tests read plain text; `Client.raw` and `raw_command()` give the bytes.
 
@@ -321,7 +332,7 @@ Bugs and clumsy points that only play showed (fixed):
 Behaviour that was examined and left as it is:
 
 - Targeting is by first match with no numbering. A Village Guard and a Goblin Guard (and a Large Rat and a Giant Rat) are never in the same room, so `kill guard` and `kill rat` are unambiguous in this area. In a room with two Goblin Warriors the first listed is attacked, and `kill goblin` while fighting turns to the next.
-- Late text after a prompt is not an ordering bug: a command's own output is always queued before its "> ". What arrives afterwards is asynchronous by design (NPC emotes, ambushes, combat rounds, other players' actions). See DESIGN.md section 7.
+- Late text after a prompt is not an ordering bug: a command's own output is always queued before its "> ". What arrives afterwards is asynchronous by design (NPC emotes, ambushes, combat actions, other players' actions). See DESIGN.md section 7.
 - The balance simulation matches the code once the minion's timing and the level-up heal mid-fight were corrected in the script. It predicts a Level 4-5 player with a longsword and two potions beats the Overseer 57-78% of the time; the real runs agree (two to three engagements). No numbers in the area were changed.
 
 Not verified: the Traveling Merchant's North Road appearance and the wolf are random and seen only by chance in some runs; the rare longsword is a 30% roll; recovery after a natural death was only tested through the deliberate death.

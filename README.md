@@ -69,7 +69,7 @@ A large rat dies.
 You gain 8 experience.
 ```
 
-The first-time walk-through of the whole area (about 15 minutes of real fighting) is what `tests/playthrough_test.py` does.
+The first-time walk-through of the whole area (about 15 to 20 minutes of real fighting) is what `tests/playthrough_test.py` does.
 
 ### Become a wizard
 
@@ -125,9 +125,11 @@ Introduce a syntax error and update again: the error comes back with file and li
 
 New characters now start in the Village Square of Vincent's Hollow (the start room is the `StartRoom` constant in `mudlib/std/player.cs`; `/domains/town` stays as the small technical demo). The gameplay systems are described in [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md), and builders should read [docs/BUILDING.md](docs/BUILDING.md).
 
-Player commands: `ansi`, `kill`/`attack`, `flee`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
+Player commands: `ansi`, `kill`/`attack`, `flee`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
 
-Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `heal [TARGET]` (5), `smite TARGET` (10), plus `update` and `clone` as before.
+Combat has no rounds. Each fighter acts when its own Reaction Time and the Recovery of its last action have passed (an unarmed player strikes every 6 seconds, one with a sword every 8), and `score`, `consider` and `stat` show the numbers. Drinking a potion mid-fight is queued for your next ready moment; `stop` cancels it. See docs/COMBAT_TIMING.md.
+
+Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `heal [TARGET]` and `speed TARGET PERCENT [SECONDS]` (5), `smite TARGET` (10), plus `update` and `clone` as before.
 
 ### Colour
 
@@ -176,7 +178,8 @@ public class Lantern : Item
 | `tests/playthrough_test.py` | A brand-new level 1 character plays the finished area from the start to the end of both quests, against an unmodified mudlib (port 4813, 10 to 25 minutes) |
 | `tests/ansi_test.py` | Colour: tag rendering, `ansi on/off`, raw `cat`, escaping of player input (port 4814, about 30 seconds) |
 | `tests/load_check.py` | Quick check that every area file compiles and loads (port 4821, under a minute) |
-| `tests/balance_sim.py` | Standalone combat balance simulation |
+| `tests/timing_test.py` | Measures real intervals between combat actions against the timing formula (port 4815, about 3 minutes) |
+| `tests/balance_sim.py` | Standalone combat balance simulation (event clock); `check` compares it with the mudlib numbers |
 | `deploy/lesmudos.service` | Sample systemd unit (a starting point; not yet tested on a server) |
 | `docs` | Design and API reference |
 
@@ -189,6 +192,7 @@ LESMUDOS_TEST_PORT=4812 python3 tests/area_test.py
 LESMUDOS_TEST_PORT=4813 python3 tests/playthrough_test.py
 LESMUDOS_TEST_PORT=4821 python3 tests/load_check.py
 LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
+LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
 python3 tests/balance_sim.py
 ```
 
