@@ -15,6 +15,7 @@ public class Harland : Shopkeeper
 
         AddChat("Started with rats years ago. Then goblins moved in. Now something's organizing them.");
         AddChat("Vincent used to talk about tunnels beneath the village. Nobody believed him.");
+        AddChatAfterQuest("clear-the-cellar", "The cellar is quiet at last, and I have you to thank for it. The Hollowman's Rest will not forget what you did down there, friend.");
         AddTopic("cellar,goblins,goblin,rats,rat", "Rats, then goblins, and now something is organizing the goblins. I've paid two men to look down there, and neither came back up talking.");
         AddTopic("vincent,tunnels,tunnel,underground", "Vincent used to talk about tunnels under the village, always hungry to dig further. Nobody believed him, and I'm not sure I do yet.");
         AddTopic("bed,room,rest,sleep", "A bed for the night is five gold, and you'll wake up fit as a fiddle. Say the word and I'll show you upstairs myself.");

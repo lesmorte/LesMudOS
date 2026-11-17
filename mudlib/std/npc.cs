@@ -15,6 +15,8 @@ public class Npc : Living
     private readonly List<string> emoteLines = new();
     private readonly List<int> emotePercents = new();
     private readonly Dictionary<string, int> chatIndex = new();
+    private string questChatId = "";
+    private string questChatLine = "";
 
     public Npc()
     {
@@ -40,6 +42,16 @@ public class Npc : Living
         emotePercents.Add(percent);
     }
 
+    /// <summary>
+    /// Once a player has completed the quest (state 2), the main line (the first one added) is replaced
+    /// for that player by this one, and the other chat lines stay as they are. For thanks after a quest.
+    /// </summary>
+    protected void AddChatAfterQuest(string questId, string line)
+    {
+        questChatId = questId;
+        questChatLine = line;
+    }
+
     /// <summary>Replaces the next chat line for this player (for example after a quest). Null for the normal line.</summary>
     protected virtual string? TalkOverride(ObjectRef who) => null;
 
@@ -60,6 +72,7 @@ public class Npc : Living
             var key = who.Call<string>("QueryName") ?? "";
             var index = chatIndex.GetValueOrDefault(key);
             line = chat[index % chat.Count];
+            if (index % chat.Count == 0 && questChatId != "" && who.Call<int>("QueryQuest", questChatId) == 2) line = questChatLine;
             chatIndex[key] = index + 1;
         }
         return line == null ? $"{Name} has nothing to say to you." : Speech(line);

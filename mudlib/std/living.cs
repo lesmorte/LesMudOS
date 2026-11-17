@@ -213,6 +213,19 @@ public abstract class Living : Thing
         SetHeartBeat(true);
     }
 
+    /// <summary>Make this enemy the one attacked first. A player's "kill" uses it to switch targets. False if it is not an enemy.</summary>
+    public bool Focus(ObjectRef enemy)
+    {
+        var index = enemies.IndexOf(enemy);
+        if (index < 0) return false;
+        if (index > 0)
+        {
+            enemies.RemoveAt(index);
+            enemies.Insert(0, enemy);
+        }
+        return true;
+    }
+
     public void ForgetEnemy(ObjectRef enemy)
     {
         enemies.Remove(enemy);
@@ -236,6 +249,9 @@ public abstract class Living : Thing
     }
 
     public bool QueryFightingWith(ObjectRef other) => enemies.Contains(other);
+
+    /// <summary>The enemies in the order they will be attacked.</summary>
+    protected List<ObjectRef> Enemies() => enemies.Where(e => e.IsAlive).ToList();
 
     /// <summary>Called once per round before the normal attack. Set SkipAttack to replace the attack. For boss abilities.</summary>
     protected virtual void CombatRound(ObjectRef target) { }

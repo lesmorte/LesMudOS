@@ -89,7 +89,7 @@ public abstract class Room : MudObject
         locks[direction] = new Lock { KeyId = keyId, Refusal = refusal };
     }
 
-    /// <summary>An exit nobody can use yet. It is listed, and gives the message.</summary>
+    /// <summary>A way nobody can use yet (a road into the wilderness). It is not listed among the exits, but the direction gives the message.</summary>
     protected void BlockExit(string direction, string message) => LockExit(direction, "", message);
 
     // ---- Queries ----
@@ -127,7 +127,7 @@ public abstract class Room : MudObject
         ArmReset();
         var who = ThisPlayer();
         if (who == null || !Interactive(who)) return;
-        foreach (var direction in Exits.Keys)
+        foreach (var direction in Exits.Keys.Concat(locks.Keys).Distinct().ToList())
         {
             AddAction(direction, GoExit);
             AddAction(direction.Substring(0, 1), GoExit); // "n" for "north", "u" for "up", "d" for "down"
@@ -139,9 +139,11 @@ public abstract class Room : MudObject
     {
         var player = ThisPlayer();
         var verb = QueryVerb();
-        var direction = Exits.ContainsKey(verb) ? verb : verb.Length == 1 ? Exits.Keys.FirstOrDefault(d => d.StartsWith(verb)) : null;
+        var ways = Exits.Keys.Concat(locks.Keys).Distinct().ToList();
+        var direction = ways.Contains(verb) ? verb : verb.Length == 1 ? ways.FirstOrDefault(d => d.StartsWith(verb)) : null;
         if (player == null || direction == null) return false;
-        MoveThrough(player, direction);
+        if (!Exits.ContainsKey(direction)) TellObject(player, locks[direction].Refusal + "\n"); // blocked, and not listed
+        else MoveThrough(player, direction);
         return true;
     }
 

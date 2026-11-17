@@ -76,7 +76,7 @@ public class Rowan : Npc
         if (state == 2) { Speak($"You have already finished \"{Title(quest)}\". Thank you again."); return true; }
         if (state == 1) { Speak($"You have already taken \"{Title(quest)}\". " + Reminder(quest)); return true; }
 
-        player.Call("SetQuest", quest, 1);
+        player.Call("SetQuest", quest, 1, Title(quest));
         Write($"Quest accepted: {Title(quest)}.\n");
         if (quest == Cellar)
             Speak("Good. Go down through the Hollowman's Rest, past the cellar and into the old smugglers' tunnels. The goblins answer to an Overseer. Kill him, and come back and report.");
@@ -123,7 +123,7 @@ public class Rowan : Npc
 
     private void Reward(ObjectRef player, string quest, int xp, int gold, string extra)
     {
-        player.Call("SetQuest", quest, 2);
+        player.Call("SetQuest", quest, 2, Title(quest));
         Write($"Quest complete: {Title(quest)}!\n");
         player.Call("AddXp", xp);
         player.Call("AddGold", gold);
@@ -139,7 +139,7 @@ public class Rowan : Npc
 
         if (player.Call<int>("QueryQuest", Orders) == 0)
         {
-            player.Call("SetQuest", Orders, 1);
+            player.Call("SetQuest", Orders, 1, Title(Orders));
             Speak("There is more. Whatever drove those goblins left its orders somewhere down there. Find the Overseer's Orders, if the goblins have not burned them, and bring them to me.");
             Write("New quest: Recover the Overseer's Orders.\n");
         }

@@ -22,6 +22,7 @@ public abstract class Adventurer : Living
 
     [Saved] private int xp;
     [Saved] private Dictionary<string, int> quests = new();
+    [Saved] private Dictionary<string, string> questTitles = new();
     [Saved] private List<string> killed = new();
     [Saved] private List<string> carried = new();
     [Saved] private List<int> carriedEquipped = new();
@@ -81,6 +82,13 @@ public abstract class Adventurer : Living
     public int QueryQuest(string id) => quests.TryGetValue(id, out var state) ? state : 0;
 
     public void SetQuest(string id, int state) => quests[id] = state;
+
+    /// <summary>Set a quest's state and the title the quest log shows for it ("Clear the Cellar").</summary>
+    public void SetQuest(string id, int state, string title)
+    {
+        quests[id] = state;
+        questTitles[id] = title;
+    }
 
     public void NotifyKill(string programPath)
     {
@@ -403,10 +411,19 @@ public abstract class Adventurer : Living
         var room = Environment();
         var target = args == "" || room == null ? null : Present(args, room);
         if (target == null) { NotifyFail("Kill what?"); return false; }
-        if (QueryFightingWith(target) && target.IsAlive) { Write("You are already fighting that.\n"); return true; }
+        if (QueryFightingWith(target) && target.IsAlive)
+        {
+            // Already an enemy: "kill" picks it as the one to attack next.
+            var first = Enemies().FirstOrDefault(e => Environment(e) == room);
+            if (first == target) { Write("You are already fighting that.\n"); return true; }
+            Focus(target);
+            Write($"You turn on {target.Call<string>("QueryLabel")}.\n");
+            return true;
+        }
         var refusal = CanFight(target);
         if (refusal != null) { Write(refusal + "\n"); return true; }
         StartFight(target);
+        Focus(target);
         return true;
     }
 
@@ -576,7 +593,7 @@ public abstract class Adventurer : Living
                (done.Count > 0 ? "Completed quests: " + string.Join(", ", done) + "\n" : "");
     }
 
-    private static string QuestTitle(string id) => Cap(id.Replace('-', ' '));
+    private string QuestTitle(string id) => questTitles.TryGetValue(id, out var title) ? title : Cap(id.Replace('-', ' '));
 
     // ---- Builder tools ----
 
