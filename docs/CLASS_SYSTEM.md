@@ -94,7 +94,7 @@ New items for starting kits and the smithy: Novice's Mace (mace), Apprentice's S
 
 ## 6. The class framework
 
-A class is data: id, name, tier (archetype, advanced, subclass, prestige), parent class, title, requirements, experience modifier, the skills and traits it grants, the equipment access it adds, resource values (archetypes only), guild, and whether it is enabled. A skill or trait is data in the same way.
+A class is data: id, name, tier (archetype, advanced, subclass, prestige), parent class, title, requirements, experience modifier, attack rate, the skills and traits it grants, the equipment access it adds, resource values (archetypes only), guild, and whether it is enabled. A skill or trait is data in the same way.
 
 Requirements:
 
@@ -115,7 +115,38 @@ Experience to reach level n = 50 × n × (n − 1) × experience modifier
 
 That gives 100, 300, 600 and 1000 for levels 2 to 5, close to the present 100, 250, 500, 900. The constants live in one place. The experience modifier is the largest modifier among the character's classes: 1.0 for standard classes, 1.25 for Spellblade as the brief gives it, higher for future prestige classes. A character who gains a modifier keeps their level and experience; only the experience needed for later levels changes.
 
-Per level: +8 maximum HP, as now. The attack roll's level bonus is kept as it is; it will need a cap or a curve before areas above about level 10 exist, and that is recorded here as known debt.
+Per level: +8 maximum HP, as now.
+
+### Attack and defense scaling
+
+The attack roll has to work from level 1 to level 100, and how fast a character's attack grows depends on class. The roll becomes a contest of two level-scaled values:
+
+```
+Hit if  d20 + Attack ≥ 10 + Armor + Defense
+
+Attack  = round(attack rate × level) + weapon, skill and effect bonuses
+Defense = level − 1
+```
+
+- **Attack rate** is a field of the class, so it is data. It is the attack gained per level.
+- **Defense** grows one point per level for everyone, players and creatures alike, so that two combatants of the same level and a full attack rate meet on the same terms at level 1 and at level 100. The defense rate is a single constant and can become a class field later if classes should differ in it too.
+- A natural 20 always hits and a natural 1 always misses, as now.
+
+Rates have to stay close together. Each point of attack is 5% on the die, and the gap between two rates is multiplied by level: a rate of 0.7 against 1.0 is unnoticeable at level 5 and a 30-point gap at level 100, where that class could no longer hit anything of its own level. So the difference between the best and worst class is held to a few points at the cap:
+
+| Archetype | Attack rate | Attack at level 5 | Attack at level 50 | Attack at level 100 | Against an equal-level foe at level 100 |
+|---|---|---|---|---|---|
+| Warrior | 1.00 | 5 | 50 | 100 | as at level 1 |
+| Scout | 1.00 | 5 | 50 | 100 | as at level 1 |
+| Adventurer | 0.98 | 5 | 49 | 98 | 10% less likely to hit |
+| Priest | 0.97 | 5 | 49 | 97 | 15% less likely to hit |
+| Mage | 0.96 | 5 | 48 | 96 | 20% less likely to hit |
+
+An advanced class may carry its own rate, which then replaces the archetype's: Templar 1.00, Monk 1.00, Spellblade 0.99, Bard 0.99. Classes that do not name one keep their archetype's. Creatures have a rate of 1.00 unless the creature says otherwise.
+
+This rate governs weapon attacks and skills that make an attack roll. Spells that need no hit roll (Arcane Bolt, Fireball, Drain Life) are not affected by it, which is how the casting classes stay effective while being poorer with a weapon.
+
+Consequence for the existing area: today the defender's level counts for nothing, so adding Defense makes every attack against a target above level 1 less likely to hit, in both directions (by 15 points between two level 4 combatants). Creature armor in Vincent's Hollow is lowered to compensate where needed, and the result is checked with the simulation in stage C.
 
 ## 7. Archetypes
 
@@ -123,13 +154,13 @@ Chosen at character creation, after the password, from a short in-character pres
 
 "Avoid large stat differences" is taken literally: HP and Reaction Time differ a little, and the rest is skills, resources and equipment access.
 
-| Archetype | Starting HP | Base Reaction Time | Starting kit | Gold |
-|---|---|---|---|---|
-| Warrior | 34 | 3.0 | Rusty Sword, Small Shield | 10 |
-| Scout | 30 | 2.0 | Hunting Bow, Iron Dagger | 10 |
-| Priest | 28 | 2.5 | Novice's Mace, Minor Healing Potion | 15 |
-| Mage | 26 | 2.5 | Apprentice's Staff, Minor Healing Potion | 15 |
-| Adventurer | 30 | 2.5 | Training Spear, two Trail Rations | 20 |
+| Archetype | Starting HP | Base Reaction Time | Attack rate | Starting kit | Gold |
+|---|---|---|---|---|---|
+| Warrior | 34 | 3.0 | 1.00 | Rusty Sword, Small Shield | 10 |
+| Scout | 30 | 2.0 | 1.00 | Hunting Bow, Iron Dagger | 10 |
+| Priest | 28 | 2.5 | 0.97 | Novice's Mace, Minor Healing Potion | 15 |
+| Mage | 26 | 2.5 | 0.96 | Apprentice's Staff, Minor Healing Potion | 15 |
+| Adventurer | 30 | 2.5 | 0.98 | Training Spear, two Trail Rations | 20 |
 
 ### Starting features
 
