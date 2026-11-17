@@ -79,7 +79,7 @@ public class Npc : Living
     }
 
     /// <summary>Called by the "ask" command.</summary>
-    public string? Ask(ObjectRef who, string topic)
+    public virtual string? Ask(ObjectRef who, string topic)
     {
         topic = topic.ToLowerInvariant();
         for (var i = 0; i < topicKeys.Count; i++)

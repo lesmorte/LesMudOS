@@ -743,8 +743,9 @@ public class Player : Adventurer
                 Write(EdHelp);
                 break;
             case "p":
-                if (!hasFirst) Write(count == 0 ? "(empty)\n" : Numbered(edLines, 1, count));
-                else if (validRange) Write(Numbered(edLines, first, last));
+                // File text is shown as stored, with no rendering of its tags.
+                if (!hasFirst) WriteRaw(count == 0 ? "(empty)\n" : Numbered(edLines, 1, count));
+                else if (validRange) WriteRaw(Numbered(edLines, first, last));
                 else Write(BadRange);
                 break;
             case "a":
