@@ -63,7 +63,7 @@ public abstract class Room : MudObject
         foreach (var name in Names(names))
         {
             readables[name] = text;
-            if (!details.ContainsKey(name)) details[name] = look ?? "There is writing on it. You could read it.";
+            if (!details.ContainsKey(name)) details[name] = look ?? "There is writing on it. You could {cmd}read{/} it.";
         }
     }
 
@@ -184,8 +184,9 @@ public abstract class Room : MudObject
     public string LongFor(ObjectRef? viewer)
     {
         var text = new StringBuilder();
-        text.Append(ShortDesc).Append('\n').Append(LongDesc).Append('\n');
-        text.Append(Exits.Count == 0 ? "There are no obvious exits.\n" : $"Obvious exits: {string.Join(", ", Exits.Keys)}\n");
+        // The room name is a title; every exit is a command the player can type.
+        text.Append("{title}").Append(ShortDesc).Append("{/}\n").Append(LongDesc).Append('\n');
+        text.Append(Exits.Count == 0 ? "There are no obvious exits.\n" : "Obvious exits: " + string.Join(", ", Exits.Keys.Select(d => "{cmd}" + d + "{/}")) + "\n");
 
         // Identical shorts are merged: "Two giant rats are here."
         var counts = new Dictionary<string, int>();

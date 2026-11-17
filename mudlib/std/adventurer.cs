@@ -307,7 +307,7 @@ public abstract class Adventurer : Living
             return true;
         }
         var detail = room?.Call<string>("QueryDetail", args);
-        if (detail == null) { NotifyFail($"You see no '{args}' here."); return false; }
+        if (detail == null) { NotifyFail($"You see no '{Esc(args)}' here."); return false; }
         Write(detail.EndsWith("\n") ? detail : detail + "\n");
         return true;
     }
@@ -361,7 +361,7 @@ public abstract class Adventurer : Living
             if (result == null) return true;
             refusal ??= result;
         }
-        if (!found) { NotifyFail("There is nothing here to loot."); return false; }
+        if (!found) { NotifyFail("There is nothing here to {cmd}loot{/}."); return false; }
         Write(refusal + "\n");
         return true;
     }
@@ -397,7 +397,7 @@ public abstract class Adventurer : Living
         if (text == null)
         {
             if (thing != null) { Write("There is nothing to read on that.\n"); return true; }
-            NotifyFail($"You see no '{args}' to read.");
+            NotifyFail($"You see no '{Esc(args)}' to read.");
             return false;
         }
         Write(text.EndsWith("\n") ? text : text + "\n");
@@ -544,7 +544,7 @@ public abstract class Adventurer : Living
     private bool CmdAsk(string args)
     {
         var split = args.IndexOf(" about ", StringComparison.Ordinal);
-        if (split < 0) { NotifyFail("Usage: ask NPC about TOPIC"); return false; }
+        if (split < 0) { NotifyFail("Usage: {cmd}ask{/} NPC {cmd}about{/} TOPIC"); return false; }
         var room = Environment();
         var npc = room == null ? null : Present(args.Substring(0, split).Trim(), room);
         if (npc == null) { NotifyFail("Ask whom?"); return false; }
@@ -609,7 +609,7 @@ public abstract class Adventurer : Living
     {
         if (!IsWizard(LevelGoto)) return false;
         args = args.Trim();
-        if (args == "") { NotifyFail("Usage: goto ROOM-PATH or goto PLAYER"); return false; }
+        if (args == "") { NotifyFail("Usage: {cmd}goto{/} ROOM-PATH or {cmd}goto{/} PLAYER"); return false; }
         ObjectRef destination;
         try
         {
@@ -619,7 +619,7 @@ public abstract class Adventurer : Living
         }
         catch (MudRuntimeException problem)
         {
-            Write(problem.Message + "\n");
+            Write(Esc(problem.Message) + "\n");
             return true;
         }
         Say($"{Name} vanishes in a puff of smoke.\n");

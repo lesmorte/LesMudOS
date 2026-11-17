@@ -103,7 +103,7 @@ public class Corpse : Thing
         return name == "" || (name != killerName && name != deceasedName);
     }
 
-    private string Refusal() => $"The corpse of {Strip(label)} is not yours to loot yet.";
+    private string Refusal() => $"The corpse of {Strip(label)} is not yours to {{cmd}}loot{{/}} yet.";
 
     /// <summary>The timers, for tests and wizards: lock length, and decay times when empty and when full. Wizard level 10 only.</summary>
     public void SetTimers(int lockSecs, int emptySecs, int fullSecs)
@@ -139,7 +139,7 @@ public class Corpse : Thing
         if (taker == null || PreviousObject() != taker) return "You cannot do that.";
         if (LockedFor(taker)) return Refusal();
         var item = Present(itemId, Self);
-        if (item == null) return $"There is no '{itemId}' in {Short()}.";
+        if (item == null) return $"There is no '{Esc(itemId)}' in {Short()}.";
         Hand(item, taker);
         AfterTaking();
         return null;

@@ -88,7 +88,11 @@ public class Shopkeeper : Npc
         var text = new StringBuilder($"{Name} has these for sale:\n");
         foreach (var entry in stock)
             if (entry.Sample is { IsAlive: true } sample)
-                text.Append($"  {Cap(sample.Call<string>("Short") ?? "something"),-32}{entry.Price,5} gold\n");
+            {
+                // Padded by the width of the visible text, so markup in a name cannot shift the prices.
+                var item = Cap(sample.Call<string>("Short") ?? "something");
+                text.Append($"  {item}{new string(' ', Math.Max(0, 32 - Markup(item, false).Length))}{entry.Price,5} gold\n");
+            }
         Write(text.ToString());
         return true;
     }
@@ -98,7 +102,7 @@ public class Shopkeeper : Npc
         if (args == "") { NotifyFail("Buy what?"); return false; }
         var entry = Find(args);
         var buyer = ThisPlayer();
-        if (entry == null || buyer == null) { Write($"{Name} does not sell '{args}'. Try browse.\n"); return true; }
+        if (entry == null || buyer == null) { Write($"{Name} does not sell '{Esc(args)}'. Try {{cmd}}browse{{/}}.\n"); return true; }
         if (!buyer.Call<bool>("AddGold", -entry.Price)) { Write($"You cannot afford that. It costs {entry.Price} gold.\n"); return true; }
         var what = entry.Sample!.Call<string>("Short");
         if (!OnBuy(buyer, entry.Path))
