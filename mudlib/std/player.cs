@@ -62,6 +62,14 @@ public class Player : Adventurer
     private string SaveFile => "/players/" + Name.ToLower();
 
     /// <summary>Record the carried items and the logout room, then write the save file.</summary>
+    protected override void PersistNow() => Save();
+
+    /// <summary>Called on every online player by the shutdown command, so that a planned stop loses nothing.</summary>
+    public void SaveForShutdown()
+    {
+        if (ready && PreviousObject() is { ProgramPath: "/std/player" }) Save();
+    }
+
     private void Save()
     {
         PrepareSave();
@@ -184,6 +192,7 @@ public class Player : Adventurer
 
         Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type 'help' for commands.\n\n");
         EnterWorld(StartRoom);
+        ClaimLostProperty();
         Say($"{Name} enters the game.\n");
         Look();
     }
@@ -289,6 +298,7 @@ public class Player : Adventurer
             "          who, title TEXT, password, save, quit, and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
             "Fighting:  kill (or attack) TARGET, flee, consider TARGET, hp, score (sc)\n" +
+            "Corpses:   loot [CORPSE], get THING (or all) from CORPSE, look in CORPSE\n" +
             "Gear:      wield THING, unwield, wear THING, remove THING, eat/drink THING\n" +
             "People:    talk (or greet) NPC, ask NPC about TOPIC, read THING\n" +
             "Town:      browse, buy THING, sell THING, value THING (in a shop), quests,\n" +
@@ -824,7 +834,11 @@ public class Player : Adventurer
     private bool CmdShutdown(string args)
     {
         if (!IsWizard(LevelShutdown)) return false;
-        foreach (var user in Users()) TellObject(user, $"{Name} shuts the game down.\n");
+        foreach (var user in Users())
+        {
+            TellObject(user, $"{Name} shuts the game down.\n");
+            user.Call("SaveForShutdown");
+        }
         Shutdown();
         return true;
     }

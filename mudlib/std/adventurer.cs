@@ -119,6 +119,7 @@ public abstract class Adventurer : Living
         AddAction("l", CmdLook);
         AddAction("get", CmdGet);
         AddAction("take", CmdGet);
+        AddAction("loot", CmdLoot);
         AddAction("drop", CmdDrop);
         AddAction("inventory", CmdInventory);
         AddAction("i", CmdInventory);
@@ -166,6 +167,38 @@ public abstract class Adventurer : Living
         inventoryRestored = true;
     }
 
+    /// <summary>
+    /// Belongings that were in this player's corpse when the game last stopped are
+    /// handed back by the innkeeper. Call once at login, after the inventory is restored.
+    /// </summary>
+    protected void ClaimLostProperty()
+    {
+        List<string> claim;
+        try { claim = LoadObject("/secure/vault").Call<List<string>>("Claim") ?? new List<string>(); }
+        catch (MudRuntimeException) { return; }
+        if (claim.Count == 0) return;
+        var coins = int.TryParse(claim[0], out var parsed) ? parsed : 0;
+        var returned = 0;
+        for (var i = 1; i < claim.Count; i++)
+        {
+            try
+            {
+                MoveObject(CloneObject(claim[i]), Self);
+                returned++;
+            }
+            catch (MudRuntimeException)
+            {
+                // The file is gone or no longer compiles; the item is lost.
+            }
+        }
+        if (coins > 0) Gold += coins;
+        if (returned == 0 && coins == 0) return;
+        Tell("Harland, the innkeeper of the Hollowman's Rest, hands you a bundle: he kept your belongings safe while the village was in turmoil.\n");
+        if (returned > 0) Tell($"You recover {(returned == 1 ? "an item" : returned + " items")}{(coins > 0 ? $" and {coins} gold" : "")}.\n");
+        else Tell($"You recover {coins} gold.\n");
+        PersistNow();
+    }
+
     /// <summary>Move the player into the world: the saved logout room, if there is one, else the start room.</summary>
     protected void EnterWorld(string startRoom)
     {
@@ -201,7 +234,8 @@ public abstract class Adventurer : Living
     // ---- Death ----
 
     /// <summary>
-    /// A player does not stay dead: they lose a tenth of their gold, forget
+    /// A player does not stay dead: a corpse in the room where they fell takes their
+    /// belongings and a tenth of their gold, they forget
     /// their enemies, and wake in the Guest Rooms at full health.
     /// </summary>
     public override void Die(ObjectRef? killer)
@@ -215,11 +249,13 @@ public abstract class Adventurer : Living
             if (room != null) TellRoom(room, $"{Name} collapses and dies.\n", Self);
             var lost = Gold / 10;
             Gold -= lost;
+            LeaveCorpse(room, killer, lost);
             ClearEnemies();
             Hp = QueryMaxHp();
             MoveObject(LoadObject(RespawnRoom));
             TellRoom(Environment()!, $"{Name} appears, looking battered.\n", Self);
             Tell($"You wake in the Guest Rooms, bruised but alive. The healer's fee costs you {lost} gold.\n");
+            PersistNow();
             Look();
         }
         finally
@@ -228,11 +264,32 @@ public abstract class Adventurer : Living
         }
     }
 
+    /// <summary>Write the character to disk now. Players override this.</summary>
+    protected virtual void PersistNow() { }
+
+    /// <summary>Put everything carried (equipment included) and the fee into a corpse in the room.</summary>
+    private void LeaveCorpse(ObjectRef? room, ObjectRef? killer, int fee)
+    {
+        if (room == null) return;
+        var corpse = CloneObject("/std/corpse");
+        MoveObject(corpse, room);
+        foreach (var slot in new[] { "weapon", "shield", "body", "head", "trinket" }) Unequip(slot);
+        foreach (var item in AllInventory()) MoveObject(item, corpse);
+        if (fee > 0)
+        {
+            var coins = CloneObject("/std/coins");
+            coins.Call("SetAmount", fee);
+            MoveObject(coins, corpse);
+        }
+        corpse.Call("Setup", Name, killer ?? Self, Self);
+    }
+
     // ---- Commands: looking and carrying ----
 
     private bool CmdLook(string args)
     {
         if (args.StartsWith("at ")) args = args.Substring(3);
+        else if (args.StartsWith("in ")) args = args.Substring(3);
         if (args == "") { Look(); return true; }
         var room = Environment();
         var target = Present(args) ?? (room == null ? null : Present(args, room));
@@ -250,6 +307,8 @@ public abstract class Adventurer : Living
     private bool CmdGet(string args)
     {
         var room = Environment();
+        var from = args.IndexOf(" from ", StringComparison.Ordinal);
+        if (from > 0) return GetFromCorpse(args.Substring(0, from).Trim(), args.Substring(from + 6).Trim());
         var item = room == null ? null : Present(args, room);
         if (item == null || item == Self) { NotifyFail("Get what?"); return false; }
         if (!item.Call<bool>("CanGet")) { Write("You can't take that.\n"); return true; }
@@ -258,6 +317,44 @@ public abstract class Adventurer : Living
         Write($"You take {description}.\n");
         Say($"{Name} takes {description}.\n");
         item.Call("Taken", Self);
+        return true;
+    }
+
+    private ObjectRef? CorpseHere(string name)
+    {
+        var room = Environment();
+        if (room == null) return null;
+        foreach (var ob in AllInventory(room))
+            if (ob.Call<bool>("IsCorpse") && (name == "" || ob.Call<bool>("Id", name.ToLowerInvariant()))) return ob;
+        return null;
+    }
+
+    private bool GetFromCorpse(string what, string corpseName)
+    {
+        var corpse = CorpseHere(corpseName);
+        if (corpse == null || what == "") { NotifyFail("Get what from what?"); return false; }
+        var refusal = what == "all" ? corpse.Call<string>("TakeAll") : corpse.Call<string>("Take", what);
+        if (refusal != null) Write(refusal + "\n");
+        return true;
+    }
+
+    private bool CmdLoot(string args)
+    {
+        var room = Environment();
+        if (room == null) return false;
+        string? refusal = null;
+        var found = false;
+        foreach (var ob in AllInventory(room).ToList())
+        {
+            if (!ob.Call<bool>("IsCorpse")) continue;
+            if (args != "" && !ob.Call<bool>("Id", args.ToLowerInvariant())) continue;
+            found = true;
+            var result = ob.Call<string>("TakeAll");
+            if (result == null) return true;
+            refusal ??= result;
+        }
+        if (!found) { NotifyFail("There is nothing here to loot."); return false; }
+        Write(refusal + "\n");
         return true;
     }
 

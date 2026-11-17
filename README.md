@@ -98,6 +98,14 @@ Replaced /domains/town/square; moved 1 occupant(s) back in.
 
 Introduce a syntax error and update again: the error comes back with file and line, and the room you are standing in is untouched.
 
+## The game: Vincent's Hollow
+
+New characters now start in the Village Square of Vincent's Hollow (the start room is the `StartRoom` constant in `mudlib/std/player.cs`; `/domains/town` stays as the small technical demo). The gameplay systems are described in [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md), and builders should read [docs/BUILDING.md](docs/BUILDING.md).
+
+Player commands: `kill`/`attack`, `flee`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
+
+Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `heal [TARGET]` (5), `smite TARGET` (10), plus `update` and `clone` as before.
+
 ## What a mudlib file looks like
 
 ```csharp
@@ -134,9 +142,11 @@ public class Lantern : Item
 |---|---|
 | `src/LesMudOS.Api` | The contract mudlib code compiles against: `MudObject` (applies and efuns), `ObjectRef`, `IMaster`, `[Saved]` |
 | `src/LesMudOS.Driver` | The host: kernel and game loop, Roslyn compiler, tick injector, sandbox analyzer, telnet server, save store |
-| `mudlib` | Sample mudlib: `/secure` (master, login, wizard registry), `/std` (thing, item, room, player, void), `/domains/town` |
+| `mudlib` | Sample mudlib: `/secure` (master, login, wizard registry), `/std` (thing, item, room, living, npc, monster, shopkeeper, weapon, armor, consumable, coins, corpse, adventurer, player, void), `/secure/vault` (lost-property vault), `/domains/town` (technical demo), `/domains/hollow` (Vincent's Hollow) |
 | `mudlib/Mudlib.csproj` | Not used at run time. Gives IntelliSense for mudlib files and lets `dotnet build` check the whole mudlib. |
-| `tests/smoke_test.py` | End-to-end test over TCP |
+| `tests/smoke_test.py` | End-to-end test of the driver over TCP (port 4811 in the examples below) |
+| `tests/area_test.py` | End-to-end test of the game systems and the Hollow (port 4812) |
+| `tests/balance_sim.py` | Standalone combat balance simulation |
 | `deploy/lesmudos.service` | Sample systemd unit (a starting point; not yet tested on a server) |
 | `docs` | Design and API reference |
 
@@ -144,10 +154,12 @@ public class Lantern : Item
 
 ```
 dotnet build
-python3 tests/smoke_test.py
+LESMUDOS_TEST_PORT=4811 python3 tests/smoke_test.py
+LESMUDOS_TEST_PORT=4812 python3 tests/area_test.py
+python3 tests/balance_sim.py
 ```
 
-The test starts the driver on port 4777 against a temporary copy of the mudlib, logs in two players, and checks account creation and passwords, movement, object-supplied verbs, heartbeats, call-outs, wizard levels and promotion, live update of a room and of a base class, compile-error handling, the sandbox, the evaluation-cost limit, the recursion guard, unloading of old program versions, and save/restore.
+The smoke test starts the driver on port 4777 (or `LESMUDOS_TEST_PORT`) against a temporary copy of the mudlib, logs in two players, and checks account creation and passwords, movement, object-supplied verbs, heartbeats, call-outs, wizard levels and promotion, live update of a room and of a base class, compile-error handling, the sandbox, the evaluation-cost limit, the recursion guard, unloading of old program versions, and save/restore.
 
 ## Deploying to a Linux VM
 

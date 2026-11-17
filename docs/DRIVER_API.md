@@ -126,7 +126,7 @@ Protected methods on `MudObject`. `ob` parameters default to this object where m
 | `ObjectRef? ThisPlayer()` | The living object the current execution is for |
 | `ObjectRef? PreviousObject()` | The object whose code called into this one: through `Call`, through an efun that triggered one of this object's applies, or directly. Null if the driver entered this object at top level (command, heartbeat, call-out). Use it for security checks instead of trusting an argument. |
 | `string QueryVerb()` | The verb of the command being executed |
-| `void EnableCommands()` | Mark this object living. Also makes it `ThisPlayer()` for the rest of the execution, so it can bind its own commands. |
+| `void EnableCommands()` | Mark this object living. Also makes it `ThisPlayer()` for the rest of the execution, so it can bind its own commands. When called from a constructor or `Create()` of an object that another object is cloning, `ThisPlayer()` is restored to the cloner when the clone call returns, so creating a creature from a command does not hijack the command. |
 | `bool Living(ObjectRef ob)` | |
 | `bool Interactive(ObjectRef ob)` | Has a connection |
 | `IReadOnlyList<ObjectRef> Users()` | All interactive objects |
@@ -236,12 +236,15 @@ Commands in `/std/player` and the level each needs:
 |---|---|
 | `promote <player> <level>`, `wizards` | 1 |
 | `mudstat` | 1 |
+| `goto <room path or player>`, `stat <me, here or name>` | 1 |
+| `heal [<target>]` | 5 |
+| `smite <target>` | 10 |
 | `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`), `cat <file>` | 1 |
 | `mkdir <dir>`, `edit <file>`, `copy <from> <to>`, `move <from> <to>`, `rename <file> <newname>`, `delete <file>`, `rmdir <dir>` outside `/secure` and `/std` | 5 |
 | The same, under `/secure` and `/std` | 10 |
 | `clone <path>` | 3 |
 | `update <path>` | 5 |
-| `shutdown` | 10 |
+| `shutdown` (saves every online player first) | 10 |
 | `promote <secret>` | Any, but only works while there is no level-10 wizard |
 
 Each wizard has a current mudlib directory, saved with the player. `cd` and `list` take absolute or relative paths, with `.` and `..`; `cd` alone returns to `/`. `update` and `clone` resolve relative paths against it too.
@@ -267,6 +270,8 @@ File names given to `cat`, `edit`, `copy`, `move`, `rename` and `delete` get `.c
 | `h` | Help |
 
 After `a`, `i` or `c`, every line typed or pasted goes into the file, indentation included, until a line containing only `.`. Saving does not load the code; the editor prints the `update` command to run.
+
+`goto`, `stat`, `heal` and `smite` live in `/std/adventurer` with the other gameplay commands. `/secure/vault` is a second blueprint-only daemon beside the wizard registry: the master lets only the vault blueprint read and write its save file `/secure/vault`, and the vault accepts records only from `/std/corpse` clones (see GAME_SYSTEMS.md, Corpses).
 
 Below the required level a command answers `What?`, the same as a verb that does not exist. Levels are checked on every use, so a demotion takes effect immediately.
 

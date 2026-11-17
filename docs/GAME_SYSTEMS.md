@@ -2,9 +2,9 @@
 
 The sample mudlib so far has rooms, items and wizard tools, but no game. This document specifies the gameplay layer needed for the first real area, [Vincent's Hollow](areas/vincents-hollow.md): living things, combat, equipment, NPC dialogue, shops, quests, spawning and encounters.
 
-Everything here is mudlib code under `/std`. No driver change is expected. If an implementer finds one is needed, it must be small, generic, and recorded in DRIVER_API.md.
+Everything here is mudlib code under `/std`. The one driver change is small and generic, and is recorded in DRIVER_API.md: a creature that calls `EnableCommands` in its constructor no longer changes `ThisPlayer()` for the object that cloned it.
 
-Status: design. Sections are marked as implemented when the code lands.
+Status: **implemented** (sections 2 to 10 and the corpses). Where the implementation differs from the first design, this document has been corrected to describe what the code does. The list of differences is at the end of section 11.
 
 ## 1. Principles
 
@@ -17,22 +17,25 @@ Status: design. Sections are marked as implemented when the code lands.
 
 ```
 mudlib/std/
-  thing.cs        (exists) name, ids, short, long
-  item.cs         (exists) portable thing; gains Value and Weight-free pick-up hook
-  weapon.cs       new: Item with damage
-  armor.cs        new: Item with armor value and slot
-  consumable.cs   new: Item that is eaten or drunk for an effect
-  coins.cs        new: Item that turns into gold when picked up
-  living.cs       new: abstract Thing with hit points, combat, equipment
-  npc.cs          new: Living with dialogue; peaceful by default
-  monster.cs      new: Npc that fights, gives experience and drops loot
-  shopkeeper.cs   new: Npc that sells from a stock list and buys items back
-  adventurer.cs   new: abstract Living with the player's gameplay commands and saved character
-  player.cs       (exists) now inherits adventurer; keeps login, wizard and file commands
-  room.cs         (exists) gains details, readable text, spawns, encounters, locked exits, safe flag, reset
+  thing.cs        name, ids, short, long, Stat()
+  item.cs         portable thing; Value, QuestItem, ReadText, OnGet hook, Vanish()
+  weapon.cs      : Item with damage
+  armor.cs       : Item with armor value and slot
+  consumable.cs  : Item that is eaten or drunk for an effect
+  coins.cs       : Item that turns into gold when picked up
+  living.cs      : abstract Thing with hit points, combat, equipment
+  npc.cs         : Living with dialogue; peaceful by default
+  monster.cs     : Npc that fights, gives experience and drops loot
+  shopkeeper.cs  : Npc that sells from a stock list and buys items back
+  adventurer.cs  : abstract Living with the player's gameplay commands and saved character
+  corpse.cs       what a dead creature or player leaves: a locked container with decay
+  player.cs       now inherits adventurer; keeps login, wizard and file commands
+  room.cs         details, readable text, spawns, encounters, locked exits, safe flag, reset
+mudlib/secure/
+  vault.cs        the lost-property vault (section 9, Corpses)
 mudlib/domains/hollow/
-  village/        the 8 village rooms
-  cellars/        the 10 dungeon rooms
+  village/        the village rooms built so far (square, guest_rooms, ironoak, guild)
+  cellars/        the dungeon rooms built so far (overseer_chamber)
   npc/            villagers
   mob/            hostile creatures
   obj/            weapons, armor, potions, keys, quest items
@@ -47,16 +50,17 @@ New protected members on `Room`, all optional:
 | Member | Purpose |
 |---|---|
 | `AddDetail(string names, string description)` | Scenery that `look at` finds when no object matches. `names` is a comma-separated list of lower-case words or phrases (`"well,stone well"`). |
-| `AddReadable(string names, string text)` | Text shown by `read <name>`. Also registers a detail if none exists for that name. |
+| `AddReadable(string names, string text, string? look = null)` | Text shown by `read <name>`. The optional third argument is what `look at <name>` shows instead of the text (the quest board has a short look and a long read). Without it, `look at` shows the text too. |
 | `AddSpawn(string path, int count = 1)` | Creatures or items this room should contain. Cloned in at creation and topped up at each reset: the room keeps the handles it spawned and replaces the ones that are no longer alive or, for items, no longer in the room. |
 | `AddEncounter(string path, int percent)` | Each time a player walks in, each encounter has `percent` chance to appear, if none spawned by this room is still alive and at least 60 seconds have passed since the last one. Encounter creatures that are not in combat leave ("wanders off") at the next reset. |
 | `LockExit(string direction, string keyId, string refusal)` | The exit can be used only by someone carrying an object whose `Id(keyId)` is true. Others get `refusal`. The key is not consumed. |
+| `BlockExit(string direction, string message)` | An exit nobody can use (the wilderness road). It is listed and gives the message. |
 | `Safe` | No combat can start or continue here. |
-| `ResetSeconds` | Default 300. Each room re-arms a call-out to its own `Reset()`. `Reset()` tops up spawns; override it (and call `base.Reset()`) for anything else. |
+| `ResetSeconds` | Default 300. Each room re-arms a call-out to its own `Reset()`. `Reset()` tops up spawns and calls `OnReset` on the creatures it spawned (a shopkeeper rerolls its rare stock there); override it (and call `base.Reset()`) for anything else. Corpses are not touched by a reset. |
 
-Public functions for other objects: `QueryDetail(name)`, `QueryReadable(name)`, `QuerySafe()`.
+Public functions for other objects: `QueryDetail(name)`, `QueryReadable(name)`, `QuerySafe()`, `QueryLogoutRoom()`, `QueryExits()`, `CanUseExit(who, direction)`, `MoveThrough(who, direction)` and `Stat()`. An exit whose destination file does not exist answers with a friendly "not open yet" message.
 
-`Long()` for a room lists, after the description and exits, the visible objects. Creatures and items are shown as today (`A ginger tavern cat is here.`); several identical shorts are merged (`Two giant rats are here.`).
+`Long()` for a room lists, after the description and exits, the visible objects. Creatures and items are shown as today (`A ginger tavern cat is here.`); several identical shorts are merged (`Two giant rats are here.`; corpses merge as `Two corpses of a large rat are here.`).
 
 Exit names may be any single word (`north`, `up`, `down`). The one-letter abbreviation rule stays, with `u` and `d` for up and down.
 
@@ -85,7 +89,8 @@ Equipment slots: `weapon`, `shield`, `body`, `head`, `trinket`. One item per slo
 - **Damage:** uniform in the attack's damage range, minimum 1.
 - Enemies that are no longer in the room are dropped from the list after 30 seconds, so walking away ends a fight, and a creature does not chase.
 - Messages: the attacker, the defender and bystanders each get a line, varying by damage (miss, scratch, hit, hard hit). Keep each round to one line per attack per observer.
-- `Living.Die(ObjectRef? killer)` is virtual. See monsters and players below.
+- `Living.Die(ObjectRef? killer)` is virtual. See monsters, players and corpses below.
+- Players cannot fight each other: `CanFight` refuses with "Players cannot fight each other." Monsters do not regenerate.
 - `Living.Heal(int amount)`, `Living.TakeDamage(int amount, ObjectRef? from)`.
 
 ### Hooks for special behaviour
@@ -112,26 +117,26 @@ Equipment slots: `weapon`, `shield`, `body`, `head`, `trinket`. One item per slo
 | `Aggressive` | Attacks any player who enters, after a one-round pause. |
 | `XpValue` | Experience for the kill. |
 | `GoldMin`, `GoldMax` | Coins given to the killer. |
-| `AddLoot(string path, int percent)` | Items that may drop to the floor on death. |
+| `AddLoot(string path, int percent)` | Items that may be found in the corpse, each with this percent chance. |
 | `Assist` | Default true: joins a fight when another monster in the room is attacked. |
 
-On death: a death line for the room, experience and gold to the killer (the one whose attack killed it), loot cloned into the room, `killer.Call("NotifyKill", Self.ProgramPath)` so quests can react, then the monster is destructed. The room's reset brings it back.
+On death: a death line for the room; experience to the killer (the one whose attack killed it) at once and `killer.Call("NotifyKill", Self.ProgramPath)` so quests can react; a **corpse** is cloned into the room holding the rolled gold (as a coins item) and the loot (see Corpses in section 9); then the monster is destructed. The room's reset brings a new one. Gold and loot are no longer paid or dropped directly: the killer must `loot` the corpse.
 
 ### Creature numbers for the Hollow
 
 | Creature | Level | HP | Damage | To hit | Armor | XP | Gold | Notes |
 |---|---|---|---|---|---|---|---|---|
 | Large Rat | 1 | 6 | 1-2 | 0 | 0 | 8 | 0 | Aggressive |
-| Giant Rat | 1 | 10 | 1-3 | 0 | 0 | 12 | 0 | Aggressive |
+| Giant Rat | 1 | 8 | 1-3 | 0 | 0 | 12 | 0 | Aggressive |
 | Wandering Wolf | 2 | 16 | 2-4 | 1 | 1 | 25 | 0 | Aggressive; encounter |
-| Goblin Scavenger | 2 | 10 | 2-4 | 2 | 1 | 22 | 1-6 | Fast but fragile |
-| Spore Bat | 2 | 8 | 1-3 | 1 | 4 | 20 | 0 | Evasive: high armor, low HP |
-| Goblin Guard | 2 | 20 | 2-4 | 0 | 3 | 32 | 2-8 | Defensive; one carries the Rusty Key |
-| Giant Cave Toad | 3 | 40 | 2-5 | 0 | 0 | 50 | 0 | High health |
-| Goblin Warrior | 3 | 22 | 3-5 | 1 | 2 | 42 | 3-10 | Balanced |
+| Goblin Scavenger | 2 | 10 | 2-3 | 2 | 1 | 22 | 2-8 | Fast but fragile |
+| Spore Bat | 2 | 6 | 1-3 | 1 | 3 | 20 | 0 | Evasive: high armor, low HP |
+| Goblin Guard | 2 | 16 | 2-3 | 0 | 2 | 32 | 4-12 | Defensive; one carries the Rusty Key |
+| Giant Cave Toad | 3 | 30 | 2-5 | 0 | 0 | 50 | 0 | High health |
+| Goblin Warrior | 3 | 16 | 2-4 | 0 | 2 | 42 | 5-14 | Balanced |
 | Goblin Minion | 2 | 12 | 2-4 | 0 | 1 | 15 | 0 | Summoned by the boss only |
-| Goblin Elite Guard | 4 | 38 | 3-6 | 2 | 3 | 85 | 8-16 | Mini-boss |
-| Goblin Overseer | 5 | 75 | 4-7 | 2 | 3 | 250 | 0 | Boss; see below |
+| Goblin Elite Guard | 4 | 22 | 3-5 | 2 | 3 | 85 | 12-22 | Mini-boss |
+| Goblin Overseer | 5 | 54 | 4-6 | 2 | 3 | 250 | 0 | Boss; see below |
 
 Goblin Overseer abilities:
 
@@ -139,36 +144,36 @@ Goblin Overseer abilities:
 - **Power Strike:** each round, 20% chance that the attack does double damage, with its own message.
 - **Summon Goblin Minion:** the first time his HP falls to half or below, one Goblin Minion is cloned into the room and joins the fight. Once per life.
 
-These numbers are a starting point. The implementer checks them with a short simulation (section 12) and may adjust within reason, recording the final values here.
+These are the final numbers after the balance simulation (section 12). The first draft made the Barracks, the Hall and the boss unwinnable for a solo player; HP, damage and armor were lowered as shown. The Large Rat, Giant Rat, Wolf, Goblin Minion and Overseer have mudlib files; the others are in the table for the builders of the remaining rooms and are used by the simulation. The Overseer is aggressive (it attacks anyone who enters its chamber). Gold from monsters is in the corpse. The Guard with the Rusty Key is not built yet.
 
 ## 7. Items
 
-`Item` gains `Value` (gold) and `protected virtual void OnGet(ObjectRef taker)`, called by the `get` command after the move.
+`Item` gains `Value` (gold), `QuestItem` (cannot be sold), `ReadText` and `protected virtual void OnGet(ObjectRef taker)`, called after the item has been moved to a taker by `get`, `get ... from` or `loot`. `Vanish()` lets an item destruct itself when it is sold, eaten or handed in (only player bodies may destruct other objects).
 
 | Class | Fields | Commands |
 |---|---|---|
 | `Weapon` | `DamageMin`, `DamageMax`, `ToHit` | `wield <weapon>`, `unwield` |
 | `Armor` | `ArmorValue`, `Slot`, optional `MaxHpBonus` | `wear <item>`, `remove <item>` |
 | `Consumable` | `HealAmount`, `UseVerb` (`eat`, `drink`), `UseMessage` | `eat <item>`, `drink <item>` (also `quaff`) |
-| `Coins` | `Amount` (or `AmountMin`/`AmountMax` rolled in `Create`) | Picking it up adds the gold and destructs the item |
+| `Coins` | `Amount` (or `AmountMin`/`AmountMax`, rolled when first seen), `SetAmount(n)` | Picking it up (or looting it) adds the gold and destructs the item |
 
 ### Equipment for the Hollow
 
 | Item | Type | Numbers | Value | Source |
 |---|---|---|---|---|
-| Rusty Sword | weapon | 2-5 | 10 | Ironoak Arms |
-| Training Spear | weapon | 2-4, to hit +1 | 8 | Ironoak Arms |
-| Iron Dagger | weapon | 1-4, to hit +1 | 6 | Ironoak Arms |
-| Woodcutter Axe | weapon | 3-6 | 18 | Ironoak Arms |
+| Rusty Sword | weapon | 3-5 | 10 | Ironoak Arms |
+| Training Spear | weapon | 2-5, to hit +1 | 8 | Ironoak Arms |
+| Iron Dagger | weapon | 2-4, to hit +1 | 6 | Ironoak Arms |
+| Woodcutter Axe | weapon | 4-7 | 18 | Ironoak Arms |
 | Small Shield | armor, shield | 1 | 12 | Ironoak Arms |
-| Fine Iron Longsword | weapon | 4-8 | 60 | Ironoak Arms, rare |
+| Fine Iron Longsword | weapon | 5-9 | 60 | Ironoak Arms, rare |
 | Guild Initiate's Helm | armor, head | 1 | 15 | Reward, Clear the Cellar |
-| Goblin Overseer's Axe | weapon | 5-9 | 70 | Boss, always |
+| Goblin Overseer's Axe | weapon | 6-10 | 70 | Boss corpse, always |
 | Leather Commander's Vest | armor, body | 3 | 60 | Boss, always |
 | Bag of Coins | coins | 60-100 | | Boss, always |
 | Overseer's Orders | quest item | readable | 0 | Boss, always |
-| Rusty Key | key | | 0 | One Goblin Guard, always |
-| Minor Healing Potion | consumable, drink | heals 15 | 15 | Storage Chamber; merchant |
+| Rusty Key | key | | 0 | One Goblin Guard's corpse, always (not built yet) |
+| Minor Healing Potion | consumable, drink | heals 20 | 15 | Storage Chamber; merchant |
 | Magical Trinket | armor, trinket | max HP +5 | 40 | Hidden Cache, always |
 | Rare Enchanted Dagger | weapon | 3-6, to hit +2 | 80 | Hidden Cache, 25% |
 | Random Gold | coins | 30-60 | | Hidden Cache, always |
@@ -187,7 +192,7 @@ Services use the same class with a different stock:
 - **Harland the Innkeeper** sells food and drink (consumables) and a bed. Buying the bed restores the buyer to full HP and takes them upstairs to the Guest Rooms.
 - **Traveling Merchant** sells Minor Healing Potions and trail rations.
 
-`Shopkeeper` has `protected virtual bool OnBuy(ObjectRef buyer, string path)` so a service can do something other than hand over an item.
+`Shopkeeper` has `protected virtual bool OnBuy(ObjectRef buyer, string path)` so a service can do something other than hand over an item. Stock samples are kept inside the shopkeeper so that `buy sword` and `value sword` find them by name. The Traveling Merchant is built (potion 15, ration 5). Harland and his bed are not built yet.
 
 ## 9. The player character
 
@@ -199,9 +204,9 @@ Saved with the player: level, experience, HP, gold, quest states, the program pa
 - **Experience to reach level:** 2: 100, 3: 250, 4: 500, 5: 900. Level 5 is the cap for now.
 - **Each level:** +8 max HP, and full heal on levelling. (The +1 to hit comes from level in the attack roll.)
 - **Regeneration:** 1 HP every 10 seconds out of combat; 3 in a safe room.
-- **Death:** the player is told so, loses 10% of their gold, and wakes in the Guest Rooms at full HP. No experience or items are lost. Their killer forgets them.
+- **Death:** the player is told so, and a **corpse** in the room where they died takes everything they carry (equipment included) and a gold fee of 10% of their purse. They wake in the Guest Rooms at full HP, with experience and level intact, and must walk back to the corpse and `loot` it. Their killer forgets them. The loss is saved at once.
 - **Logout room:** quitting in a room whose `QueryLogoutRoom()` is true (the Guest Rooms) makes that the next login room. Otherwise players enter at the Village Square.
-- **Inventory persistence:** on save, the paths of carried items are stored and the items are destructed with the player on quit; on login they are cloned again. Per-item state is not kept. Items no longer drop to the floor on quit.
+- **Inventory persistence:** on save, the paths of carried items and which are equipped are stored and the items are destructed with the player on quit; on login they are cloned again and re-equipped. Other per-item state is not kept. Items do not drop to the floor on quit.
 
 Commands, available to every player:
 
@@ -214,11 +219,14 @@ Commands, available to every player:
 | `eat`, `drink`, `quaff` | Consumables |
 | `talk <npc>`, `ask <npc> about <topic>` | Dialogue |
 | `read <thing>` | Readable details and readable items |
+| `loot [<corpse>]`, `get <thing> from <corpse>`, `get all from <corpse>`, `look in <corpse>` | Corpses, see below |
+| `browse`, `buy`, `sell`, `value` | In a shop |
+| `accept`, `report` | In the Adventurers Guild |
 | `score` (also `sc`) | Level, experience and what the next level needs, HP, gold, equipment, quests |
 | `hp` | One-line health |
 | `quests` | Quest log |
 
-`look at <thing>` falls back to room details, and `look at <creature>` adds a rough health line.
+`look at <thing>` falls back to room details, and `look at <creature>` adds a rough health line. `stat <thing>` accepts `me`, `here` or a name present in the room.
 
 Public functions on the player for other objects: `QueryLevel`, `QueryHp`, `QueryMaxHp`, `QueryGold`, `AddGold(int)` (negative to take; refuses to go below zero and returns false), `AddXp(int)`, `QueryQuest(string id)`, `SetQuest(string id, int state)`, `NotifyKill(string programPath)`, `QueryKilled(string programPath)`.
 
@@ -226,12 +234,23 @@ Public functions on the player for other objects: `QueryLevel`, `QueryHp`, `Quer
 
 | Command | Level | Effect |
 |---|---|---|
-| `goto <room path>` | 1 | Move to a room |
+| `goto <room path or player>` | 1 | Move to a room, or to where a player is |
 | `stat <thing>` | 1 | Show a living thing's or item's numbers |
 | `heal [<target>]` | 5 | Restore full HP |
 | `smite <target>` | 10 | Kill a creature at once, with normal death processing and kill credit |
 
-These follow the existing rule: below the level, the command answers "What?".
+These follow the existing rule: below the level, the command answers "What?". `shutdown` now saves every online player before the driver stops.
+
+### Corpses
+
+`/std/corpse` is a container that cannot be picked up. Its short is `the corpse of <label>` (`the corpse of a goblin guard`, `the corpse of Keith`), its ids are `corpse` and `corpse of <name>`, and `look at corpse` (or `look in corpse`) lists what it holds, or says it is empty, and for a viewer who may not loot it adds "It was felled moments ago; only those involved may touch it."
+
+- **Who made it.** A monster leaves one holding its rolled gold (a coins item) and its loot; always-drop items (the Overseer's four items, the Rusty Key) are in it. A player leaves one holding everything they carried and the gold fee. Experience and kill credit are still immediate.
+- **The lock.** For `LockSeconds` (1800) only a player whose name equals the killer's or the dead player's may take things. Both are recorded by lower-case player name, because a player's object changes at logout. A non-player killer or victim records nothing. After the lock anyone may loot. The check uses the clock at every attempt; there is no timer. Refusal: "The corpse of X is not yours to loot yet."
+- **Taking things.** Only `Take(itemId)` and `TakeAll()` on the corpse hand things over; they identify the taker with `PreviousObject()` and `ThisPlayer()` and return null or the refusal text. The plain `get` command sees only what lies directly in the room. `loot` goes through the room's corpses, skipping those the player may not loot.
+- **Decay.** An empty corpse disappears two minutes after it became empty ("crumbles to dust"). A monster's corpse that still holds loot rots away after 60 minutes and its contents with it. A player's corpse that still holds things rots after 60 minutes and spills them on the floor. Reset does not touch corpses. A wizard of level 10 can shorten the times of a corpse (`SetTimers`) for tests.
+- **The lost-property vault.** `/secure/vault` is a blueprint-only daemon (loaded at boot, saved as `/secure/vault`). A player corpse reports its contents to it when created and after every change; an empty or gone corpse removes its record. A player may have several corpses; records are keyed by name plus a corpse id. After a restart every record on disk refers to a corpse that no longer exists, so it is unclaimed; records made during the current run are live and cannot be claimed. At login, after the inventory is restored, the player is handed anything recorded under their name (Harland, the innkeeper, kept it safe), the records are deleted, and the player is saved. Only a corpse clone may record or clear, and only a player body may claim, for its own name taken from the calling object. Monster corpses are not recorded. Equipment state is not kept in the vault.
+- **Player versus player.** The code does not allow players to attack each other, so no player can currently kill another; the lock rule would let a player killer loot a victim's corpse if that ever changes.
 
 ## 10. Quests
 
@@ -263,8 +282,20 @@ Kills count only if they happened while the quest was active or before it was ac
 - Dungeon rooms get a short name from their heading in the brief ("Collapsed Passage").
 - The brief's descriptions are used word for word as each room's long description. Builders add details (things to look at), ambient emotes and extra NPC chat in keeping with them, but do not replace or contradict the given text. Dialogue quoted in the brief is used word for word as the NPC's first lines.
 
+### Differences from the first design
+
+- Extra room helpers: `BlockExit`, `MoveThrough`, `CanUseExit`, `LongFor(viewer)`, `Stat()`; `AddReadable` has an optional third argument.
+- `Npc`'s constructor calls `EnableCommands`; a builder does not. The driver change that makes this safe is in DRIVER_API.md.
+- Rowan offers the second quest automatically when the first is completed, and `report` also completes a quest that is finished but was never accepted. The quest title in messages is the quest id made readable.
+- Spawned creatures get an `OnReset` hook (used by the shopkeeper's rare stock).
+- The `update` command rebuilds only interactive occupants of the room, so NPCs are not duplicated.
+- Monsters do not regenerate. The Overseer is aggressive. The Traveling Merchant is built.
+- The Tavern is expected at `village/tavern.cs` and the Tavern Cellar at `village/cellar.cs`; neither exists yet, so those exits answer "not open yet".
+- Combat details: one attack per heartbeat, the player acts first; fleeing picks a random usable exit.
+- Corpses and the vault were added after the first design (section 9).
+
 ## 12. Testing
 
 - `tests/smoke_test.py` keeps testing the driver and wizard tools against `/domains/town`. Because new players now start in Vincent's Hollow, the smoke test patches the start room in its temporary copy of the mudlib. Its existing checks must keep passing.
-- `tests/area_test.py` is a new end-to-end test for the gameplay systems and the area: movement through every exit of the area, look/read on the brief's objects, each NPC's quoted dialogue, buying and equipping, a real fight with a weak creature, death and respawn, the locked cache, the boss abilities (using `smite` and `heal` where luck would make the test flaky), both quests through to the ending, and persistence of the character across logout.
+- `tests/area_test.py` is a new end-to-end test for the gameplay systems and the area: movement through every exit of the area, look/read on the brief's objects, each NPC's quoted dialogue, buying and equipping, a real fight with a weak creature, corpses and looting, death and respawn, a driver restart and a crash with the lost-property vault, the locked cache, the boss abilities (using `smite` and `heal` where luck would make the test flaky), both quests through to the ending, and persistence of the character across logout.
 - A simulation script, `tests/balance_sim.py`, plays the combat rules outside the driver with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).

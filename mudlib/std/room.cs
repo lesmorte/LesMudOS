@@ -212,6 +212,8 @@ public abstract class Room : MudObject
     {
         foreach (var article in new[] { "a ", "an ", "the " })
             if (desc.StartsWith(article)) { desc = desc.Substring(article.Length); break; }
+        var of = desc.IndexOf(" of ", StringComparison.Ordinal);
+        if (of > 0) return Plural(desc.Substring(0, of)) + desc.Substring(of);
         if (desc.EndsWith("s") || desc.EndsWith("x") || desc.EndsWith("ch") || desc.EndsWith("sh")) return desc + "es";
         if (desc.EndsWith("f")) return desc.Substring(0, desc.Length - 1) + "ves";
         return desc + "s";

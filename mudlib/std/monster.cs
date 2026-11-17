@@ -3,7 +3,7 @@
 /// <summary>
 /// A hostile creature. Set Level, MaxHp, DamageMin/Max, ToHit, Armor, XpValue,
 /// GoldMin/GoldMax and AddLoot() in Create(). On death the killer receives the
-/// experience and gold, loot falls to the floor, and the room's reset brings a
+/// experience; a corpse holding the gold and loot is left in the room, and the room's reset brings a
 /// new one.
 /// </summary>
 public class Monster : Npc
@@ -64,33 +64,40 @@ public class Monster : Npc
         var label = Cap(QueryLabel());
         if (room != null) TellRoom(room, (DeathMessage == "" ? $"{label} dies." : DeathMessage) + "\n");
 
+        var gold = GoldMax > 0 ? GoldMin + Random(Math.Max(1, GoldMax - GoldMin + 1)) : 0;
         if (killer != null && killer.IsAlive)
         {
-            var gold = GoldMax > 0 ? GoldMin + Random(Math.Max(1, GoldMax - GoldMin + 1)) : 0;
-            if (gold > 0)
-            {
-                killer.Call("AddGold", gold);
-                TellObject(killer, $"You find {gold} gold on the body.\n");
-            }
             if (XpValue > 0) killer.Call("AddXp", XpValue);
             killer.Call("NotifyKill", Self.ProgramPath);
         }
 
         if (room != null)
         {
-            for (var i = 0; i < lootPaths.Count; i++)
+            ObjectRef? corpse = null;
+            try
             {
-                if (Random(100) >= lootPercents[i]) continue;
-                try
+                corpse = CloneObject("/std/corpse");
+                MoveObject(corpse, room);
+                if (gold > 0)
                 {
-                    var loot = CloneObject(lootPaths[i]);
-                    MoveObject(loot, room);
-                    TellRoom(room, $"{Cap(loot.Call<string>("Short") ?? "Something")} falls to the floor.\n");
+                    var coins = CloneObject("/std/coins");
+                    coins.Call("SetAmount", gold);
+                    MoveObject(coins, corpse);
                 }
-                catch (MudRuntimeException)
+                for (var i = 0; i < lootPaths.Count; i++)
                 {
-                    // A broken loot file must not keep the monster alive.
+                    if (Random(100) >= lootPercents[i]) continue;
+                    try { MoveObject(CloneObject(lootPaths[i]), corpse); }
+                    catch (MudRuntimeException)
+                    {
+                        // A broken loot file must not keep the monster alive.
+                    }
                 }
+                corpse.Call("Setup", QueryLabel(), killer ?? Self, Self);
+            }
+            catch (MudRuntimeException)
+            {
+                // No corpse is better than an immortal monster.
             }
         }
         Destruct();

@@ -16,6 +16,13 @@ public class Coins : Item
         if (Amount <= 0) Amount = 1;
     }
 
+    /// <summary>Make this a pile of exactly this many coins (used for dropped and looted gold).</summary>
+    public void SetAmount(int amount)
+    {
+        Amount = Math.Max(1, amount);
+        ShortDesc = null;
+    }
+
     public int QueryAmount()
     {
         Roll();
