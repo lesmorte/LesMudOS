@@ -199,7 +199,7 @@ public class ExampleShopkeeper : Shopkeeper
 
 ### A monster with loot
 
-Set the numbers in `Create()`. `Aggressive` attacks anyone who walks in; `Assist` (default true) joins fights against other monsters. On death the killer gets `XpValue` experience at once, and a **corpse** appears holding `GoldMin`-`GoldMax` gold and each `AddLoot(path, percent)` item that was rolled in. The killer (and nobody else for half an hour) loots it with `loot`. Use `DeathMessage` to replace the standard "dies." line. Level is for the to-hit roll; `ToHit` and `Armor` are bonuses (see GAME_SYSTEMS.md for the formulas and the Hollow's creature table). A level 1 creature with 6 HP and 1-2 damage is a rat; a boss with special abilities overrides `CombatRound` (see `/domains/hollow/mob/goblin_overseer`).
+Set the numbers in `Create()`. `Aggressive` attacks anyone who walks in; `Assist` (default true) joins fights against other monsters. On death the killer gets `XpValue` experience at once, and a **corpse** appears holding `GoldMin`-`GoldMax` gold and each `AddLoot(path, percent)` item that was rolled in. The killer (and nobody else for half an hour) loots it with `loot`. Use `DeathMessage` to replace the standard "dies." line. Level is for the to-hit roll; `ToHit` and `Armor` are bonuses (see GAME_SYSTEMS.md for the formulas and the Hollow's creature table).
 
 ```csharp
 // File: /domains/example/rat.cs
@@ -222,10 +222,49 @@ public class ExampleRat : Monster
         GoldMin = 1;
         GoldMax = 3;
         Aggressive = true;
+        BaseReaction = 2.0;
+        AddCombatAction("bite", "Bite", preparation: 0, recovery: 0.5);
         AddLoot("/domains/example/potion", 100);
     }
 }
 ```
+
+### Timing: a creature with one action, and one with a pattern
+
+Combat has no rounds: every creature acts on the event clock of [COMBAT_TIMING.md](COMBAT_TIMING.md), exactly as a player does. A creature has a **base Reaction Time** (`BaseReaction`, 1.0 fast to 6.0 slow, steps of 0.5; default 2.5, the same as a player) and a list of **actions**. Each action has a `preparation` (a wind-up before it takes effect, 0 for a plain attack) and a `recovery`, both in time units of 2 seconds, and the time to its next action is `(Reaction Time + recovery) x 2` seconds. A rat with Reaction Time 2.0 and a bite with recovery 0.5 acts every `(2.0 + 0.5) x 2 = 5` seconds. The rest of the numbers (HP, damage, to hit, armor) work as before; because actions are several seconds apart, damage and HP are larger than they were when a round was 2 seconds (the table in GAME_SYSTEMS.md has the Hollow's).
+
+- **A creature with one action** needs one line of data and no code: `AddCombatAction("bite", "Bite", preparation: 0, recovery: 0.5);`. A creature that declares no action at all uses the plain attack of its weapon, or its fists (recovery 0.5).
+- **A creature with several actions** declares them all and overrides `ChooseAction`, which is called whenever the creature is ready and has an enemy. `ActionsTaken()` counts the actions chosen so far in this fight (0 while choosing the first), so a fixed rhythm that players can learn is a one-liner. `windUp` is the verb phrase the room reads when the preparation begins ("The ogre rears back..."): always give a prepared action one, because it is how a player sees the blow coming. `damageMultiplier` scales an attack. Other kinds of action (a summons, a shout) use `kind:` with your own word and are done in an override of `Special(CombatAction action, ObjectRef? target)`; see `/domains/hollow/mob/goblin_overseer`.
+- The fight rules for everybody: the one who starts a fight acts at once; everyone drawn in (the one attacked, monsters that assist) waits their own Reaction Time x 2 seconds before the first action; an aggressive creature waits that long after a player arrives; an action aimed at someone who has died or left is wasted.
+
+```csharp
+// File: /domains/example/drake.cs
+// @inherit /std/monster
+public class ExampleDrake : Monster
+{
+    public override void Create()
+    {
+        Name = "Example Drake";
+        Ids.Add("drake");
+        ShortDesc = "an example drake";
+        LongDesc = "A small drake that exists to be timed.";
+        Level = 3;
+        MaxHp = 40;
+        DamageMin = 3;
+        DamageMax = 5;
+        XpValue = 30;
+        Aggressive = true;
+        BaseReaction = 4.0;
+        AddCombatAction("claw", "Claw Swipe", preparation: 0, recovery: 1.0);
+        AddCombatAction("breath", "Fire Breath", preparation: 1.0, recovery: 3.0, windUp: "rears back and swells its chest", damageMultiplier: 2);
+    }
+
+    /// <summary>Claw Swipe, Claw Swipe, Fire Breath, and round again.</summary>
+    protected override CombatAction ChooseAction(ObjectRef target) => FindAction(ActionsTaken() % 3 == 2 ? "breath" : "claw")!;
+}
+```
+
+The drake claws every `(4.0 + 1.0) x 2 = 10` seconds, and every third action the room reads "An example drake rears back and swells its chest..." two seconds before the breath lands, which then costs it `(4.0 + 3.0) x 2 = 14` seconds in all. `stat drake` lists both actions with their delays.
 
 ## Items
 
@@ -233,7 +272,7 @@ Every item has `Name`, `Ids` (words that name it), `ShortDesc` (with article, fo
 
 ### A weapon
 
-`wield` it. Damage replaces the unarmed 1-3; `ToHit` is added to attack rolls.
+`wield` it. Damage replaces the unarmed 2-5; `ToHit` is added to attack rolls. Two timing fields: `ReactionMod` is added to the wielder's Reaction Time for as long as it is wielded (heavy weapons are slow to bring to bear), and `Recovery` is the Recovery of a basic attack with it. A player with Reaction Time 2.5 attacks every `(2.5 + ReactionMod + Recovery) x 2` seconds: 6 with fists, 9 with this sword (`0.5` and `1.0`). A slower weapon must hit harder so that its damage per second is no worse (see the weapon table in GAME_SYSTEMS.md).
 
 ```csharp
 // File: /domains/example/sword.cs
@@ -246,9 +285,11 @@ public class ExampleSword : Weapon
         Ids.Add("sword");
         ShortDesc = "an example sword";
         LongDesc = "A plain blade, balanced for testing.";
-        DamageMin = 3;
-        DamageMax = 5;
+        DamageMin = 9;
+        DamageMax = 14;
         ToHit = 0;
+        ReactionMod = 0.5;
+        Recovery = 1.0;
         Value = 10;
     }
 }
@@ -256,7 +297,7 @@ public class ExampleSword : Weapon
 
 ### Armor
 
-`wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxHpBonus` (optional) adds to maximum HP while worn.
+`wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxHpBonus` (optional) adds to maximum HP while worn. `ReactionMod` (optional, default 0) is added to the wearer's Reaction Time while worn: a shield or heavy armor makes its wearer a little slower.
 
 ```csharp
 // File: /domains/example/helm.cs
@@ -273,6 +314,7 @@ public class ExampleHelm : Armor
         Slot = "head";
         ArmorValue = 1;
         MaxHpBonus = 0;
+        ReactionMod = 0.0;
         Value = 15;
     }
 }
@@ -280,7 +322,7 @@ public class ExampleHelm : Armor
 
 ### A consumable
 
-`eat`, `drink` or `quaff` it. `UseVerb` is `"eat"` or `"drink"`; `HealAmount` is restored; `UseMessage` is shown to the user. The item is used up. For anything stranger, override `OnUse(ObjectRef user)`.
+`eat`, `drink` or `quaff` it. `UseVerb` is `"eat"` or `"drink"`; `HealAmount` is restored; `UseMessage` is shown to the user. The item is used up. Using it is a combat action like any other: its `Recovery` (default 0.5 time units) is part of the time before the user can act again, and a user who is still recovering has it queued for the next Ready Time (`stop` cancels). For anything stranger, override `OnUse(ObjectRef user)`.
 
 ```csharp
 // File: /domains/example/potion.cs
@@ -296,6 +338,7 @@ public class ExamplePotion : Consumable
         HealAmount = 20;
         UseVerb = "drink";
         UseMessage = "You drink the example potion. It tastes of cherries.";
+        Recovery = 0.5;
         Value = 15;
     }
 }

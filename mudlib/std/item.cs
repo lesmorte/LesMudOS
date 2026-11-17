@@ -21,6 +21,9 @@ public class Item : Thing
     /// <summary>The equipment slot this item goes in ("weapon", "head", ...), or "" if it cannot be worn or wielded.</summary>
     public virtual string QuerySlot() => "";
 
+    /// <summary>What this item adds to the Reaction Time of whoever has it equipped. Weapons and armor override it.</summary>
+    public virtual double QueryReactionMod() => 0;
+
     /// <summary>Called after a player has picked this item up. ThisPlayer() is the taker.</summary>
     protected virtual void OnGet(ObjectRef taker) { }
 

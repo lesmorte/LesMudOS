@@ -287,6 +287,34 @@ def fight_until(c, marker, timeout=90, heal_with=None):
     return data
 
 
+def wait_ready(c, timeout=40):
+    """Wait until a wizard's character may begin an action again (`stat me` says so)."""
+    end = time.time() + timeout
+    while time.time() < end:
+        if "Now: ready" in c.command("stat me"):
+            return True
+        time.sleep(0.4)
+    return False
+
+
+def fight_until_timed(c, marker, timeout=90, heal_with=None):
+    """Like fight_until, but returns (text, [(seconds since the start, chunk)]) so that durations can be checked."""
+    start = time.time()
+    end = start + timeout
+    data = ""
+    chunks = []
+    last_heal = 0
+    while time.time() < end and marker not in data:
+        got = quiet(c, 0.25)
+        if got:
+            chunks.append((time.time() - start, got))
+            data += got
+        if heal_with is not None and time.time() - last_heal > 1.4:
+            last_heal = time.time()
+            c.send("heal")
+    return data, chunks
+
+
 def go(c, *verbs):
     out = ""
     for verb in verbs:
@@ -495,8 +523,8 @@ def run(work, mudlib):
 
     # ===== character sheet, help =====
     s = score_of(hero)
-    check("a new character: level 1, 30 HP, 25 gold, unarmed 1-3", s["text"], "Level 1   Experience 0 (100 more for level 2)",
-          "HP 30/30   Gold 25", "Damage 1-3", "nothing equipped", "no quests")
+    check("a new character: level 1, 30 HP, 25 gold, unarmed 2-5, Reaction Time 2.5", s["text"], "Level 1   Experience 0 (100 more for level 2)",
+          "HP 30/30   Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
     check("hp command", hero.command("hp"), "HP 30/30")
     text = hero.command("help")
     check("help lists the new commands", text, "kill (or attack)", "flee", "consider", "wield", "wear", "browse", "buy", "accept", "report", "quests", "score",
@@ -544,9 +572,10 @@ def run(work, mudlib):
     check("a sword cannot be worn", hero.command("wear sword"), "You can't wear that.")
     check("wear", hero.command("wear shield"), "You put on a small shield.")
     s = score_of(hero)
-    check("score shows the equipment and derived numbers", s["text"], "Damage 3-5", "Armor 1", "weapon: a rusty sword", "shield: a small shield")
+    check("score shows the equipment and derived numbers", s["text"], "Damage 9-14", "Armor 1", "weapon: a rusty sword", "shield: a small shield",
+          "Reaction Time 3.5 (base 2.5, a rusty sword +0.5, a small shield +0.5). Your attack takes 9.0 seconds.")
     check("unwield", hero.command("unwield"), "You stop wielding a rusty sword.")
-    check("unarmed again", score_of(hero)["text"], "Damage 1-3")
+    check("unarmed again", score_of(hero)["text"], "Damage 2-5", "Your attack takes 7.0 seconds.")
     hero.command("wield sword")
     check("remove armor", hero.command("remove shield"), "You take off a small shield.")
     check("remove what is not worn", hero.command("remove shield"), "You are not wearing or wielding that.")
@@ -603,9 +632,10 @@ def run(work, mudlib):
     check("consider an easy opponent", hero.command("consider rat"), "A large rat looks like an even match")
     text = hero.read_until("attacks you", timeout=15)
     check("aggressive monsters attack after a pause", text, "A large rat attacks you!")
-    text = text + fight_until(hero, "dies.", timeout=60)
-    text += fight_until(hero, "dies.", timeout=60) if text.count("dies.") < 2 else ""
-    check("a real fight to the death: rounds, messages, two kills", text, "You hit a large rat", "A large rat dies.")
+    text = text + fight_until(hero, "dies.", timeout=120)
+    text += fight_until(hero, "dies.", timeout=120) if text.count("dies.") < 2 else ""
+    check("a real fight to the death: messages, two kills", "yes" if re.search(r"You (scratch|hit|smash|miss) a large rat", text) else text, "yes")
+    check("a real fight to the death: two kills", text, "A large rat dies.")
     check("each kill pays experience", text, "You gain 8 experience.")
     drain(hero)
     s = score_of(hero)
@@ -632,7 +662,7 @@ def run(work, mudlib):
     text = hero.command("den")
     check("gnawers sleep until attacked", text, "Two gnawers are here.")
     check("kill: start a fight", hero.command("kill gnawer"), "You attack a gnawer.")
-    text = fight_until(hero, "dies.", timeout=30)
+    text = fight_until(hero, "dies.", timeout=90)
     check("the other creature joined the fight", "joined" if re.search(r"A gnawer (misses|scratches|hits)", text) else text, "joined")
     check("a gnawer died", text, "A gnawer dies.")
     drain(hero, 1.5)
@@ -657,7 +687,7 @@ def run(work, mudlib):
     wiz.command("clone " + TEST + "dummy_a")
     check("consider a level 1 dummy", hero.command("consider dummy"), "looks like an even match")
     check("attack is an alias of kill", hero.command("attack dummy"), "You attack a training dummy.")
-    text = fight_until(hero, "reached level", timeout=40)
+    text = fight_until(hero, "reached level", timeout=120)
     check("100 experience reach level 2", text, "You gain 100 experience.", "You have reached level 2!", "Maximum HP is now 38")
     drain(hero)
     s = score_of(hero)
@@ -666,14 +696,14 @@ def run(work, mudlib):
     for dummy, xp, total, level, max_hp in levels:
         wiz.command("clone " + TEST + dummy)
         hero.command("kill dummy")
-        text = fight_until(hero, "reached level", timeout=40)
+        text = fight_until(hero, "reached level", timeout=120)
         check(f"level {level} is reached", text, f"You gain {xp} experience.", f"You have reached level {level}!", f"Maximum HP is now {max_hp}")
         drain(hero)
     s = score_of(hero)
     check("level 5 is the highest", s["text"], f"Level 5   Experience {base + 950} (highest level)", "HP 62/62")
     wiz.command("clone " + TEST + "dummy_a")
     hero.command("kill dummy")
-    text = fight_until(hero, "gain 100 experience", timeout=40)
+    text = fight_until(hero, "gain 100 experience", timeout=120)
     drain(hero)
     s = score_of(hero)
     check("no level beyond 5, experience still counts", s["text"], f"Level 5   Experience {final_xp} (highest level)")
@@ -718,8 +748,11 @@ def run(work, mudlib):
     deficit = 62 - after
     text = hero.command("drink potion")
     check("a potion heals 20", text, "You pull the stopper and drink the ruby-red potion.", f"You recover {min(20, deficit)} hit points.")
+    # Using something is an action with a Recovery: wait for the Ready Time ((2.5 + axe 1.0 + shield 0.5 + 0.5) x 2 = 9 s) between uses.
+    time.sleep(9.5)
     check("quaff is an alias of drink", hero.command("quaff potion"), "ruby-red potion")
     hurt = hp_of(hero)[0]
+    time.sleep(9.5)
     check("eat", hero.command("eat ration"), "You chew through the dry biscuit")
     check("the ration healed 5 or filled up", str(hp_of(hero)[0] >= min(62, hurt + 5) - 0), "True")
     check("the consumables are gone", hero.command("i"), absent=("potion", "ration"))
@@ -767,7 +800,7 @@ def run(work, mudlib):
     wiz.command("clone " + TEST + "looter")
     gold0 = score_of(hero)["gold"]
     hero.command("kill looter")
-    text = fight_until(hero, "dies.", timeout=30)
+    text = fight_until(hero, "dies.", timeout=90)
     drain(hero, 1.0)
     text = hero.command("look")
     check("a monster leaves a corpse and nothing on the floor", text, "The corpse of a looter is here.", absent=("sword is here", "coins"))
@@ -795,7 +828,7 @@ def run(work, mudlib):
     # a full monster corpse rots away with its contents
     wiz.command("clone " + TEST + "looter")
     hero.command("kill looter")
-    fight_until(hero, "dies.", timeout=30)
+    fight_until(hero, "dies.", timeout=90)
     wiz.command("timers 0 120 3")
     text = quiet(hero, 6)
     check("a full monster corpse rots with its contents", text, "The corpse of looter crumbles to dust.")
@@ -819,7 +852,7 @@ def run(work, mudlib):
     check("death: 10% of the gold lost", str(s["gold"]), str(gold - fee))
     check("death: full HP, experience and level kept", s["text"], f"Level 5   Experience {final_xp}", "HP 62/62")
     check("death: carried items went into the corpse", hero.command("i"), "You are empty-handed.")
-    check("death: nothing is equipped", score_of(hero)["text"], "nothing equipped", "Damage 1-3")
+    check("death: nothing is equipped", score_of(hero)["text"], "nothing equipped", "Damage 2-5")
     check("the guest rooms are safe: nothing fights here", hero.command("kill brute"), "Kill what?")
     check("a safe room heals faster (checked above); unknown exits", hero.command("north"), "What?")
 
@@ -958,7 +991,8 @@ def run(work, mudlib):
     low.read_until("Goodbye")
 
     # ===== the Goblin Overseer =====
-    # Level the wizard to 5 with dummies, then fight the real boss with bare hands and a lot of healing.
+    # Level the wizard to 5 with dummies, then fight the real boss with the Overseer's own axe (the fists of a wizard would need
+    # six minutes for his 114 HP) and a lot of healing.
     wiz.command("goto " + TEST + "dummy")
     for dummy in ("dummy_d", "dummy_c", "dummy_b", "dummy_a"):
         wiz.command("clone " + TEST + dummy)
@@ -974,30 +1008,42 @@ def run(work, mudlib):
     text = wiz.command("look")
     check("the Overseer Chamber", text, "Overseer Chamber", "Unlike the rest of the dungeon, this room is surprisingly organized.", "The Goblin Overseer is here.")
     check("look at a detail of the chamber", wiz.command("look at crow"), "crude black crow")
-    check("stat on the boss", wiz.command("stat overseer"), "Level 5, HP 54/54", "Damage 4-6, to hit 2, armor 3", "xp 250", "loot 4")
-    text = fight_until(wiz, "falls dead among his maps", timeout=240, heal_with=True)
+    check("stat on the boss", wiz.command("stat overseer"), "Level 5, HP 114/114", "Damage 4-7, to hit 2, armor 3", "xp 250", "loot 4",
+          "Reaction Time: base 4.0", "Axe Slash: preparation 0.0, recovery 1.0", "delay 10.0 s", "Power Strike: preparation 1.0, recovery 2.0", "delay 12.0 s",
+          "Battle Cry", "Summon Goblin Minion")
+    wiz.command("clone " + HOLLOW + "obj/overseers_axe")
+    wiz.command("wield axe")
+    # The boss ambushes after his Reaction Time x 2 = 8 s; the wizard hits first.
+    wiz.command("kill overseer")
+    text, chunks = fight_until_timed(wiz, "falls dead among his maps", timeout=300, heal_with=True)
     check("Battle Cry opens the fight", text, "BATTLE CRY")
     check("Battle Cry is used once per fight", str(text.count("BATTLE CRY")), "1")
     check("the Battle Cry replaces the first attack", str(text.index("BATTLE CRY") < min([text.index(w) for w in ("Goblin Overseer hits", "Goblin Overseer misses", "Goblin Overseer scratches", "Goblin Overseer smashes") if w in text] or [10 ** 9])), "True")
     check("Power Strike happens", text, "POWER STRIKE")
     check("Summon Goblin Minion happens", text, "a goblin minion scrambles out of the shadows!")
-    check("the minion joins the fight", text, "A goblin minion hits you", ) if "A goblin minion hits you" in text or "A goblin minion misses you" in text else check(
-        "the minion joins the fight", text, "A goblin minion misses you")
+    check("the minion joins the fight", "A goblin minion " + ("acts" if re.search(r"A goblin minion (hits|misses) you", text) else "idle"), "A goblin minion acts")
     check("Summon is used once per life", str(text.count("scrambles out of the shadows")), "1")
-    # +2 damage only inside the Battle Cry window: a "brutal" hit needs 8+ damage, which only the cry (4-6 +2) or a Power Strike can reach.
-    attacks = re.findall(r"(POWER STRIKE|The Goblin Overseer (?:hits|misses|scratches|smashes) you[a-z ]*\.)", text)
-    rounds = 0
+    check("the Power Strike is announced before it lands", text, "The Goblin Overseer draws his axe far back...", "brings the axe down in a crushing POWER STRIKE!")
+    check("the warning comes before the blow", str(text.index("draws his axe far back") < text.index("crushing POWER STRIKE")), "True")
+    # +2 damage only inside the Battle Cry window (30 seconds): a "brutal" hit needs 8+ damage, which only the cry (4-7 +2) or a Power Strike can reach.
+    cry_at = next((t for t, chunk in chunks if "BATTLE CRY" in chunk), 0)
     outside_ok = True
+    inside_seen = False
     pending_power = False
-    for token in attacks:
-        if token == "POWER STRIKE":
-            pending_power = True
-            continue
-        rounds += 1
-        if "brutally" in token and not pending_power and rounds > 5:
-            outside_ok = False
-        pending_power = False
-    check("bonus damage lasts only the first five rounds after the Battle Cry", str(outside_ok), "True")
+    for t, chunk in chunks:
+        for token in re.findall(r"(POWER STRIKE|The Goblin Overseer (?:hits|misses|scratches|smashes) you[a-z ]*\.)", chunk):
+            if token == "POWER STRIKE":
+                pending_power = True
+                continue
+            if "brutally" in token and not pending_power:
+                if t - cry_at > 31:
+                    outside_ok = False
+                else:
+                    inside_seen = True
+            pending_power = False
+    check("bonus damage lasts only 30 seconds after the Battle Cry", str(outside_ok), "True")
+    if not inside_seen:
+        print("      (no brutal cry hit happened in this run; the window rule was only checked from the other side)")
     drain(wiz, 1.0)
     check("the death line", text, "The Goblin Overseer staggers, drops to his knees, and falls dead among his maps.")
     check("the boss pays experience", text, "You gain 250 experience.")
@@ -1010,10 +1056,11 @@ def run(work, mudlib):
     check("the bag of coins becomes gold", text, "You take a bag of coins from the corpse of the Goblin Overseer.", "to your purse.")
     gain = score_of(wiz)["gold"] - gold_before
     check("the bag holds 60 to 100 gold", str(60 <= gain <= 100), "True")
+    wiz.command("drop axe")  # the one cloned for the fight; the real one comes from the corpse
     check("take the axe", wiz.command("get axe from corpse"), "You take the Goblin Overseer's axe from the corpse")
     check("wield the axe", wiz.command("wield axe"), "You wield the Goblin Overseer's axe.")
     check("take and wear the vest", (wiz.command("get vest from corpse"), wiz.command("wear vest"))[1], "You put on a leather commander's vest.")
-    check("axe numbers", score_of(wiz)["text"], "Damage 6-10")
+    check("axe numbers", score_of(wiz)["text"], "Damage 17-25", "Reaction Time")
     check("vest armor", score_of(wiz)["text"], "Armor 3")
 
     # ===== quest 1 for the wizard, then quest 2 with the ending =====
@@ -1096,7 +1143,7 @@ def run(work, mudlib):
     check("promote the builder to level 5", wiz.command("promote builder 5"), "builder is now wizard level 5")
     b.read_until("level is now")
     drain(b, 0.5)
-    expected = {"hall", "vault_door", "vault", "trail", "villager", "shopkeeper", "rat", "sword", "helm", "potion", "purse", "key"}
+    expected = {"hall", "vault_door", "vault", "trail", "villager", "shopkeeper", "rat", "drake", "sword", "helm", "potion", "purse", "key"}
     check("the guide has a template for every kind", ",".join(sorted(p.rsplit("/", 1)[1] for p in templates)), *sorted(expected))
     b.command("heal")
     text = b.command("goto /domains/example/hall") + quiet(b, 0.5)
@@ -1104,12 +1151,18 @@ def run(work, mudlib):
     check("template: detail", b.command("look at floor"), "chipped and swept clean")
     check("template: look at a readable", b.command("look at notice"), "You could read it.")
     check("template: readable", b.command("read notice"), "Beware of rats.")
-    text = fight_until(b, "dies.", timeout=40, heal_with=True)
-    text += fight_until(b, "dies.", timeout=40, heal_with=True) if text.count("dies.") < 2 else ""
+    check("template: a creature with one action", b.command("stat rat"), "Reaction Time: base 2.0", "Bite: preparation 0.0, recovery 0.5, modifier 0.0, delay 5.0 s")
+    text = fight_until(b, "dies.", timeout=120, heal_with=True)
+    text += fight_until(b, "dies.", timeout=120, heal_with=True) if text.count("dies.") < 2 else ""
     drain(b, 1.0)
     check("template: the monster fights and dies", text, "An example rat dies.")
     text = b.command("loot")
     check("template: the corpse holds gold and the loot", text, "from the corpse of an example rat.", "gold to your purse.")
+    b.command("loot")
+    text = b.command("clone /domains/example/drake") + b.command("stat drake")
+    b.command("smite drake")
+    check("template: a creature with a pattern lists its actions and delays", text, "Reaction Time: base 4.0", "Claw Swipe: preparation 0.0, recovery 1.0, modifier 0.0, delay 10.0 s",
+          "Fire Breath: preparation 1.0, recovery 3.0, modifier 0.0, delay 14.0 s", "wind-up \"rears back and swells its chest\"")
     b.command("loot")
     check("template: encounters are registered", (b.command("goto /domains/example/trail"), drain(b, 0.5), b.command("stat here"))[2], "Encounter /domains/example/rat 50%")
     b.command("goto /domains/example/vault_door")
@@ -1125,10 +1178,12 @@ def run(work, mudlib):
     check("template: the shopkeeper sells", b.command("browse"), "example sword", "10 gold", "example potion", "15 gold")
     check("template: buy", b.command("buy sword"), "You buy an example sword for 10 gold.")
     check("template: wield", b.command("wield example sword"), "You wield an example sword.")
+    check("template: the weapon's timing fields reach the character sheet", b.command("score"), "Damage 9-14", "Reaction Time 3.0 (base 2.5, an example sword +0.5)", "Your attack takes 8.0 seconds.")
     check("template: sell", b.command("sell example sword"), "for 5 gold.")
     b.command("clone /domains/example/helm")
     check("template: armor", b.command("wear example helm"), "You put on an example helm.")
     b.command("clone /domains/example/potion")
+    wait_ready(b)  # using something is an action: the fight above may still be recovering
     check("template: consumable", b.command("drink example potion"), "You drink the example potion. It tastes of cherries.")
     b.command("clone /domains/example/purse")
     gold = score_of(b)["gold"]
@@ -1149,7 +1204,7 @@ def run(work, mudlib):
     wiz2.command("goto " + TEST + "scratch")
     # The wizard's own state came back: level 5 wizard, quests done, equipment.
     s = score_of(wiz2)
-    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 5", "Damage 6-10", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
+    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 5", "Damage 17-25", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
     wiz2.send("quit")
     wiz2.read_until("Goodbye")
 

@@ -82,6 +82,15 @@ public abstract class Thing : MudObject
     /// </summary>
     protected static string Esc(string text) => text.Replace("{", "{{");
 
+    /// <summary>A number with one decimal place, written the same on every machine: 2.5, 11.0, -0.5.</summary>
+    protected static string Num(double value)
+    {
+        var tenths = (long)Math.Round(value * 10, MidpointRounding.AwayFromZero);
+        var sign = tenths < 0 ? "-" : "";
+        tenths = Math.Abs(tenths);
+        return sign + (tenths / 10) + "." + (tenths % 10);
+    }
+
     /// <summary>The text with its first letter in upper case.</summary>
     protected static string Cap(string text) => text.Length == 0 ? text : char.ToUpper(text[0]) + text.Substring(1);
 }

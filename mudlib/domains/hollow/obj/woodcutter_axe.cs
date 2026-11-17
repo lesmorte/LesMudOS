@@ -8,8 +8,10 @@ public class WoodcutterAxe : Weapon
         Ids.Add("axe");
         ShortDesc = "a woodcutter axe";
         LongDesc = "A heavy-headed axe made for felling pines. It will do for goblins as well.";
-        DamageMin = 4;
-        DamageMax = 7;
+        DamageMin = 14;
+        DamageMax = 21;
+        ReactionMod = 1.0;
+        Recovery = 1.5;
         Value = 18;
     }
 }

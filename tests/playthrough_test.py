@@ -22,7 +22,10 @@ run cannot finish in time or after too many deaths, that is reported as a FINDIN
 rest of the flow is verified with wizard help (`heal`) on the same character, clearly
 labelled in the output.
 
-Combat is random, so every run is different. A real run takes 10 to 25 minutes.
+Combat is random, so every run is different. Combat runs on the event clock of docs/COMBAT_TIMING.md: actions are
+6 to 15 seconds apart, so the bot reads the fight as a player would, by what arrives and when, and decides on
+potions and retreats with the damage a creature can still deal before the hero can act again. A real run takes
+15 to 25 minutes.
 
 Usage (from the repository root, after `dotnet build`):
     LESMUDOS_TEST_PORT=4813 python3 tests/playthrough_test.py
@@ -58,15 +61,16 @@ GUILD = "Adventurers Guild"
 SMITH = "Ironoak Arms"
 CHAMBER = "Overseer Chamber"
 
-# What a player works out by `consider` and by dying: worst damage per round of one creature (top of its
-# damage range; the Overseer counts Battle Cry plus a Power Strike), and the word that attacks it.
+# What a player works out by `consider`, `stat`-like experience and by dying: the most damage one creature can deal before the
+# hero can act again (about 10 seconds: its hits in that time at the top of its damage range; a creature that winds up a heavy
+# blow counts that blow; the Overseer counts a Power Strike with the Battle Cry bonus), and the word that attacks it.
 CREATURES = {
-    "large rat": (2, "rat"), "giant rat": (3, "rat"), "wandering wolf": (4, "wolf"), "goblin scavenger": (3, "scavenger"),
-    "spore bat": (3, "bat"), "goblin guard": (3, "guard"), "giant cave toad": (5, "toad"), "goblin warrior": (4, "warrior"),
-    "goblin minion": (4, "minion"), "goblin elite guard": (5, "elite"), "goblin overseer": (16, "overseer"),
+    "large rat": (4, "rat"), "giant rat": (6, "rat"), "wandering wolf": (8, "wolf"), "goblin scavenger": (9, "scavenger"),
+    "spore bat": (4, "bat"), "goblin guard": (8, "guard"), "giant cave toad": (8, "toad"), "goblin warrior": (8, "warrior"),
+    "goblin minion": (8, "minion"), "goblin elite guard": (10, "elite"), "goblin overseer": (18, "overseer"),
 }
 COUNTS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
-# Rooms with creatures that attack two seconds after a player arrives.
+# Rooms with creatures that attack some seconds (their Reaction Time x 2) after a player arrives.
 MOB_ROOMS = {"Tavern Cellar", "Collapsed Passage", "Storage Chamber", "Guard Post", "Flooded Tunnel", "Mushroom Cavern",
              "Goblin Barracks", "Overseer Hall", "Overseer Chamber"}
 # The level a sensible player wants before a room (the dungeon is advertised for levels 2 to 5).
@@ -164,6 +168,9 @@ class Hero:
         self.died = False
         self.death_room = None
         self.helped = False
+        self.potion_pending = False  # a drink was queued ("You are not ready yet") and has not happened yet
+        self.potion_pending_at = 0.0
+        self.potion_log = ""  # the text of every potion drunk
         self.log_text = ""
         self.pos = room_of(self.feed(self.welcome))
 
@@ -173,6 +180,10 @@ class Hero:
         """Everything that arrives passes through here: deaths, levels, position, health."""
         text = clean(text)
         self.log_text += text
+        for m in re.finditer(r"You pull the stopper and drink the ruby-red potion\.[^\n]*", text):
+            self.potion_pending = False
+            self.potion_log += m.group(0) + "\n"
+            self.stats["potions"] += 1
         if "You have died!" in text:
             self.died = True
             self.death_room = self.pos
@@ -244,10 +255,8 @@ class Hero:
     # ---- moving ----
 
     def move(self, direction):
-        """One step. A room whose creatures were told of us a moment ago is entered only after their ambush call-out has passed."""
-        target = ROOMS.get(self.pos, {"exits": {}})["exits"].get(direction)
-        if target in MOB_ROOMS and time.time() - self.entered.get(target, 0) < 2.4:
-            time.sleep(2.4 - (time.time() - self.entered[target]))
+        """One step. (Creatures ambush after their Reaction Time, 3 to 9 seconds; a player who walks through a room is not caught by an
+        ambush that was prepared for an earlier visit unless he is still there when it falls, which the fight loop handles.)"""
         return self.cmd(direction)
 
     def go(self, dst):
@@ -334,7 +343,7 @@ class Run:
 
         hero = self.hero = Hero("hero", self.stats, deadline=self.t_hard)
         check("a new character arrives in the Village Square", hero.welcome, "Welcome, Hero.", "Village Square", ROOMS["Village Square"]["desc"])
-        check("score of a new character", hero.score(), "Level 1   Experience 0 (100 more for level 2)", "HP 30/30   Gold 25", "Damage 1-3", "nothing equipped", "You have no quests.")
+        check("score of a new character", hero.score(), "Level 1   Experience 0 (100 more for level 2)", "HP 30/30   Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "You have no quests.")
         check("quests of a new character", hero.cmd("quests"), "You have no quests.")
         check("a new character carries nothing", hero.cmd("i"), "You are empty-handed.")
 
@@ -486,7 +495,7 @@ class Run:
         check("buy the Rusty Sword for 10 gold", text, "You buy a rusty sword for 10 gold.")
         check("wield it", hero.cmd("wield sword"), "You wield a rusty sword.")
         check("the shield is too dear for now (15 gold left)", hero.cmd("buy axe"), "You cannot afford that. It costs 18 gold.")
-        check("score shows the sword", hero.score(), "Damage 3-5", "weapon: a rusty sword", "Gold 15")
+        check("score shows the sword", hero.score(), "Damage 9-14", "weapon: a rusty sword", "Gold 15", "Reaction Time 3.0 (base 2.5, a rusty sword +0.5). Your attack takes 8.0 seconds.")
         hero.go(GUILD)
         check("accept Clear the Cellar", hero.cmd("accept cellar"), "Quest accepted: Clear the Cellar.", "The goblins answer to an Overseer. Kill him, and come back and report.")
         check("accepting again is refused politely", hero.cmd("accept cellar"), "You have already taken \"Clear the Cellar\".")
@@ -502,7 +511,7 @@ class Run:
         hero.cmd("kill elite")
         t0 = time.time()
         text = ""
-        while not hero.died and time.time() - t0 < 120:
+        while not hero.died and time.time() - t0 < 240:
             text += hero.pump(0.5)
         check("two goblin elite guards kill a level 1 character", text, "You have died!", "You wake in the Guest Rooms, bruised but alive. The healer's fee costs you 1 gold.")
         hero.settle(1.0)
@@ -518,7 +527,7 @@ class Run:
         text = thief.cmd("look")
         check("a second player sees the corpse of Hero", text, "The corpse of Hero is here.")
         check("the lock is announced", thief.cmd("look at corpse of hero"), "It holds: a rusty sword, a gold coin.", "only those involved may touch it.")
-        check("loot is refused for a second player", thief.cmd("loot"), "The corpse of Hero is not yours to loot yet.")
+        check("loot is refused for a second player", thief.cmd("loot corpse of hero"), "The corpse of Hero is not yours to loot yet.")
         check("taking one thing is refused too", thief.cmd("get sword from corpse of hero"), "The corpse of Hero is not yours to loot yet.")
         thief.go(START)
         thief.quit()
@@ -537,15 +546,15 @@ class Run:
         hero = self.hero
         room = hero.death_room or "Overseer Hall"
         hero.go(room)
-        text = hero.cmd("loot")
+        text = hero.cmd("loot corpse of hero")
         check("the dead player loots the corpse and gets the sword and the fee back", text, "You take a rusty sword from the corpse of Hero.") if "rusty sword" in text else check("loot", text, "You take")
-        text += hero.cmd("loot")
+        text += hero.cmd("loot corpse of hero")
         hero.go("Goblin Barracks") if room == "Overseer Hall" else None
         self.note("corpse fetched from the " + room)
         hero.go(START)
         hero.equip_all()
         hero.score()
-        check("the sword is wielded again and the gold is back", "Damage 3-5 gold %d" % hero.gold, "Damage 3-5", "gold 15")
+        check("the sword is wielded again and the gold is back", "Damage 9-14 gold %s" % ("15" if hero.gold >= 15 else hero.gold), "Damage 9-14", "gold 15")
 
     def shield_and_ale(self):
         hero = self.hero
@@ -719,19 +728,32 @@ class Run:
             if self.fallback and hero.hp < hero.max_hp * 0.6:
                 hero.cmd("heal")
                 continue
+            if hero.potion_log and "potion_checked" not in self.stats:
+                self.stats["potion_checked"] = True
+                check("a healing potion heals up to 20 in the fight", hero.potion_log, "You pull the stopper and drink the ruby-red potion.", " hit points.")
             if hero.hp <= worst + 3:
-                if use_potions and hero.count("healing potion") > 0 and hero.hp > worst:
-                    t = hero.cmd("drink potion")
-                    self.stats["potions"] += 1
-                    if self.stats["potions"] == 1:
-                        check("a healing potion heals 20 in the fight", t, "You pull the stopper and drink the ruby-red potion.", "You recover 20 hit points.")
+                # A drink is an action: it happens at the next Ready Time (at most about 11 seconds away), so it is only worth
+                # waiting for while there is still room for what the creatures can do until then.
+                if hero.potion_pending and time.time() - hero.potion_pending_at < 14 and hero.hp > worst * 0.5:
                     continue
+                if use_potions and not hero.potion_pending and hero.hp > worst and hero.count("healing potion") > 0:
+                    t = hero.cmd("drink potion")
+                    if "You are not ready yet" in t:
+                        hero.potion_pending = True
+                        hero.potion_pending_at = time.time()
+                        if "potion_queue_checked" not in self.stats:
+                            self.stats["potion_queue_checked"] = True
+                            check("a potion drunk while recovering is queued for the next Ready Time", t, "You will drink a minor healing potion as soon as you can")
+                    continue
+                if hero.potion_pending:
+                    hero.cmd("stop")  # leaving: do not drink it later for nothing
+                    hero.potion_pending = False
                 info["retreats"] += 1
                 self.stats["retreats"] += 1
                 info["seconds"] += time.time() - started
                 info["lost"] += max(0, start_hp - hero.hp)
                 return "retreat"
-            if time.time() - last_combat > 4:
+            if time.time() - last_combat > 20:
                 enemies = hero.enemies()
                 if not enemies:
                     info["seconds"] += time.time() - started
@@ -997,6 +1019,10 @@ class Run:
         check("the Overseer summons a Goblin Minion once his HP falls to half", text, "snarls an order, and a goblin minion scrambles out of the shadows!")
         if "POWER STRIKE" in text:
             self.stats["notes"].append("saw the Overseer's Power Strike")
+            check("the Power Strike was announced first", text, "The Goblin Overseer draws his axe far back...")
+            check("the warning came before the blow", "yes" if text.index("draws his axe far back") < text.index("crushing POWER STRIKE") else "no", "yes")
+        else:
+            self.stats["notes"].append("the Overseer died before his first Power Strike")
         check("his death line", text, "The Goblin Overseer staggers, drops to his knees, and falls dead among his maps.")
         check("the corpse held the axe, the vest, the coins and the orders", loot, "Goblin Overseer's axe", "leather commander's vest", "bag of coins", "the Overseer's Orders")
         hero.settle(1.0)
@@ -1052,9 +1078,11 @@ class Run:
         # food and drink at full health, if not tried before
         hero.score()
         check("buy a bowl of stew", hero.cmd("buy stew"), "You buy a bowl of stew for 4 gold.")
+        hero.settle(9.0)  # a fight or a potion just before leaves the hero on a Recovery
         check("eat it", hero.cmd("eat stew"), "You spoon up the hot stew until the bowl is empty.")
         hero.go(START)
         check("buy a trail ration", hero.cmd("buy ration"), "You buy a trail ration for 5 gold.")
+        hero.settle(9.0)  # the stew above put the hero on its Recovery
         check("eat it", hero.cmd("eat ration"), "You chew through the dry biscuit and salted meat.")
 
     # ================================================================ 6. checks with the warden

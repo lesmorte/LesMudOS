@@ -606,6 +606,8 @@ internal sealed class Kernel : IDriverServices
     // IDriverServices: time
     // =====================================================================
 
+    public long TimeMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
     public int CallOut(ObjectRef owner, Action function, double delaySeconds)
     {
         var id = ++_nextCallOutId;
