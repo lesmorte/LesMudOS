@@ -16,6 +16,6 @@ public class FbGuardianHall : Room
         AddDetail("door,great door,north,slab door,north door", "The door is a single slab, taller than the pillars, slid aside in a groove in the floor until a narrow gap is left. The stone sill is thick with dust that no one has crossed in a very long time, and it has no chalk upon it. Whoever stood here stopped before it.");
         AddDetail("ticks,tick,marks,chalk,floor,paving,dots", "Along the paving between the pillars runs a line of small chalk ticks, one beside each of the fourteen pillars, neatly spaced, as a surveyor sets them. The last tick lies three paces from the door. There the line ends, and no chalk lies beyond it.");
         AddReadable("walls,wall,figures,figure,band,carving,carvings,frieze,procession,border,last figures", "The procession ends here. The last seven figures have turned about, so that they stand with their backs to the great door and their faces toward the gallery, toward you; their arms are down and their hands are open. Above them the border that was unfinished in the court in the wood, and ran on through every passage since, bends at last and meets itself, a closed ring. It is the only closed ring in the barrow. The faces, to the end, are blank.", "The last of the carved figures face you along the walls. You could {cmd}read{/} the band.");
-        AddSpawn("/domains/greenvale/corridor/mob/barrow_guardian", 1);
+        AddSpawn("/domains/greenvale/corridor/mob/restless_spirit", 1);
     }
 }
