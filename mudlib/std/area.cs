@@ -10,6 +10,17 @@ public abstract class Area : MudObject
     /// <summary>"Greenvale".</summary>
     protected string RegionName = "";
 
+    /// <summary>
+    /// The level band of the area's rooms: ground meant for characters of level BandLow to BandHigh (0 for none). A room that calls
+    /// its own DangerBand keeps that instead. Entering a band whose low end is two or more above your level warns you once.
+    /// </summary>
+    protected int BandLow;
+    protected int BandHigh;
+
+    public int QueryBandLow() => BandLow;
+
+    public int QueryBandHigh() => BandHigh;
+
     public string QueryAreaName() => AreaName;
 
     public string QueryRegionName() => RegionName;

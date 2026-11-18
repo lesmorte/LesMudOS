@@ -55,6 +55,9 @@ public class Npc : Living
     /// <summary>Replaces the next chat line for this player (for example after a quest). Null for the normal line.</summary>
     protected virtual string? TalkOverride(ObjectRef who) => null;
 
+    /// <summary>Called when someone talks to this NPC or asks it something. A patrol stops walking for a moment here.</summary>
+    protected virtual void Spoken(ObjectRef who) { }
+
     /// <summary>Called when the room resets. Shopkeepers restock here.</summary>
     public virtual void OnReset() { }
 
@@ -66,6 +69,7 @@ public class Npc : Living
     /// <summary>Called by the "talk" command. Returns what is shown to the player.</summary>
     public string? Talk(ObjectRef who)
     {
+        Spoken(who);
         var line = TalkOverride(who);
         if (line == null && chat.Count > 0)
         {
@@ -81,6 +85,7 @@ public class Npc : Living
     /// <summary>Called by the "ask" command.</summary>
     public virtual string? Ask(ObjectRef who, string topic)
     {
+        Spoken(who);
         topic = topic.ToLowerInvariant();
         for (var i = 0; i < topicKeys.Count; i++)
         {

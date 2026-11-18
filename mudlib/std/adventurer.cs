@@ -509,6 +509,7 @@ public abstract class Adventurer : Living
         AddAction("hp", CmdHp);
         AddAction("skills", CmdSkills);
         AddAction("quests", CmdQuests);
+        AddAction("search", CmdSearch);
         // Builder tools. Each handler checks the wizard level on every use and
         // declines below it, so to everyone else these verbs do not exist.
         AddAction("goto", CmdGoto);
@@ -681,6 +682,7 @@ public abstract class Adventurer : Living
         var detail = room?.Call<string>("QueryDetail", args);
         if (detail == null) { NotifyFail($"You see no '{Esc(args)}' here."); return false; }
         Write(detail.EndsWith("\n") ? detail : detail + "\n");
+        room!.Call("Examined", Self, args); // a detail may be what reveals a hidden exit
         return true;
     }
 
@@ -814,6 +816,53 @@ public abstract class Adventurer : Living
         }
         Write("There is no way out!\n");
         return true;
+    }
+
+    // ---- World features: hidden exits and search (docs/GAME_SYSTEMS.md) ----
+
+    private const int MaxFoundExits = 1000;
+    private const int MaxFoundExitsInWiz = 50; // records for rooms under /wiz are capped, so a sandbox cannot fill the save file
+
+    /// <summary>The hidden exits this character has found, as "room path|direction". Kept on the character; a room asks for its own.</summary>
+    [Saved] private List<string> foundExits = new();
+
+    public bool QueryFoundExit(string roomPath, string direction) => foundExits.Contains(roomPath + "|" + direction);
+
+    /// <summary>
+    /// A room tells the character they have found one of its hidden exits. The room is the caller and can only record itself, for a
+    /// character who is in it, so no other object (a wizard's, say) can put a record against a room it is not. Returns true if the exit
+    /// was newly recorded; the record is saved at once.
+    /// </summary>
+    public bool RecordFoundExit(string direction)
+    {
+        var room = PreviousObject();
+        if (room == null || room.IsClone || Environment() != room || direction == "" || direction.Contains('|')) return false;
+        if (!room.Call<List<string>>("QueryHiddenExits")?.Contains(direction) ?? true) return false;
+        var key = room.Name + "|" + direction;
+        if (foundExits.Contains(key) || foundExits.Count >= MaxFoundExits) return false;
+        if (room.Name.StartsWith("/wiz/", StringComparison.OrdinalIgnoreCase) && foundExits.Count(k => k.StartsWith("/wiz/", StringComparison.OrdinalIgnoreCase)) >= MaxFoundExitsInWiz) return false;
+        foundExits.Add(key);
+        PersistNow();
+        return true;
+    }
+
+    private bool CmdSearch(string args)
+    {
+        if (Environment() == null) return false;
+        if (QueryInCombat()) { Write("You cannot search while you are fighting.\n"); return true; }
+        // A short action on the combat clock: its delay is your Reaction Time less 1 (not below 0), about 3 seconds.
+        ActAsAction(new CombatAction { Id = "search", Name = "Search", Kind = "search", Preparation = 0, Recovery = 0, ReactionMod = -1.0 }, "search");
+        return true;
+    }
+
+    protected override void Special(CombatAction action, ObjectRef? target)
+    {
+        if (action.Kind != "search") { base.Special(action, target); return; }
+        var room = Environment();
+        if (room == null) return;
+        if (QueryInCombat()) { Tell("You cannot search while you are fighting.\n"); return; }
+        TellRoom(room, $"{Name} searches the area carefully.\n", Self);
+        if (!room.Call<bool>("Search", Self)) Tell("You search carefully but find nothing of note.\n");
     }
 
     private bool CmdConsider(string args)
