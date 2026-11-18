@@ -714,103 +714,103 @@ ITEM_GOLD = {"healing_potion": 15.0, "trail_ration": 2.0, "iron_dagger": 3.0, "r
 
 #   id, name, level, hp, dmg, to_hit, armor, xp, reaction, acts, pattern, gold, loot, band, boss, dodge, aggressive
 CORRIDOR = [
-    CKind("field_rabbit", "Field Rabbit", 1, 8, (1, 2), 0, 0, 3, 1.5, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
+    CKind("field_rabbit", "Field Rabbit", 1, 8, (1, 2), 0, 0, 12, 1.5, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
           band=(5, 6)),
-    CKind("roe_deer", "Roe Deer", 3, 22, (1, 3), 0, 0, 8, 2.5, (A("kick", "Kick", 0, 1.0),), P(cycle=("kick",)),
+    CKind("roe_deer", "Roe Deer", 3, 22, (1, 3), 0, 0, 26, 2.5, (A("kick", "Kick", 0, 1.0),), P(cycle=("kick",)),
           band=(5, 7)),
-    CKind("grey_fox", "Grey Fox", 4, 26, (2, 4), 1, 1, 14, 1.5, (A("nip", "Nip", 0, 0.5),), P(cycle=("nip",)),
+    CKind("grey_fox", "Grey Fox", 4, 26, (2, 4), 1, 1, 65, 1.5, (A("nip", "Nip", 0, 0.5),), P(cycle=("nip",)),
           band=(5, 6), dodge=10),
-    CKind("stray_wolf", "Stray Wolf", 5, 43, (7, 12), 1, 1, 100, 2.0, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
+    CKind("stray_wolf", "Stray Wolf", 5, 43, (7, 12), 1, 1, 115, 2.0, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
           band=(5, 7)),
-    CKind("forest_spider", "Forest Spider", 5, 41, (6, 12), 2, 0, 100, 1.5,
-          (A("bite", "Bite", 0, 0.5), A("venom", "Slowing Bite", 0, 0.5, fx="slow:1.3:14")),
-          P(cycle=("bite", "bite", "venom")), band=(5, 7), aggressive=True),
-    CKind("bandit_lookout", "Bandit Lookout", 6, 48, (10, 15), 2, 2, 120, 3.0, (A("slash", "Slash", 0, 1.0),),
+    CKind("forest_spider", "Forest Spider", 5, 41, (5, 10), 2, 0, 115, 1.5,
+          (A("bite", "Bite", 0, 0.5), A("venom", "Slowing Bite", 0, 0.5, fx="slow:1.25:8")),
+          P(cycle=("bite", "bite", "bite", "venom")), band=(5, 7), aggressive=True),
+    CKind("bandit_lookout", "Bandit Lookout", 6, 48, (10, 15), 2, 2, 145, 3.0, (A("slash", "Slash", 0, 1.0),),
           P(cycle=("slash",)), gold=(4, 12), loot=(("iron_dagger", 20), ("trail_ration", 25)), band=(6, 7), aggressive=True),
-    CKind("forest_wolf", "Forest Wolf", 6, 52, (5, 10), 2, 1, 120, 2.0,
+    CKind("forest_wolf", "Forest Wolf", 6, 52, (4, 8), 2, 1, 145, 2.0,
           (A("bite", "Bite", 0, 0.5), A("savage", "Savage Bite", 0, 0.5, mult=2)),
           P(cycle=("bite", "bite", "bite", "savage")), band=(5, 7)),
-    CKind("wild_boar", "Wild Boar", 6, 47, (11, 19), 1, 2, 120, 3.5,
+    CKind("wild_boar", "Wild Boar", 6, 47, (11, 19), 1, 2, 145, 3.5,
           (A("gore", "Gore", 0, 1.0), A("charge", "Charge", 1.0, 1.5, mult=2)),
           P(first=("charge",), cycle=("gore",)), band=(6, 8)),
-    CKind("goblin_scout", "Goblin Scout", 7, 57, (8, 12), 3, 2, 140, 2.0, (A("stab", "Quick Stab", 0, 0.5),),
+    CKind("goblin_scout", "Goblin Scout", 7, 57, (6, 9), 3, 2, 220, 2.0, (A("stab", "Quick Stab", 0, 0.5),),
           P(cycle=("stab",)), gold=(5, 14), loot=(("iron_dagger", 20), ("healing_potion", 8)), band=(7, 8), aggressive=True),
-    CKind("goblin_raider", "Goblin Raider", 7, 53, (8, 13), 2, 3, 140, 3.0,
+    CKind("goblin_raider", "Goblin Raider", 7, 53, (7, 11), 2, 3, 185, 3.0,
           (A("hack", "Cleaver Hack", 0, 1.0), A("whoop", "War Whoop", 0.5, 0.5, kind="buff", fx="damage=3,speed=0.85:25")),
           P(cycle=("hack",), at=((50, "whoop"),)), gold=(6, 16), loot=(("rusty_sword", 15), ("training_spear", 15), ("healing_potion", 8)),
           band=(6, 9), aggressive=True),
-    CKind("boar_brute", "Boar Brute", 7, 53, (7, 12), 2, 3, 140, 4.5,
+    CKind("boar_brute", "Boar Brute", 7, 53, (8, 14), 2, 3, 180, 4.5,
           (A("gore", "Gore", 0, 1.5), A("trample", "Trample", 1.0, 2.0, mult=2)),
           P(cycle=("gore", "gore", "trample")), band=(6, 8)),
-    CKind("tunnel_rat", "Tunnel Rat", 7, 63, (5, 10), 3, 1, 140, 2.0, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
+    CKind("tunnel_rat", "Tunnel Rat", 7, 40, (3, 6), 3, 1, 140, 1.5, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
           band=(7, 8), aggressive=True),
-    CKind("woodland_spider", "Woodland Spider", 8, 65, (3, 5), 3, 1, 160, 1.5,
-          (A("bite", "Bite", 0, 0.5), A("venom", "Slowing Bite", 0, 0.5, fx="slow:1.35:14")),
-          P(cycle=("bite", "bite", "venom")), band=(7, 9), aggressive=True),
-    CKind("rogue_bandit", "Rogue Bandit", 8, 60, (10, 16), 3, 3, 160, 3.0,
+    CKind("woodland_spider", "Woodland Spider", 8, 65, (4, 7), 3, 1, 310, 1.5,
+          (A("bite", "Bite", 0, 0.5), A("venom", "Slowing Bite", 0, 0.5, fx="slow:1.25:8")),
+          P(cycle=("bite", "bite", "bite", "venom")), band=(7, 9), aggressive=True),
+    CKind("rogue_bandit", "Rogue Bandit", 8, 60, (10, 16), 3, 3, 320, 3.0,
           (A("slash", "Slash", 0, 1.0), A("pommel", "Pommel Strike", 0, 1.5, fx="stagger:2", factor=0.5)),
           P(cycle=("slash", "slash", "pommel")), gold=(8, 20), loot=(("rusty_sword", 15), ("healing_potion", 10), ("trail_ration", 20)),
           band=(8, 9), aggressive=True),
-    CKind("young_black_bear", "Young Black Bear", 8, 67, (7, 13), 2, 2, 160, 4.0,
+    CKind("young_black_bear", "Young Black Bear", 8, 67, (7, 13), 2, 2, 270, 4.0,
           (A("swipe", "Swipe", 0, 1.5), A("maul", "Maul", 1.0, 2.0, mult=2)),
           P(cycle=("swipe", "swipe", "maul")), band=(7, 8)),
-    CKind("black_bear", "Black Bear", 8, 64, (8, 13), 3, 3, 160, 4.5,
+    CKind("black_bear", "Black Bear", 8, 64, (7, 11), 3, 3, 270, 4.5,
           (A("swipe", "Swipe", 0, 1.5), A("maul", "Maul", 1.0, 2.0, mult=2), A("roar", "Bellowing Roar", 0.5, 0.5, kind="buff", fx="damage=3,speed=0.85:30")),
           P(cycle=("swipe", "swipe", "maul"), at=((50, "roar"),)), band=(7, 9)),
-    CKind("heartwood_goblin", "Goblin Warrior", 8, 56, (7, 11), 3, 4, 160, 3.0,
+    CKind("heartwood_goblin", "Goblin Warrior", 8, 56, (5, 8), 3, 4, 270, 3.0,
           (A("slash", "Slash", 0, 1.0), A("heavy", "Heavy Swing", 0.5, 1.5, mult=2)),
           P(cycle=("slash", "slash", "slash", "heavy")), gold=(8, 20), loot=(("training_spear", 15), ("iron_dagger", 15), ("healing_potion", 8)),
           band=(7, 9), aggressive=True),
-    CKind("highway_bandit", "Highway Bandit", 8, 59, (7, 11), 3, 3, 160, 3.0,
+    CKind("highway_bandit", "Highway Bandit", 8, 59, (6, 9), 3, 3, 250, 3.0,
           (A("slash", "Slash", 0, 1.0), A("pommel", "Pommel Strike", 0, 1.5, fx="stagger:2", factor=0.5)),
           P(cycle=("slash", "slash", "pommel")), gold=(8, 22), loot=(("rusty_sword", 15), ("healing_potion", 12), ("trail_ration", 20)),
           band=(6, 9), aggressive=True),
-    CKind("thorn_woodling", "Thorn Woodling", 9, 62, (11, 18), 2, 4, 200, 4.0,
-          (A("lash", "Branch Lash", 0, 1.5), A("thorns", "Thorn Barrage", 0.5, 1.5, fx="weaken:armor=-2:20")),
+    CKind("thorn_woodling", "Thorn Woodling", 9, 62, (9, 14), 2, 4, 390, 4.0,
+          (A("lash", "Branch Lash", 0, 1.5), A("thorns", "Thorn Barrage", 0.5, 1.5, fx="weaken:armor=-2:12")),
           P(cycle=("lash", "lash", "thorns")), band=(8, 10)),
-    CKind("forest_stalker", "Forest Stalker", 9, 62, (4, 7), 4, 2, 200, 2.0,
+    CKind("forest_stalker", "Forest Stalker", 9, 62, (4, 7), 4, 2, 440, 2.0,
           (A("claw", "Claw", 0, 1.0), A("ambush", "Ambush Strike", 0.5, 1.0, mult=2, hit=4)),
           P(first=("ambush",), cycle=("claw",)), band=(8, 10), dodge=15, aggressive=True),
-    CKind("ancient_wolf", "Ancient Wolf", 9, 69, (11, 18), 3, 3, 200, 3.0,
+    CKind("ancient_wolf", "Ancient Wolf", 9, 69, (8, 13), 3, 3, 490, 3.0,
           (A("bite", "Rending Bite", 0, 1.0), A("howl", "Howl", 0.5, 0.5, kind="buff", fx="damage=2,speed=0.75:25")),
           P(cycle=("bite",), at=((60, "howl"),)), band=(9, 10), aggressive=True),
-    CKind("rogue_goblin_veteran", "Rogue Goblin Veteran", 9, 53, (6, 9), 4, 5, 200, 3.5,
-          (A("slash", "Slash", 0, 1.0), A("daze", "Dazing Blow", 0, 1.5, fx="weaken:tohit=-2,damage=-2:20", factor=0.75)),
+    CKind("rogue_goblin_veteran", "Rogue Goblin Veteran", 9, 53, (7, 10), 4, 5, 390, 3.5,
+          (A("slash", "Slash", 0, 1.0), A("daze", "Dazing Blow", 0, 1.5, fx="weaken:tohit=-2,damage=-2:12", factor=0.75)),
           P(cycle=("slash", "slash", "daze")), gold=(10, 26), loot=(("healing_potion", 15), ("woodcutter_axe", 10), ("trail_ration", 20)),
           band=(8, 10), aggressive=True),
-    CKind("restless_spirit", "Restless Spirit", 9, 64, (10, 16), 3, 0, 200, 2.5,
-          (A("touch", "Grave Touch", 0, 1.0), A("chill", "Chill of the Grave", 0, 1.0, fx="slow:1.25:12")),
-          P(cycle=("touch", "touch", "chill")), band=(9, 10), dodge=20, aggressive=True),
-    CKind("ancient_skeleton", "Ancient Skeleton", 9, 63, (8, 13), 3, 4, 200, 3.5,
+    CKind("restless_spirit", "Restless Spirit", 9, 64, (8, 13), 3, 0, 460, 2.5,
+          (A("touch", "Grave Touch", 0, 1.0), A("chill", "Chill of the Grave", 0, 1.0, fx="slow:1.2:8")),
+          P(cycle=("touch", "touch", "touch", "chill")), band=(9, 10), dodge=15, aggressive=True),
+    CKind("ancient_skeleton", "Ancient Skeleton", 9, 63, (8, 13), 3, 4, 470, 3.5,
           (A("blade", "Rusted Blade", 0, 1.0), A("crush", "Bone Crusher", 1.0, 1.5, mult=2)),
           P(cycle=("blade", "blade", "blade", "crush")), gold=(3, 12), band=(9, 10), aggressive=True),
-    CKind("goblin_tunneler", "Goblin Tunneler", 8, 60, (5, 8), 3, 3, 160, 3.0,
+    CKind("goblin_tunneler", "Goblin Tunneler", 8, 60, (5, 8), 3, 3, 270, 3.0,
           (A("pick", "Pick Strike", 0, 1.0), A("overhead", "Overhead Swing", 1.0, 1.5, mult=2)),
           P(cycle=("pick", "pick", "overhead")), gold=(8, 20), loot=(("iron_dagger", 15), ("healing_potion", 8), ("trail_ration", 20)),
           band=(7, 9), aggressive=True),
-    CKind("root_creeper", "Root Creeper", 8, 58, (8, 13), 2, 3, 160, 3.5,
-          (A("lash", "Root Lash", 0, 1.0), A("grasp", "Clinging Grasp", 0, 1.5, fx="slow:1.3:14")),
+    CKind("root_creeper", "Root Creeper", 8, 58, (8, 13), 2, 3, 270, 3.5,
+          (A("lash", "Root Lash", 0, 1.0), A("grasp", "Clinging Grasp", 0, 1.5, fx="slow:1.25:8")),
           P(cycle=("lash", "lash", "grasp")), band=(7, 9), aggressive=True),
     # bosses and near-bosses: two special actions each
-    CKind("bandit_leader", "Bandit Leader", 10, 42, (7, 11), 4, 5, 1000, 3.5,
+    CKind("bandit_leader", "Bandit Leader", 10, 100, (6, 10), 4, 4, 1550, 3.5,
           (A("slash", "Sabre Slash", 0, 1.0), A("smash", "Shield Smash", 0.5, 1.5, fx="stagger:3", factor=0.75),
-           A("rally", "Call the Pack", 0.5, 1.0, kind="summon", fx="highway_bandit")),
-          P(cycle=("slash", "slash", "smash"), at=((60, "rally"), (30, "rally"))), gold=(30, 60),
+           A("rally", "Call the Pack", 0.5, 1.0, kind="summon", fx="bandit_lookout")),
+          P(cycle=("slash", "slash", "smash"), at=((50, "rally"),)), gold=(30, 60),
           loot=(("bag_of_coins", 100), ("healing_potion", 60), ("enchanted_dagger", 15)), band=(8, 10), boss=True, aggressive=True),
-    CKind("forest_panther", "Forest Panther", 10, 83, (7, 12), 5, 3, 1000, 2.0,
-          (A("claw", "Claw", 0, 1.0), A("pounce", "Pouncing Leap", 0.5, 1.0, mult=2, hit=4), A("rake", "Raking Frenzy", 0, 1.0, fx="weaken:armor=-2:20")),
-          P(first=("pounce",), cycle=("claw", "claw", "rake", "claw")), band=(9, 10), boss=True, dodge=20, aggressive=True),
-    CKind("warren_broodmother", "Warren Broodmother", 10, 35, (7, 11), 3, 4, 1000, 4.0,
-          (A("bite", "Venom Fang", 0, 1.0, fx="slow:1.3:14"), A("spit", "Webbed Spit", 0.5, 1.5, fx="weaken:tohit=-2,damage=-2:20", factor=0.75),
+    CKind("forest_panther", "Forest Panther", 10, 120, (6, 10), 5, 3, 1550, 2.0,
+          (A("claw", "Claw", 0, 1.0), A("pounce", "Pouncing Leap", 0.5, 1.0, mult=2, hit=4), A("rake", "Raking Frenzy", 0, 1.0, fx="weaken:armor=-2:12")),
+          P(first=("pounce",), cycle=("claw", "claw", "rake", "claw")), band=(9, 10), boss=True, dodge=15, aggressive=True),
+    CKind("warren_broodmother", "Warren Broodmother", 10, 80, (6, 10), 3, 3, 1550, 4.0,
+          (A("fang", "Venom Fang", 0, 1.0), A("spit", "Webbed Spit", 0.5, 1.5, fx="slow:1.25:10", factor=0.75),
            A("brood", "Call the Brood", 0.5, 1.0, kind="summon", fx="tunnel_rat")),
-          P(cycle=("bite", "bite", "spit"), at=((66, "brood"), (33, "brood"))), band=(8, 10), boss=True, aggressive=True),
-    CKind("barrow_guardian", "Barrow Guardian", 10, 194, (7, 11), 3, 5, 600, 4.5,
+          P(cycle=("fang", "fang", "spit"), at=((66, "brood"), (33, "brood"))), band=(8, 10), boss=True, aggressive=True),
+    CKind("barrow_guardian", "Barrow Guardian", 10, 150, (10, 15), 3, 4, 880, 4.5,
           (A("slam", "Stone Fist", 0, 1.5), A("quake", "Earthshaker", 1.0, 2.0, mult=2, fx="stagger:2"),
-           A("stone", "Stone Skin", 0.5, 0.5, kind="buff", fx="armor=3:20")),
+           A("stone", "Stone Skin", 0.5, 0.5, kind="buff", fx="armor=3:15")),
           P(cycle=("slam", "slam", "quake"), at=((50, "stone"),)), band=(9, 10), boss=True, aggressive=True),
-    CKind("fallen_knight", "Fallen Knight", 10, 95, (8, 12), 5, 6, 1000, 3.5,
+    CKind("fallen_knight", "Fallen Knight", 10, 155, (6, 10), 5, 5, 1550, 3.5,
           (A("cleave", "Rusted Cleave", 0, 1.0), A("crush", "Crushing Blow", 1.0, 1.5, mult=2),
-           A("ward", "Shield of the Fallen", 0.5, 0.5, kind="buff", fx="armor=4,speed=0.9:20")),
+           A("ward", "Shield of the Fallen", 0.5, 0.5, kind="buff", fx="armor=2,speed=0.9:15")),
           P(first=("ward",), cycle=("cleave", "cleave", "crush")), gold=(20, 40), loot=(("healing_potion", 50),), band=(9, 10), boss=True, aggressive=True),
 ]
 CKINDS = {k.id: k for k in CORRIDOR}
@@ -883,7 +883,7 @@ GEAR = {"warrior": ("overseer's axe", True), "scout": ("fine longsword", False),
         "mage": ("iron dagger", False), "adventurer": ("overseer's axe", True)}
 GEAR_ARMOR = 4     # vest 3 + helm 1
 GEAR_HP = TRINKET_HP
-CORRIDOR_POTIONS = 4
+CORRIDOR_POTIONS = 5
 
 
 def cplayer(arch, level):
@@ -931,6 +931,11 @@ RESUPPLY = 0.05             # share of the time spent buying potions in bulk
 HP_REGEN_PER_SECOND = 0.1   # Adventurer.Tick: 1 HP per 10 s out of combat (3 per 10 s in a safe room)
 ROOMS_TO_PREY = {5: 14, 6: 26, 7: 40, 8: 54, 9: 68, 10: 76}   # rooms from the Hollow's guest rooms to where level n prey lives
 CORPSE_SECONDS = 10.0       # find and loot the corpse after a death
+# A perfect-knowledge player rests in a haven (a safe room: 3 HP per 10 s, Stamina and Mana twice as fast) whenever the hunting
+# ground has one within HAVEN_ROOMS rooms. Share of the time that is true, by character level (segments 1 to 3 have a haven
+# beside their loops; Heartwood and the dungeons have none).
+HAVEN_ROOMS = 6
+HAVEN_SHARE = {5: 1.0, 6: 1.0, 7: 0.8, 8: 0.5, 9: 0.25, 10: 0.25}
 
 
 def kind_gold(k):
@@ -943,34 +948,58 @@ def regen_hp(arch):
     return HP_REGEN_PER_SECOND * (1.5 if arch == "adventurer" else 1.0)
 
 
-def pace_cell(arch, level, key, funded=True, runs=500, gold=None):
-    """One calling at one level hunting one creature, in the steady state: the seconds of a whole cycle per kill and the
-    experience per hour. funded: gold from the kills buys potions that are drunk after each fight (15 gold for 20 HP);
-    otherwise the character waits for natural regeneration. Two passes so that Stamina and Mana at the start of a fight
-    are what the recovery time of the first pass gave back."""
+def pace_cell(arch, level, key, f=0.0, runs=400, haven=True):
+    """One calling at one level hunting one creature, in the steady state. f is the share of the damage taken that is
+    healed by bought potions (15 gold for 20 HP, drunk after the fight); the rest heals by natural regeneration. Returns the
+    seconds of a whole cycle per kill (fight, loot and walk, recovery, and for the lost fights the way back from the Hollow)
+    and the experience per hour. Two passes so that Stamina and Mana at the start of a fight are what the recovery gave back."""
     k = CKINDS[key]
     a = ARCHS[arch]
-    g = kind_gold(k) if gold is None else gold
     start = None
     walk = ROOMS_BETWEEN_KILLS * ROOM_SECONDS + LOOT_SECONDS
     for _ in range(3):
         c = cfight(arch, level, key, 0, runs, start)
-        potions = min(g / 15.0, c["dtot"] / POTION_HEAL) if funded else 0.0
-        t_hp = max(0.0, c["dtot"] - POTION_HEAL * potions) / regen_hp(arch) + potions * POTION_SECONDS
+        potions = f * c["dtot"] / POTION_HEAL
+        t_place = max(0.0, c["dtot"] * (1 - f)) / regen_hp(arch) + potions * POTION_SECONDS
+        t_haven = 2 * HAVEN_ROOMS * ROOM_SECONDS + max(0.0, c["dtot"] * (1 - f)) / (3 * regen_hp(arch)) + potions * POTION_SECONDS
+        h = HAVEN_SHARE[min(10, max(5, level))] if haven else 0.0
+        t_hp = (1 - h) * t_place + h * min(t_place, t_haven)
         wait = t_hp + walk
-        start = (min(a.stamina, c["end_s"] + a.stamina_regen * wait / 10.0), min(a.mana, c["end_m"] + a.mana_regen * wait / 10.0))
+        start = (min(a.stamina, c["end_s"] + a.stamina_regen * wait * (1 + h) / 10.0), min(a.mana, c["end_m"] + a.mana_regen * wait * (1 + h) / 10.0))
     w = c["win"]
     win_cycle = (c["sec"] + walk + t_hp) * (1 + RESUPPLY)
     loss_cycle = c["sec_loss"] + ROOMS_TO_PREY[min(10, max(5, level))] * ROOM_SECONDS + CORPSE_SECONDS
     cycle = w * win_cycle + (1 - w) * loss_cycle
     xph = 3600.0 * w * k.xp / cycle if cycle else 0.0
     return dict(win=w, fight=c["sec"], dtot=c["dtot"], lost=c["lost"], t_hp=t_hp, walk=walk, cycle=cycle, xph=xph,
-                potions=potions, gold=g, win_cycle=win_cycle)
+                potions=potions, win_cycle=win_cycle)
 
 
 def prey(level):
     """The ordinary creatures a character of this level hunts: those of its own level and one above (bosses are visits)."""
     return [k for k in CORRIDOR if k.level in (level, level + 1) and not k.boss and k.level >= 5]
+
+
+def potion_share(arch, level, keys, runs=300, funded=True, haven=True):
+    """The share of the damage taken in a hunting mix (the creatures in `keys`, killed in equal numbers) that the mix's own gold
+    buys back in potions: the gold of all the kills is pooled, and potions are drunk wherever they save most time."""
+    if not funded:
+        return 0.0
+    gold = sum(kind_gold(CKINDS[k]) for k in keys)
+    damage = sum(pace_cell(arch, level, k, 0.0, runs, haven)["dtot"] for k in keys)
+    return min(1.0, (gold / 15.0) / (damage / POTION_HEAL)) if damage else 1.0
+
+
+def pace_mix(arch, level, runs=300, funded=True, f=None, haven=True):
+    """Experience per hour of one calling at one level hunting the mix of prey(level) in equal numbers."""
+    keys = [k.id for k in prey(level)]
+    if f is None:
+        f = potion_share(arch, level, keys, runs, funded, haven)
+    cells = [pace_cell(arch, level, k, f, runs, haven) for k in keys]
+    xp = sum(c["win"] * CKINDS[k].xp for c, k in zip(cells, keys))
+    cycle = sum(c["cycle"] for c in cells)
+    return dict(xph=3600.0 * xp / cycle, f=f, cycle=cycle / len(cells), win=sum(c["win"] for c in cells) / len(cells),
+                fight=sum(c["fight"] for c in cells) / len(cells), best=max(c["xph"] for c in cells), worst=min(c["xph"] for c in cells), n=len(cells))
 
 
 # ---------------------------------------------------------------- consistency with the mudlib
