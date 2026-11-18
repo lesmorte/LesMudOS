@@ -376,6 +376,8 @@ def main():
         o.send("old-pass-word")
         o.read_until("again: ")
         o.send("old-pass-word")
+        o.read_until("Your calling: ")  # an existing character is asked for a calling at the next login (class system)
+        o.send("novice")
         o.read_until("> ")
         check("an existing character without the field gets colour on", str(BOLD + "Test Hall" + RESET in o.raw), "True")
         o.send("quit")
