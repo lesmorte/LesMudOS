@@ -72,7 +72,7 @@ NODE_WORD = {"berry_bush": "bush", "herb_patch": "herb", "wildflowers": "wildflo
 # The brief (task D): patrol file -> (segment, first room, last room); spawned in the first room.
 PATROLS = {"patrol_south_road": ("south_road", 7, 11), "patrol_eldergreen_edge": ("eldergreen_edge", 5, 11), "patrol_green_road": ("green_road", 9, 11),
            "patrol_heartwood": ("heartwood", 7, 11), "patrol_approach": ("approach", 3, 7)}
-BOSS_ROOMS = ["approach/w3", "approach/d2", "root_warrens/nest", "barrow/long_gallery", "barrow/borrowed_tomb"]
+BOSS_ROOMS = ["approach/w3", "approach/d2", "root_warrens/nest", "barrow/long_gallery", "barrow/guardian_hall", "barrow/borrowed_tomb"]
 DUNGEON_CREATURES = {"root_warrens": {"tunnel_rat", "goblin_tunneler", "root_creeper", "warren_broodmother"},
                      "barrow": {"restless_spirit", "ancient_skeleton", "barrow_guardian", "fallen_knight"}}
 

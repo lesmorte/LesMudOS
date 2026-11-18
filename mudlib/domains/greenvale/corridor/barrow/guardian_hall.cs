@@ -8,7 +8,7 @@ public class FbGuardianHall : Room
         LongDesc = "The gallery opens into a hall so wide that the far wall is only a suggestion, with two rows of seven square pillars marching away into the dark. Every sound you make comes back from a long way off, a little late. At the north end, before a tall door of the same stone, a great frame stands upon a wide slab, hung with bands and straps that have been cut, with pale chips scattered on the floor around it. Along the walls the last of the carved figures have turned, each one, to face the way you came.";
         Exits["south"] = "/domains/greenvale/corridor/barrow/long_gallery";
         Exits["north"] = "/domains/greenvale/corridor/barrow/borrowed_tomb";
-        ResetSeconds = 600;
+        ResetSeconds = 1800;
         DangerBand(9, 10);
 
         AddDetail("pillars,pillar,rows,columns,column", "There are seven pillars to a row, square and plain, each carrying nothing on its faces but the interlaced line in bands of seven. They are set so exactly that from the door you look down two lanes of perfect shadow. Their feet are bare of dust, as though something had been walking among them.");
