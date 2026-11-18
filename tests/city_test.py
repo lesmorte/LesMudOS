@@ -533,6 +533,9 @@ def main():
         wiz = ci.Session("wiz")
         out = wiz.cmd("promote " + h.SECRET)
         R.ok("level 10 wizard" in out, "setup: the secret makes a level 10 wizard", out)
+        # The starting kit would answer to 'spear' and the like before the room's details do: walk empty-handed.
+        for line in ("unwield", "drop spear", "drop ration", "drop ration", "drop dagger", "drop sword", "drop staff", "drop bow", "drop mace"):
+            wiz.cmd(line)
         wk = Walker(wiz, doc, rooms, others)
         order = sorted(rooms, key=lambda p: (0 if p.startswith(VALE) else 1, p))
         R.section("2-5. Every room: details, readables, people, shops, exits")

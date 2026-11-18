@@ -127,14 +127,14 @@ class Source:
         for fn, args in self.calls:
             if fn == "AddDetail":
                 for k in keys_of(args[0]):
-                    if k in d_owner:
+                    if k in d_owner and d_owner[k] != args[0]:
                         pairs.setdefault((d_owner[k], args[0]), []).append(k)
                     details[k] = args[1]
                     d_owner[k] = args[0]
             elif fn == "AddReadable":
                 look = args[2] if len(args) > 2 else "There is writing on it. You could {cmd}read{/} it."
                 for k in keys_of(args[0]):
-                    if k in r_owner:
+                    if k in r_owner and r_owner[k] != args[0]:
                         pairs.setdefault((r_owner[k], args[0]), []).append(k)
                     readables[k] = args[1]
                     r_owner[k] = args[0]
