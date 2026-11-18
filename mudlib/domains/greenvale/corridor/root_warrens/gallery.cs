@@ -16,7 +16,7 @@ public class RwGallery : Room
         AddDetail("roof,ceiling,belly,clay,sag", "The roof bellies down between the props in loose bags of clay, with fine roots coming through like hair. A little earth sifts down with every footstep, and now and then a small clod drops with a wet slap.");
         AddDetail("roots,root,cords,pale", "The roots that hang here are thin and grey and slick, and when you stand still they sway a little, though the air is almost still. They are thickest at the western end of the gallery.");
         AddDetail("floor,bones,bone,droppings", "The floor is a mash of gnawed bone, splinters and droppings. Among them, in one place, a ring of bones laid out in a careful circle, as if a rat had arranged them for a purpose.");
-        AddDetail("pale,dimness,west,glow,fungus", "To the west the gallery bends, and beyond the bend there is a faint cold pallor, as of moonlight through water, which does not come from any lamp. It is the colour of the roots.");
+        AddDetail("dimness,west,glow,fungus", "To the west the gallery bends, and beyond the bend there is a faint cold pallor, as of moonlight through water, which does not come from any lamp. It is the colour of the roots.");
 
         AddSpawn("/domains/greenvale/corridor/mob/tunnel_rat", 2);
     }

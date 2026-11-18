@@ -12,7 +12,7 @@ public class RwSpoilHeap : Room
         DangerBand(7, 8);
 
         AddDetail("heap,spoil,slope,stone,stones,clay,rubble", "The heap is a dull mix of yellow clay, grey stones and rotted roots, dumped barrow by barrow over a long time. The top is crowned with a smooth crust where the fungus has taken it, and the sides are cratered with burrows.");
-        AddDetail("fungus,fungi,shelves,shelf,mould,drifts", "The fungus grows in pale shelves the colour of old candle-wax, soft and damp to the touch and faintly sweet-smelling. It is thickest where the clay is dampest. It would be worth carrying away, if one knew what it was good for.");
+        AddDetail("fungus,fungi,shelves,shelf,drifts", "The fungus grows in pale shelves the colour of old candle-wax, soft and damp to the touch and faintly sweet-smelling. It is thickest where the clay is dampest. It would be worth carrying away, if one knew what it was good for.");
         AddDetail("holes,hole,burrows,burrow,earth,tracks", "Each hole is the width of a man's head and wide at the mouth, with a smear of dung inside. Fresh earth is spilled before them in tongues. They run deeper than a hand can reach, and all of them slope downward.");
         AddDetail("barrow,wheel,cart", "It is a stout wooden barrow bound with iron, lying where it was dropped. The wheel is gone and the bed has been gnawed through at one corner, as though the rats had wanted whatever was last in it.");
         AddDetail("roof,ceiling,timbers", "A line of timbers runs across the roof, each cracked, and one has been chewed so thin that it bows. Dust falls from it whenever the heap shifts.");

@@ -6,10 +6,6 @@ public class CnHerbPatch : Node
     public override void Create()
     {
         Name = "Herb Patch";
-        Ids.Add("patch");
-        Ids.Add("herb patch");
-        Ids.Add("herbs");
-        Ids.Add("herb");
         ShortDesc = "a patch of herbs";
         PickedShort = "a trampled patch of herbs";
         Kind = "herb patch";

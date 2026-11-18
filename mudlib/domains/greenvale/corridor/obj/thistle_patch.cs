@@ -6,10 +6,6 @@ public class CnThistlePatch : Node
     public override void Create()
     {
         Name = "Thistle Patch";
-        Ids.Add("thistle");
-        Ids.Add("thistles");
-        Ids.Add("patch");
-        Ids.Add("thistle patch");
         ShortDesc = "a patch of thistles";
         PickedShort = "a patch of stripped thistles";
         Kind = "thistle patch";

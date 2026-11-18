@@ -6,10 +6,6 @@ public class CnBerryBush : Node
     public override void Create()
     {
         Name = "Berry Bush";
-        Ids.Add("bush");
-        Ids.Add("berry bush");
-        Ids.Add("bushes");
-        Ids.Add("berries");
         ShortDesc = "a berry bush";
         PickedShort = "a picked-over berry bush";
         Kind = "berry bush";

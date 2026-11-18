@@ -10,7 +10,7 @@ public class HwS1 : Room
         ResetSeconds = 600;
         DangerBand(9, 10);
 
-        AddDetail("cleft,cache,hollow,stones,wall,thorn,roof", "The cleft is no wider than a table, roofed with a slab and a tangle of thorn, so that you would pass it a hundred times without knowing. The stones of the wall at its back are of the dark green-grey and are the same as the ruins on the road.");
+        AddDetail("cleft,cache,hollow,stones,wall,roof", "The cleft is no wider than a table, roofed with a slab and a tangle of thorn, so that you would pass it a hundred times without knowing. The stones of the wall at its back are of the dark green-grey and are the same as the ruins on the road.");
         AddDetail("flakes,black,char,charcoal,floor,dust,cinders,cinder,soot", "The black flakes on the floor are the remains of pages, crumbling at the touch and leaving a smear on the fingers. The cinders in the corner have been raked into a heap and then not lit.");
         AddDetail("books,book,papers,paper,stack,journals,journal,notebooks,notes", "The stack is of five or six bound journals and a bundle of loose sheets, charred to a crust at the edges and soaked since by damp, so that the fire stopped and was not put out. Most of the pages have fused into a block. A few, near the middle, can still be read in part: you could {cmd}read first journal{/}, {cmd}read second journal{/} or {cmd}read third journal{/}.");
         AddDetail("satchel,bag,leather,scorched satchel", "The satchel is a plain leather bag with a buckled flap, scorched black on one side and whole on the other. It is empty except for a few flakes, and it has no mark, no name and no maker's stamp. The wearer was careful.");

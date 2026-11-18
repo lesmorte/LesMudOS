@@ -12,7 +12,7 @@ public class OaM11 : Room
         DangerBand(6, 8);
 
         AddDetail("wall,city wall,sky,towers", "At this distance the wall is no longer a line but a cliff, grey and streaked, with square towers crowning it and small figures walking the parapet between them. The size of it sinks in all at once.");
-        AddDetail("carters,carters' yards,yards,stables,sheds", "Carters' yards line both sides, their gates open on cobbled courts where wagons are backed in for loading. Men in leather aprons call to each other across the lane, and everyone is in a hurry.");
+        AddDetail("carters,carters' yards,yards,stables", "Carters' yards line both sides, their gates open on cobbled courts where wagons are backed in for loading. Men in leather aprons call to each other across the lane, and everyone is in a hurry.");
         AddDetail("wheelwright,wheelwrights,sheds,wheels,spokes", "A wheelwright's shed stands open to the road, with a dozen wheels hanging from its beams like enormous clocks. The wheelwright is fitting an iron tyre with a roaring fire and a lot of shouting.");
         AddDetail("troughs,trough,water,cobbles,puddles", "Stone troughs stand at every corner, long enough for a team, scummed with straw and sky. The cobbles around them are polished by hooves.");
         AddDetail("noise,roar,gate,sound", "A great single sound, made of wheels, hooves, hawkers, hammers and bells, rolls down the road from the gate. It does not seem to come from anywhere in particular.");

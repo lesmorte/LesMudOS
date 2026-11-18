@@ -1,15 +1,11 @@
 // @inherit /std/node
 
-/// <summary>A wildflowers on the Greenvale corridor: 3 charges, each back in 10 minutes.</summary>
+/// <summary>Wildflowers on the Greenvale corridor: 3 charges, each back in 10 minutes.</summary>
 public class CnWildflowers : Node
 {
     public override void Create()
     {
         Name = "Wildflowers";
-        Ids.Add("flowers");
-        Ids.Add("wildflowers");
-        Ids.Add("wildflower");
-        Ids.Add("blooms");
         ShortDesc = "a drift of wildflowers";
         PickedShort = "a drift of trampled wildflowers";
         Kind = "wildflowers";

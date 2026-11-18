@@ -283,3 +283,13 @@ Ten rooms, levels 9 to 10. An ancient burial site predating Greenvale, one of th
 ## After the builders
 
 The lead connects the Vale Road's first room to segment 1, retires the three Vale Road rooms the corridor replaces (`meadows`, `river_bend`, `rise`), adds the hidden ways, nodes, patrols and bands, places the dungeon entrances, and adds area data for each directory.
+
+### As integrated
+
+- **Connections.** `/domains/greenvale/vale_road/road` leads north to `south_road/m01`; `approach/m11` leads north to `/domains/greenvale/vale_road/approach`, whose south exit leads back. The Vale Road's Long Meadows, River Bend and Rise and its Riverwatch ranger are retired; the corridor's River Bend (`approach/m07`) and Rise (`approach/m10`) replace them.
+- **Hidden ways** (`HiddenExit`; the detail keys are the hint, so looking at the detail always finds the way, and `search` finds it with the chance shown): `south_road/d2` west to `s1` (20, the west wall); `eldergreen_edge/d2` east to `s1` (20, the giant beech); `green_road/w3` down to `s1` (15, the hearth and flagstones); `heartwood/d2` east to `s1` (15, the dead thicket); `heartwood/w2` down to `root_warrens/entrance` (10, the hollow under the root plate); `heartwood/d3` in to `barrow/entrance` (10, the gap between the slabs); `approach/d1` down to `s1` (15, the sump). Each far room has its ordinary exit back.
+- **Chronicle.** The five secret rooms report `discover.hidden` and the two dungeon entrances report `discover.secret_dungeon` from `Init`, as the Hollow's Hidden Cache and Forgotten Cellars do. The dungeons are reported as lying beneath Heartwood.
+- **Nodes.** `corridor/obj/` holds `berry_bush`, `herb_patch`, `wildflowers` and `thistle_patch` (3 charges, 600 s); 29 placements, listed in `tests/corridor_test.py`. The `harvest` command belongs to the crafting system.
+- **Patrols.** One Riverwatch patrol (two rangers presented as one) per segment in `corridor/npc/`, pace 45 s, there and back: South Road `m07` to `m11`; Eldergreen Edge `m05` to `m11`; Green Road `m09` to `m11`; Heartwood `m07` to `m11`; Approach `m03` to `m07`. Each is spawned in the first room of its route.
+- **Bands and areas.** Every room calls `DangerBand` with the band of its table row (Root Warrens 7-8, the nest 9-10, the Barrow 9-10); each directory has an `area.cs` (and the city's districts have theirs). Boss rooms (`approach/w3`, `approach/d2`, `root_warrens/nest`, `barrow/long_gallery` where the Barrow Guardian stands, `barrow/borrowed_tomb` where the Fallen Knight lies) reset every 1800 s.
+- **Experience.** The table of [../CORRIDOR_BALANCE.md](../CORRIDOR_BALANCE.md) section 4.3 is applied; the curve beyond level 10 is provisional.

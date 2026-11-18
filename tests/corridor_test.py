@@ -66,7 +66,7 @@ NODES = {
     "approach": {"wildflowers": ["m01", "w5"], "berry_bush": ["m02", "w4", "w5"], "herb_patch": ["w1", "w5"]},
 }
 NODE_KINDS = {"berry_bush": ("berry bush", 1), "herb_patch": ("herb patch", 2), "wildflowers": ("wildflowers", 1), "thistle_patch": ("thistle patch", 2)}
-NODE_WORD = {"berry_bush": "bush", "herb_patch": "herbs", "wildflowers": "wildflowers", "thistle_patch": "thistles"}
+NODE_WORD = {"berry_bush": "bush", "herb_patch": "herb", "wildflowers": "wildflowers", "thistle_patch": "thistle"}
 # The brief (task D): patrol file -> (segment, first room, last room); spawned in the first room.
 PATROLS = {"patrol_south_road": ("south_road", 7, 11), "patrol_eldergreen_edge": ("eldergreen_edge", 5, 11), "patrol_green_road": ("green_road", 9, 11),
            "patrol_heartwood": ("heartwood", 7, 11), "patrol_approach": ("approach", 3, 7)}
@@ -343,6 +343,61 @@ class Walker(ct.Walker):
         R.ok(sorted(hidden) == mine, f"walk: a wizard sees the hidden exits of {path} marked", f"marked: {sorted(hidden)}\nfile:   {mine}")
         R.ok(sorted(shown) == sorted(list(src.exits) + mine), f"walk: the exits that {path} lists are the exits in its file", f"listed: {sorted(shown)}\nfile:   {sorted(list(src.exits) + mine)}")
 
+    def check_details(self, path, src):
+        """Every detail and readable is reachable by at least one of its keys (an object of the room may answer to one of them first)."""
+        w = self.w
+        details, readables, dupes = src.room_texts()
+        for keys, first, second in dupes:
+            R.ok(False, f"details: {path}: keys {keys} are defined twice; the later definition replaces the earlier",
+                 f"earlier: [{first}]\nlater:   [{second}]")
+        for fn, args in src.calls:
+            if fn not in ("AddDetail", "AddReadable"):
+                continue
+            keys = ci.keys_of(args[0])
+            if not keys:
+                R.ok(False, f"details: {path}: a {fn} without a key")
+                continue
+            # What `look at` shows for a key is the last AddDetail that named it, else the first AddReadable's own look text.
+            mine = [k for k in keys if fn == "AddReadable" or ci.norm(ci.render(details.get(k, ""))) == ci.norm(ci.render(args[1]))]
+            reached, last = None, ""
+            for key in mine:
+                out = self.say(w, "look at " + key)
+                text = body(out)
+                if text and not any(text.startswith(n) for n in ct.NO_SUCH) and ci.norm(ci.render(details.get(key, ""))) in ci.norm(text):
+                    reached = key
+                    break
+                last = text
+            R.ok(reached is not None, f"details: {path}: look at '{keys[0]}' reaches the room's text" + ("" if reached in (None, keys[0]) else f" (by '{reached}')"),
+                 f"none of {mine} shows it; last answer: {last[:200]!r}")
+            if fn == "AddReadable":
+                got, last = None, ""
+                for key in [k for k in keys if readables.get(k) == args[1]]:
+                    out = self.say(w, "read " + key)
+                    text = body(out)
+                    if text and not any(text.startswith(n) for n in ct.NO_SUCH) and ci.norm(ci.render(args[1])) in ci.norm(text):
+                        got = key
+                        break
+                    last = text
+                R.ok(got is not None, f"readables: {path}: read '{keys[0]}' shows the room's text" + ("" if got in (None, keys[0]) else f" (by '{got}')"), f"last answer: {last[:200]!r}")
+
+    def exits(self, path):
+        """Every ordinary exit both ways. The way back from a secret room is the hidden exit of the other room: hidden_ways tests it."""
+        src = self.src(path)
+        w = self.w
+        for direction, dest in src.exits.items():
+            dsrc = self.src(dest)
+            self.say(w, "goto " + path, city=False)
+            out = self.say(w, direction)
+            if not R.ok(dsrc.short in lines_of(out), f"exits: {path} {direction} leads to '{dsrc.short}' ({dest})", f"first lines: {lines_of(out)[:2]}\n{body(out)[:200]!r}"):
+                continue
+            backs = [d for d, p in dsrc.exits.items() if p == path]
+            if not backs:
+                R.ok(re.search(r'HiddenExit\(\s*"\w+"\s*,\s*"' + re.escape(path) + '"', dsrc.text) is not None, f"exits: {dest} has a way back to {path} (ordinary or hidden)", f"exits of {dest}: {dsrc.exits}")
+                continue
+            typed = ct.COMPASS.get(backs[0], backs[0])
+            out = self.say(w, typed)
+            R.ok(src.short in lines_of(out), f"exits: '{typed}' in {dest} returns to '{src.short}' ({path})", f"first lines: {lines_of(out)[:2]}\n{body(out)[:200]!r}")
+
     def stat_checks(self, path):
         src = self.src(path)
         out = self.say(self.w, "stat here", city=False).replace("\r", "")
@@ -447,6 +502,7 @@ class Walker(ct.Walker):
             R.ok(before - self.gold() == price, f"shops: buying {word} costs {price} gold", f"gold {before} -> {self.gold()}")
             inv = self.say(w, "i")
             R.ok(item.short in inv, f"shops: the {word} arrives in the inventory", f"inventory: {body(inv)[:240]!r}")
+            self.say(w, "sell " + word, city=False)  # so that a later room's details are not answered by the wizard's own purchase
 
 
 def walk_exits(wk, paths):
@@ -468,7 +524,8 @@ def hidden_ways(wk, game, probe_holder):
     base = renown_of(p)
     # Wizards make no history: the wizard went to all seven places in the walk and the ledger knows nothing of it.
     R.ok(base == 0, "chronicle: a new character starts with no renown", f"{base}")
-    count = 0
+    gains = {}
+    last_renown = 0
     for frm, direction, to, key, chance, event, subject, name in HIDDEN:
         src = ci.Source(COR + frm)
         far = ci.Source(COR + to)
@@ -490,9 +547,13 @@ def hidden_ways(wk, game, probe_holder):
         out = wk.say(p, direction)
         R.ok(far.short in lines_of(out), f"hidden: {tag} is walkable once found: '{far.short}'", f"{lines_of(out)[:2]}")
         time.sleep(0.4)
-        count += 1
         got = renown_of(p)
-        R.ok(got == 30 * count, f"chronicle: entering {far.short} reports {event} for a character (renown {30 * count})", f"renown {got}")
+        gain = got - last_renown
+        last_renown = got
+        if event == "discover.hidden":
+            R.ok(gain == 30, f"chronicle: finding {far.short} reports {event} for a character (renown +30)", f"renown +{gain}")
+        else:
+            R.ok(gain >= 30 and gains.setdefault(event, gain) == gain, f"chronicle: entering {far.short} reports {event} for a character (renown +{gains.get(event, gain)}, the same for both dungeons)", f"renown +{gain}")
         back = next((d for d, t in far.exits.items() if t == COR + frm), None)
         out = wk.say(p, back or "?")
         R.ok(src.short in lines_of(out), f"hidden: the way back from {to} ('{back}') returns to '{src.short}'", f"{lines_of(out)[:2]}")
@@ -502,23 +563,19 @@ def hidden_ways(wk, game, probe_holder):
         R.ok(far.short in lines_of(out), f"hidden: {tag} still works the second time")
         wk.say(p, back or "?")
         time.sleep(0.3)
-    R.ok(renown_of(p) == 30 * len(HIDDEN), "chronicle: a second visit earns nothing more (a character is credited once)", f"{renown_of(p)}")
-    # the Chronicle holds the seven entries, with the area they were found in
+    R.ok(renown_of(p) == last_renown, "chronicle: a second visit earns nothing more (a character is credited once)", f"{renown_of(p)} after {last_renown}")
+    # The Chronicle: a hidden room earns renown (checked above, +30 each); a secret dungeon is also an entry of the Chronicle itself.
+    wk.say(p, "tele " + HOLLOW + "village/guild")
     about = wk.say(p, "chronicle about finder")
-    R.ok("Finder appears in 7 entries" in about, "chronicle: the Chronicle holds seven entries about the finder", body(about)[:300])
-    ids = re.findall(r"#?(\d+)\b", about)
+    R.ok("Finder appears in 2 entries" in about, "chronicle: the Chronicle holds the two dungeon discoveries as entries about the finder", body(about)[:300])
     entries = {}
-    for entry_id in sorted({int(i) for i in ids if int(i) < 1000}):
-        text = wk.say(p, f"chronicle {entry_id}")
-        entries[entry_id] = text
+    for entry_id in sorted({int(i) for i in re.findall(r"#(\d+)", about)}):
+        entries[entry_id] = wk.say(p, f"chronicle {entry_id}")
     joined = " ".join(ci.norm(t) for t in entries.values())
     for frm, direction, to, key, chance, event, subject, name in HIDDEN:
-        if event == "discover.hidden":
-            area = AREAS[to.split("/")[0]]
-            R.ok(re.search(r"found " + re.escape(name) + r", hidden in " + re.escape(area), joined) is not None,
-                 f"chronicle: the entry for {name} says it was found, hidden in {area}", joined[:600])
-        else:
-            R.ok(re.search(r"discovered " + re.escape(name) + r" beneath Heartwood", joined) is not None, f"chronicle: the entry for {name} says it lies beneath Heartwood", joined[:600])
+        if event == "discover.secret_dungeon":
+            R.ok(re.search(r"Finder discovered " + re.escape(name) + r" beneath Heartwood", joined) is not None and "Where: Heartwood" in joined,
+                 f"chronicle: the entry for {name} says it lies beneath Heartwood", joined[:600])
     R.ok(all("Where:" in t for t in entries.values()), "chronicle: each entry names its place")
     nowiz = wk.say(w, "chronicle about wiz")
     R.ok("does not yet appear" in nowiz, "chronicle: the wizard appears in no entry", body(nowiz)[:200])
@@ -537,6 +594,7 @@ def wizards_make_no_history(wk, paths):
         out = w.cmd("goto " + COR + to)
         R.ok("Wizards make no history" in out, f"chronicle: a wizard in {to} is told that wizards make no history", f"{body(out)[:200]!r}")
     R.ok("Renown: 0" in w.cmd("renown"), "chronicle: the wizard has no renown")
+    w.cmd("goto " + HOLLOW + "village/guild")
     about = w.cmd("chronicle about wiz")
     R.ok("does not yet appear" in about, "chronicle: the wizard appears in no entry", body(about)[:200])
 
@@ -658,7 +716,7 @@ def walk_the_road(wk, doc):
     ok, out = step("north", ci.Source(VALE + "road").short, "the Hollow side: the North Road joins the Vale Road")
     ok, out = step("north", doc[COR + "south_road/m01"]["short"], "the Vale Road joins the first room of the South Road")
     here = COR + "south_road/m01"
-    warned = 0
+    warned = out.count("more dangerous than you are ready for")
     steps = 0
     while here != COR + "approach/m11" and steps < 120:
         nxt = doc[here]["exits"]["north"]
