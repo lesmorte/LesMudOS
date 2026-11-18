@@ -18,4 +18,18 @@ public class HiddenCache : Room
         MoveObject(CloneObject("/domains/hollow/obj/magical_trinket"), Self);
         if (Random(100) < 25) MoveObject(CloneObject("/domains/hollow/obj/enchanted_dagger"), Self);
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.hidden", who, new List<ObjectRef> { who }, Self, "hidden-cache",
+                new Dictionary<string, string> { ["name"] = "the Hidden Cache" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

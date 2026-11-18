@@ -136,6 +136,13 @@ public abstract class Adventurer : Living
         CheckLevelUp();
     }
 
+    /// <summary>Tells the event service about something this character did. Best-effort: history never stops play.</summary>
+    protected void ReportEvent(string id, string subject, Dictionary<string, string>? names = null)
+    {
+        try { LoadObject("/secure/events").Call<string>("Report", id, Self, new List<ObjectRef> { Self }, Environment(), subject, names ?? new Dictionary<string, string>()); }
+        catch (MudRuntimeException) { }
+    }
+
     private void CheckLevelUp()
     {
         while (Level < MaxLevel && xp >= QueryXpForLevel(Level + 1))
@@ -143,6 +150,7 @@ public abstract class Adventurer : Living
             Level++;
             Hp = QueryMaxHp();
             Tell($"You have reached level {Level}! You feel stronger and fully healed. Maximum HP is now {QueryMaxHp()}.\n");
+            if (Level is 10 or 25 or 50 or 75 or 100) ReportEvent("level.milestone", Level.ToString(), new Dictionary<string, string> { ["level"] = Level.ToString() });
         }
     }
 
@@ -1075,6 +1083,8 @@ public abstract class Adventurer : Living
         var area = Environment()?.Call<string>("QueryAreaName") ?? "";
         var region = Environment()?.Call<string>("QueryRegionName") ?? "";
         if (area != "" || region != "") text.Append($"Area {area}   Region {region}\n");
+        try { text.Append(LoadObject("/secure/renown").Call<string>("TierLine", QueryName()) ?? ""); }
+        catch (MudRuntimeException) { }
         text.Append($"HP {Hp}/{QueryMaxHp()}   Stamina {QueryStamina()}/{QueryMaxStamina()}   Mana {QueryMana()}/{QueryMaxMana()}   Gold {Gold}\n");
         text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}   Dodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {QueryCrit()}%\n");
         var effectLines = QueryEffectLines();

@@ -5,11 +5,14 @@ public class VillageSquare : Room
     public override void Create()
     {
         ShortDesc = "Village Square";
-        LongDesc = "The center of Vincent's Hollow bustles with life. A large stone well marks the center of the square while merchants display goods from temporary stalls. Locals gather around benches exchanging news while children dart between travelers.";
+        LongDesc = "The center of Vincent's Hollow bustles with life. A large stone well marks the center of the square while merchants display goods from temporary stalls. Locals gather around benches exchanging news while children dart between travelers. Off the square stand the healer's cottage and the craftsman's workshop, and a lane leads downwind to the tannery.";
         Exits["north"] = "/domains/hollow/village/gate";
         Exits["west"] = "/domains/hollow/village/guild";
         Exits["east"] = "/domains/hollow/village/ironoak";
         Exits["south"] = "/domains/hollow/village/tavern";
+        Exits["healer"] = "/domains/hollow/village/healer";
+        Exits["workshop"] = "/domains/hollow/village/workshop";
+        Exits["tannery"] = "/domains/hollow/village/tannery";
         Safe = true;
 
         AddDetail("well,stone well", "A broad well of fitted grey stone, its rim worn smooth by seventy years of hands and buckets. The water far below smells cold and clean. A small plaque is set into the stonework.");
