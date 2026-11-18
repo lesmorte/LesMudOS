@@ -18,4 +18,18 @@ public class ValeRoad : Room
         AddDetail("fields,field,green fields,vale", "Green fields roll away on either side toward low hills. Somewhere out there, Oakenfell, the first city of the vale, lies waiting.");
         AddDetail("timber,stone,rubble,tangle,fallen timber", "Whole trunks and a drift of loose stone have been dragged to the verge. Someone has been at it with an axe, and the road is clear.");
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "travel.pass", who, new List<ObjectRef> { who }, Self, "vale-road",
+                new Dictionary<string, string> { ["name"] = "the Vale Road" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

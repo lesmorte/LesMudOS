@@ -32,4 +32,18 @@ public class GvGreatStump : Room
         AddReadable("burning marker,second marker,storm marker,storm,burning,motto", "\"THE STORM AND THE BURNING\nIn a terrible storm, generations after the founding, lightning struck the Great Oak. It burned for three days and three nights, and on the third day it fell. The settlers, who had steered by it, sheltered beneath it and made their vows before it, did not leave. They chose to rebuild around the place where it stood, and they named the town Oakenfell, for the oak that fell.\n\nFROM STRONG ROOTS GROW GREAT THINGS\"", "A tall slab of grey slate with a heading, several lines of text and a motto at the foot. You could {cmd}read{/} it.");
         AddDetail("grove,walls,wall,south", "South, between the yews, the path runs back to the grove. The old walls close in on every other side, and the roots go under them.");
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.great_stump", who, new List<ObjectRef> { who }, Self, "great-stump",
+                new Dictionary<string, string> { ["name"] = "the Great Stump" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

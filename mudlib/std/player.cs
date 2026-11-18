@@ -189,6 +189,8 @@ public class Player : Adventurer
         AddAction("say", CmdSay);
         AddAction("who", CmdWho);
         AddAction("title", CmdTitle);
+        AddAction("renown", a => { Write(LoadObject("/secure/renown").Call<string>("RenownText", Name) ?? ""); return true; });
+        AddAction("date", a => { Write(LoadObject("/secure/chronicle").Call<string>("DateCommand") ?? ""); return true; });
         AddAction("password", CmdPassword);
         AddAction("save", CmdSave);
         AddAction("quit", CmdQuit);

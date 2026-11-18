@@ -17,6 +17,8 @@ public class GoblinOverseer : Monster
     public override void Create()
     {
         Name = "Goblin Overseer";
+        ChronicleEvent = "boss.goblin_overseer";
+        ChronicleSubject = "goblin-overseer";
         Ids.Add("overseer");
         Ids.Add("goblin");
         ShortDesc = "the Goblin Overseer";

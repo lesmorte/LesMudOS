@@ -57,6 +57,28 @@ public class Monster : Npc
 
     public override string Stat() => base.Stat() + $"  Monster: aggressive {Aggressive}, assist {Assist}, xp {XpValue}, gold {GoldMin}-{GoldMax}, loot {lootPaths.Count}\n";
 
+    /// <summary>What kind of creature this is to the Chronicle ("goblin", "wolf"). Default: the file name.</summary>
+    public string ChronicleKind { get; set; } = "";
+    /// <summary>For a creature of rank: the event type its death reports ("boss.dungeon", "boss.world", or its own), else "".</summary>
+    public string ChronicleEvent { get; set; } = "";
+    /// <summary>For a creature of rank: the subject that tells it apart ("goblin-overseer"). Default: the file name.</summary>
+    public string ChronicleSubject { get; set; } = "";
+
+    // Tells the event service about this death. History is best-effort: a failure here must never stop a death.
+    private void ReportDeath(ObjectRef killer, ObjectRef? room)
+    {
+        try
+        {
+            if (!Interactive(killer)) return;
+            var file = Self.ProgramPath.Substring(Self.ProgramPath.LastIndexOf('/') + 1);
+            var names = new Dictionary<string, string> { ["name"] = Cap(QueryLabel()) };
+            var boss = ChronicleEvent != "";
+            LoadObject("/secure/events").Call<string>("Report", boss ? ChronicleEvent : "kill.ordinary", killer, new List<ObjectRef> { killer }, room,
+                boss ? (ChronicleSubject == "" ? file.Replace('_', '-') : ChronicleSubject) : (ChronicleKind == "" ? file : ChronicleKind), names);
+        }
+        catch (MudRuntimeException) { }
+    }
+
     public override void Die(ObjectRef? killer)
     {
         if (Dead) return;
@@ -71,6 +93,7 @@ public class Monster : Npc
         {
             if (XpValue > 0) killer.Call("AddXp", XpValue);
             killer.Call("NotifyKill", Self.ProgramPath);
+            ReportDeath(killer, room);
         }
 
         if (room != null)
