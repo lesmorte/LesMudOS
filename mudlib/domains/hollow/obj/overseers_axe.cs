@@ -15,6 +15,7 @@ public class OverseersAxe : Weapon
         DamageMax = 25;
         ReactionMod = 1.5;
         Recovery = 1.5;
+        Category = "axe";
         Value = 70;
     }
 }

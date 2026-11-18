@@ -24,21 +24,37 @@ public class CombatAction
     public string Strike = "";
     /// <summary>Damage multiplier of an attack action.</summary>
     public int DamageMultiplier = 1;
-    /// <summary>Resource cost, unused until the skills pass.</summary>
+    /// <summary>Stamina paid when the action begins.</summary>
     public int StaminaCost;
-    /// <summary>Resource cost, unused until the spells pass.</summary>
+    /// <summary>Mana paid when the action begins.</summary>
     public int ManaCost;
-    /// <summary>"attack" (a to-hit roll and damage), "use" (a consumable), or a builder's own kind handled in Special().</summary>
+    /// <summary>"attack" (a to-hit roll and damage), "use" (a consumable), "skill" (a skill or spell file resolves it), or a builder's own kind handled in Special().</summary>
     public string Kind = "attack";
+    /// <summary>Added to the attack roll of an attack action (Precision Strike: +5).</summary>
+    public int ToHitBonus;
+    /// <summary>Critical chance in percent that replaces the basic chance for this attack; -1 keeps the basic chance.</summary>
+    public int CritChance = -1;
+    /// <summary>Multiplier on the damage roll as a fraction (Shield Bash does 0.5). Applied after the integer multiplier.</summary>
+    public double DamageFactor = 1.0;
+    /// <summary>The skill or spell file behind this action, if any. Its OnHit, OnMiss and Resolve are called.</summary>
+    public ObjectRef? Skill;
     /// <summary>The consumable of a "use" action.</summary>
     public ObjectRef? Item;
 }
 
-/// <summary>A haste or slow effect: it multiplies Reaction Time until it expires.</summary>
-public class SpeedEffect
+/// <summary>
+/// A timed effect: one mechanism for every temporary change. It has an id (an effect with the same id replaces
+/// the old one), a duration, and modifiers: a speed factor on Reaction Time (haste below 1, slow above 1), an
+/// amount of damage it absorbs, and named additive modifiers (see Living.QueryMod for the keys).
+/// </summary>
+public class TimedEffect
 {
-    public double Factor = 1.0;
+    public string Id = "";
+    public string Name = "";
     public long Until;
+    public double SpeedFactor = 1.0;
+    public int Absorb;
+    public Dictionary<string, double> Mods = new();
 }
 
 /// <summary>
@@ -67,6 +83,25 @@ public abstract class Living : Thing
     /// <summary>Base Reaction Time, 1.0 (fast) to 6.0 (slow) in steps of 0.5. When can I begin my next action?</summary>
     protected double BaseReaction = 2.5;
 
+    // Resources (docs/CLASS_SYSTEM.md section 3). Creatures set these in Create(); players get them from their class.
+    /// <summary>Maximum Stamina. Spent by physical skills.</summary>
+    protected int MaxStamina = 50;
+    /// <summary>Maximum Mana. Spent by spells. Creatures default to none.</summary>
+    protected int MaxMana;
+    /// <summary>Stamina regained per 10 seconds.</summary>
+    protected double StaminaRegen = 5;
+    /// <summary>Mana regained per 10 seconds.</summary>
+    protected double ManaRegen = 2;
+    /// <summary>Natural chance in percent to dodge an attack (before any effect or trait).</summary>
+    protected int Dodge;
+    /// <summary>Natural chance in percent to block a hit with a shield the creature has by nature. Shield-bearers use the shield rule instead.</summary>
+    protected int BlockNatural;
+    /// <summary>Attack gained per level (Attack = round(AttackRate x Level) + bonuses). Creatures have 1.0 unless they say otherwise.</summary>
+    protected double AttackRate = 1.0;
+    [Saved] private double stamina = -1; // -1: not yet set, meaning full
+    [Saved] private double mana = -1;
+    private long resourceTime;
+
     /// <summary>True once Die has run for a creature that does not come back.</summary>
     protected bool Dead;
 
@@ -74,7 +109,7 @@ public abstract class Living : Thing
     private readonly Dictionary<ObjectRef, long> absentSince = new();
     private readonly Dictionary<string, ObjectRef> equipment = new();
     private readonly List<CombatAction> actions = new();
-    private readonly Dictionary<string, SpeedEffect> speedEffects = new();
+    private readonly Dictionary<string, TimedEffect> effects = new();
     private bool wasFighting;
 
     // The combat clock. Exactly one call-out (timerId) drives a combatant; chain is its token.
@@ -82,6 +117,9 @@ public abstract class Living : Thing
     private CombatAction? current;
     private ObjectRef? currentTarget;
     private CombatAction? queued;
+    private ObjectRef? queuedTarget;
+    private int paidStamina; // what the current action cost when it began (half comes back if it is interrupted)
+    private int paidMana;
     private long actionStart;
     private long resolveAt;
     private long readyAt;
@@ -125,16 +163,64 @@ public abstract class Living : Thing
 
     public int QueryArmor()
     {
-        var total = Armor;
+        var total = Armor + (int)Math.Round(QueryMod("armor"));
         foreach (var item in QueryEquipment()) total += item.Call<int>("QueryArmorValue");
         return total;
     }
 
-    public int QueryToHit() => ToHit + (QueryEquipped("weapon")?.Call<int>("QueryToHit") ?? 0);
+    /// <summary>Bonuses to the attack roll other than level: natural, weapon, effects and traits.</summary>
+    public int QueryToHit()
+    {
+        var weapon = QueryEquipped("weapon");
+        return ToHit + (weapon?.Call<int>("QueryToHit") ?? 0) + (int)Math.Round(QueryMod("tohit") + (weapon != null ? QueryMod("tohit_armed") : 0));
+    }
 
-    public int QueryDamageMin() => QueryEquipped("weapon") is { } w ? w.Call<int>("QueryDamageMin") : DamageMin;
+    /// <summary>Attack gained per level. Players take it from their class.</summary>
+    public virtual double QueryAttackRate() => AttackRate;
 
-    public int QueryDamageMax() => QueryEquipped("weapon") is { } w ? w.Call<int>("QueryDamageMax") : DamageMax;
+    /// <summary>Attack = round(attack rate x level) + QueryToHit(). The only place the rate is applied.</summary>
+    public int QueryAttack() => (int)Math.Floor(QueryAttackRate() * Level + 0.5 + 1e-9) + QueryToHit();
+
+    /// <summary>Defense grows one point per level for everyone.</summary>
+    public int QueryDefense() => Math.Max(0, Level - 1);
+
+    // ---- Rolls ----
+
+    private static int Clamp(int value, int low, int high) => Math.Max(low, Math.Min(high, value));
+
+    /// <summary>Chance in percent to dodge an attack.</summary>
+    public int QueryDodge() => Clamp(Dodge + (int)Math.Round(QueryMod("dodge")), 0, 75);
+
+    /// <summary>Chance in percent to block a hit: 15 with a shield (or the creature's own), plus effects. 0 without one.</summary>
+    public int QueryBlock()
+    {
+        var basis = QueryEquipped("shield") != null ? 15 : BlockNatural;
+        if (basis <= 0) return 0;
+        return Clamp(basis + (int)Math.Round(QueryMod("block")), 0, 90);
+    }
+
+    /// <summary>Chance in percent that a hit is a critical hit: 5 plus effects and traits.</summary>
+    public int QueryCrit() => Clamp(5 + (int)Math.Round(QueryMod("crit")), 0, 100);
+
+    /// <summary>The defender's dodge roll, made before the attacker's hit roll. True if the attack is dodged.</summary>
+    public bool RollDodge() => Random(100) < QueryDodge();
+
+    private ObjectRef? UsedWeapon() => QueryMod("ignore_weapon") > 0 ? null : QueryEquipped("weapon");
+
+    public int QueryDamageMin() => UsedWeapon() is { } w ? w.Call<int>("QueryDamageMin") : DamageMin + (int)Math.Round(QueryMod("unarmed_min"));
+
+    public int QueryDamageMax() => UsedWeapon() is { } w ? w.Call<int>("QueryDamageMax") : DamageMax + (int)Math.Round(QueryMod("unarmed_max"));
+
+    /// <summary>The category of the wielded weapon ("sword"), or "" when unarmed.</summary>
+    public string QueryWeaponCategory() => QueryEquipped("weapon") is { } w ? w.Call<string>("QueryCategory") ?? "" : "";
+
+    public bool QueryHasShield() => QueryEquipped("shield") != null;
+
+    /// <summary>Healing from a spell: the base amount plus what the caster's traits add (Divine Knowledge).</summary>
+    public int ScaleHealing(int amount) => Math.Max(1, (int)Math.Round(amount * (1 + QueryMod("healing_pct") / 100.0), MidpointRounding.AwayFromZero));
+
+    /// <summary>Damage from a spell: the base amount plus what the caster's traits add (Arcane Mastery).</summary>
+    public int ScaleSpellDamage(int amount) => Math.Max(1, (int)Math.Round(amount * (1 + QueryMod("spell_damage_pct") / 100.0), MidpointRounding.AwayFromZero));
 
     protected int EquipmentHpBonus()
     {
@@ -160,7 +246,9 @@ public abstract class Living : Thing
     public override string Stat() =>
         base.Stat() +
         $"  Level {Level}, HP {Hp}/{QueryMaxHp()}, gold {Gold}\n" +
-        $"  Damage {QueryDamageMin()}-{QueryDamageMax()}, to hit {QueryToHit()}, armor {QueryArmor()}\n" +
+        $"  Stamina {QueryStamina()}/{QueryMaxStamina()}, Mana {QueryMana()}/{QueryMaxMana()}\n" +
+        $"  Damage {QueryDamageMin()}-{QueryDamageMax()}, attack {QueryAttack()} (rate {Num(QueryAttackRate())}), defense {QueryDefense()}, armor {QueryArmor()}, dodge {QueryDodge()}%, block {QueryBlock()}%, crit {QueryCrit()}%\n" +
+        EffectsStat() +
         $"  Peaceful {QueryPeaceful()}, enemies {enemies.Count(e => e.IsAlive)}\n" +
         TimingStat();
 
@@ -183,6 +271,8 @@ public abstract class Living : Thing
     {
         if (Dead || amount <= 0) return;
         if (from != null && from.IsAlive && from != Self && Environment(from) == Environment()) AddEnemy(from);
+        amount = Absorb(amount);
+        if (amount <= 0) return;
         Hp -= amount;
         if (hp <= 0) Die(from);
     }
@@ -241,39 +331,201 @@ public abstract class Living : Thing
     public double QueryEquipmentReaction()
     {
         var total = 0.0;
-        foreach (var item in QueryEquipment()) total += item.Call<double>("QueryReactionMod");
+        foreach (var item in QueryEquipment()) total += QueryItemReaction(item);
         return total;
     }
 
-    /// <summary>The product of all active haste and slow effects. 1.0 when there are none.</summary>
+    /// <summary>One item's reaction modifier for this wearer: a weapon's is reduced by Improvised Combat, never below 0.</summary>
+    public double QueryItemReaction(ObjectRef item)
+    {
+        var mod = item.Call<double>("QueryReactionMod");
+        if (mod > 0 && item.Call<string>("QuerySlot") == "weapon") mod = Math.Max(0, mod - QueryMod("weapon_reaction_reduction"));
+        return mod;
+    }
+
+    /// <summary>The product of all active haste and slow effects (and the traits that speed their owner). 1.0 when there are none.</summary>
     public double QuerySpeedFactor()
     {
-        var now = TimeMs();
-        var factor = 1.0;
-        foreach (var id in speedEffects.Keys.ToList())
-        {
-            if (speedEffects[id].Until <= now) { speedEffects.Remove(id); continue; }
-            factor *= speedEffects[id].Factor;
-        }
+        var factor = ExtraSpeedFactor();
+        foreach (var effect in LiveEffects()) factor *= effect.SpeedFactor;
         return factor;
     }
+
+    /// <summary>A speed factor that does not come from a timed effect (a trait such as Battle Fury). 1.0 for none.</summary>
+    protected virtual double ExtraSpeedFactor() => 1.0;
 
     /// <summary>Final Reaction Time = (base + equipment modifiers + encumbrance) x speed factor.</summary>
     public double QueryReaction() => (BaseReaction + QueryEquipmentReaction() + Encumbrance()) * QuerySpeedFactor();
 
-    /// <summary>
-    /// Haste (factor below 1) or slow (above 1) on Reaction Time, for this many seconds. 20% haste is 0.8,
-    /// 20% slow is 1.2. An effect with the same id replaces the old one; 0 seconds removes it.
-    /// Every speed effect in the game goes through this.
-    /// </summary>
-    public void AddSpeedEffect(string id, double factor, int seconds)
+    // ---- Timed effects ----
+
+    private List<TimedEffect> LiveEffects()
     {
-        if (Dead) return;
-        if (seconds <= 0) { speedEffects.Remove(id); return; }
-        speedEffects[id] = new SpeedEffect { Factor = Math.Max(0.1, Math.Min(10.0, factor)), Until = TimeMs() + seconds * 1000L };
+        var now = TimeMs();
+        foreach (var id in effects.Keys.ToList())
+            if (effects[id].Until <= now || (effects[id].Mods.Count == 0 && effects[id].Absorb <= 0 && Math.Abs(effects[id].SpeedFactor - 1.0) < 0.0001))
+                effects.Remove(id);
+        return effects.Values.ToList();
     }
 
-    public void RemoveSpeedEffect(string id) => speedEffects.Remove(id);
+    /// <summary>
+    /// A timed effect: the one mechanism for every temporary change. An effect with the same id replaces the old one;
+    /// 0 seconds removes it. mods is "key=value;key=value" with keys tohit, tohit_armed, damage, armor, dodge, block, crit
+    /// (additive; percentages for dodge, block and crit); speedFactor multiplies Reaction Time (0.8 is 20% haste);
+    /// absorb is the number of damage points the effect soaks up before it is used up.
+    /// </summary>
+    public void AddEffect(string id, string name, int seconds, string mods, double speedFactor, int absorb)
+    {
+        if (Dead) return;
+        if (seconds <= 0) { effects.Remove(id); return; }
+        var effect = new TimedEffect
+        {
+            Id = id, Name = name, Until = TimeMs() + seconds * 1000L,
+            SpeedFactor = Math.Max(0.1, Math.Min(10.0, speedFactor)), Absorb = Math.Max(0, absorb),
+        };
+        foreach (var part in mods.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var pair = part.Split('=');
+            if (pair.Length == 2 && ParseNumber(pair[1], out var value)) effect.Mods[pair[0].Trim()] = value;
+        }
+        effects[id] = effect;
+    }
+
+    /// <summary>Parse "-1" or "0.5" with a dot on every machine (mudlib code may not use cultures).</summary>
+    private static bool ParseNumber(string text, out double value)
+    {
+        value = 0;
+        text = text.Trim();
+        var negative = text.StartsWith("-");
+        if (negative) text = text.Substring(1);
+        var parts = text.Split('.');
+        if (parts.Length > 2 || parts[0].Length == 0 || !parts[0].All(char.IsDigit) || (parts.Length == 2 && (parts[1].Length == 0 || !parts[1].All(char.IsDigit)))) return false;
+        var fraction = parts.Length == 2 ? double.Parse(parts[1]) / Math.Pow(10, parts[1].Length) : 0;
+        value = (double.Parse(parts[0]) + fraction) * (negative ? -1 : 1);
+        return true;
+    }
+
+    public void RemoveEffect(string id) => effects.Remove(id);
+
+    public bool QueryHasEffect(string id) => LiveEffects().Any(e => e.Id == id);
+
+    /// <summary>
+    /// Haste (factor below 1) or slow (above 1) on Reaction Time, for this many seconds. 20% haste is 0.8,
+    /// 20% slow is 1.2. It is a timed effect like any other.
+    /// </summary>
+    public void AddSpeedEffect(string id, double factor, int seconds) =>
+        AddEffect(id, factor < 1.0 ? "Haste" : "Slow", seconds, "", factor, 0);
+
+    public void RemoveSpeedEffect(string id) => RemoveEffect(id);
+
+    /// <summary>A named modifier: the sum over active effects and the owner's traits and class.</summary>
+    public double QueryMod(string key)
+    {
+        var total = TraitMod(key);
+        foreach (var effect in LiveEffects()) if (effect.Mods.TryGetValue(key, out var value)) total += value;
+        return total;
+    }
+
+    /// <summary>A modifier that comes from the owner's traits and class rather than from an effect. Players override it.</summary>
+    protected virtual double TraitMod(string key) => 0;
+
+    private int Absorb(int amount)
+    {
+        foreach (var effect in LiveEffects())
+        {
+            if (effect.Absorb <= 0) continue;
+            var soaked = Math.Min(effect.Absorb, amount);
+            effect.Absorb -= soaked;
+            amount -= soaked;
+            Tell($"{effect.Name} absorbs {soaked} damage.\n");
+            if (amount <= 0) break;
+        }
+        return amount;
+    }
+
+    /// <summary>The active effects with their remaining seconds, for score: "Blessing (42 s)".</summary>
+    public List<string> QueryEffectLines()
+    {
+        var now = TimeMs();
+        return LiveEffects().Select(e => $"{e.Name} ({Math.Max(0, (e.Until - now + 999) / 1000)} s)").ToList();
+    }
+
+    private string EffectsStat()
+    {
+        var lines = QueryEffectLines();
+        return lines.Count == 0 ? "" : "  Effects: " + string.Join(", ", lines) + "\n";
+    }
+
+    // ---- Resources ----
+
+    public virtual int QueryMaxStamina() => MaxStamina;
+
+    public virtual int QueryMaxMana() => MaxMana;
+
+    public virtual double QueryStaminaRegen() => StaminaRegen;
+
+    public virtual double QueryManaRegen() => ManaRegen;
+
+    /// <summary>
+    /// Bring Stamina and Mana up to the present. Regeneration is lazy: nothing ticks, the amount regained since the last
+    /// call is worked out here at the current rate (doubled in a safe room, faster out of combat for those with the trait).
+    /// </summary>
+    private void SettleResources()
+    {
+        var now = TimeMs();
+        var maxStamina = QueryMaxStamina();
+        var maxMana = QueryMaxMana();
+        if (stamina < 0 || stamina > maxStamina) stamina = stamina < 0 ? maxStamina : maxStamina;
+        if (mana < 0 || mana > maxMana) mana = mana < 0 ? maxMana : maxMana;
+        if (resourceTime == 0) resourceTime = now;
+        var tens = (now - resourceTime) / 10000.0;
+        resourceTime = now;
+        if (tens <= 0) return;
+        var factor = 1.0;
+        var room = Environment();
+        if (room != null && room.Call<bool>("QuerySafe")) factor *= 2;
+        if (!QueryInCombat()) factor *= 1 + QueryMod("regen_out");
+        stamina = Math.Min(maxStamina, stamina + QueryStaminaRegen() * factor * tens);
+        mana = Math.Min(maxMana, mana + QueryManaRegen() * factor * tens);
+    }
+
+    public int QueryStamina() { SettleResources(); return (int)Math.Floor(stamina + 1e-9); }
+
+    public int QueryMana() { SettleResources(); return (int)Math.Floor(mana + 1e-9); }
+
+    /// <summary>Pay Stamina and Mana together. False, and nothing is paid, if either is short.</summary>
+    public bool SpendResources(int staminaCost, int manaCost)
+    {
+        SettleResources();
+        if (stamina + 1e-9 < staminaCost || mana + 1e-9 < manaCost) return false;
+        stamina -= staminaCost;
+        mana -= manaCost;
+        return true;
+    }
+
+    /// <summary>Give back resources (an interrupted action), up to the maximum.</summary>
+    public void RefundResources(int staminaAmount, int manaAmount)
+    {
+        SettleResources();
+        stamina = Math.Min(QueryMaxStamina(), stamina + staminaAmount);
+        mana = Math.Min(QueryMaxMana(), mana + manaAmount);
+    }
+
+    /// <summary>Fill Stamina and Mana.</summary>
+    public void FillResources()
+    {
+        stamina = QueryMaxStamina();
+        mana = QueryMaxMana();
+        resourceTime = TimeMs();
+    }
+
+    /// <summary>Set Stamina and Mana to exact values (wizard tools and tests).</summary>
+    public void SetResources(int staminaValue, int manaValue)
+    {
+        SettleResources();
+        stamina = Clamp(staminaValue, 0, QueryMaxStamina());
+        mana = Clamp(manaValue, 0, QueryMaxMana());
+    }
 
     /// <summary>The delay of an action in milliseconds: (final Reaction Time + action modifier + action Recovery) x 2 s.</summary>
     private long DelayMs(CombatAction a) => Math.Max(0, (long)Math.Round((QueryReaction() + a.ReactionMod + a.Recovery) * UnitMs));
@@ -586,9 +838,16 @@ public abstract class Living : Thing
         var action = queued;
         queued = null;
         var target = FirstPresentEnemy();
+        if (action != null && queuedTarget != null && queuedTarget.IsAlive && Environment(queuedTarget) == Environment()) target = queuedTarget;
+        queuedTarget = null;
         if (action != null && action.Item != null && (!action.Item.IsAlive || Environment(action.Item) != Self))
         {
             Tell("You no longer have what you meant to use.\n");
+            action = null;
+        }
+        if (action != null && !CanPay(action))
+        {
+            Tell($"You no longer have the strength or the mana for {action.Name}.\n");
             action = null;
         }
         if (action == null)
@@ -608,6 +867,14 @@ public abstract class Living : Thing
     /// <summary>Start an action now: announce the wind-up, resolve at once if there is none, and set the Ready Time.</summary>
     private void Begin(CombatAction action, ObjectRef? target)
     {
+        paidStamina = 0;
+        paidMana = 0;
+        if (action.StaminaCost > 0 || action.ManaCost > 0)
+        {
+            if (!SpendResources(action.StaminaCost, action.ManaCost)) { Tell($"You cannot pay for {action.Name}.\n"); return; }
+            paidStamina = action.StaminaCost;
+            paidMana = action.ManaCost;
+        }
         var now = TimeMs();
         var prep = PrepMs(action);
         current = action;
@@ -639,7 +906,7 @@ public abstract class Living : Thing
             if (action.Item != null && action.Item.IsAlive && Environment(action.Item) == Self) action.Item.Call("Consume", Self);
             return;
         }
-        var present = target != null && target.IsAlive && !target.Call<bool>("IsDead") && Environment(target) == room;
+        var present = target != null && target.IsAlive && !target.Call<bool>("IsDead") && (Environment(target) == room || Environment(target) == Self);
         if (action.Kind == "attack")
         {
             if (!present)
@@ -651,6 +918,7 @@ public abstract class Living : Thing
             if (action.Strike != "") TellRoom(room, $"{Cap(QueryLabel())} {action.Strike}\n");
             Attack(target!, action);
         }
+        else if (action.Kind == "skill" && action.Skill != null && action.Skill.IsAlive) action.Skill.Call("Resolve", Self, present ? target : null);
         else Special(action, present ? target : null);
         if (!Dead && Self.IsAlive) PruneEnemies();
     }
@@ -662,26 +930,130 @@ public abstract class Living : Thing
         var label = Cap(QueryLabel());
         var theirs = target.Call<string>("QueryLabel") ?? "it";
 
+        // 1. The defender's dodge, before the hit roll.
+        if (target.Call<bool>("RollDodge"))
+        {
+            Tell($"{Cap(theirs)} dodges your attack.\n");
+            TellObject(target, $"You dodge {label}'s attack.\n");
+            TellRoom(room, $"{Cap(theirs)} dodges {label}'s attack.\n", Self, target);
+            action.Skill?.Call("OnMiss", Self, target);
+            return;
+        }
+
+        // 2. d20 + Attack against 10 + Armor + Defense. A natural 20 always hits, a natural 1 always misses.
         var roll = Random(20) + 1;
-        var need = 10 + target.Call<int>("QueryArmor");
-        var hit = roll == 20 || (roll != 1 && roll + Level + QueryToHit() >= need);
+        var need = 10 + target.Call<int>("QueryArmor") + target.Call<int>("QueryDefense");
+        var hit = roll == 20 || (roll != 1 && roll + QueryAttack() + action.ToHitBonus >= need);
         if (!hit)
         {
             Tell($"You miss {theirs}.\n");
             TellObject(target, $"{label} misses you.\n");
             TellRoom(room, $"{label} misses {theirs}.\n", Self, target);
+            action.Skill?.Call("OnMiss", Self, target);
             return;
         }
 
+        // 3. Damage: the roll, flat bonuses, the creature's own rule, the action's multipliers.
         var low = QueryDamageMin();
         var high = Math.Max(low, QueryDamageMax());
-        var damage = Math.Max(1, low + Random(high - low + 1));
+        var damage = Math.Max(1, low + Random(high - low + 1) + (int)Math.Round(QueryMod("damage")));
         damage = Math.Max(1, ModifyDamage(damage, target)) * Math.Max(1, action.DamageMultiplier);
+        if (Math.Abs(action.DamageFactor - 1.0) > 0.0001) damage = Math.Max(1, (int)Math.Round(damage * action.DamageFactor, MidpointRounding.AwayFromZero));
+
+        // 4. Critical hit, then the defender's block.
+        var critChance = Clamp((action.CritChance >= 0 ? action.CritChance : 5) + (int)Math.Round(QueryMod("crit")), 0, 100);
+        var critical = Random(100) < critChance;
+        if (critical) damage = Math.Max(1, (int)Math.Round(damage * 1.5, MidpointRounding.AwayFromZero));
+        var blocked = Random(100) < target.Call<int>("QueryBlock");
+        if (blocked) damage = Math.Max(1, damage / 2);
+
         var tier = damage <= 2 ? 0 : damage <= 4 ? 1 : damage <= 7 ? 2 : 3;
-        Tell($"You {HitYou[tier]} {theirs}{HitHow[tier]}.\n");
-        TellObject(target, $"{label} {HitThem[tier]} you{HitHow[tier]}.\n");
-        TellRoom(room, $"{label} {HitThem[tier]} {theirs}{HitHow[tier]}.\n", Self, target);
+        Tell($"You {HitYou[tier]} {theirs}{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n");
+        TellObject(target, $"{label} {HitThem[tier]} you{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? " You block part of the blow." : "") + "\n");
+        TellRoom(room, $"{label} {HitThem[tier]} {theirs}{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n", Self, target);
         target.Call("TakeDamage", damage, Self);
+        action.Skill?.Call("OnHit", Self, target, damage);
+    }
+
+    // ---- Combat: interrupts ----
+
+    /// <summary>
+    /// The first interrupt (docs/CLASS_SYSTEM.md section 4). An action in its Preparation is cancelled: half its resource
+    /// cost is lost (the other half comes back) and half its Recovery is still paid. Otherwise the Ready Time is pushed
+    /// back by the given seconds. Returns true if an action was interrupted.
+    /// </summary>
+    public bool Stagger(double seconds, ObjectRef? by)
+    {
+        if (Dead || !Self.IsAlive) return false;
+        var now = TimeMs();
+        if (phase == "preparing")
+        {
+            var name = current?.Name ?? "action";
+            var halfRecovery = Math.Max(0, readyAt - resolveAt) / 2;
+            RefundResources(paidStamina / 2, paidMana / 2);
+            paidStamina = 0;
+            paidMana = 0;
+            phase = "recovering";
+            current = null;
+            currentTarget = null;
+            readyAt = now + halfRecovery;
+            if (Environment() is { } room) TellRoom(room, $"{Cap(QueryLabel())} is thrown off balance, and the {name.ToLowerInvariant()} is interrupted!\n");
+            Schedule(readyAt);
+            return true;
+        }
+        readyAt = Math.Max(readyAt, now) + (long)Math.Round(seconds * 1000);
+        if (phase == "idle") phase = "recovering";
+        if (Environment() is { } here) TellRoom(here, $"{Cap(QueryLabel())} is staggered.\n");
+        Kick();
+        return false;
+    }
+
+    // ---- Combat: skills ----
+
+    /// <summary>Can this action be paid for right now?</summary>
+    private bool CanPay(CombatAction action)
+    {
+        if (action.StaminaCost <= 0 && action.ManaCost <= 0) return true;
+        return QueryStamina() >= action.StaminaCost && QueryMana() >= action.ManaCost;
+    }
+
+    /// <summary>
+    /// Use a skill or spell as an action on the clock. The skill file supplies the numbers (Preparation, Recovery, the costs,
+    /// the attack modifiers). Returns a refusal, or null if the action began or was queued. Costs are paid when it begins.
+    /// </summary>
+    protected string? UseSkill(ObjectRef skill, ObjectRef? target)
+    {
+        if (Dead) return "You are in no state to do that.";
+        var isSpell = skill.Call<string>("QueryKind") == "spell";
+        if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
+        var stamina = skill.Call<int>("QueryStaminaCost");
+        var manaCost = skill.Call<int>("QueryManaCost");
+        if (isSpell && manaCost > 0) manaCost = Math.Max(1, (int)Math.Round(manaCost * (1 + QueryMod("spell_cost_pct") / 100.0), MidpointRounding.AwayFromZero));
+        var isAttack = skill.Call<bool>("QueryIsAttack");
+        var action = new CombatAction
+        {
+            Id = skill.Call<string>("QueryId") ?? "skill", Name = skill.Call<string>("QueryTitle") ?? "Skill",
+            Preparation = skill.Call<double>("QueryPreparation"), Recovery = skill.Call<double>("QueryRecovery"),
+            ReactionMod = skill.Call<double>("QueryReactionMod"), WindUp = skill.Call<string>("QueryWindUp") ?? "",
+            Kind = isAttack ? "attack" : "skill", StaminaCost = stamina, ManaCost = manaCost,
+            ToHitBonus = skill.Call<int>("QueryToHitBonus"), CritChance = skill.Call<int>("QueryCritChance"),
+            DamageFactor = skill.Call<double>("QueryDamageFactor"), DamageMultiplier = Math.Max(1, skill.Call<int>("QueryDamageMultiplier")),
+            Skill = skill,
+        };
+        if (!CanPay(action))
+            return QueryStamina() < action.StaminaCost ? "You are too tired for that." : "You do not have the mana for that.";
+        if (QueryReady())
+        {
+            queued = null;
+            Begin(action, target ?? FirstPresentEnemy());
+            return null;
+        }
+        var replaced = queued != null;
+        queued = action;
+        queuedTarget = target;
+        Tell($"You are not ready yet. You will use {action.Name} as soon as you can" + (replaced ? ", instead of what you had planned" : "") + ". ({cmd}stop{/} cancels.)\n");
+        Kick();
+        return null;
     }
 
     // ---- Combat: the queue ----
@@ -708,6 +1080,7 @@ public abstract class Living : Thing
         }
         var replaced = queued != null;
         queued = action;
+        queuedTarget = null;
         Tell($"You are not ready yet. You will {item.Call<string>("QueryUseVerb")} {item.Call<string>("Short")} as soon as you can" +
              (replaced ? ", instead of what you had planned" : "") + ". ({cmd}stop{/} cancels.)\n");
         Kick();

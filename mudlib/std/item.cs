@@ -9,6 +9,8 @@ public class Item : Thing
     protected bool QuestItem;
     /// <summary>If set, "read <thing>" shows this text.</summary>
     protected string? ReadText;
+    /// <summary>A magical property, in words, that Magical Lore and Appraise reveal ("raises maximum HP by 5"). Empty for none.</summary>
+    protected string Magic = "";
 
     public override bool CanGet() => true;
 
@@ -17,6 +19,12 @@ public class Item : Thing
     public bool QueryQuestItem() => QuestItem;
 
     public string? QueryReadText() => ReadText;
+
+    /// <summary>Skills this item grants while it is equipped (ids in /skills). None by default; a builder overrides it.</summary>
+    public virtual List<string> QueryGrantedSkills() => new();
+
+    /// <summary>The exact numbers, for Magical Lore and Appraise. Weapons and armor add their own lines.</summary>
+    public virtual string Appraisal() => $"{Cap(Short() ?? Name)}. Worth {Value} gold." + (Magic != "" ? $" Magical property: {Magic}." : " It holds no magic.") + "\n";
 
     /// <summary>The equipment slot this item goes in ("weapon", "head", ...), or "" if it cannot be worn or wielded.</summary>
     public virtual string QuerySlot() => "";

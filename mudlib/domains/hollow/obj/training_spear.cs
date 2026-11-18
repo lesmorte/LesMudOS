@@ -13,6 +13,7 @@ public class TrainingSpear : Weapon
         ReactionMod = 0.5;
         Recovery = 1.0;
         ToHit = 1;
+        Category = "spear";
         Value = 8;
     }
 }

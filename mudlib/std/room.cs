@@ -100,6 +100,24 @@ public abstract class Room : MudObject
 
     public List<string> QueryExits() => Exits.Keys.ToList();
 
+    /// <summary>The path of the room an exit leads to, or null.</summary>
+    public string? QueryExitPath(string direction) => Exits.GetValueOrDefault(direction);
+
+    /// <summary>
+    /// The area this room belongs to is named by the file area.cs in the room's own directory (see /std/area), so the area
+    /// and region names are written once per area. A room with no such file reports no area.
+    /// </summary>
+    private ObjectRef? FindArea()
+    {
+        var path = Self.ProgramPath;
+        try { return LoadObject(path.Substring(0, path.LastIndexOf('/')) + "/area"); }
+        catch (MudRuntimeException) { return null; }
+    }
+
+    public string QueryAreaName() => FindArea()?.Call<string>("QueryAreaName") ?? "";
+
+    public string QueryRegionName() => FindArea()?.Call<string>("QueryRegionName") ?? "";
+
     public virtual string? QueryDetail(string name) => details.GetValueOrDefault(Names(name).FirstOrDefault() ?? "");
 
     public virtual string? QueryReadable(string name) => readables.GetValueOrDefault(Names(name).FirstOrDefault() ?? "");
@@ -186,7 +204,8 @@ public abstract class Room : MudObject
         var text = new StringBuilder();
         // The room name is a title; every exit is a command the player can type.
         text.Append("{title}").Append(ShortDesc).Append("{/}\n").Append(LongDesc).Append('\n');
-        text.Append(Exits.Count == 0 ? "There are no obvious exits.\n" : "Obvious exits: " + string.Join(", ", Exits.Keys.Select(d => "{cmd}" + d + "{/}")) + "\n");
+        var detailed = viewer != null && viewer.Call<double>("QueryMod", "exit_detail") > 0;
+        text.Append(Exits.Count == 0 ? "There are no obvious exits.\n" : "Obvious exits: " + string.Join(", ", Exits.Keys.Select(d => "{cmd}" + d + "{/}" + (detailed ? ExitNote(d, viewer!) : ""))) + "\n");
 
         // Identical shorts are merged: "Two giant rats are here."
         var counts = new Dictionary<string, int>();
@@ -206,6 +225,15 @@ public abstract class Room : MudObject
             text.Append(n == 1 ? " is here.\n" : " are here.\n");
         }
         return text.ToString();
+    }
+
+    /// <summary>Where an exit leads, and whether it is locked against the viewer (Traveler's Instinct): " (to Village Square)".</summary>
+    private string ExitNote(string direction, ObjectRef viewer)
+    {
+        var where = "unexplored";
+        try { where = LoadObject(Exits[direction]).Call<string>("Short") ?? where; }
+        catch (MudRuntimeException) { }
+        return $" (to {where}{(locks.ContainsKey(direction) && !CanUseExit(viewer, direction) ? ", locked" : "")})";
     }
 
     private static string Cap(string text) => text.Length == 0 ? text : char.ToUpper(text[0]) + text.Substring(1);

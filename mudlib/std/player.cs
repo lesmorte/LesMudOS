@@ -328,7 +328,8 @@ public class Player : Adventurer
             "          {cmd}who{/}, {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
             "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/}, {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/}),\n" +
-            "           {cmd}stop{/} (cancel a potion or meal you queued while recovering)\n" +
+            "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
+            "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "Corpses:   {cmd}loot{/} [CORPSE], {cmd}get{/} THING (or all) from CORPSE, {cmd}look in{/} CORPSE\n" +
             "Gear:      {cmd}wield{/} THING, {cmd}unwield{/}, {cmd}wear{/} THING, {cmd}remove{/} THING, {cmd}eat{/}/{cmd}drink{/} THING\n" +
             "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING\n" +
@@ -361,9 +362,11 @@ public class Player : Adventurer
               "          {cmd}rmdir{/} <dir>                remove an empty directory\n" +
               "                                     (those seven need level 5 outside your home, and in other wizards' homes;\n" +
               "                                     level 10 for /secure, /std, /wiz itself and the home directories)\n");
-        if (level >= 5) Write("          {cmd}heal{/} [<target>]            restore a creature (or yourself) to full HP\n");
+        if (level >= 5) Write("          {cmd}restore{/} [<target>]         restore a creature (or yourself) to full HP, Stamina and Mana\n");
         if (level >= 5) Write("          {cmd}speed{/} <target> <percent> [<seconds>]  haste (positive) or slow (negative) a creature's Reaction Time; 0 clears\n");
-        if (level >= 10) Write("          {cmd}smite{/} <target>             kill a creature at once, with kill credit\n");
+        if (level >= 10) Write("          {cmd}slay{/} <target>              kill a creature at once, with kill credit\n");
+        if (level >= 10) Write("          {cmd}setlevel{/} <1-100>           set your level (experience, HP and resources follow)\n");
+        if (level >= LevelUpdate) Write("          {cmd}update{/} <path>              recompile a file and replace the loaded object\n");
         if (level >= LevelShutdown) Write("          {cmd}shutdown{/}                   stop the driver\n");
         return true;
     }

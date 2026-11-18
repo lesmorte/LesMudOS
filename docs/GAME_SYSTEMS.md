@@ -32,7 +32,7 @@ mudlib/std/
   player.cs       now inherits adventurer; keeps login, wizard and file commands
   room.cs         details, readable text, spawns, encounters, locked exits, safe flag, reset
 mudlib/secure/
-  vault.cs        the lost-property vault (section 9, Corpses)
+  lost_property.cs  the lost-property store (section 9, Corpses)
 mudlib/domains/hollow/
   village/        the eight village rooms (north_road, gate, square, guild, ironoak, tavern, guest_rooms, cellar)
   cellars/        the ten dungeon rooms (collapsed_passage to overseer_chamber)
@@ -90,7 +90,7 @@ Combat has no rounds. Each fighter has its own clock, described fully in [COMBAT
 - An action with a Preparation shows a wind-up line when it begins and takes effect Preparation x 2 seconds later (inside its delay, not added to it). If the target has died or left in between, the blow is wasted.
 - One call-out per fighter drives the clock. Heartbeats are used only for regeneration and idle NPC behaviour.
 - A player can queue one action (a potion, food) while recovering; it happens at the next ready moment in place of an attack. A newer command replaces it and `stop` clears it.
-- **To hit:** `d20 + attacker level + QueryToHit() >= 10 + defender QueryArmor()`. A natural 20 always hits, a natural 1 always misses.
+- **To hit:** the defender's dodge is rolled first; then `d20 + attacker QueryAttack() + action bonus >= 10 + defender QueryArmor() + defender QueryDefense()`, where `QueryAttack() = round(attack rate x level) + QueryToHit()` and `QueryDefense() = level - 1`. A natural 20 always hits, a natural 1 always misses. A hit is critical with 5% (x1.5); a defender with a shield blocks 15% of hits (damage halved). See [CLASS_SYSTEM.md](CLASS_SYSTEM.md).
 - **Damage:** uniform in the action's damage range (times the action's multiplier), minimum 1.
 - Enemies that are no longer in the room are forgotten after 30 seconds, so walking away ends a fight, and a creature does not chase.
 - Messages: the attacker, the defender and bystanders each get a line, varying by damage (miss, scratch, hit, hard hit). One line per attack per observer.
@@ -205,15 +205,19 @@ Services use the same class with a different stock:
 
 `Shopkeeper` has `protected virtual bool OnBuy(ObjectRef buyer, string path)` so a service can do something other than hand over an item. Stock samples are kept inside the shopkeeper so that `buy sword` and `value sword` find them by name. The Traveling Merchant sells potions at 15 and rations at 5. Harland sells stew (4), ale (2) and the bed (5); buying the bed heals the buyer fully and takes them up to the Guest Rooms.
 
+## 8a. Classes, skills and areas
+
+The five callings, their skills and traits, equipment categories and access, the level-scaled attack rule, the travel pass and the Vale Road are described in [CLASS_SYSTEM.md](CLASS_SYSTEM.md). Every living thing has Stamina and Mana. Weapons and armor have a `Category`. Rooms get their area and region names from an `area.cs` in their directory (`score` shows them). Creature numbers in the tables here are unchanged by the class system; `tests/balance_sim.py` shows how each archetype fares against them.
+
 ## 9. The player character
 
 `Adventurer` (abstract, inherits `Living`) carries everything about playing the game; `Player` inherits it and keeps accounts, wizard tools and files.
 
 Saved with the player: level, experience, HP, gold, quest states, the program paths of carried items and which are equipped, and the logout room.
 
-- **New character:** level 1, 30 HP, 25 gold, unarmed 1-3.
-- **Experience to reach level:** 2: 100, 3: 250, 4: 500, 5: 900. Level 5 is the cap for now.
-- **Each level:** +8 max HP, and full heal on levelling. (The +1 to hit comes from level in the attack roll.)
+- **New character:** chooses one of five callings after the password (Warrior, Scout, Priest, Mage, Adventurer); level 1, the calling's HP, gold, resources and starting kit (CLASS_SYSTEM.md section 7); unarmed 1-3.
+- **Experience to reach level n:** 50 x n x (n - 1) times the experience modifier of the character's classes (2: 100, 3: 300, 4: 600, 5: 1000). The level cap is 100.
+- **Each level:** +8 max HP, and full heal on levelling. (Attack grows by the class's attack rate per level and Defense by 1.)
 - **Regeneration:** 1 HP every 10 seconds out of combat; 3 in a safe room.
 - **Death:** the player is told so, and a **corpse** in the room where they died takes everything they carry (equipment included) and a gold fee of 10% of their purse. They wake in the Guest Rooms at full HP, with experience and level intact, and must walk back to the corpse and `loot` it. Their killer forgets them. The loss is saved at once.
 - **Logout room:** quitting in a room whose `QueryLogoutRoom()` is true (the Guest Rooms) makes that the next login room. Otherwise players enter at the Village Square.
@@ -235,7 +239,8 @@ Commands, available to every player:
 | `accept`, `report` | In the Adventurers Guild |
 | `ansi [on\|off]` (also `color`, `colour`) | Show or change ANSI colour (section 14) |
 | `score` (also `sc`) | Level, experience and what the next level needs, HP, gold, equipment, quests |
-| `hp` | One-line health |
+| `hp` | One-line health, Stamina and Mana |
+| `skills` | Your skills, spells and traits with costs and timing |
 | `quests` | Quest log |
 
 `look at <thing>` falls back to room details, and `look at <creature>` adds a rough health line. `stat <thing>` accepts `me`, `here` or a name present in the room.
@@ -248,8 +253,8 @@ Public functions on the player for other objects: `QueryLevel`, `QueryHp`, `Quer
 |---|---|---|
 | `goto <room path or player>` | 1 | Move to a room, or to where a player is |
 | `stat <thing>` | 1 | Show a living thing's or item's numbers |
-| `heal [<target>]` | 5 | Restore full HP |
-| `smite <target>` | 10 | Kill a creature at once, with normal death processing and kill credit |
+| `restore [<target>]` | 5 | Restore full HP, Stamina and Mana (was `heal`; the word now belongs to the Priest's spell) |
+| `slay <target>` | 10 | Kill a creature at once, with normal death processing and kill credit |
 
 These follow the existing rule: below the level, the command answers "What?". `shutdown` now saves every online player before the driver stops.
 
@@ -261,7 +266,7 @@ These follow the existing rule: below the level, the command answers "What?". `s
 - **The lock.** For `LockSeconds` (1800) only a player whose name equals the killer's or the dead player's may take things. Both are recorded by lower-case player name, because a player's object changes at logout. A non-player killer or victim records nothing. After the lock anyone may loot. The check uses the clock at every attempt; there is no timer. Refusal: "The corpse of X is not yours to loot yet."
 - **Taking things.** Only `Take(itemId)` and `TakeAll()` on the corpse hand things over; they identify the taker with `PreviousObject()` and `ThisPlayer()` and return null or the refusal text. The plain `get` command sees only what lies directly in the room. `loot` goes through the room's corpses, skipping those the player may not loot.
 - **Decay.** An empty corpse disappears two minutes after it became empty ("crumbles to dust"). A monster's corpse that still holds loot rots away after 60 minutes and its contents with it. A player's corpse that still holds things rots after 60 minutes and spills them on the floor. Reset does not touch corpses. A wizard of level 10 can shorten the times of a corpse (`SetTimers`) for tests.
-- **The lost-property vault.** `/secure/vault` is a blueprint-only daemon (loaded at boot, saved as `/secure/vault`). A player corpse reports its contents to it when created and after every change; an empty or gone corpse removes its record. A player may have several corpses; records are keyed by name plus a corpse id. After a restart every record on disk refers to a corpse that no longer exists, so it is unclaimed; records made during the current run are live and cannot be claimed. At login, after the inventory is restored, the player is handed anything recorded under their name (Harland, the innkeeper, kept it safe), the records are deleted, and the player is saved. Only a corpse clone may record or clear, and only a player body may claim, for its own name taken from the calling object. Monster corpses are not recorded. Equipment state is not kept in the vault.
+- **The lost-property store.** `/secure/lost_property` is a blueprint-only daemon (loaded at boot, saved as `/secure/lost_property`; a save left by the old name `/secure/vault` is read once and carried over). A player corpse reports its contents to it when created and after every change; an empty or gone corpse removes its record. A player may have several corpses; records are keyed by name plus a corpse id. After a restart every record on disk refers to a corpse that no longer exists, so it is unclaimed; records made during the current run are live and cannot be claimed. At login, after the inventory is restored, the player is handed anything recorded under their name (Harland, the innkeeper, kept it safe), the records are deleted, and the player is saved. Only a corpse clone may record or clear, and only a player body may claim, for its own name taken from the calling object. Monster corpses are not recorded. Equipment state is not kept in the vault.
 - **Player versus player.** The code does not allow players to attack each other, so no player can currently kill another; the lock rule would let a player killer loot a victim's corpse if that ever changes.
 
 ## 10. Quests
@@ -304,12 +309,12 @@ Kills count only if they happened while the quest was active or before it was ac
 - Monsters do not regenerate. The Overseer is aggressive. The Traveling Merchant is built.
 - There are no rounds, so there is no acting order: every fighter has its own ready time. `kill <name>` picks the first match in the room, in the order the room lists things; if the player is already fighting, `kill <other>` turns on the other (it is attacked first from then on). There is no numbering (`kill 2.goblin`).
 - Combat details: one action per ready time; fleeing picks a random usable exit and is not an action.
-- Corpses and the vault were added after the first design (section 9).
+- Corpses and the lost-property store were added after the first design (section 9).
 
 ## 12. Testing
 
 - `tests/smoke_test.py` keeps testing the driver and wizard tools against `/domains/town`. Because new players now start in Vincent's Hollow, the smoke test patches the start room in its temporary copy of the mudlib. Its existing checks must keep passing.
-- `tests/area_test.py` is a new end-to-end test for the gameplay systems and the area: movement through every exit of the area, look/read on the brief's objects, each NPC's quoted dialogue, buying and equipping, a real fight with a weak creature, corpses and looting, death and respawn, a driver restart and a crash with the lost-property vault, the locked cache, the boss abilities (using `smite` and `heal` where luck would make the test flaky), both quests through to the ending, and persistence of the character across logout.
+- `tests/area_test.py` is a new end-to-end test for the gameplay systems and the area: movement through every exit of the area, look/read on the brief's objects, each NPC's quoted dialogue, buying and equipping, a real fight with a weak creature, corpses and looting, death and respawn, a driver restart and a crash with the lost-property store, the locked cache, the boss abilities (using `smite` and `heal` where luck would make the test flaky), both quests through to the ending, and persistence of the character across logout.
 - A simulation script, `tests/balance_sim.py`, plays the combat rules on an event clock outside the driver (the same delay formula as the mudlib; `python3 tests/balance_sim.py check` parses the mudlib files and fails if the numbers differ) with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
 - `tests/playthrough_test.py` (port 4813, `LESMUDOS_TEST_PORT`) is the first-player test. It copies the mudlib unmodified (no stub rooms), makes a brand-new non-wizard level 1 character and plays the whole area: every exit of all 18 rooms in both directions, the sign, plaque and quest board, the brief's objects, every NPC's quoted lines word for word, the shop and the tavern (including the bed and logging out in the Guest Rooms), a deliberate death with corpse recovery and the locked-corpse message for a second player, then both quests with a fight loop (flee, rest, bed, potions, looting, the Hidden Cache, levelling) up to the Goblin Overseer, `report`, the rewards and the ending speech. A warden wizard account is used only to peek at state; if the solo character cannot finish, the test records a finding and falls back to `heal`, clearly labelled. It takes 15 to 20 minutes.
 - `tests/timing_test.py` (port 4815) measures real intervals between combat actions against the formula (design section 6): unarmed, sword, shield, haste, slow, fast and slow creatures, the first-action delay of creatures drawn in, the Overseer's pattern and its Power Strike warning, the potion queue and `stop`, and lifetime cases (spamming `kill`, dying with a potion queued, a target quitting during a wind-up).

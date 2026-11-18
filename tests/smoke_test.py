@@ -31,16 +31,48 @@ failures = []
 # Colour is on by default, so the game sends ANSI sequences. Client strips them
 # (SGR sequences only: ESC [ digits and semicolons m) so that every check reads
 # plain text; the raw text is kept in Client.raw for the colour checks.
+DEFAULT_ARCHETYPE = "adventurer"
+
+# The tests written before classes existed assume a bare character: 30 HP, 25 gold, no kit, unarmed 2-5, no
+# equipment limits, nothing that changes timing. They get one as a test-only archetype in their temporary mudlib.
+NOVICE_CLASS = """// @inherit /std/pclass
+public class NoviceClass : PlayerClass
+{
+    public override void Create()
+    {
+        ClassName = "Novice"; Tier = "archetype"; SortOrder = 99; Title = "Novice";
+        Tagline = "A bare test character."; Description = "Test only.";
+        StartHp = 30; StartReaction = 2.5; MaxStamina = 70; MaxMana = 70; StaminaRegen = 6; ManaRegen = 5;
+        AttackRate = 1.0; StartGold = 25;
+        Weapons.Add("*"); ArmorTypes.AddRange(new[] { "light", "medium", "heavy" }); Shield = true;
+        Traits.Add("novice_fists");
+    }
+}
+"""
+NOVICE_FISTS = """// @inherit /std/trait
+public class NoviceFistsTrait : Trait
+{
+    public override void Create()
+    {
+        Title = "Novice Fists"; Summary = "Unarmed damage 2-5 (test only).";
+        Mods["unarmed_min"] = 1; Mods["unarmed_max"] = 2;
+    }
+}
+"""
 ANSI = re.compile("\x1b\\[[0-9;]*m")
 ANSI_TAIL = re.compile("\x1b(\\[[0-9;]*)?$")
 
 
 class Client:
-    def __init__(self, name, password=PASSWORD, login=True):
+    def __init__(self, name, password=PASSWORD, login=True, archetype=None):
         """Connect and give the name. With login, also answer the password
         prompts: once for an existing account, twice for a new one or one
-        that has no password yet. Text read past the name that is not a
-        password prompt (a refusal) is kept for the next read_until."""
+        that has no password yet, and then the choice of a calling if the
+        game asks for one (a new character, or one saved before classes; the
+        default is the adventurer, whose kit and unarmed damage are closest
+        to the character the older tests were written for). Text read past
+        the name that is not a password prompt (a refusal) is kept for the
+        next read_until."""
         self.pending = ""
         self.raw = ""  # everything received since the last raw_reset(), with escape sequences
         self._carry = ""  # an escape sequence cut by the end of a chunk
@@ -55,10 +87,21 @@ class Client:
             self.send(password)
             self.read_until("again: ")
             self.send(password)
+            self.choose_calling(archetype)
         elif "Password: " in text:
             self.send(password)
+            self.choose_calling(archetype)
         else:
             self.pending = text
+
+    def choose_calling(self, archetype):
+        """After the password: if the game asks for a calling, choose `archetype` (None leaves the prompt unanswered).
+        Everything read on the way is kept for the next read_until."""
+        archetype = DEFAULT_ARCHETYPE if archetype is None else archetype
+        text = self.read_any(("Your calling: ", "> ", "Wrong password", "Goodbye", "Another name?", "Someone else"), timeout=15.0)
+        if archetype is not None and "Your calling: " in text and not text.rstrip().endswith("There is no such calling. Your calling:"):
+            self.send(archetype)
+        self.pending = text
 
     def rx(self, chunk):
         """Decode a received chunk, keep it in self.raw, and return it without ANSI sequences."""
@@ -180,7 +223,7 @@ def edit(mudlib, path, old, new):
         f.write(source.replace(old, new))
 
 
-def copy_mudlib(destination):
+def copy_mudlib(destination, novice=False):
     """Copy the mudlib for a test run, leaving out the build output beside Mudlib.csproj
     (only at the top: domains may have an obj/ directory of their own)."""
     source = os.path.join(ROOT, "mudlib")
@@ -190,6 +233,11 @@ def copy_mudlib(destination):
         return [n for n in names if (top and n in ("bin", "obj")) or n.endswith(".csproj")]
 
     shutil.copytree(source, destination, ignore=skip)
+    if novice:
+        global DEFAULT_ARCHETYPE
+        DEFAULT_ARCHETYPE = "novice"
+        write(destination, "/classes/novice", NOVICE_CLASS)
+        write(destination, "/skills/novice_fists", NOVICE_FISTS)
 
 
 def main():
@@ -769,7 +817,7 @@ public class Beacon : Item
             "    private bool Attempt(string args)",
             "    {",
             '        var wiz = LoadObject("/secure/wizlist");',
-            '        var vault = LoadObject("/secure/vault");',
+            '        var vault = LoadObject("/secure/lost_property");',
             '        Run("copyfile", () => CopyFile("/domains/town/square.cs", "/wiz/bob/stolen.cs"));',
             '        Run("writefile", () => WriteFile("/wiz/bob/own.cs", "x"));',
             '        Run("readfile", () => ReadFile("/wiz/bob/items/gem.cs"));',
@@ -782,7 +830,7 @@ public class Beacon : Item
             '        Run("restore-alice", () => RestoreObject("/players/alice"));',
             '        Run("save-wizlist", () => SaveObject("/secure/wizlist"));',
             '        Run("restore-wizlist", () => RestoreObject("/secure/wizlist"));',
-            '        Run("save-vault", () => SaveObject("/secure/vault"));',
+            '        Run("save-vault", () => SaveObject("/secure/lost_property"));',
             '        Run("secret", () => CheckAdminSecret(args));',
             '        Run("update", () => UpdateProgram("/std/room"));',
             '        Run("shutdown", () => Shutdown());',
@@ -804,7 +852,7 @@ public class Beacon : Item
                               ("removefile", "may not remove-file /wiz/bob/items/gem.cs"), ("removedir", "may not remove-dir /wiz/bob/rooms"),
                               ("save-alice", "may not write /players/alice"), ("restore-alice", "may not read /players/alice"),
                               ("save-wizlist", "may not write /secure/wizlist"), ("restore-wizlist", "may not read /secure/wizlist"),
-                              ("save-vault", "may not write /secure/vault"), ("secret", "may not check the admin secret"),
+                              ("save-vault", "may not write /secure/lost_property"), ("secret", "may not check the admin secret"),
                               ("update", "may not update /std/room"), ("shutdown", "may not shut the driver down"), ("destruct-player", "may not destruct")]:
             check("wizard homes: code in a home cannot " + label, text, label + "=BLOCKED ", reason)
         check("wizard homes: code in a home cannot promote", text, "promote=Only a player can do that.")
@@ -932,7 +980,10 @@ public class Spinner : Item
         g.send(pw_g)
         g.read_until("again: ")
         g.send(pw_g)
-        check("matching passwords create the account", g.read_until("> "), "Account created.", "Welcome, Gwendolyn.")
+        # Changed with the class system: after the password a new character is asked for a calling before entering the game.
+        check("matching passwords create the account", g.read_until("Your calling: "), "Account created.", "choose your calling")
+        g.send("adventurer")
+        check("the chosen calling lets the new account into the game", g.read_until("> "), "You take up the calling of the Adventurer.", "Welcome, Gwendolyn.")
         saved = save_file("gwendolyn")
         check("new account is saved at once, with a hash", saved, '"passwordHash": "pbkdf2-sha256$210000$', absent=(pw_g,))
         g.send("quit")
@@ -985,7 +1036,10 @@ public class Spinner : Item
         c.send("old-timer-pass")
         c.read_until("again: ")
         c.send("old-timer-pass")
-        check("password set, then into the game", c.read_until("> "), "Password set.", "Welcome back, Oldtimer. This is visit number 5.")
+        # Changed with the class system: a character saved before classes is asked for a calling at the next login.
+        check("password set, then asked for a calling", c.read_until("Your calling: "), "Password set.", "choose your calling")
+        c.send("adventurer")
+        check("calling chosen, then into the game", c.read_until("> "), "Welcome back, Oldtimer. This is visit number 5.")
         check("old save file kept its fields", c.command("who"), "Oldtimer the old-timer")
         check("old account now has a hash", save_file("oldtimer"), '"passwordHash": "pbkdf2-sha256$', '"title": "the old-timer"', absent=("old-timer-pass",))
         c.send("quit")

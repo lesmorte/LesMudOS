@@ -8,20 +8,26 @@
 public abstract class Adventurer : Living
 {
     private const string RespawnRoom = "/domains/hollow/village/guest_rooms";
-    private const int MaxLevel = 5;
-    private const int BaseHp = 30;
+    private const string Registry = "/secure/classes";
+    // The levelling constants, all in one place. Experience to reach level n = XpScale x n x (n - 1) x modifier.
+    private const int MaxLevel = 100;
+    private const double XpScale = 50.0;
+    private const int DefaultBaseHp = 30; // for a character that has no archetype yet (only between password and choice)
     private const int HpPerLevel = 8;
     private const int RegenBeats = 5; // one regeneration step per 10 seconds
     private const int LevelGoto = 1;
     private const int LevelStat = 1;
     private const int LevelHeal = 5;
     private const int LevelSpeed = 5;
-    private const int LevelSmite = 10;
-
-    // Experience needed to reach level n is XpForLevel[n].
-    private static readonly int[] XpForLevel = { 0, 0, 100, 250, 500, 900 };
+    private const int LevelSlay = 10;
+    private const int LevelSetLevel = 10;
 
     [Saved] private int xp;
+    // A character's classes, as ids only. Everything a class grants is read from the class files at login.
+    [Saved] private string archetype = "";
+    [Saved] private string advancedClass = "";
+    [Saved] private string subclass = "";
+    [Saved] private string prestigeClass = "";
     [Saved] private Dictionary<string, int> quests = new();
     [Saved] private Dictionary<string, string> questTitles = new();
     [Saved] private List<string> killed = new();
@@ -32,16 +38,57 @@ public abstract class Adventurer : Living
     private int regenBeats;
     private bool dying;
     private bool inventoryRestored;
+    private double hpCarry; // fractions of a hit point regenerated but not yet given
+    private bool adventureBegun;
+    private bool equipKit; // a new character's weapon and shield are put on when the kit is created
+
+    // What the classes give, worked out by RefreshClasses from the class files.
+    private readonly List<ObjectRef> classObjects = new();
+    private readonly List<ObjectRef> classSkills = new(); // skills and spells (not traits) of the classes
+    private readonly List<ObjectRef> classTraits = new();
+    private readonly HashSet<string> weaponAccess = new();
+    private readonly HashSet<string> armorAccess = new();
+    private bool shieldAccess;
+    private bool unrestricted = true; // true until an archetype is chosen
+    private int startHp = DefaultBaseHp;
+    private int classMaxStamina = 70;
+    private int classMaxMana = 70;
+    private double classStaminaRegen = 6;
+    private double classManaRegen = 5;
+    private double classRate = 1.0;
+    private double expModifier = 1.0;
+    private string archetypeName = "";
+    private string classTitle = "";
+    private List<ObjectRef> grantedTraits = new();
+    private long grantedAt;
 
     public override void Create()
     {
         Level = 1;
-        DamageMin = 2;
-        DamageMax = 5;
+        DamageMin = 1; // unarmed 1-3; Improvised Combat makes it 2-5
+        DamageMax = 3;
         Gold = 25;
     }
 
-    public override int QueryMaxHp() => BaseHp + HpPerLevel * (Level - 1) + EquipmentHpBonus();
+    public override int QueryMaxHp() => startHp + HpPerLevel * (Level - 1) + EquipmentHpBonus();
+
+    public override int QueryMaxStamina() => classMaxStamina;
+
+    public override int QueryMaxMana() => classMaxMana;
+
+    public override double QueryStaminaRegen() => classStaminaRegen;
+
+    public override double QueryManaRegen() => classManaRegen;
+
+    public override double QueryAttackRate() => classRate;
+
+    protected override double TraitMod(string key)
+    {
+        var total = 0.0;
+        foreach (var trait in classTraits) total += trait.Call<double>("Modifier", key, Self);
+        foreach (var trait in GrantedTraits()) total += trait.Call<double>("Modifier", key, Self);
+        return total;
+    }
 
     public override bool IsPlayerCharacter() => true;
 
@@ -67,12 +114,29 @@ public abstract class Adventurer : Living
         return true;
     }
 
+    /// <summary>
+    /// The levelling formula, in one place: experience needed to reach level n is 50 x n x (n - 1) x the experience modifier.
+    /// Level 1 needs nothing.
+    /// </summary>
+    public static int ExperienceFor(int level, double modifier) =>
+        level <= 1 ? 0 : (int)Math.Round(XpScale * level * (level - 1) * modifier, MidpointRounding.AwayFromZero);
+
+    /// <summary>Experience needed to reach a level with this character's classes (the largest experience modifier among them).</summary>
+    public int QueryXpForLevel(int level) => ExperienceFor(level, expModifier);
+
+    public double QueryExpModifier() => expModifier;
+
     public void AddXp(int amount)
     {
         if (amount <= 0) return;
         xp += amount;
         Tell($"You gain {amount} experience.\n");
-        while (Level < MaxLevel && xp >= XpForLevel[Level + 1])
+        CheckLevelUp();
+    }
+
+    private void CheckLevelUp()
+    {
+        while (Level < MaxLevel && xp >= QueryXpForLevel(Level + 1))
         {
             Level++;
             Hp = QueryMaxHp();
@@ -97,6 +161,298 @@ public abstract class Adventurer : Living
     }
 
     public bool QueryKilled(string programPath) => killed.Contains(programPath);
+
+    // ---- Classes (docs/CLASS_SYSTEM.md sections 6 and 7) ----
+
+    public string QueryArchetype() => archetype;
+
+    /// <summary>True if the character has no calling yet (or its class file is gone) and must choose at login.</summary>
+    public bool NeedsArchetype() => !adventureBegun && (archetype == "" || ClassFile(archetype) == null);
+
+    /// <summary>The ids of the character's classes, archetype first.</summary>
+    public List<string> QueryClassIds() => new[] { archetype, advancedClass, subclass, prestigeClass }.Where(c => c != "").ToList();
+
+    public bool QueryHasClass(string id) => id != "" && QueryClassIds().Contains(id);
+
+    /// <summary>The class a character has in a tier ("archetype", "advanced", "subclass" or "prestige"), or "".</summary>
+    public string QueryClassOfTier(string tier) => tier switch
+    {
+        "archetype" => archetype, "advanced" => advancedClass, "subclass" => subclass, "prestige" => prestigeClass, _ => "",
+    };
+
+    /// <summary>The title of the highest class the character has ("Warrior", later "Knight").</summary>
+    public string QueryClassTitle() => classTitle;
+
+    private ObjectRef? ClassFile(string id)
+    {
+        try { return LoadObject(Registry).Call<ObjectRef>("Class", id); }
+        catch (MudRuntimeException) { return null; }
+    }
+
+    private ObjectRef? SkillFile(string id)
+    {
+        try { return LoadObject(Registry).Call<ObjectRef>("Skill", id); }
+        catch (MudRuntimeException) { return null; }
+    }
+
+    /// <summary>
+    /// Work out everything the classes give from the class files: starting HP, resources, attack rate, experience modifier,
+    /// equipment access, skills and traits. Nothing derived is saved, so this runs at login and whenever a class changes.
+    /// A class file that is gone or disabled grants nothing.
+    /// </summary>
+    private void RefreshClasses()
+    {
+        classObjects.Clear();
+        classSkills.Clear();
+        classTraits.Clear();
+        weaponAccess.Clear();
+        armorAccess.Clear();
+        shieldAccess = false;
+        expModifier = 1.0;
+        classTitle = "";
+        archetypeName = "";
+        var rate = 0.0;
+        var known = false;
+        foreach (var id in QueryClassIds())
+        {
+            var cls = ClassFile(id);
+            if (cls == null || (!cls.Call<bool>("QueryEnabled") && cls.Call<string>("QueryTier") != "archetype")) continue;
+            classObjects.Add(cls);
+            classTitle = cls.Call<string>("QueryTitle") ?? classTitle;
+            expModifier = Math.Max(expModifier, cls.Call<double>("QueryExpModifier"));
+            if (cls.Call<double>("QueryAttackRate") > 0) rate = cls.Call<double>("QueryAttackRate");
+            foreach (var w in cls.Call<List<string>>("QueryWeapons") ?? new List<string>()) weaponAccess.Add(w);
+            foreach (var a in cls.Call<List<string>>("QueryArmorTypes") ?? new List<string>()) armorAccess.Add(a);
+            if (cls.Call<bool>("QueryShield")) shieldAccess = true;
+            foreach (var sid in cls.Call<List<string>>("QuerySkills") ?? new List<string>())
+                if (SkillFile(sid) is { } skill && !classSkills.Contains(skill)) classSkills.Add(skill);
+            foreach (var tid in cls.Call<List<string>>("QueryTraits") ?? new List<string>())
+                if (SkillFile(tid) is { } trait && !classTraits.Contains(trait)) classTraits.Add(trait);
+            if (cls.Call<string>("QueryTier") == "archetype")
+            {
+                known = true;
+                archetypeName = cls.Call<string>("QueryClassName") ?? "";
+                startHp = cls.Call<int>("QueryStartHp");
+                BaseReaction = cls.Call<double>("QueryStartReaction");
+                classMaxStamina = cls.Call<int>("QueryMaxStamina");
+                classMaxMana = cls.Call<int>("QueryMaxMana");
+                classStaminaRegen = cls.Call<double>("QueryStaminaRegen");
+                classManaRegen = cls.Call<double>("QueryManaRegen");
+            }
+        }
+        unrestricted = !known;
+        classRate = rate > 0 ? rate : 1.0;
+        if (!known)
+        {
+            startHp = DefaultBaseHp;
+            classMaxStamina = 70;
+            classMaxMana = 70;
+            classStaminaRegen = 6;
+            classManaRegen = 5;
+        }
+        grantedAt = 0;
+    }
+
+    /// <summary>
+    /// Called by /secure/login after the password, for a character with no archetype (a new one, or one saved before classes):
+    /// take the chosen archetype. A character that has played before keeps their level, items and gold; one that has not
+    /// receives the archetype's starting gold and kit. Returns null, or why the choice was refused. Works once.
+    /// </summary>
+    public string? ChooseArchetype(string id)
+    {
+        var caller = PreviousObject();
+        if (adventureBegun || archetype != "" && ClassFile(archetype) != null) return "Your calling is already chosen.";
+        if (caller == null || !caller.IsClone || caller.ProgramPath != "/secure/login" || !Interactive(caller)) return "That is not possible now.";
+        var cls = ClassFile(id);
+        if (cls == null || cls.Call<string>("QueryTier") != "archetype" || !cls.Call<bool>("QueryEnabled")) return "There is no such calling.";
+        var pristine = Level == 1 && xp == 0 && carried.Count == 0 && quests.Count == 0 && Gold == 25 && advancedClass == "";
+        archetype = id;
+        RefreshClasses();
+        if (pristine)
+        {
+            Gold = cls.Call<int>("QueryStartGold");
+            carried.Clear();
+            carriedEquipped.Clear();
+            foreach (var path in cls.Call<List<string>>("QueryKit") ?? new List<string>()) carried.Add(path);
+            equipKit = true;
+        }
+        Hp = QueryMaxHp();
+        FillResources();
+        return null;
+    }
+
+    /// <summary>
+    /// Give the character an advanced, subclass or prestige class. This is the entry point the Hall of Legends in Oakenfell (stage B) calls when a
+    /// hallmaster completes a pledge; it is not a player command, and only another object may call it. It checks the class
+    /// exists and is enabled, that the tier is free, that the parent class is one the character has, and every requirement
+    /// of the class file. Returns null on success or the reason for refusing.
+    /// </summary>
+    public string? ApplyClass(string id)
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller == Self || caller.Call<bool>("IsPlayerCharacter")) return "A class is given by the game, not taken.";
+        var cls = ClassFile(id);
+        if (cls == null) return "There is no such class.";
+        if (!cls.Call<bool>("QueryEnabled")) return "That class is not open.";
+        var tier = cls.Call<string>("QueryTier") ?? "";
+        if (tier == "archetype") return "A calling cannot be changed.";
+        if (QueryClassOfTier(tier) != "") return $"You already have a {tier} class.";
+        var parent = cls.Call<string>("QueryParent") ?? "";
+        if (parent != "" && !QueryHasClass(parent)) return "You do not have the calling this class builds on.";
+        var problem = cls.Call<string>("CheckRequirements", Self);
+        if (problem != null) return problem;
+        switch (tier)
+        {
+            case "advanced": advancedClass = id; break;
+            case "subclass": subclass = id; break;
+            case "prestige": prestigeClass = id; break;
+            default: return "That class cannot be given.";
+        }
+        RefreshClasses();
+        CheckLevelUp();
+        BindSkillCommands();
+        Tell($"You are now a {classTitle}.\n");
+        PersistNow();
+        return null;
+    }
+
+    // ---- Skills ----
+
+    private List<ObjectRef> GrantedTraits()
+    {
+        if (TimeMs() - grantedAt < 1000 && grantedAt != 0) return grantedTraits;
+        grantedAt = TimeMs();
+        grantedTraits = GrantedSkills().Where(s => s.Call<string>("QueryKind") == "trait").ToList();
+        return grantedTraits;
+    }
+
+    /// <summary>Skills, spells and traits that equipped items grant. They are listed apart and vanish with the item.</summary>
+    private List<ObjectRef> GrantedSkills()
+    {
+        var result = new List<ObjectRef>();
+        foreach (var item in QueryEquipment())
+            foreach (var id in item.Call<List<string>>("QueryGrantedSkills") ?? new List<string>())
+                if (SkillFile(id) is { } skill && !result.Contains(skill) && !classSkills.Contains(skill) && !classTraits.Contains(skill)) result.Add(skill);
+        return result;
+    }
+
+    private ObjectRef? FindSkillByCommand(string word)
+    {
+        foreach (var skill in classSkills.Concat(GrantedSkills()))
+            if (skill.Call<string>("QueryCommand") == word) return skill;
+        return null;
+    }
+
+    /// <summary>Bind the command word of every skill the character has. A word bound once stays bound; one for a skill that is gone says so.</summary>
+    private void BindSkillCommands()
+    {
+        if (ThisPlayer() != Self) return;
+        foreach (var skill in classSkills.Concat(GrantedSkills()))
+        {
+            var word = skill.Call<string>("QueryCommand");
+            if (!string.IsNullOrEmpty(word)) AddAction(word, CmdSkill);
+        }
+    }
+
+    private bool CmdSkill(string args)
+    {
+        var skill = FindSkillByCommand(QueryVerb());
+        if (skill == null) return false;
+        args = args.Trim();
+        var room = Environment();
+        ObjectRef? target = null;
+        var kind = skill.Call<string>("QueryTarget");
+        if (kind == "enemy")
+        {
+            target = args == "" ? Enemies().FirstOrDefault(e => Environment(e) == room) : room == null ? null : Present(args, room);
+            if (target == null) { Write(args == "" ? "Use it on whom? You are not fighting anyone.\n" : $"You see no '{Esc(args)}' here.\n"); return true; }
+            if (!target.Call<bool>("IsCreature")) { Write("You cannot fight that.\n"); return true; }
+        }
+        else if (kind == "friend")
+        {
+            target = args == "" || args == "me" || args == "self" ? Self : room == null ? null : Present(args, room);
+            if (target == null || !target.Call<bool>("IsCreature")) { Write($"There is no one called '{Esc(args)}' here.\n"); return true; }
+        }
+        else if (kind == "item")
+        {
+            target = args == "" ? null : Present(args) ?? (room == null ? null : Present(args, room));
+            if (target == null) { Write(args == "" ? "Use it on what?\n" : $"You see no '{Esc(args)}' here.\n"); return true; }
+        }
+        var refusal = skill.Call<string>("CanUse", Self, target) ?? SkillRefusal(skill);
+        if (refusal != null) { Write(refusal + "\n"); return true; }
+        if (kind == "enemy" && target != null)
+        {
+            if (!QueryFightingWith(target))
+            {
+                var no = CanFight(target);
+                if (no != null) { Write(no + "\n"); return true; }
+                StartFight(target);
+            }
+            Focus(target);
+        }
+        refusal = UseSkill(skill, target);
+        if (refusal != null) Write(refusal + "\n");
+        return true;
+    }
+
+    private bool CmdSkills(string args)
+    {
+        var text = new StringBuilder();
+        var own = classSkills.Where(s => s.Call<string>("QueryKind") != "trait").ToList();
+        var traits = classTraits.ToList();
+        text.Append(own.Count == 0 ? "You have no skills or spells.\n" : "Skills and spells (cost; time to use for you):\n");
+        foreach (var skill in own) text.Append("  " + SkillLine(skill) + "\n");
+        if (traits.Count > 0)
+        {
+            text.Append("Traits:\n");
+            foreach (var trait in traits) text.Append("  " + SkillLine(trait) + "\n");
+        }
+        var granted = GrantedSkills();
+        if (granted.Count > 0)
+        {
+            text.Append("Granted by what you wear or wield (gone when it is removed):\n");
+            foreach (var skill in granted) text.Append("  " + SkillLine(skill) + "\n");
+        }
+        Write(text.ToString());
+        return true;
+    }
+
+    private string SkillLine(ObjectRef skill)
+    {
+        var delay = (QueryReaction() + skill.Call<double>("QueryReactionMod") + skill.Call<double>("QueryRecovery")) * 2;
+        return skill.Call<string>("Line", delay) ?? "";
+    }
+
+    /// <summary>Why a skill cannot be paid for or used now, or null. Checked before a fight is started for it.</summary>
+    private string? SkillRefusal(ObjectRef skill)
+    {
+        var isSpell = skill.Call<string>("QueryKind") == "spell";
+        if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
+        var mana = skill.Call<int>("QueryManaCost");
+        if (isSpell && mana > 0) mana = Math.Max(1, (int)Math.Round(mana * (1 + QueryMod("spell_cost_pct") / 100.0), MidpointRounding.AwayFromZero));
+        if (QueryStamina() < skill.Call<int>("QueryStaminaCost")) return "You are too tired for that.";
+        if (QueryMana() < mana) return "You do not have the mana for that.";
+        return null;
+    }
+
+    // ---- Equipment access (docs/CLASS_SYSTEM.md section 5) ----
+
+    /// <summary>Why this character may not wield or wear the item, or null. An item without a category is for anyone.</summary>
+    private string? AccessRefusal(ObjectRef item)
+    {
+        if (unrestricted) return null;
+        var category = item.Call<string>("QueryCategory") ?? "";
+        var slot = item.Call<string>("QuerySlot") ?? "";
+        var who = Cap(archetypeName) + "s";
+        if (category == "" || category == "trinket") return null;
+        if (slot == "weapon")
+            return weaponAccess.Contains("*") || weaponAccess.Contains(category) ? null : $"You are not trained to wield {Article(category)} {category}: {who} cannot.";
+        if (category == "shield")
+            return shieldAccess ? null : $"You are not trained to carry a shield: {who} cannot.";
+        return armorAccess.Contains("*") || armorAccess.Contains(category) ? null : $"You are not trained to wear {category} armor: {who} cannot.";
+    }
+
+    private static string Article(string word) => word.Length > 0 && "aeiou".Contains(word[0]) ? "an" : "a";
 
     // ---- Saving ----
 
@@ -151,16 +507,20 @@ public abstract class Adventurer : Living
         AddAction("score", CmdScore);
         AddAction("sc", CmdScore);
         AddAction("hp", CmdHp);
+        AddAction("skills", CmdSkills);
         AddAction("quests", CmdQuests);
         // Builder tools. Each handler checks the wizard level on every use and
         // declines below it, so to everyone else these verbs do not exist.
         AddAction("goto", CmdGoto);
         AddAction("stat", CmdStat);
-        AddAction("heal", CmdHeal);
-        AddAction("smite", CmdSmite);
+        AddAction("restore", CmdRestore);
+        AddAction("slay", CmdSlay);
         AddAction("speed", CmdSpeed);
+        AddAction("setlevel", CmdSetLevel);
 
         SetHeartBeat(true);
+        adventureBegun = true;
+        RefreshClasses();
 
         for (var i = 0; i < carried.Count; i++)
         {
@@ -168,14 +528,18 @@ public abstract class Adventurer : Living
             {
                 var item = CloneObject(carried[i]);
                 MoveObject(item, Self);
-                if (carriedEquipped.Contains(i)) Equip(item);
+                var slot = item.Call<string>("QuerySlot") ?? "";
+                var put = carriedEquipped.Contains(i) || (equipKit && (slot == "weapon" || slot == "shield") && QueryEquipped(slot) == null);
+                if (put && AccessRefusal(item) == null) Equip(item);
             }
             catch (MudRuntimeException)
             {
                 // The file is gone or no longer compiles; the item is lost.
             }
         }
+        equipKit = false;
         inventoryRestored = true;
+        BindSkillCommands();
     }
 
     /// <summary>
@@ -185,7 +549,7 @@ public abstract class Adventurer : Living
     protected void ClaimLostProperty()
     {
         List<string> claim;
-        try { claim = LoadObject("/secure/vault").Call<List<string>>("Claim") ?? new List<string>(); }
+        try { claim = LoadObject("/secure/lost_property").Call<List<string>>("Claim") ?? new List<string>(); }
         catch (MudRuntimeException) { return; }
         if (claim.Count == 0) return;
         var coins = int.TryParse(claim[0], out var parsed) ? parsed : 0;
@@ -237,9 +601,12 @@ public abstract class Adventurer : Living
     {
         if (++regenBeats < RegenBeats) return;
         regenBeats = 0;
-        if (QueryInCombat() || Hp >= QueryMaxHp()) return;
+        if (QueryInCombat() || Hp >= QueryMaxHp()) { hpCarry = 0; return; }
         var room = Environment();
-        Heal(room != null && room.Call<bool>("QuerySafe") ? 3 : 1);
+        hpCarry += (room != null && room.Call<bool>("QuerySafe") ? 3 : 1) * (1 + QueryMod("regen_out"));
+        var whole = (int)Math.Floor(hpCarry + 1e-9);
+        hpCarry -= whole;
+        if (whole > 0) Heal(whole);
     }
 
     // ---- Death ----
@@ -264,6 +631,7 @@ public abstract class Adventurer : Living
             ClearEnemies();
             ResetCombat(); // a pending attack or potion must not fire after the death
             Hp = QueryMaxHp();
+            FillResources();
             MoveObject(LoadObject(RespawnRoom));
             TellRoom(Environment()!, $"{Name} appears, looking battered.\n", Self);
             Tell($"You wake in the Guest Rooms, bruised but alive. The healer's fee costs you {lost} gold.\n");
@@ -504,6 +872,8 @@ public abstract class Adventurer : Living
         var slot = item.Call<string>("QuerySlot")!;
         var description = item.Call<string>("Short");
         if (IsEquipped(item)) { Write("You already have that on.\n"); return true; }
+        var refusal = AccessRefusal(item);
+        if (refusal != null) { Write(refusal + "\n"); return true; }
         var old = QueryEquipped(slot);
         if (old != null)
         {
@@ -513,6 +883,8 @@ public abstract class Adventurer : Living
         Equip(item);
         Write($"{you} {description}.\n");
         Say($"{Name} {they} {description}.\n");
+        grantedAt = 0;
+        BindSkillCommands();
         return true;
     }
 
@@ -585,9 +957,16 @@ public abstract class Adventurer : Living
         var text = new StringBuilder();
         text.Append($"{Short()}\n");
         text.Append($"Level {Level}   Experience {xp}");
-        text.Append(Level >= MaxLevel ? " (highest level)\n" : $" ({XpForLevel[Level + 1] - xp} more for level {Level + 1})\n");
-        text.Append($"HP {Hp}/{QueryMaxHp()}   Gold {Gold}\n");
-        text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}   To hit +{Level + QueryToHit()}   Armor {QueryArmor()}\n");
+        text.Append(Level >= MaxLevel ? " (highest level)\n" : $" ({QueryXpForLevel(Level + 1) - xp} more for level {Level + 1})\n");
+        var calling = archetypeName == "" ? "none yet" : archetypeName;
+        text.Append($"Calling {calling}" + (advancedClass != "" || subclass != "" || prestigeClass != "" ? $"   Class {classTitle}" : "") + "\n");
+        var area = Environment()?.Call<string>("QueryAreaName") ?? "";
+        var region = Environment()?.Call<string>("QueryRegionName") ?? "";
+        if (area != "" || region != "") text.Append($"Area {area}   Region {region}\n");
+        text.Append($"HP {Hp}/{QueryMaxHp()}   Stamina {QueryStamina()}/{QueryMaxStamina()}   Mana {QueryMana()}/{QueryMaxMana()}   Gold {Gold}\n");
+        text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}   Dodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {QueryCrit()}%\n");
+        var effectLines = QueryEffectLines();
+        if (effectLines.Count > 0) text.Append("Effects: " + string.Join(", ", effectLines) + "\n");
         var gear = new List<string>();
         foreach (var slot in new[] { "weapon", "shield", "body", "head", "trinket" })
             if (QueryEquipped(slot) is { } item) gear.Add($"{slot}: {item.Call<string>("Short")}");
@@ -604,7 +983,7 @@ public abstract class Adventurer : Living
         var parts = new List<string> { $"base {Num(QueryBaseReaction())}" };
         foreach (var item in QueryEquipment())
         {
-            var mod = item.Call<double>("QueryReactionMod");
+            var mod = QueryItemReaction(item);
             if (mod != 0) parts.Add($"{item.Call<string>("Short")} {(mod > 0 ? "+" : "")}{Num(mod)}");
         }
         var speed = QuerySpeedFactor();
@@ -615,7 +994,7 @@ public abstract class Adventurer : Living
 
     private bool CmdHp(string args)
     {
-        Write($"HP {Hp}/{QueryMaxHp()}\n");
+        Write($"HP {Hp}/{QueryMaxHp()}   Stamina {QueryStamina()}/{QueryMaxStamina()}   Mana {QueryMana()}/{QueryMaxMana()}\n");
         return true;
     }
 
@@ -679,12 +1058,13 @@ public abstract class Adventurer : Living
         return true;
     }
 
-    private bool CmdHeal(string args)
+    private bool CmdRestore(string args)
     {
         if (!IsWizard(LevelHeal)) return false;
         var target = args.Trim() == "" ? Self : FindHere(args.Trim());
-        if (target == null || !target.Call<bool>("IsCreature")) { NotifyFail("Heal whom?"); return false; }
+        if (target == null || !target.Call<bool>("IsCreature")) { NotifyFail("Restore whom?"); return false; }
         target.Call("Heal", 100000);
+        target.Call("FillResources");
         if (target == Self) Write("You are restored to full health.\n");
         else
         {
@@ -717,15 +1097,31 @@ public abstract class Adventurer : Living
         return true;
     }
 
-    private bool CmdSmite(string args)
+    private bool CmdSlay(string args)
     {
-        if (!IsWizard(LevelSmite)) return false;
+        if (!IsWizard(LevelSlay)) return false;
         var target = args.Trim() == "" ? null : FindHere(args.Trim());
-        if (target == null || target == Self || !target.Call<bool>("IsCreature")) { NotifyFail("Smite whom?"); return false; }
+        if (target == null || target == Self || !target.Call<bool>("IsCreature")) { NotifyFail("Slay whom?"); return false; }
         var room = Environment();
-        Write($"You smite {target.Call<string>("QueryLabel")}!\n");
-        if (room != null) TellRoom(room, $"{Name} smites {target.Call<string>("QueryLabel")}!\n", Self, target);
+        Write($"You slay {target.Call<string>("QueryLabel")}!\n");
+        if (room != null) TellRoom(room, $"{Name} slays {target.Call<string>("QueryLabel")}!\n", Self, target);
         target.Call("Die", Self);
+        return true;
+    }
+
+    /// <summary>
+    /// A test and builder tool: set your level (1 to 100). Your experience is set to exactly what that level needs, your
+    /// HP and resources are filled. Level 10 wizards only.
+    /// </summary>
+    private bool CmdSetLevel(string args)
+    {
+        if (!IsWizard(LevelSetLevel)) return false;
+        if (!int.TryParse(args.Trim(), out var level) || level < 1 || level > MaxLevel) { NotifyFail("Usage: {cmd}setlevel{/} 1-" + MaxLevel); return false; }
+        Level = level;
+        xp = QueryXpForLevel(level);
+        Hp = QueryMaxHp();
+        FillResources();
+        Write($"You are now level {Level} with {xp} experience; the next level needs {(Level >= MaxLevel ? 0 : QueryXpForLevel(Level + 1))}.\n");
         return true;
     }
 }

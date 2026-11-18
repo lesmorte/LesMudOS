@@ -2,7 +2,7 @@
 
 The owner's brief is [specs/class-system.md](specs/class-system.md). This document says how it is built in LesMudOS. It follows combat timing pass 1 ([COMBAT_TIMING.md](COMBAT_TIMING.md)) and pulls in the parts of the timing brief that classes cannot work without: stamina, mana, skills and spells.
 
-Status: design. Nothing here is implemented yet.
+Status: stage A (everything up to and including the five archetypes, the travel pass and the Vale Road) is implemented; sections 8 (the Hall of Legends) and 9 (advanced classes) are the design for stages B and C. Section 12 describes how stage A is built and how to extend it.
 
 ## 1. Decisions from the owner
 
@@ -19,7 +19,7 @@ Status: design. Nothing here is implemented yet.
 | B | Oakenfell, the first major city of Greenvale (needs an area brief), with the Hall of Legends and its five hallmasters; advancement at level 5; the 15 advanced classes with two signature abilities each, including allies (summons and companions) |
 | C | Balance simulation and tests for the advanced classes; a play-through that ends with travelling to the city and pledging a class |
 
-Stage B cannot start until the city exists. Stage A does not depend on it.
+Stage B cannot start until the city has its area brief. Stage A does not depend on it.
 
 Subclasses (level 10) and prestige classes exist in the framework from stage A but have no content and cannot be chosen.
 
@@ -30,13 +30,13 @@ Every living thing, players and NPCs alike, has Vitality (the existing HP), Stam
 | | Max Stamina | Max Mana | Stamina regained per 10 s | Mana regained per 10 s |
 |---|---|---|---|---|
 | Warrior | 100 | 20 | 10 | 2 |
-| Scout | 100 | 20 | 10 | 2 |
-| Priest | 40 | 100 | 4 | 8 |
+| Scout | 100 | 20 | 8 | 2 |
+| Priest | 40 | 100 | 4 | 4 |
 | Mage | 30 | 100 | 3 | 8 |
 | Adventurer | 70 | 70 | 6 | 5 |
 | Creatures | per creature, default 50 | default 0 | 5 | 2 |
 
-Regeneration is the same in and out of combat; resting in a safe room doubles it. Resources do not grow with level in this pass (class identity comes from skills, not from stat growth).
+Regeneration is the same in and out of combat (the Adventurer's Survival Training makes it 50% faster out of combat); resting in a safe room doubles it. Resources do not grow with level in this pass (class identity comes from skills, not from stat growth).
 
 `score` and the short `hp` line show all three. Costs are checked when an action begins; an action the character cannot pay for is refused and not queued.
 
@@ -46,7 +46,7 @@ A skill is an action in the sense of COMBAT_TIMING.md: it has a name, a command 
 
 A trait is a passive feature: it changes a number or unlocks something, and has no command.
 
-- `skills` lists the character's skills and traits with their costs, timing in seconds for this character, and one line each. Skills granted by an equipped item are listed separately and disappear when the item is removed (the mechanism exists now; the first item-granted skills come with the timing brief's examples in a later pass).
+- `skills` lists the character's skills and traits with their costs, timing in seconds for this character, and one line each. Skills granted by an equipped item are listed separately and disappear when the item is removed (the mechanism exists now: an item overrides `QueryGrantedSkills`; no item in the Hollow grants one yet).
 - A skill is used by typing its command word, with a target where it takes one (`bash goblin`, `heal`, `bolt rat`). With no target it uses the current enemy, or the character for helpful spells.
 - Using a skill while not ready queues it, replacing whatever was queued, exactly as a potion does.
 
@@ -115,7 +115,7 @@ One character level, shared by all classes. The cap becomes 100.
 Experience to reach level n = 50 × n × (n − 1) × experience modifier
 ```
 
-That gives 100, 300, 600 and 1000 for levels 2 to 5, close to the present 100, 250, 500, 900. The constants live in one place. The experience modifier is the largest modifier among the character's classes: 1.0 for standard classes, 1.25 for Spellblade as the brief gives it, higher for future prestige classes. A character who gains a modifier keeps their level and experience; only the experience needed for later levels changes.
+That gives 100, 300, 600 and 1000 for levels 2 to 5 (it was 100, 250, 500, 900). The result is rounded to a whole number. The constants live in one place. The experience modifier is the largest modifier among the character's classes: 1.0 for standard classes, 1.25 for Spellblade as the brief gives it, higher for future prestige classes. A character who gains a modifier keeps their level and experience; only the experience needed for later levels changes.
 
 Per level: +8 maximum HP, as now.
 
@@ -148,7 +148,7 @@ An advanced class may carry its own rate, which then replaces the archetype's: T
 
 This rate governs weapon attacks and skills that make an attack roll. Spells that need no hit roll (Arcane Bolt, Fireball, Drain Life) are not affected by it, which is how the casting classes stay effective while being poorer with a weapon.
 
-Consequence for the existing area: today the defender's level counts for nothing, so adding Defense makes every attack against a target above level 1 less likely to hit, in both directions (by 15 points between two level 4 combatants). Creature armor in Vincent's Hollow is lowered to compensate where needed, and the result is checked with the simulation in stage C.
+Consequence for the existing area: today the defender's level counts for nothing, so adding Defense makes every attack against a target above level 1 less likely to hit, in both directions (by 15 points between two level 4 combatants). The simulation (`tests/balance_sim.py`) shows the Hollow needs no creature change: with the class numbers of section 7 every archetype completes it by level 4-5. Creature armor was left as it was.
 
 ## 7. Archetypes
 
@@ -158,26 +158,26 @@ Chosen at character creation, after the password, from a short in-character pres
 
 | Archetype | Starting HP | Base Reaction Time | Attack rate | Starting kit | Gold |
 |---|---|---|---|---|---|
-| Warrior | 34 | 3.0 | 1.00 | Rusty Sword, Small Shield | 10 |
-| Scout | 30 | 2.0 | 1.00 | Hunting Bow, Iron Dagger | 10 |
-| Priest | 28 | 2.5 | 0.97 | Novice's Mace, Minor Healing Potion | 15 |
-| Mage | 26 | 2.5 | 0.96 | Apprentice's Staff, Minor Healing Potion | 15 |
+| Warrior | 40 | 3.0 | 1.00 | Rusty Sword, Small Shield | 10 |
+| Scout | 26 | 2.0 | 1.00 | Hunting Bow, Iron Dagger | 10 |
+| Priest | 26 | 2.5 | 0.97 | Novice's Mace, Minor Healing Potion | 15 |
+| Mage | 24 | 2.5 | 0.96 | Apprentice's Staff, Minor Healing Potion | 15 |
 | Adventurer | 30 | 2.5 | 0.98 | Training Spear, two Trail Rations | 20 |
 
 ### Starting features
 
 | Archetype | Feature | Kind | Cost | Prep / Recovery | Effect |
 |---|---|---|---|---|---|
-| Warrior | Shield Bash (`bash`) | skill | 15 Stamina | 0 / 1.5 | Needs a shield. A normal hit roll; on a hit, half weapon damage, and the target is staggered: an action it is preparing is interrupted, otherwise its Ready Time is pushed back 2 seconds. |
-| Warrior | Defensive Training | trait | | | +1 armor. |
-| Warrior | Weapon Proficiency | trait | | | +1 to hit with any weapon. |
-| Scout | Evasion | trait | | | 10% dodge. |
+| Warrior | Shield Bash (`bash`) | skill | 15 Stamina | 0 / 1.5 | Needs a shield. A normal hit roll; on a hit, three quarters of weapon damage, and the target is staggered: an action it is preparing is interrupted, otherwise its Ready Time is pushed back 2 seconds. |
+| Warrior | Defensive Training | trait | | | +2 armor. |
+| Warrior | Weapon Proficiency | trait | | | +2 to hit with any weapon. |
+| Scout | Evasion | trait | | | 8% dodge. |
 | Scout | Tracking (`track`) | skill | 5 Stamina | 0 / 0.5 | Lists the creatures in each adjacent room. |
-| Scout | Precision Strike (`strike`) | skill | 20 Stamina | 0.5 / 1.0 | An attack at +5 to hit with a 30% critical chance. |
-| Priest | Minor Heal (`heal`) | spell | 20 Mana | 0.5 / 1.0 | Restores 15 HP to the caster or a target in the room. |
+| Scout | Precision Strike (`strike`) | skill | 25 Stamina | 0.5 / 1.0 | An attack at +2 to hit with a 15% critical chance. |
+| Priest | Minor Heal (`heal`) | spell | 25 Mana | 0.5 / 1.0 | Restores 8 HP (10 with Divine Knowledge) to the caster or a target in the room. |
 | Priest | Blessing (`bless`) | spell | 25 Mana | 0.5 / 1.0 | +1 to hit and +1 armor for 60 seconds, on the caster or a target. |
 | Priest | Divine Knowledge | trait | | | Healing spells restore 25% more. |
-| Mage | Arcane Bolt (`bolt`) | spell | 15 Mana | 0.5 / 1.0 | 6-10 damage that ignores armor; needs no hit roll, can be dodged. |
+| Mage | Arcane Bolt (`bolt`) | spell | 20 Mana (16 with Mana Efficiency) | 0.5 / 1.0 | 6-9 damage that ignores armor; needs no hit roll, can be dodged. |
 | Mage | Mana Efficiency | trait | | | Spells cost 20% less Mana. |
 | Mage | Magical Lore (`lore`) | skill | 5 Mana | 0 / 0.5 | Shows an item's exact numbers and any magical property. |
 | Adventurer | Survival Training | trait | | | HP, Stamina and Mana regenerate 50% faster out of combat. |
@@ -277,7 +277,7 @@ Skeletons, companions and turrets are living things under the same combat rules 
 
 ## 10. What must keep working
 
-Everything already built: the combat clock, corpses and the vault, quests, shops, colour, wizard tools, passwords, the area and its tests. Creatures gain Stamina and Mana but none in Vincent's Hollow uses a skill in this pass, so the area's balance changes only through what players can now do.
+Everything already built: the combat clock, corpses and lost property, quests, shops, colour, wizard tools, passwords, the area and its tests. Creatures gain Stamina and Mana but none in Vincent's Hollow uses a skill in this pass, so the area's balance changes only through what players can now do.
 
 ## 11. Balance and testing
 
@@ -285,3 +285,26 @@ Everything already built: the combat clock, corpses and the vault, quests, shops
 - Advanced classes cannot be fought with in the Hollow beyond repeating the dungeon at level 5, so their abilities are tested for correctness, not for balance against content that does not exist yet.
 - Tests: creation with each archetype; an existing character being asked at login; every starting feature; equipment access refusals; resources and regeneration; dodge, block and critical rolls with controlled test creatures; timed effects expiring; stagger; the travel pass from Rowan including re-issue; the closed road with and without the pass; (stage B and C:) each hallmaster; the two-step pledge and its refusals; every one of the 30 signature features; allies' lifetimes and credit; the experience formula and the Spellblade modifier; a class file added in the test's temporary mudlib being selectable without touching other files; persistence of all of it.
 - The play-through is run once per archetype. Each must complete both quests solo without wizard help, receive the travel pass and walk out onto the Vale Road. From stage C it continues to the city and pledges an advanced class.
+
+## 12. How stage A is built (for builders and for stage B)
+
+Files:
+
+| Path | What |
+|---|---|
+| `/std/living.cs` | Stamina and Mana (lazy regeneration), timed effects, dodge/block/critical, `Stagger`, `UseSkill`, the level-scaled `Attack` |
+| `/std/adventurer.cs` | The player's classes, skills, equipment access, `score`, `skills`, `restore`, `slay`, `setlevel` |
+| `/std/skill.cs`, `/std/trait.cs`, `/std/pclass.cs`, `/std/area.cs` | The small bases a skill, trait, class and area file inherit |
+| `/secure/classes.cs` | The registry. It lists the `/classes` and `/skills` directories on demand (the master grants this object, and only it, `get-dir` on those two paths), so a new file is found without a restart and without editing any list |
+| `/classes/*.cs`, `/skills/*.cs` | The five archetypes and the 16 starting skills and traits |
+| `area.cs` in a domain directory | The area name and region name of every room in that directory |
+
+To add a skill or trait: one file in `/skills` that inherits `/std/skill` (a command word, costs, timing, `Resolve(user, target)`) or `/std/trait` (`Mods["key"] = value`). The modifier keys understood are `tohit`, `tohit_armed`, `damage`, `armor`, `dodge`, `block`, `crit`, `regen_out`, `spell_cost_pct`, `healing_pct`, `spell_damage_pct`, `unarmed_min`, `unarmed_max`, `weapon_reaction_reduction`, `ignore_weapon`, `nospell` and `exit_detail`. To add a class: one file in `/classes` that inherits `/std/pclass` and sets its fields (tier, parent, requirements through `Require("level", "5")`, `ExpModifier`, `AttackRate`, the skills, traits and equipment access it adds, `Enabled`). Nothing else is edited. A class's id is its file name.
+
+The save holds `archetype`, `advancedClass`, `subclass` and `prestigeClass` as ids and nothing derived; every number comes from the class files at login.
+
+The entry point stage B uses to give an advanced class: `player.Call<string>("ApplyClass", id)` on the player object. It must be called by a game object (an NPC or room), never by a player's own commands; it returns `null` on success and otherwise a sentence saying why not (unknown or disabled class, parent class missing, requirement unmet, tier already filled). The Hall of Legends does the two-step pledge, then calls it.
+
+Experience: `Adventurer.ExperienceFor(level)` is the single place for the formula and the modifier.
+
+Balance as built (`python3 tests/balance_sim.py`): see the tables it prints. The class numbers of section 7 are the tuned values.

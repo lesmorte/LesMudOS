@@ -23,7 +23,7 @@ public class Login : MudObject
     public void Logon()
     {
         if (!Interactive(Self)) return; // only a login object the driver gave a connection to
-        Write("\nWelcome to LesMudOS.\n\nBy what name are you known? ");
+        Write("\nWelcome to Legends of Hollowmere.\n\nBy what name are you known? ");
         InputTo(GotName);
     }
 
@@ -88,7 +88,7 @@ public class Login : MudObject
         if (body is not { IsAlive: true }) { Fail("Something went wrong. Goodbye.\n"); return; }
         if (body.Call<bool>("CheckPassword", password))
         {
-            EnterGame();
+            AfterPassword();
             return;
         }
         if (++attempts >= MaxPasswordAttempts)
@@ -136,6 +136,69 @@ public class Login : MudObject
             return;
         }
         Write(accountState == "new" ? "Account created.\n" : "Password set.\n");
+        AfterPassword();
+    }
+
+    // ---- The choice of a calling (docs/CLASS_SYSTEM.md section 7) ----
+    // A character with no archetype, new or saved before classes existed, chooses one after the password and before
+    // entering the game. The list comes from the class files; the body decides what the choice gives.
+
+    private void AfterPassword()
+    {
+        if (body is not { IsAlive: true }) { Fail("Something went wrong. Goodbye.\n"); return; }
+        if (!body.Call<bool>("NeedsArchetype"))
+        {
+            EnterGame();
+            return;
+        }
+        var text = new StringBuilder("\nBefore you set out, choose your calling. Each is a way of facing the dangers of Hollowmere:\n\n");
+        foreach (var id in Callings())
+            if (Registry().Call<ObjectRef>("Class", id) is { } cls)
+                text.Append($"  {cls.Call<string>("QueryClassName")}: {cls.Call<string>("QueryTagline")}\n");
+        text.Append("\nType the name of a calling to choose it, or help and a name (for example: help mage) to read more.\nYour calling: ");
+        Write(text.ToString());
+        InputTo(GotCalling);
+    }
+
+    private ObjectRef Registry() => LoadObject("/secure/classes");
+
+    private List<string> Callings() => Registry().Call<List<string>>("EnabledOfTier", "archetype") ?? new List<string>();
+
+    private ObjectRef? FindCalling(string word)
+    {
+        word = word.Trim().ToLowerInvariant();
+        foreach (var id in Callings())
+            if (Registry().Call<ObjectRef>("Class", id) is { } cls
+                && (id == word || (cls.Call<string>("QueryClassName") ?? "").ToLowerInvariant() == word)) return cls;
+        return null;
+    }
+
+    private void GotCalling(string input)
+    {
+        if (body is not { IsAlive: true }) { Fail("Something went wrong. Goodbye.\n"); return; }
+        input = input.Trim();
+        if (input.StartsWith("help", StringComparison.OrdinalIgnoreCase))
+        {
+            var cls = FindCalling(input.Substring(4));
+            Write(cls == null ? "Say help and the name of a calling.\nYour calling: " : $"{cls.Call<string>("QueryClassName")}: {cls.Call<string>("QueryDescription")}\nYour calling: ");
+            InputTo(GotCalling);
+            return;
+        }
+        var chosen = FindCalling(input);
+        if (chosen == null)
+        {
+            Write("There is no such calling. Your calling: ");
+            InputTo(GotCalling);
+            return;
+        }
+        var problem = body.Call<string>("ChooseArchetype", chosen.Call<string>("QueryId"));
+        if (problem != null)
+        {
+            Write(problem + " Your calling: ");
+            InputTo(GotCalling);
+            return;
+        }
+        Write($"You take up the calling of the {chosen.Call<string>("QueryClassName")}.\n");
         EnterGame();
     }
 

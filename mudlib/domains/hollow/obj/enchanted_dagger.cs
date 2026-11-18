@@ -14,6 +14,8 @@ public class EnchantedDagger : Weapon
         ReactionMod = 0.0;
         Recovery = 0.5;
         ToHit = 2;
+        Category = "dagger";
+        Magic = "the blade is enchanted: +2 to hit";
         Value = 80;
     }
 }

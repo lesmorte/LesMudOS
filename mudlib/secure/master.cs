@@ -5,11 +5,12 @@
 public class Master : MudObject, IMaster
 {
     private const string WizList = "/secure/wizlist";
-    private const string Vault = "/secure/vault";
+    private const string LostProperty = "/secure/lost_property";
+    private const string LegacyVault = "/secure/vault";  // the old name of the lost-property save file, read once by the upgrade
 
     public ObjectRef Connect() => CloneObject("/secure/login");
 
-    public IEnumerable<string> Preload() => new[] { WizList, Vault, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
+    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
 
     // Save files: player bodies own /players/*, the wizard registry owns its own file.
     public bool ValidRead(string path, ObjectRef caller) => OwnsSaveFile(path, caller);
@@ -18,9 +19,15 @@ public class Master : MudObject, IMaster
     private static bool OwnsSaveFile(string path, ObjectRef caller)
     {
         if (path == WizList) return IsWizList(caller);
-        if (path == Vault) return !caller.IsClone && caller.ProgramPath == Vault;
+        if (path == LostProperty || path == LegacyVault) return !caller.IsClone && caller.ProgramPath == LostProperty;
+        // The history daemons each own the save file of their own name.
+        if (path is "/secure/chronicle" or "/secure/renown" or "/secure/rumors" or "/secure/events") return !caller.IsClone && caller.ProgramPath == path;
         return path.StartsWith("/players/") && IsPlayerBody(caller);
     }
+
+    // The class registry blueprint may list the two directories where classes and skills live, and nothing else.
+    private static bool IsClassRegistry(ObjectRef ob, string? path)
+        => !ob.IsClone && ob.ProgramPath == "/secure/classes" && (path == "/classes" || path == "/skills");
 
     private static bool IsPlayerBody(ObjectRef ob) => ob.IsClone && ob.ProgramPath == "/std/player";
 
@@ -37,6 +44,7 @@ public class Master : MudObject, IMaster
             case "admin-secret": return IsWizList(caller);
             case "exec": return caller.ProgramPath == "/secure/login";
             case "get-dir":
+                return IsPlayerBody(caller) || IsClassRegistry(caller, arg);
             case "read-file":
             case "write-file":
             case "make-dir":

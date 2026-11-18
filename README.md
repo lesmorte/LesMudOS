@@ -146,11 +146,11 @@ Introduce a syntax error and update again: the error comes back with file and li
 
 New characters now start in the Village Square of Vincent's Hollow (the start room is the `StartRoom` constant in `mudlib/std/player.cs`; `/domains/town` stays as the small technical demo). The gameplay systems are described in [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md), and builders should read [docs/BUILDING.md](docs/BUILDING.md).
 
-Player commands: `ansi`, `kill`/`attack`, `flee`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
+Player commands: `ansi`, `kill`/`attack`, `flee`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `skills`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
 
 Combat has no rounds. Each fighter acts when its own Reaction Time and the Recovery of its last action have passed (an unarmed player strikes every 6 seconds, one with a sword every 8), and `score`, `consider` and `stat` show the numbers. Drinking a potion mid-fight is queued for your next ready moment; `stop` cancels it. See docs/COMBAT_TIMING.md.
 
-Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `heal [TARGET]` and `speed TARGET PERCENT [SECONDS]` (5), `smite TARGET` (10), plus `update` and `clone` as before.
+Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `restore [TARGET]` and `speed TARGET PERCENT [SECONDS]` (5), `slay TARGET` (10), plus `update` and `clone` as before.
 
 ### Colour
 
@@ -192,7 +192,7 @@ public class Lantern : Item
 |---|---|
 | `src/LesMudOS.Api` | The contract mudlib code compiles against: `MudObject` (applies and efuns), `ObjectRef`, `IMaster`, `[Saved]` |
 | `src/LesMudOS.Driver` | The host: kernel and game loop, Roslyn compiler, tick injector, sandbox analyzer, telnet server, save store |
-| `mudlib` | Sample mudlib: `/secure` (master, login, wizard registry), `/std` (thing, item, room, living, npc, monster, shopkeeper, weapon, armor, consumable, coins, corpse, adventurer, player, void), `/secure/vault` (lost-property vault), `/domains/town` (technical demo), `/domains/hollow` (Vincent's Hollow) |
+| `mudlib` | Sample mudlib: `/secure` (master, login, wizard registry), `/std` (thing, item, room, living, npc, monster, shopkeeper, weapon, armor, consumable, coins, corpse, adventurer, player, void), `/secure/lost_property` (lost-property store), `/domains/town` (technical demo), `/domains/hollow` (Vincent's Hollow) |
 | `mudlib/Mudlib.csproj` | Not used at run time. Gives IntelliSense for mudlib files and lets `dotnet build` check the whole mudlib. |
 | `tests/smoke_test.py` | End-to-end test of the driver over TCP (port 4811 in the examples below) |
 | `tests/area_test.py` | End-to-end test of the game systems and of the Hollow's content, with test rooms and wizard help (port 4812, about 8 minutes) |

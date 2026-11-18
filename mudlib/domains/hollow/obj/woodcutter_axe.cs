@@ -12,6 +12,7 @@ public class WoodcutterAxe : Weapon
         DamageMax = 21;
         ReactionMod = 1.0;
         Recovery = 1.5;
+        Category = "axe";
         Value = 18;
     }
 }

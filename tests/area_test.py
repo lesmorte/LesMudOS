@@ -115,9 +115,9 @@ public class VTool : Item
     }
     private bool Run(string args)
     {
-        var vault = LoadObject("/secure/vault");
-        vault.Call("Record", "tester", "fake-id", new List<string> { "/domains/hollow/obj/rusty_sword" }, 5);
-        var claim = vault.Call<List<string>>("Claim");
+        var store = LoadObject("/secure/lost_property");
+        store.Call("Record", "tester", "fake-id", new List<string> { "/domains/hollow/obj/rusty_sword" }, 5);
+        var claim = store.Call<List<string>>("Claim");
         Write("claim count " + (claim == null ? -1 : claim.Count) + " gold " + (claim == null ? "?" : claim[0]) + "\\n");
         return true;
     }
@@ -154,7 +154,7 @@ TEST_FILES = {
     "brute": monster("Brute", "Brute", ["ogre"], "a brute", 500, 25, 25, tohit=30, level=5, aggressive=True),
     "scratch_mob": monster("ScratchMob", "Scratch", ["biter"], "a biter", 2000, 4, 4, tohit=30, armor=5, aggressive=True),
     "dummy_a": monster("DummyA", "Dummy", ["training dummy"], "a training dummy", 1, 1, 1, tohit=-30, xp=100),
-    "dummy_b": monster("DummyB", "Dummy", ["training dummy"], "a training dummy", 1, 1, 1, tohit=-30, xp=150),
+    "dummy_b": monster("DummyB", "Dummy", ["training dummy"], "a training dummy", 1, 1, 1, tohit=-30, xp=200),
     "dummy_c": monster("DummyC", "Dummy", ["training dummy"], "a training dummy", 1, 1, 1, tohit=-30, xp=300),
     "dummy_d": monster("DummyD", "Dummy", ["training dummy"], "a training dummy", 1, 1, 1, tohit=-30, xp=400),
     "villager": '''// @inherit /std/npc
@@ -283,7 +283,7 @@ def fight_until(c, marker, timeout=90, heal_with=None):
         data += quiet(c, 0.5)
         if heal_with is not None and time.time() - last_heal > 1.4:
             last_heal = time.time()
-            c.send("heal")
+            c.send("restore")
     return data
 
 
@@ -311,7 +311,7 @@ def fight_until_timed(c, marker, timeout=90, heal_with=None):
             data += got
         if heal_with is not None and time.time() - last_heal > 1.4:
             last_heal = time.time()
-            c.send("heal")
+            c.send("restore")
     return data, chunks
 
 
@@ -363,7 +363,7 @@ def hollow_files(mudlib):
 def main():
     work = tempfile.mkdtemp(prefix="lesmudos-area-")
     mudlib = os.path.join(work, "mudlib")
-    h.copy_mudlib(mudlib)
+    h.copy_mudlib(mudlib, novice=True)
     os.makedirs(os.path.join(mudlib, "domains", "test"))
     for name, source in TEST_FILES.items():
         h.write(mudlib, TEST + name, source)
@@ -377,7 +377,7 @@ def main():
     box[0], box[1] = start_driver(work, mudlib)
     try:
         run(work, mudlib)
-        run_vault(work, mudlib, box)
+        run_lost_property(work, mudlib, box)
         box[1].flush()
         logged = open(os.path.join(work, "driver.log")).read()
         h.check("the driver logged no errors", "ok" if "ERROR" not in logged else logged[logged.index("ERROR"):][:800], "ok")
@@ -430,7 +430,7 @@ def die_in_pit(wiz, name, items_to_carry):
     return c, before, text
 
 
-def run_vault(work, mudlib, box):
+def run_lost_property(work, mudlib, box):
     check = h.check
     sword = (HOLLOW + "obj/rusty_sword", "rusty sword")
     shield = (HOLLOW + "obj/small_shield", "small shield")
@@ -451,8 +451,8 @@ def run_vault(work, mudlib, box):
     fee = before // 10
     check("the corpse holds the belongings and the fee", (wiz.command("goto " + TEST + "pit"), wiz.command("look in corpse of mourn"))[1],
           "a rusty sword", "a small shield", f"{fee} gold coins")
-    vault = open(os.path.join(work, "save", "secure", "vault.json")).read()
-    check("the vault already holds the record (write-through)", vault, "rusty_sword", "small_shield", '"mourn|')
+    store_text = open(os.path.join(work, "save", "secure", "lost_property.json")).read()
+    check("the lost-property store already holds the record (write-through)", store_text, "rusty_sword", "small_shield", '"mourn|')
     gold_after_death = score_of(mourn)["gold"]
     mourn.send("quit")
     mourn.read_until("Goodbye")
@@ -467,8 +467,8 @@ def run_vault(work, mudlib, box):
     check("after a clean restart the owner gets the belongings back", text, "Harland, the innkeeper of the Hollowman's Rest", "You recover 2 items and %d gold." % fee)
     check("the items are in the inventory", mourn.command("i"), "a rusty sword", "a small shield")
     check("and the gold is back", str(score_of(mourn)["gold"]), str(gold_after_death + fee))
-    vault = open(os.path.join(work, "save", "secure", "vault.json")).read()
-    check("the record is deleted", vault, absent=("mourn|", "rusty_sword"))
+    store_text = open(os.path.join(work, "save", "secure", "lost_property.json")).read()
+    check("the record is deleted", store_text, absent=("mourn|", "rusty_sword"))
     mourn.send("quit")
     mourn.read_until("Goodbye")
     mourn = h.Client("mourn")
@@ -486,13 +486,13 @@ def run_vault(work, mudlib, box):
     fee = before // 10
     gold_after_death = score_of(crasher)["gold"]
     wiz.command("goto " + TEST + "pit")
-    wiz.command("smite brute")
+    wiz.command("slay brute")
     for step in ("d", "north", "down", "pit"):
         crasher.command(step)
     check("the owner loots only the sword", crasher.command("get rusty sword from corpse of crasher"), "You take a rusty sword from the corpse of Crasher.")
-    vault = open(os.path.join(work, "save", "secure", "vault.json")).read()
-    check("the vault follows the corpse", vault, "small_shield", '"crasher|')
-    check("the sword has left the vault record", str("rusty_sword" in vault.split('"crasher|')[1]), "False")
+    store_text = open(os.path.join(work, "save", "secure", "lost_property.json")).read()
+    check("the lost-property store follows the corpse", store_text, "small_shield", '"crasher|')
+    check("the sword has left the lost-property record", str("rusty_sword" in store_text.split('"crasher|')[1]), "False")
     restart(work, mudlib, box, "kill")
     crasher = h.Client("crasher")
     text = crasher.read_until("> ")
@@ -524,11 +524,11 @@ def run(work, mudlib):
     # ===== character sheet, help =====
     s = score_of(hero)
     check("a new character: level 1, 30 HP, 25 gold, unarmed 2-5, Reaction Time 2.5", s["text"], "Level 1   Experience 0 (100 more for level 2)",
-          "HP 30/30   Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
+          "HP 30/30", "Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
     check("hp command", hero.command("hp"), "HP 30/30")
     text = hero.command("help")
     check("help lists the new commands", text, "kill (or attack)", "flee", "consider", "wield", "wear", "browse", "buy", "accept", "report", "quests", "score",
-          absent=("goto", "Wizard", "smite"))
+          absent=("goto", "Wizard", "slay"))
 
     # ===== details, readables, NPC talk =====
     check("look at a detail", hero.command("look at well"), "broad well of fitted grey stone")
@@ -681,7 +681,7 @@ def run(work, mudlib):
     # ===== experience and levelling =====
     drain(hero, 1.0)
     base = score_of(hero)["xp"]
-    final_xp = base + 1050
+    final_xp = base + 1100
     wiz.command("goto " + TEST + "dummy")
     hero.command("dummy")
     wiz.command("clone " + TEST + "dummy_a")
@@ -691,8 +691,8 @@ def run(work, mudlib):
     check("100 experience reach level 2", text, "You gain 100 experience.", "You have reached level 2!", "Maximum HP is now 38")
     drain(hero)
     s = score_of(hero)
-    check("level 2: experience, the rest to level 3, full healed 38 HP", s["text"], f"Level 2   Experience {base + 100} ({150 - base} more for level 3)", "HP 38/38")
-    levels = [("dummy_b", 150, "", 3, 46), ("dummy_c", 300, "", 4, 54), ("dummy_d", 400, "", 5, 62)]
+    check("level 2: experience, the rest to level 3, full healed 38 HP", s["text"], f"Level 2   Experience {base + 100} ({200 - base} more for level 3)", "HP 38/38")
+    levels = [("dummy_b", 200, "", 3, 46), ("dummy_c", 300, "", 4, 54), ("dummy_d", 400, "", 5, 62)]
     for dummy, xp, total, level, max_hp in levels:
         wiz.command("clone " + TEST + dummy)
         hero.command("kill dummy")
@@ -700,13 +700,13 @@ def run(work, mudlib):
         check(f"level {level} is reached", text, f"You gain {xp} experience.", f"You have reached level {level}!", f"Maximum HP is now {max_hp}")
         drain(hero)
     s = score_of(hero)
-    check("level 5 is the highest", s["text"], f"Level 5   Experience {base + 950} (highest level)", "HP 62/62")
+    check("level 5 reached at 1000 experience; level 6 needs 1500", s["text"], f"Level 5   Experience {base + 1000} ({500 - base} more for level 6)", "HP 62/62")
     wiz.command("clone " + TEST + "dummy_a")
     hero.command("kill dummy")
     text = fight_until(hero, "gain 100 experience", timeout=120)
     drain(hero)
     s = score_of(hero)
-    check("no level beyond 5, experience still counts", s["text"], f"Level 5   Experience {final_xp} (highest level)")
+    check("100 more experience does not level at 5, and still counts", s["text"], f"Level 5   Experience {final_xp} ({400 - base} more for level 6)")
     check("no second level-up message", text, absent=("reached level",))
     check("kill credit is recorded for the killer", s["text"], "Level 5")
     hero.command("out")
@@ -868,7 +868,7 @@ def run(work, mudlib):
 
     # ===== the player's corpse =====
     wiz.command("goto " + TEST + "trap")
-    check("a wizard kills the brute", wiz.command("smite brute"), "A brute dies.")
+    check("a wizard kills the brute", wiz.command("slay brute"), "A brute dies.")
     check("the dead player's corpse lies where they fell", wiz.command("look"), "The corpse of Hero is here.")
     check("the corpse lists the belongings", wiz.command("look in corpse of hero"), "a woodcutter axe", "a small shield", f"{fee} gold coins")
     check("another player cannot loot the corpse of Hero", wiz.command("get all from corpse of hero"), "The corpse of Hero is not yours to loot yet.")
@@ -955,8 +955,8 @@ def run(work, mudlib):
     # ===== builder wizard commands and their level gates =====
     check("goto: below level 1 it does not exist", hero.command("goto " + TEST + "hub"), "What?")
     check("stat: below level 1 it does not exist", hero.command("stat me"), "What?")
-    check("heal: below level 5 it does not exist", hero.command("heal"), "What?")
-    check("smite: below level 10 it does not exist", hero.command("smite benson"), "What?")
+    check("heal: below level 5 it does not exist", hero.command("restore"), "What?")
+    check("slay: below level 10 it does not exist", hero.command("slay benson"), "What?")
     low = h.Client("lowly")
     low.read_until("> ")
     check("promote to level 1", wiz.command("promote lowly 1"), "lowly is now wizard level 1")
@@ -969,23 +969,23 @@ def run(work, mudlib):
     check("level 1: stat here", low.command("stat here"), "Gnawer Den", "Spawn /domains/test/gnawer x2: 2 alive", "Exit out")
     check("level 1: goto a player", low.command("goto hero") + quiet(low, 1.0), "Village Square", "Hero the newcomer")
     check("level 1: goto a missing room", low.command("goto /domains/nowhere"), "No such file")
-    check("level 1: heal does not exist", low.command("heal"), "What?")
-    check("level 1: smite does not exist", low.command("smite torren"), "What?")
-    check("level 1: help lists goto and stat", low.command("help", marker="stop the driver") if False else low.command("help"), "goto", "stat", absent=("smite", "heal ["))
+    check("level 1: heal does not exist", low.command("restore"), "What?")
+    check("level 1: slay does not exist", low.command("slay torren"), "What?")
+    check("level 1: help lists goto and stat", low.command("help", marker="stop the driver") if False else low.command("help"), "goto", "stat", absent=("slay", "restore ["))
     wiz.command("promote lowly 5")
     low.read_until("level is now")
     drain(low, 0.5)
-    check("level 5: heal yourself", low.command("heal"), "You are restored to full health.")
+    check("level 5: heal yourself", low.command("restore"), "You are restored to full health.")
     low.command("goto " + TEST + "den")
-    check("level 5: heal another creature", low.command("heal gnawer"), "You restore a gnawer to full health.")
-    check("level 5: smite does not exist", low.command("smite gnawer"), "What?")
+    check("level 5: heal another creature", low.command("restore gnawer"), "You restore a gnawer to full health.")
+    check("level 5: slay does not exist", low.command("slay gnawer"), "What?")
     wiz.command("promote lowly 10")
     low.read_until("level is now")
     drain(low, 0.5)
-    text = low.command("smite gnawer")
-    check("level 10: smite kills with normal death processing", text, "You smite a gnawer!", "A gnawer dies.")
-    check("smite on yourself or nothing", low.command("smite nobody"), "Smite whom?")
-    check("help for level 10 lists everything", low.command("help", marker="stop the driver"), "heal [", "smite", "goto", "stat")
+    text = low.command("slay gnawer")
+    check("level 10: slay kills with normal death processing", text, "You slay a gnawer!", "A gnawer dies.")
+    check("slay on yourself or nothing", low.command("slay nobody"), "Slay whom?")
+    check("help for level 10 lists everything", low.command("help", marker="stop the driver"), "restore [", "slay", "goto", "stat")
     low.read_until("> ")
     low.send("quit")
     low.read_until("Goodbye")
@@ -996,7 +996,7 @@ def run(work, mudlib):
     wiz.command("goto " + TEST + "dummy")
     for dummy in ("dummy_d", "dummy_c", "dummy_b", "dummy_a"):
         wiz.command("clone " + TEST + dummy)
-        wiz.command("smite dummy")
+        wiz.command("slay dummy")
     s = score_of(wiz)
     check("the wizard reached level 5 by smiting", s["text"], "Level 5")
     # quest 1 for the wizard, before the boss
@@ -1008,7 +1008,7 @@ def run(work, mudlib):
     text = wiz.command("look")
     check("the Overseer Chamber", text, "Overseer Chamber", "Unlike the rest of the dungeon, this room is surprisingly organized.", "The Goblin Overseer is here.")
     check("look at a detail of the chamber", wiz.command("look at crow"), "crude black crow")
-    check("stat on the boss", wiz.command("stat overseer"), "Level 5, HP 114/114", "Damage 4-7, to hit 2, armor 3", "xp 250", "loot 4",
+    check("stat on the boss", wiz.command("stat overseer"), "Level 5, HP 114/114", "Damage 4-7, attack 7", "defense 4, armor 3", "xp 250", "loot 4",
           "Reaction Time: base 4.0", "Axe Slash: preparation 0.0, recovery 1.0", "delay 10.0 s", "Power Strike: preparation 1.0, recovery 2.0", "delay 12.0 s",
           "Battle Cry", "Summon Goblin Minion")
     wiz.command("clone " + HOLLOW + "obj/overseers_axe")
@@ -1098,20 +1098,20 @@ def run(work, mudlib):
     check("the 60 second rule: no new encounter right away", wiz.command("wolf"), "Wolf Run", absent=("wolf is here",))
     wiz.command("out")
 
-    # ===== reset: a creature killed by smite is replaced =====
+    # ===== reset: a creature killed by slay is replaced =====
     wiz.command("rats")
-    wiz.command("smite rat")
+    wiz.command("slay rat")
     text = wiz.command("look")
     check("one rat left after a kill", text, "A large rat is here.", absent=("Two large rats",))
-    wiz.command("smite rat")
+    wiz.command("slay rat")
     text = ""
     end = time.time() + 25
     while time.time() < end and "Two large rats are here." not in text:
         time.sleep(1)
         text = wiz.command("look")
     check("killed creatures are replaced at reset", text, "Two large rats are here.")
-    wiz.command("smite rat")
-    wiz.command("smite rat")
+    wiz.command("slay rat")
+    wiz.command("slay rat")
     wiz.command("out")
 
     # ===== live update keeps one of each NPC =====
@@ -1145,7 +1145,7 @@ def run(work, mudlib):
     drain(b, 0.5)
     expected = {"hall", "vault_door", "vault", "trail", "villager", "shopkeeper", "rat", "drake", "sword", "helm", "potion", "purse", "key"}
     check("the guide has a template for every kind", ",".join(sorted(p.rsplit("/", 1)[1] for p in templates)), *sorted(expected))
-    b.command("heal")
+    b.command("restore")
     text = b.command("goto /domains/example/hall") + quiet(b, 0.5)
     check("the plain room template loads", text, "Example Hall", "A square hall with a worn flagstone floor.", "Two example rats are here.", "An example potion is here.")
     check("template: detail", b.command("look at floor"), "chipped and swept clean")
@@ -1160,7 +1160,7 @@ def run(work, mudlib):
     check("template: the corpse holds gold and the loot", text, "from the corpse of an example rat.", "gold to your purse.")
     b.command("loot")
     text = b.command("clone /domains/example/drake") + b.command("stat drake")
-    b.command("smite drake")
+    b.command("slay drake")
     check("template: a creature with a pattern lists its actions and delays", text, "Reaction Time: base 4.0", "Claw Swipe: preparation 0.0, recovery 1.0, modifier 0.0, delay 10.0 s",
           "Fire Breath: preparation 1.0, recovery 3.0, modifier 0.0, delay 14.0 s", "wind-up \"rears back and swells its chest\"")
     b.command("loot")
@@ -1204,7 +1204,7 @@ def run(work, mudlib):
     wiz2.command("goto " + TEST + "scratch")
     # The wizard's own state came back: level 5 wizard, quests done, equipment.
     s = score_of(wiz2)
-    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 5", "Damage 17-25", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
+    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 6", "Damage 17-25", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
     wiz2.send("quit")
     wiz2.read_until("Goodbye")
 
