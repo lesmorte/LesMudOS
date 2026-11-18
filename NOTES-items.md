@@ -21,8 +21,11 @@ Branch work/items, worktree /home/claude/wt-items. Spec: docs/PLAN-corridor-craf
   "Quality and stacks" with a compiled template (/domains/example/pelt) and the helper table.
 - Passing after the main change: smoke, area, class, ansi, timing, chronicle, load_check.
 
+- Final rerun after the last fixes: build 0/0; smoke 372, area 303, class 140, ansi 82, timing 74, chronicle 198,
+  item 125 checks, all 0 failures; load_check 0 failed. Every script passed on its first run.
+
 ## Next
-- Final rerun of smoke, area, load_check, item_test after the last fixes; report.
+- Nothing open for F1. Waiting on the lead: the room.cs plural ("are here") for stacks; whether looting should save.
 
 ## Decisions
 - Record format: "path" or "path?q=2&n=5&p.key=value" (%XX escapes for % & = ?). Kept in the same List<string> fields,
