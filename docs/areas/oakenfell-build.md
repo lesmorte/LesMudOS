@@ -32,16 +32,12 @@ These need systems that are still being built. Describe the place and its people
 
 ### Vale Road (owner: builder 1, prefix `Vr`) — directory `/domains/greenvale/vale_road/`
 
-`/domains/greenvale/vale_road/road` already exists (it is being written by someone else): its north exit will be connected at integration.
+Two rooms remain here. The Long Meadows, the River Bend and the Rise (and the Riverwatch ranger of the River Bend) were retired when the Greenvale Transit Corridor replaced them; the road between them is now the corridor's five segments (see [transit-corridor-build.md](transit-corridor-build.md)). The corridor's River Bend, the Rise and the Carters' Mile are `/domains/greenvale/corridor/approach/m07`, `m10` and `m11`.
 
 | Path | Short name | Exits |
 |---|---|---|
-| `/domains/greenvale/vale_road/meadows` | Vale Road, the Long Meadows | south `/domains/greenvale/vale_road/road`; north `/domains/greenvale/vale_road/river_bend` |
-| `/domains/greenvale/vale_road/river_bend` | Vale Road, the River Bend | south `.../meadows`; north `.../rise` |
-| `/domains/greenvale/vale_road/rise` | Vale Road, the Rise | south `.../river_bend`; north `.../approach` |
-| `/domains/greenvale/vale_road/approach` | The Southgate Approach | south `.../rise`; north `southgate/gate` |
-
-The meadows have a wandering wolf encounter (`/domains/hollow/mob/wandering_wolf`, 20%). The river bend has a peaceful Riverwatch Ranger on patrol. The Rise is the first sight of the city and carries the "wonder" moment.
+| `/domains/greenvale/vale_road/road` | The Vale Road | south `/domains/hollow/village/north_road`; north `/domains/greenvale/corridor/south_road/m01` |
+| `/domains/greenvale/vale_road/approach` | The Southgate Approach | south `/domains/greenvale/corridor/approach/m11`; north `southgate/gate` |
 
 ### Southgate District (owner: builder 1, prefix `Sg`) — directory `southgate/`
 

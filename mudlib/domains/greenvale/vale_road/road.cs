@@ -11,7 +11,7 @@ public class ValeRoad : Room
         LongDesc = "Past the last milestone of Vincent's Hollow the North Road widens into the Vale Road, a rutted cart track between hedgerows and rolling green fields. The air is cooler here, and the smoke of the village is already a smudge behind you. The road runs on north toward Oakenfell, the first city of Greenvale. A heap of cut timber and loose stone lies at the verge, where a fall has lately been cleared from the way.";
         Exits["south"] = "/domains/hollow/village/north_road";
         Safe = false;
-        Exits["north"] = "/domains/greenvale/vale_road/meadows";
+        Exits["north"] = "/domains/greenvale/corridor/south_road/m01";
 
         AddDetail("road,track,cart track,vale road", "The track is churned and rutted by carts, with a strip of grass down the middle where the wheels do not reach. It runs north between the hedgerows.");
         AddDetail("hedgerows,hedgerow,hedge,hedges", "Hawthorn and bramble, thick with last year's berries, line both sides of the road.");
