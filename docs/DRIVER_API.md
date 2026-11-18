@@ -240,17 +240,36 @@ Commands in `/std/player` and the level each needs:
 | `goto <room path or player>`, `stat <me, here or name>` | 1 |
 | `heal [<target>]` | 5 |
 | `smite <target>` | 10 |
-| `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`), `cat <file>` | 1 |
-| `mkdir <dir>`, `edit <file>`, `copy <from> <to>`, `move <from> <to>`, `rename <file> <newname>`, `delete <file>`, `rmdir <dir>` outside `/secure` and `/std` | 5 |
-| The same, under `/secure` and `/std` | 10 |
-| `clone <path>` | 3 |
-| `update <path>` | 5 |
+| `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`), `cat <file>` | 1, anywhere |
+| `mkdir <dir>`, `edit <file>`, `copy <from> <to>`, `move <from> <to>`, `rename <file> <newname>`, `delete <file>`, `rmdir <dir>`, `update <path>`, `clone <path>` | 1 in your own home `/wiz/<you>/...`; otherwise as in the next table |
 | `shutdown` (saves every online player first) | 10 |
 | `promote <secret>` | Any, but only works while there is no level-10 wizard |
 
-Each wizard has a current mudlib directory, saved with the player. `cd` and `list` take absolute or relative paths, with `.` and `..`; `cd` alone returns to `/`. `update` and `clone` resolve relative paths against it too.
+#### Wizard homes and who may change what
 
-File names given to `cat`, `edit`, `copy`, `move`, `rename` and `delete` get `.cs` appended if they have no extension. If the destination of `copy` or `move` is an existing directory, the file keeps its name inside it. `rename` takes a bare new name and keeps the file in its directory. None of them overwrites an existing file. `copy` needs the level to write the destination; `move` and `rename` change both places, so they need the level to write both. Changing `/secure` and `/std` (compared without regard to case, since some file systems ignore it) needs level 10 because that code is what enforces wizard levels: a wizard who could edit `/std/player.cs` could grant themselves anything.
+Every wizard (level 1 or higher) has a home directory `/wiz/<name>`, where `<name>` is the player's own name in lower case. The player body creates it with `MakeDir` when the player becomes a wizard (the level-10 bootstrap or `promote`) and again at login if it is missing, and says so once, in one line, when it makes it. Demotion to level 0 leaves the directory and its files where they are; the former wizard has no wizard commands until promoted again, and then has the home back.
+
+The single rule is `ChangeRefusal(path)` in `/std/player`. Every command that creates, writes, copies to, moves, renames or removes a file or directory asks it for each path it touches (`move` and `rename` ask for both, `copy` for the destination only; reading is open to every wizard), and the editor and `delete` ask again when they save or when the answer arrives. Names are compared whole segment by whole segment and without regard to case, so `bob` has nothing to do with `/wiz/bobby` and `/WIZ/Bob` is `/wiz/bob`.
+
+| Path | `mkdir`, `edit`, `copy` to, `move`, `rename`, `delete`, `rmdir` | `update` | `clone` | `goto` |
+|---|---|---|---|---|
+| Under your own home, `/wiz/<you>/...` | level 1 | level 1 | level 1 | level 1 |
+| Under another wizard's home | level 5 | level 5 | level 3 | level 1 |
+| The home directory itself `/wiz/<name>`, `/wiz`, or a file directly in `/wiz` | level 10 (see below) | level 5 | level 3 | level 1 |
+| `/secure`, `/std` | level 10 | level 5 | level 3 | level 1 |
+| Anywhere else | level 5 | level 5 | level 3 | level 1 |
+
+Reading (`list`, `cd`, `cat`) is level 1 everywhere. A wizard below level 5 who tries to change something in another wizard's home is refused with `/wiz/<name> is another wizard's home. Below wizard level 5 you may read it (list, cd, cat) but not change it.` `update`, `clone` and `goto` are not loosened for other people's files: below the level shown they are refused (`goto` is level 1 everywhere, as before). The home directory and `/wiz` cannot be removed, renamed or moved, or have files created directly in them, by anyone below level 10, the owner included; the owner controls everything under the home. (The one exception: `mkdir` of your own home, which normally exists already, is allowed.) The directory commands cannot rename directories anyway, since `RenameFile` moves files only.
+
+`~` at the start of a path (`~` alone, or `~/...`) means the wizard's own home in every command that takes a path, including `goto`, `update` and `clone`; `cd` with no argument goes there (`cd /` goes to the root). `~name` is not special. `pwd` and all messages show the real path.
+
+The master gives file efuns to player bodies only. Code that a wizard writes under `/wiz` is an ordinary program: it gets no file efuns, cannot call `Promote` or `Bootstrap`, cannot read or write save files, and cannot reach the admin secret. The tests in the "wizard homes" section of `tests/smoke_test.py` try each of these from a level-1 wizard's object.
+
+`mudlib/Mudlib.csproj` leaves `wiz/**` out, so files that wizards create at run time cannot break `dotnet build`.
+
+Each wizard has a current mudlib directory, saved with the player. `cd` and `list` take absolute or relative paths, with `.` and `..`; `cd` alone goes to the wizard's home (and `cd /` to the root). `update` and `clone` resolve relative paths against it too.
+
+File names given to `cat`, `edit`, `copy`, `move`, `rename` and `delete` get `.cs` appended if they have no extension. If the destination of `copy` or `move` is an existing directory, the file keeps its name inside it. `rename` takes a bare new name and keeps the file in its directory. None of them overwrites an existing file. `copy` needs permission to write the destination; `move` and `rename` change both places, so they need it for both. Changing `/secure` and `/std` (compared without regard to case, since some file systems ignore it) needs level 10 because that code is what enforces wizard levels: a wizard who could edit `/std/player.cs` could grant themselves anything.
 
 `delete` and `rmdir` are the only commands that destroy anything, and nothing they remove can be recovered. `delete <file>` asks `Delete <path>? This cannot be undone. (y/n)`; only `y` or `yes` (in any case) deletes, and anything else answers `Not deleted.` The level is checked again when the answer arrives. If any other message reached the wizard between the question and the answer (it may have been another object's question that the `y` was meant for), nothing is deleted and `delete` must be typed again. If the file was a `.cs` file whose object is loaded, the object stays loaded until it is destructed or the driver restarts, and `delete` says so. `delete` on a directory says to use `rmdir`. `rmdir <dir>` removes an empty directory without asking. It refuses a directory with anything in it, hidden files included, and the directory you are in or one above it. There is no recursive delete: empty a directory file by file first.
 

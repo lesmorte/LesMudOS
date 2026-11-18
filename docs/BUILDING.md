@@ -2,7 +2,25 @@
 
 How to add rooms, creatures, shops and items to the game. Every template below is real code: `tests/area_test.py` extracts the blocks whose first line is `// File: <path>.cs`, writes them into a test mudlib under `/domains/example`, loads them in the driver and plays with them. If a template here stops compiling, that test fails.
 
-You need wizard level 3 or more to `clone`, 1 to `goto` and `stat`, 5 to `update` and to edit files. See [GAME_SYSTEMS.md](GAME_SYSTEMS.md) for the rules and numbers behind the classes, and [DRIVER_API.md](DRIVER_API.md) for the sandbox.
+Every wizard may build in their own home directory `/wiz/<name>` (see "Where your files go" below) at any level: `edit`, `update`, `clone` and `goto` work there from level 1. Outside your home you need level 3 to `clone`, 1 to `goto` and `stat`, 5 to `update` and to edit files. See [GAME_SYSTEMS.md](GAME_SYSTEMS.md) for the rules and numbers behind the classes, and [DRIVER_API.md](DRIVER_API.md) for the sandbox.
+
+## Where your files go
+
+Every wizard has a home directory, `/wiz/<yourname>` (your name in lower case), made for you when you became a wizard. In every command, `~` at the start of a path means your home, and `cd` with no argument goes there:
+
+```
+cd                       go home: /wiz/yourname
+mkdir ~/rooms            make directories for your rooms and items
+mkdir ~/obj
+edit ~/rooms/hall        create or change a file (the line editor; "h" for help)
+update ~/rooms/hall      compile it; goto ~/rooms/hall walks in
+clone ~/obj/gem          make an item to try
+copy ~/rooms/hall ~/rooms/hall2     also: move, rename, delete (asks first), rmdir
+```
+
+You control everything under your home at any wizard level. Other wizards can read it, and wizards of level 5 or more can change it. The home directory itself and `/wiz` can be removed or renamed only by a level-10 wizard. An exit in one of your rooms names a path like any other: `Exits["north"] = "/wiz/yourname/rooms/hall";`.
+
+The mudlib project excludes `wiz/**` from `dotnet build`, so the rule that class names are unique across the whole mudlib (checklist item 3) is not checked for your files; a compile error in them shows when you `update` them.
 
 ## The checklist
 
