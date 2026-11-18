@@ -1,0 +1,29 @@
+// @inherit /std/npc
+
+public class VhTanner : Npc
+{
+    public override void Create()
+    {
+        Name = "Dunstan Skell";
+        Ids.Add("dunstan");
+        Ids.Add("skell");
+        Ids.Add("tanner");
+        Ids.Add("man");
+        ShortDesc = "Dunstan Skell the tanner";
+        LongDesc = "A lean, long-armed man with his sleeves rolled to the shoulder and hands stained the colour of tea. He has stopped noticing the smell, and he stands close to you anyway, quite cheerfully.";
+        Level = 2;
+        MaxHp = 22;
+
+        AddChat("You get used to the smell. Everyone says that, and everyone is lying, but I do mean it kindly.");
+        AddChat("Bring a hide in fresh and I'll make you something that lasts. Bring it in rotten and I'll make you a lesson.");
+        AddChat("They put me out past the square so the tavern wouldn't have to smell it. I've never been so well rested.");
+        AddTopic("tanner,tanning,tannery,trade,leather,hides,hide", "A hide is just a skin that hasn't made up its mind. I scrape it, soak it, work it, and in the end it's leather and will keep out the rain for twenty years.");
+        AddTopic("rack,tanning rack,frame,station,treatment,scraping", "The rack holds a hide taut while I work it. Leather and hide treatment, that's all it's for, and it's no small thing. Stretch it wrong and you've wasted a wolf.");
+        AddTopic("materials,skin,skins,rabbit,wolf,deer,rabbit skin,wolf skin,deer skin,rabbit blood,wolf blood,blood,vats,vat", "Rabbit, wolf and deer skins, mainly. Rabbit's soft, wolf is tough and deer is the best of the three. A little blood in the vat helps the treatment, rabbit or wolf; I never ask where it came from.");
+        AddTopic("work,craft,learn,teach,teaching,recipe,recipes,apprentice", "I'll show you the rack and trade with you, once I've set up for it. Soon. I'm still sorting out which vat is which, and I won't tell you which one is ready until I'm certain.");
+        AddTopic("smell,stink,tavern,harland", "Harland pretends he doesn't mind it. He stands upwind and holds his breath when he comes by for the boots.");
+        AddTopic("village,hollow,guard,wolves,road", "A wolf's been seen on the North Road, and that's good news for me and bad news for whoever meets it. I hear the guard is keeping watch.");
+        AddEmote("Dunstan drags a scraper down a stretched hide with a long, wet rasp.", 8);
+        AddEmote("Dunstan prods a vat with a pole, nods, and wipes his hands on his apron.", 5);
+    }
+}

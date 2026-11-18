@@ -18,4 +18,18 @@ public class CollapsedPassage : Room
 
         AddSpawn("/domains/hollow/mob/giant_rat", 2);
     }
+
+    // Tells the Chronicle that a player has found the Forgotten Cellars. A character is credited once.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.secret_dungeon", who, new List<ObjectRef> { who }, Self, "forgotten-cellars",
+                new Dictionary<string, string> { ["name"] = "The Forgotten Cellars" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

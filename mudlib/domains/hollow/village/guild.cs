@@ -25,6 +25,7 @@ public class AdventurersGuild : Room
             "A large notice board covered in pinned parchments. The two biggest are quest notices. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/hollow/npc/rowan");
+        MoveObject(CloneObject("/std/chronicle_ledger"), Self);
     }
 
     /// <summary>The board shows how the reader is getting on.</summary>

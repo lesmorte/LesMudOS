@@ -446,7 +446,7 @@ public class ExampleBerryBush : Node
 
 ## Items
 
-Every item has `Name`, `Ids` (words that name it), `ShortDesc` (with article, for lists), `LongDesc` (for `look at`) and optionally `Value` (gold; shopkeepers pay half; 0 means they will not buy it), `QuestItem = true` (cannot be sold) and `ReadText` (shown by `read`).
+Every item has `Name`, `Ids` (words that name it), `ShortDesc` (with article, for lists), `LongDesc` (for `look at`) and optionally `Value` (gold for one Common item; shopkeepers pay half; 0 means they will not buy it), `QuestItem = true` (cannot be sold or given away) and `ReadText` (shown by `read`). Quality and stacks are below, under "Quality and stacks".
 
 ### A weapon
 
@@ -562,6 +562,51 @@ public class ExampleKey : Item
     }
 }
 ```
+
+### Quality and stacks
+
+Every item has a **quality** and a **quantity**, kept with it wherever it is saved (a character's inventory, the lost-property store). Quality is a number from 0 to 5, `Item.Poor`, `Common` (the default), `Fine`, `Excellent`, `Masterwork`, `Legendary`; players see it as a word in front of the name ("a fine wolf skin", nothing for Common) and can type it (`drop fine skin`). An item's worth is `Value` times the quality's multiplier, rounded and at least 1: Poor 0.5, Common 1, Fine 1.5, Excellent 2.5, Masterwork 4, Legendary 8. The table is `Item.QualityMultipliers` and `Item.ValueFor(value, quality)`; nothing else should hold those numbers. Shops pay half of that per item.
+
+A **material** is stackable: set `Stackable = true`. A stack is one object with a quantity: "3 wolf skins". Two stacks merge when they come to rest in the same place if they are of the same file and quality (and have the same properties, below), and never otherwise. Commands split them: `get 3 skins`, `get all skins`, `drop 2 fine wolf skin`, `give 2 skins to Ann`, `buy 5 skins`, `sell 3 skins`. The plural is the short description without its article plus "s" (or "es"); set `Plural` when that is wrong. Every name in `Ids` also answers in the plural with an "s" or "es". Eating or drinking a stackable consumable uses one. Items that are not stackable behave as they always have.
+
+```csharp
+// File: /domains/example/pelt.cs
+// @inherit /std/item
+public class ExamplePelt : Item
+{
+    public override void Create()
+    {
+        Name = "example pelt";
+        Ids.Add("pelt");
+        ShortDesc = "an example pelt";
+        LongDesc = "A soft grey pelt.";
+        Value = 4;
+        Stackable = true;
+        // Plural = "example pelts";  (only when the default is wrong)
+    }
+}
+```
+
+**Working with quality and quantity in code.** Every object that derives from `/std/thing` (items, NPCs, creatures, corpses, and later stations and resource nodes; not rooms, which derive from `MudObject` directly) has these helpers, as protected functions:
+
+| Helper | Does |
+|---|---|
+| `CreateIn(path, count, quality, container)` | Make count items at a quality in a container in one call: one stack for a stackable file (merged with a matching stack there), otherwise count objects (at most 100). Returns the object holding them, or null if refused. |
+| `TakeFrom(container, count, ob => test)` | Destroy count items that pass the test, splitting the last stack. All or nothing: false, and nothing taken, if there are fewer. Give a fourth argument to move them to another container instead. |
+| `CountIn(container, path)` | How many of a file a container holds, by quality: a `Dictionary<int, int>` from quality to count. |
+| `MovePortion(item, n, destination)` | Move n of a stack (all of it for n at or above its quantity) and merge them there. |
+| `QuantityOf(ob)`, `Describe(ob, n)` | A stack's quantity (1 for anything else); how n of it read ("2 fine wolf skins"). |
+
+On an item, from other code: `QueryQuality()`, `QueryQualityName()`, `QueryQuantity()`, `QueryStackable()`, `QueryValue()` (one item, quality included), `QueryBaseValue()`, `QueryTotalValue()`, `SetQuality(q)`, `SetQuantity(n)`, `Split(n)` (returns the part split off, put beside it), `Settle()` (merge with a matching stack nearby; call it after moving a stackable item with `MoveObject` yourself), and named text properties for later systems, `QueryProperty(key)` and `SetProperty(key, value)` (at most 16, 256 characters each; stacks with different properties do not merge). The setters return false if refused: code in a wizard's home (`/wiz/...`) may change only items that are themselves under `/wiz`.
+
+```csharp
+// In an NPC, an item or a station: hand a player three Fine wolf skins, then take two skins of any quality back.
+CreateIn("/domains/test/wolf_skin", 3, Item.Fine, player);
+var tookThem = TakeFrom(player, 2, ob => ob.ProgramPath == "/domains/test/wolf_skin");
+var fine = CountIn(player, "/domains/test/wolf_skin").GetValueOrDefault(Item.Fine);
+```
+
+A file that uses `Item.Fine` and the other names needs `// @use /std/item` (an item file already has it through `@inherit`). A shopkeeper can sell a quality with `AddStock(path, price, quality)`; the price shown is the listed price times the multiplier.
 
 ## Areas, regions, skills and classes
 
