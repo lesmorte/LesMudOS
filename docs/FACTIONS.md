@@ -24,7 +24,7 @@ Defined as data in `/factions/<id>.cs`, one file each, read by the registry `/se
 
 | Id | Name | Motto | Starts |
 |---|---|---|---|
-| `assembly` | The Greenvale Assembly | Prosperity Through Unity | Known, Neutral 0 |
+| `assembly` | The Greenvale Assembly | Prosperity Through Unity | Known, Neutral 0 (+100 for a character who starts in Vincent's Hollow) |
 | `hall` | The Hall of Legends | Greatness Is Chosen | Known, Neutral 0 |
 | `consortium` | The Merchant Consortium | Trade Builds Tomorrow | Known, Neutral 0 |
 | `riverwatch` | The Riverwatch Rangers | Ever Vigilant | Known, Neutral 0 |
@@ -232,7 +232,7 @@ Each faction grants one title at Honored, one at Exalted and one at Legendary. T
 | Free Companies | Blade for Hire | Company Captain | Free Marshal |
 | Circle of Ash | Seeker of Ash | Adept of the Circle | Keeper of Ancient Ash |
 
-Friend of Oakenfell, Warden of Greenvale, Voice of the Assembly, Merchant Protector, Riverwatch Scout, Champion of the Thorn Pact and Keeper of Ancient Ash are the owner's. The rest are proposed to fill the table.
+Friend of Oakenfell, Warden of Greenvale, Voice of the Assembly, Merchant Protector, Riverwatch Scout, Champion of the Thorn Pact and Keeper of Ancient Ash are from the owner's bible. The rest were proposed to fill the table and the owner has accepted them.
 
 ## 10. Classes
 
@@ -266,10 +266,10 @@ Enough to make the system visible from the first hour in Oakenfell:
 
 `tests/faction_test.py` (port 4818): tier boundaries on both sides of every threshold; discovery by each route and the one-line message; spillover amounts for every row of the relations table; spillover neither discovering a faction nor pushing below Neutral; the repeat table across a day boundary; donation limits and the Friendly cap; wizards unaffected; untrusted caller refused; hidden faction absent from `standing` and from the Hall clerk; discounts, surcharges and refusal at a faction shop; an item refused below its tier and usable at it; a title granted and withdrawn; the three tier events reaching the Chronicle; persistence across a restart.
 
-## 13. Open questions for the owner
+## 13. The owner's decisions (18 November 2026)
 
-1. **Spillover floor.** Section 5 stops spillover at Neutral 0, so that only direct acts make a faction Suspicious or Hostile. The alternative is to let it run negative, which makes rivalries bite harder and makes befriending both sides of a rivalry much slower.
-2. **Donations.** 10 gold a point, 100 points a day, nothing past Friendly. Too generous, too mean, or should gold buy no standing at all?
-3. **Starting standing.** Everyone starts Neutral 0 with the four public factions. The bible's starting relationships could instead give a character raised in Vincent's Hollow a small head start with the Assembly.
-4. **The Free Companies and the Thorn Pact as Unknown.** Both are talked about openly in Oakenfell's taverns. They start Unknown here so that meeting them is a small discovery; they could simply start Neutral.
-5. **The proposed titles** in section 9.
+1. **Spillover floor.** Spillover stops at Neutral 0, as in section 5. Only a direct act against a faction makes it Suspicious or Hostile.
+2. **Donations.** The proposed rule stands (10 gold a point, 100 points a day for each faction, nothing past the top of Friendly), and every figure in it is configuration, not code: gold per point, the daily full-value and half-value bands, and the tier cap are read from `/factions/config.cs`, so they can be changed without touching the system. The repeat table in section 4 and the spillover threshold of 50 live in the same file.
+3. **Starting standing.** A character who starts in Vincent's Hollow begins with one bump with the Greenvale Assembly: +100, given once at character creation, with no spillover and no message beyond the ordinary one. The amount and the faction are set on the starting location, so a later starting location (Oakenfell may become one) can give a different bump or none. Everything else starts at Neutral 0.
+4. **Unknown factions.** The Thorn Pact and the Free Companies start Unknown and are discovered by meeting them. The Circle of Ash is hidden.
+5. **Titles.** The table in section 9 is accepted as written.
