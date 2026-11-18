@@ -59,6 +59,14 @@ History must not be forgeable, and any wizard can now write code in their own di
 - Reports are accepted only from objects whose program lies under the trusted trees of the mudlib (`/std`, `/secure`, `/domains`, and the class, skill and event directories). A report from anywhere else, including any wizard's home, is refused and logged.
 - The event service, the Renown ledger and the Chronicle are blueprint-only daemons under `/secure`, each checking its caller with `PreviousObject()`, like the wizard registry and the vault.
 
+### Wizards make no history
+
+The owner needs to be able to walk a level 10 wizard through the Hidden Grove, or anywhere else, without claiming the first or the Renown. More generally, every wizard has tools an ordinary player does not: `goto` from level 1, restoring health and slaying creatures at higher levels. A first earned with those is not a first.
+
+So events caused by a character with any wizard level are not recorded: no Renown, no first occurrence, no server first, no Chronicle entry, no rumor, and no contribution to aggregates. If a wizard is one participant among several, the event is recorded for the others without them. The wizard is told in one line when this happens ("Wizards make no history."), so that testing shows the hook fired.
+
+This applies to wizard levels 1 to 10 alike. The owner's instruction named level 10; it is extended to every wizard because `goto` alone, which a level 1 wizard has, is enough to claim any discovery. A character demoted to level 0 earns history normally from then on, and nothing is granted retroactively.
+
 ### The formula
 
 Exactly as the specification gives it:
@@ -229,5 +237,6 @@ The month names are placeholders of mine and are one table to change.
 - Aggregation: a counter milestone raised with a small threshold in a test catalogue.
 - Renown tiers, the NPC recognition line, titles earned and set, wizard free-text title still working.
 - Chronicle persistence across restart and after the character's save file is deleted; search; the Halls and records.
+- Wizards make no history: a level 10 wizard and a level 1 wizard each find the Great Stump and kill the Goblin Overseer with nothing recorded and no Renown gained, and an ordinary player doing the same afterward still gets the first. A mixed pair (wizard and player) records the player alone.
 - Forgery: an object in a wizard's home cannot report an event, define an event type, write the Chronicle or the Renown ledger, or raise its owner's Renown.
 - The play-through ends by reading the hero's own entries in the guild's ledger.
