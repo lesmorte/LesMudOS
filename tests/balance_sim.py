@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
-"""Balance simulation for Vincent's Hollow on the event clock (docs/COMBAT_TIMING.md, GAME_SYSTEMS.md section 12).
+"""Balance simulation for Vincent's Hollow and the five archetypes (docs/CLASS_SYSTEM.md, COMBAT_TIMING.md, GAME_SYSTEMS.md).
 
-Standalone: it does not talk to the driver. It plays the combat rules of /std/living with the numbers of the
-creatures and items in the mudlib, and prints tables for a solo player:
+Standalone: it does not talk to the driver. It plays the combat rules of /std/living with the numbers of the creatures,
+items and class files in the mudlib, and prints tables for a solo player of each archetype:
 
-  1. room by room: win rate, HP lost, fight length in seconds and in player actions
-  2. the Goblin Overseer against level 4-5 players in village gear
-  3. a whole run through the cellars with level-ups, rests and purchases
-  4. damage per second of every weapon (the slower weapons must be worth using)
+  1. room by room: win rate, HP lost, fight length in seconds, at the level a sensible player has
+  2. the Goblin Overseer against prepared level 4-5 characters
+  3. a whole run through the cellars with level-ups, rests, purchases and farming, per archetype
+  4. damage per second of every weapon, and a summary of how far each archetype is from the average
 
 Rules (identical to the code; `python3 tests/balance_sim.py check` compares the numbers below with the mudlib files):
   * There are no rounds. Every combatant has a Ready Time. When it is ready and has an enemy it begins an action:
     Total Delay = (Reaction Time + action reaction modifier + action Recovery) x 2 seconds, where Reaction Time =
-    base + the reaction modifiers of everything equipped. The effect happens Preparation x 2 seconds after the
-    start; the next action begins at the Ready Time (start + Total Delay).
-  * The player starts the fight (as the bot and most players do): he is ready at once. Every creature in the room
-    is drawn in by someone else and cannot begin its first action until its own Reaction Time x 2 seconds have
-    passed. A creature summoned by the Overseer is drawn in the same way.
-  * The player attacks the first living enemy of the room. A potion is drunk at the next Ready Time when HP is at or
-    below 35% (it replaces one attack; its action has Recovery 0.5).
-  * To hit: d20 + level + to-hit >= 10 + defender armor. A natural 20 always hits, a natural 1 always misses.
-  * Damage is uniform in the range, minimum 1. Damage multipliers and the Battle Cry bonus are applied as in
-    /std/living: (roll + bonus) x multiplier.
-  * Level n needs 0/100/250/500/900 XP for n = 1..5; each level adds 8 max HP and heals fully, in the middle of a
-    fight too (experience is paid at the kill). Base HP is 30.
+    base + the reaction modifiers of everything equipped. The effect happens Preparation x 2 seconds after the start.
+  * The player starts the fight (as most players do): he is ready at once. A creature cannot begin its first action
+    until its own Reaction Time x 2 seconds have passed. A creature summoned by the Overseer is drawn in the same way.
+  * Hit rule: the defender's dodge is rolled first; then d20 + Attack against 10 + Armor + Defense, where
+    Attack = round(AttackRate x Level) + to-hit bonuses and Defense = Level - 1. A natural 20 always hits, a natural 1
+    always misses. Damage is uniform in the weapon's range, 5% critical (x1.5), a block (15% with a shield) halves it.
+    Creatures have AttackRate 1.0 and no dodge or block.
+  * Stamina and Mana come back continuously (per 10 seconds, the class's figures); the player is rested to full
+    between fights. Level n needs 50 n (n-1) experience (100, 300, 600, 1000 for levels 2-5); a level adds 8 max HP and
+    heals fully, in the middle of a fight too.
+  * Player policies (what a sensible player does): potions at 35% HP; warrior Shield Bash on a creature that is
+    preparing an action (the interrupt) or when Stamina is high; scout Precision Strike whenever it can pay; mage
+    Arcane Bolt whenever it can pay; priest Minor Heal at 50% HP, Blessing at the start of a hard fight.
 
 Usage: python3 tests/balance_sim.py [runs]      python3 tests/balance_sim.py check
 """
@@ -34,13 +35,21 @@ import re
 import sys
 from dataclasses import dataclass
 
-XP_FOR_LEVEL = {1: 0, 2: 100, 3: 250, 4: 500, 5: 900}
 POTION_HEAL = 20
 POTION_RECOVERY = 0.5
-PLAYER_REACTION = 2.5
 UNIT_MS = 2000
 CRY_MS = 30000
-FORGET = None  # (enemies never leave the room in the simulation)
+BLESS_MS = 60000
+# Skill numbers (the mudlib's /skills files; `check` compares them).
+BASH_COST, BASH_REC, BASH_FACTOR = 15, 1.5, 0.75
+STRIKE_COST, STRIKE_PREP, STRIKE_REC, STRIKE_HIT, STRIKE_CRIT = 25, 0.5, 1.0, 2, 15
+BOLT_COST, BOLT_PREP, BOLT_REC, BOLT_DMG = 20, 0.5, 1.0, (6, 9)
+HEAL_COST, HEAL_PREP, HEAL_REC, HEAL_AMOUNT = 25, 0.5, 1.0, 8
+BLESS_COST = 25
+
+
+def xp_for_level(n):
+    return 50 * n * (n - 1)
 
 
 @dataclass(frozen=True)
@@ -99,6 +108,9 @@ ROOMS = [
 # weapon: (damage range, to hit, reaction modifier, basic attack recovery). Fists: the player's unarmed attack.
 WEAPONS = {
     "fists": ((2, 5), 0, 0.0, 0.5),
+    "novice mace": ((9, 13), 0, 0.5, 1.0),
+    "apprentice staff": ((7, 11), 1, 0.5, 1.0),
+    "hunting bow": ((8, 12), 1, 0.5, 1.0),
     "iron dagger": ((6, 9), 1, 0.0, 0.5),
     "enchanted dagger": ((7, 11), 2, 0.0, 0.5),
     "training spear": ((8, 12), 1, 0.5, 1.0),
@@ -109,37 +121,87 @@ WEAPONS = {
 }
 # armor pieces: (armor value, reaction modifier)
 SHIELD, HELM, VEST = (1, 0.5), (1, 0.0), (3, 0.0)
-TRINKET_HP = 5  # the Magical Trinket from the Hidden Cache
-BASE_HP, HP_PER_LEVEL = 30, 8
 
 
-def hit_chance(level, to_hit, armor):
-    hits = 0
-    for roll in range(1, 21):
-        if roll == 20 or (roll != 1 and roll + level + to_hit >= 10 + armor):
-            hits += 1
-    return hits / 20
+@dataclass(frozen=True)
+class Arch:
+    name: str
+    hp: int
+    reaction: float
+    rate: float
+    stamina: int
+    mana: int
+    stamina_regen: float  # per 10 seconds
+    mana_regen: float
+    gold: int
+    weapons: tuple        # progression, bought as gold allows
+    shield: bool          # carries a shield (the warrior starts with one, others buy it)
+    dodge: int = 0
+    armor_bonus: int = 0
+    hit_armed: int = 0
+    spell_cost_pct: int = 0
+    healing_pct: int = 0
+    potions: int = 0      # in the starting kit
 
 
-def player_max_hp(level, extra=0):
-    return BASE_HP + HP_PER_LEVEL * (level - 1) + extra
+ARCHS = {a.name: a for a in [
+    Arch("warrior", 40, 3.0, 1.00, 100, 20, 10, 2, 10, ("rusty sword", "woodcutter axe", "fine longsword"), True, armor_bonus=2, hit_armed=2),
+    Arch("scout", 26, 2.0, 1.00, 100, 20, 8, 2, 10, ("hunting bow", "fine longsword"), False, dodge=8),
+    Arch("priest", 26, 2.5, 0.97, 40, 100, 4, 4, 15, ("novice mace",), True, healing_pct=25, potions=1),
+    Arch("mage", 24, 2.5, 0.96, 30, 100, 3, 8, 15, ("apprentice staff",), False, spell_cost_pct=-20, potions=1),
+    Arch("adventurer", 30, 2.5, 0.98, 70, 70, 6, 5, 20, ("training spear", "woodcutter axe", "fine longsword"), True),
+]}
+TRINKET_HP = 5
+HP_PER_LEVEL = 8
+SHIELD_PRICE = 12
+# Improvised Combat (adventurer) removes 0.5 of a weapon's reaction modifier.
+REACTION_CUT = {"adventurer": 0.5}
+
+
+def rnd(x):
+    return int(x + 0.5 + 1e-9)
 
 
 class Fighter:
-    def __init__(self, level, hp, dmg, to_hit, armor, reaction, acts, kind=None, is_player=False):
+    def __init__(self, level, hp, dmg, to_hit, armor, reaction, acts, kind=None, arch=None, shield=False, rate=1.0):
         self.level, self.hp, self.max_hp = level, hp, hp
         self.dmg, self.to_hit, self.armor = dmg, to_hit, armor
-        self.reaction = reaction  # final Reaction Time
+        self.reaction = reaction
         self.acts = acts
         self.kind = kind
-        self.is_player = is_player
-        self.taken = 0  # actions chosen this fight
+        self.arch = arch
+        self.is_player = arch is not None
+        self.shield = shield
+        self.rate = rate
+        self.taken = 0
         self.attacks = 0
         self.summoned = False
         self.cry_until = 0
+        self.bless_until = 0
+        self.gen = 0
+        self.ready_at = 0
+        self.resolve_at = None
+        self.stamina = self.mana = 0.0
+        self.last_t = 0
+        self.extra_hp = 0
 
     def alive(self):
         return self.hp > 0
+
+    def attack(self, t=0):
+        return rnd(self.rate * self.level) + self.to_hit + (1 if t < self.bless_until else 0)
+
+    def defense(self):
+        return max(0, self.level - 1)
+
+    def total_armor(self, t=0):
+        return self.armor + (1 if t < self.bless_until else 0)
+
+    def dodge(self):
+        return self.arch.dodge if self.arch else 0
+
+    def block(self):
+        return 15 if self.is_player and self.shield else 0
 
     def delay_ms(self, act):
         return round((self.reaction + act.mod + act.rec) * UNIT_MS)
@@ -147,29 +209,59 @@ class Fighter:
     def prep_ms(self, act):
         return min(self.delay_ms(act), round(act.prep * UNIT_MS))
 
+    def regen(self, t):
+        if self.arch:
+            dt = (t - self.last_t) / 10000.0
+            self.stamina = min(self.arch.stamina, self.stamina + self.arch.stamina_regen * dt)
+            self.mana = min(self.arch.mana, self.mana + self.arch.mana_regen * dt)
+        self.last_t = t
+
+
+def hit_chance(attack, armor, defense):
+    hits = 0
+    for roll in range(1, 21):
+        if roll == 20 or (roll != 1 and roll + attack >= 10 + armor + defense):
+            hits += 1
+    return hits / 20
+
+
+def player_max_hp(arch, level, extra=0):
+    return arch.hp + HP_PER_LEVEL * (level - 1) + extra
+
 
 def make_monster(name):
     k = KINDS[name]
     return Fighter(k.level, k.hp, k.dmg, k.to_hit, k.armor, k.reaction, k.acts, k)
 
 
-def make_player(level, weapon, armor_pieces, extra_hp=0):
+def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True):
+    """arch: an Arch or its name. weapon: a key of WEAPONS. shield: None means the archetype's own habit."""
+    if isinstance(arch, str):
+        arch = ARCHS[arch]
+    has_shield = arch.shield if shield is None else shield
     dmg, to_hit, mod, rec = WEAPONS[weapon]
-    armor = sum(a for a, _ in armor_pieces)
-    reaction = PLAYER_REACTION + mod + sum(m for _, m in armor_pieces)
-    p = Fighter(level, player_max_hp(level, extra_hp), dmg, to_hit, armor, reaction, (Act("attack", 0, rec),), is_player=True)
+    mod = max(0.0, mod - REACTION_CUT.get(arch.name, 0.0)) if mod > 0 else mod
+    armor = arch.armor_bonus + (SHIELD[0] if has_shield else 0)
+    reaction = arch.reaction + mod + (SHIELD[1] if has_shield else 0)
+    to_hit += arch.hit_armed
+    p = Fighter(level, player_max_hp(arch, level, extra_hp), dmg, to_hit, armor, reaction, (Act("attack", 0, rec),),
+                arch=arch, shield=has_shield, rate=arch.rate)
     p.extra_hp = extra_hp
+    p.stamina, p.mana = float(arch.stamina), float(arch.mana)
+    p.weapon_rec = rec
     return p
 
 
-def roll_attack(att, defn, bonus=0, mult=1):
-    """One attack. Returns the damage dealt (0 on a miss)."""
-    roll = random.randint(1, 20)
-    if not (roll == 20 or (roll != 1 and roll + att.level + att.to_hit >= 10 + defn.armor)):
-        return 0
-    dmg = max(1, random.randint(*att.dmg))
-    dmg = max(1, dmg + bonus) * mult
-    return dmg
+def player_acts(p):
+    """The actions a player of this archetype can start (Act ids matched in resolve)."""
+    a = {"attack": Act("attack", 0, p.weapon_rec)}
+    a["potion"] = Act("potion", 0, POTION_RECOVERY)
+    a["bash"] = Act("bash", 0, BASH_REC)
+    a["strike"] = Act("strike", STRIKE_PREP, STRIKE_REC)
+    a["bolt"] = Act("bolt", BOLT_PREP, BOLT_REC)
+    a["heal"] = Act("heal", HEAL_PREP, HEAL_REC)
+    a["bless"] = Act("bless", 0.5, 1.0)
+    return a
 
 
 def choose(e):
@@ -193,54 +285,115 @@ def choose(e):
     return e.acts[0]
 
 
-def fight(player, enemies, potions=0, boss=False, drink_at=0.35, on_kill=None):
-    """Fight until one side is dead. Mutates player and enemies. on_kill(player, enemy), if given, is called when
-    the player's attack kills an enemy. Returns a dict: alive, ms (length of the fight), actions (the player's),
-    potions (left), boss_ms and lost_at_kill (when the boss died)."""
+def spell_cost(p, base):
+    return base * (100 + p.arch.spell_cost_pct) / 100.0
+
+
+def player_choice(p, t, living, potions, hard, state):
+    """Returns (act id, potions left)."""
+    arch = p.arch
+    p.regen(t)
+    target = living[0]
+    if potions > 0 and p.hp <= p.max_hp * 0.35:
+        return "potion"
+    if arch.name == "priest":
+        if p.hp <= p.max_hp * 0.5 and p.mana >= HEAL_COST:
+            return "heal"
+        if hard and t >= p.bless_until and p.mana >= BLESS_COST + HEAL_COST and not state.get("blessed"):
+            state["blessed"] = True
+            return "bless"
+    if arch.name == "warrior" and p.stamina >= BASH_COST and p.shield:
+        if target.resolve_at is not None and target.resolve_at > t:
+            return "bash"
+        if p.stamina >= 60:
+            return "bash"
+    if arch.name == "scout" and p.stamina >= STRIKE_COST:
+        return "strike"
+    if arch.name == "mage" and p.mana >= spell_cost(p, BOLT_COST):
+        return "bolt"
+    return "attack"
+
+
+def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
+    """Fight until one side is dead. Mutates player and enemies. Returns a dict: alive, ms, actions, potions,
+    boss_ms and lost_at_kill."""
     heap = []
     seq = 0
+    if hard is None:
+        hard = boss or len(enemies) >= 2
 
     def push(t, kind, ent, act=None, target=None):
         nonlocal seq
         seq += 1
-        heapq.heappush(heap, (t, seq, kind, ent, act, target))
+        heapq.heappush(heap, (t, seq, kind, ent, act, target, ent.gen))
 
     start_hp = player.hp
     out = {"actions": 0, "boss_ms": None, "lost_at_kill": None}
+    state = {}
+    acts = player_acts(player)
+    player.last_t = 0
+    player.ready_at = 0
     push(0, "ready", player)
     for e in enemies:
-        push(round(e.reaction * UNIT_MS), "ready", e)
+        e.ready_at = round(e.reaction * UNIT_MS)
+        push(e.ready_at, "ready", e)
     t = 0
+
+    def stagger(e, now):
+        e.gen += 1
+        if e.resolve_at is not None and e.resolve_at > now:
+            half = (e.ready_at - e.resolve_at) / 2
+            e.resolve_at = None
+            e.ready_at = round(now + half)
+        else:
+            e.ready_at = max(e.ready_at, now) + 2000
+        push(e.ready_at, "ready", e)
+
+    out["stagger"] = stagger
     while heap and player.hp > 0 and any(e.hp > 0 for e in enemies):
-        t, _, kind, ent, act, target = heapq.heappop(heap)
-        if ent.hp <= 0:
+        t, _, kind, ent, act, target, gen = heapq.heappop(heap)
+        if ent.hp <= 0 or gen != ent.gen:
             continue
         if kind == "ready":
             living = [e for e in enemies if e.hp > 0]
             if not living and not ent.is_player:
                 continue
             if ent.is_player:
-                if potions > 0 and ent.hp <= ent.max_hp * drink_at:
-                    potions -= 1
-                    act = Act("potion", 0, POTION_RECOVERY)
-                    ent.hp = min(ent.max_hp, ent.hp + POTION_HEAL)
-                    out["actions"] += 1
-                    push(t + ent.delay_ms(act), "ready", ent)
-                    continue
-                act = ent.acts[0]
+                choice = player_choice(ent, t, living, potions, hard, state)
+                act = acts[choice]
                 target = living[0]
                 out["actions"] += 1
+                if choice == "potion":
+                    potions -= 1
+                    ent.hp = min(ent.max_hp, ent.hp + POTION_HEAL)
+                    push(t + ent.delay_ms(act), "ready", ent)
+                    ent.ready_at = t + ent.delay_ms(act)
+                    continue
+                if choice == "bash":
+                    ent.stamina -= BASH_COST
+                elif choice == "strike":
+                    ent.stamina -= STRIKE_COST
+                elif choice == "bolt":
+                    ent.mana -= spell_cost(ent, BOLT_COST)
+                elif choice == "heal":
+                    ent.mana -= HEAL_COST
+                elif choice == "bless":
+                    ent.mana -= BLESS_COST
             else:
                 act = choose(ent)
                 ent.taken += 1
                 target = player
             delay, prep = ent.delay_ms(act), ent.prep_ms(act)
-            push(t + delay, "ready", ent)
+            ent.ready_at = t + delay
+            push(ent.ready_at, "ready", ent)
             if prep > 0:
+                ent.resolve_at = t + prep
                 push(t + prep, "resolve", ent, act, target)
             else:
+                ent.resolve_at = None
                 resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss)
         else:
+            ent.resolve_at = None
             resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss)
         if boss and out["boss_ms"] is None and enemies[0].hp <= 0:
             out["boss_ms"] = t
@@ -249,8 +402,27 @@ def fight(player, enemies, potions=0, boss=False, drink_at=0.35, on_kill=None):
     return out
 
 
+def do_hit(att, defn, t, to_hit_bonus=0, crit=5, factor=1.0, mult=1, bonus=0):
+    """One physical attack. Returns (damage, blocked) with damage 0 on a miss or dodge."""
+    if random.randint(1, 100) <= defn.dodge():
+        return 0, False
+    roll = random.randint(1, 20)
+    need = 10 + defn.total_armor(t) + defn.defense()
+    if not (roll == 20 or (roll != 1 and roll + att.attack(t) + to_hit_bonus >= need)):
+        return 0, False
+    dmg = max(1, random.randint(*att.dmg) + bonus) * mult
+    if factor != 1.0:
+        dmg = max(1, rnd(dmg * factor))
+    if random.randint(1, 100) <= crit:
+        dmg = max(1, rnd(dmg * 1.5))
+    blocked = random.randint(1, 100) <= defn.block()
+    if blocked:
+        dmg = max(1, dmg // 2)
+    return dmg, blocked
+
+
 def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
-    if target.hp <= 0:
+    if target.hp <= 0 and act.id not in ("heal", "bless"):
         return
     if act.id == "cry":
         ent.cry_until = t + CRY_MS
@@ -258,21 +430,46 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
     if act.id == "summon":
         m = make_monster("Goblin Minion")
         enemies.append(m)
-        push(t + round(m.reaction * UNIT_MS), "ready", m)
+        m.ready_at = t + round(m.reaction * UNIT_MS)
+        push(m.ready_at, "ready", m)
+        return
+    if act.id == "heal":
+        ent.hp = min(ent.max_hp, ent.hp + rnd(HEAL_AMOUNT * (100 + ent.arch.healing_pct) / 100.0))
+        return
+    if act.id == "bless":
+        ent.bless_until = t + BLESS_MS
+        return
+    if act.id == "bolt":
+        dmg = random.randint(*BOLT_DMG)
+        target.hp -= dmg
+        if target.hp <= 0 and on_kill is not None:
+            on_kill(player, target)
+        return
+    if ent.is_player:
+        kw = {}
+        if act.id == "strike":
+            kw = dict(to_hit_bonus=STRIKE_HIT, crit=STRIKE_CRIT)
+        if act.id == "bash":
+            kw = dict(factor=BASH_FACTOR)
+        dmg, _ = do_hit(ent, target, t, **kw)
+        if dmg <= 0:
+            return
+        target.hp -= dmg
+        if act.id == "bash" and target.hp > 0:
+            out["stagger"](target, t)
+        if target.hp <= 0 and on_kill is not None:
+            on_kill(player, target)
         return
     bonus = 2 if t < ent.cry_until else 0
-    dmg = roll_attack(ent, target, bonus, act.mult)
-    if dmg <= 0:
-        return
-    target.hp -= dmg
-    if ent.is_player and target.hp <= 0 and on_kill is not None:
-        on_kill(player, target)
+    dmg, _ = do_hit(ent, target, t, mult=act.mult, bonus=bonus)
+    if dmg > 0:
+        target.hp -= dmg
 
 
-def room_stats(creatures, level, weapon, armor, extra_hp=0, runs=2000, potions=0):
+def room_stats(arch, creatures, level, weapon, extra_hp=0, runs=1500, potions=0, shield=None):
     wins = lost = ms_total = actions_total = 0
     for _ in range(runs):
-        p = make_player(level, weapon, armor, extra_hp)
+        p = make_player(arch, level, weapon, shield, extra_hp)
         enemies = [make_monster(c) for c in creatures]
         r = fight(p, enemies, potions)
         if r["alive"]:
@@ -284,10 +481,10 @@ def room_stats(creatures, level, weapon, armor, extra_hp=0, runs=2000, potions=0
     return wins / runs, lost / n, ms_total / n / 1000.0, actions_total / n
 
 
-def boss_stats(level, weapon, armor, potions, extra_hp=0, runs=2000):
+def boss_stats(arch, level, weapon, potions, extra_hp=0, runs=1500, shield=None):
     kills = survive = lost = ms = actions = 0
     for _ in range(runs):
-        p = make_player(level, weapon, armor, extra_hp)
+        p = make_player(arch, level, weapon, shield, extra_hp)
         r = fight(p, [make_monster("Goblin Overseer")], potions, boss=True)
         if r["lost_at_kill"] is not None:
             kills += 1
@@ -299,37 +496,50 @@ def boss_stats(level, weapon, armor, potions, extra_hp=0, runs=2000):
     return kills / runs, survive / runs, lost / n, ms / n / 1000.0, actions / n
 
 
-# The level a sensible player has before taking on a room (the dungeon is advertised for 2-5).
 REQUIRED_LEVEL = {"Tavern Cellar": 1, "Collapsed Passage": 1, "Storage Chamber": 2, "Guard Post": 2,
                   "Flooded Tunnel": 3, "Mushroom Cavern": 3, "Goblin Barracks": 4, "Overseer Hall": 4}
 BOSS_LEVEL = 4
+PRICES = {"rusty sword": 10, "woodcutter axe": 18, "fine longsword": 60, "hunting bow": 20, "novice mace": 12,
+          "apprentice staff": 10, "training spear": 8}
 
 
-def full_run(runs=1000):
-    """A whole solo run, Tavern Cellar to the Overseer. The player starts with 25 gold (a rusty sword and a small
-    shield), buys the best affordable weapon and up to 2 potions, rests to full between rooms, and goes back to farm
-    cleared rooms (respawns) whenever he is below the level a room wants. A death costs 10% of the gold and a retry.
-    Returns the share of runs that killed the Overseer (within 3 attempts, and at the first), the average number of
-    farming fights and deaths, the level at the Overseer and the average seconds spent fighting."""
+def full_run(arch_name, runs=500):
+    """A whole solo run, Tavern Cellar to the Overseer. The player has the archetype's kit and gold, buys the next
+    weapon of the archetype's progression and a shield when it can carry one, keeps up to 2 potions, rests to full
+    between rooms and goes back to farm cleared rooms (respawns) whenever he is below the level a room wants. A
+    death costs 10% of the gold and a retry. Returns: share that killed the Overseer within 3 attempts, share at
+    the first attempt, farming fights, deaths, level histogram at the Overseer, fight seconds, share that reached
+    the Overseer at level 5 or lower (always true unless farming ran away) and the farming cap hits."""
+    arch = ARCHS[arch_name]
     done = first_try = 0
     farm_total = deaths_total = fight_ms_total = 0
     levels = {}
     for _ in range(runs):
-        xp, gold, level = 0, 25 - 10 - 12, 1
-        weapon, potions, trinket = "rusty sword", 0, 0
+        xp, gold, level = 0, arch.gold, 1
+        stage, potions, trinket = 0, arch.potions, 0
+        shield = arch.shield and arch_name == "warrior"
         cleared = []
         deaths = farm = 0
         failed = False
         fight_ms = 0
+        buy_shield = arch.shield and arch_name != "warrior"
+
+        def weapon():
+            return arch.weapons[stage]
 
         def shop():
-            nonlocal gold, weapon, potions
-            if weapon != "fine longsword" and gold >= 60:
-                gold -= 60
-                weapon = "fine longsword"
-            elif weapon == "rusty sword" and gold >= 18 + 2:
-                gold -= 18 - 5  # sell the sword for 5
-                weapon = "woodcutter axe"
+            nonlocal gold, potions, stage, shield
+            if buy_shield and not shield and gold >= SHIELD_PRICE:
+                gold -= SHIELD_PRICE
+                shield = True
+            while stage + 1 < len(arch.weapons):
+                nxt = arch.weapons[stage + 1]
+                cost = PRICES[nxt] - PRICES[arch.weapons[stage]] // 2
+                if gold >= cost + (15 if arch_name != "mage" else 0) and (nxt != "fine longsword" or gold >= PRICES[nxt] - 5 + 15):
+                    gold -= cost
+                    stage += 1
+                else:
+                    break
             while potions < 2 and gold >= 15:
                 gold -= 15
                 potions += 1
@@ -340,16 +550,16 @@ def full_run(runs=1000):
             xp += k.xp
             if k.gold[1]:
                 gold += random.randint(*k.gold)
-            while level < 5 and xp >= XP_FOR_LEVEL[level + 1]:
+            while level < 5 and xp >= xp_for_level(level + 1):
                 level += 1
                 p.level = level
-                p.max_hp = player_max_hp(level, trinket)
+                p.max_hp = player_max_hp(arch, level, trinket)
                 p.hp = p.max_hp
 
         def attempt(creatures, hard=False):
             nonlocal gold, potions, deaths, fight_ms
             for tries in range(10):
-                p = make_player(level, weapon, [SHIELD], trinket)
+                p = make_player(arch, level, weapon(), shield, trinket)
                 use = potions if hard or tries > 0 else 0
                 r = fight(p, [make_monster(c) for c in creatures], use, on_kill=on_kill)
                 fight_ms += r["ms"]
@@ -363,7 +573,7 @@ def full_run(runs=1000):
         def best_cleared():
             best = None
             for room, group in cleared:
-                if room_stats(group, level, weapon, [SHIELD], trinket, runs=40)[0] >= 0.9:
+                if room_stats(arch, group, level, weapon(), trinket, runs=40, shield=shield)[0] >= 0.9:
                     best = (room, group)
             return best
 
@@ -381,9 +591,9 @@ def full_run(runs=1000):
                 break
             cleared.append((name, creatures))
             if name == "Storage Chamber":
-                potions += 1  # the potion lying in the room
+                potions += 1
             if name == "Mushroom Cavern":
-                gold += random.randint(30, 60)  # the Hidden Cache (its key came from the Guard Post)
+                gold += random.randint(30, 60)
                 trinket = TRINKET_HP
         farm_total += farm
         deaths_total += deaths
@@ -399,7 +609,7 @@ def full_run(runs=1000):
         shop()
         levels[level] = levels.get(level, 0) + 1
         for tries in range(3):
-            p = make_player(level, weapon, [SHIELD], trinket)
+            p = make_player(arch, level, weapon(), shield, trinket)
             r = fight(p, [make_monster("Goblin Overseer")], min(potions, 2), boss=True)
             fight_ms += r["ms"]
             if r["lost_at_kill"] is not None:
@@ -414,6 +624,7 @@ def full_run(runs=1000):
 
 
 # ---------------------------------------------------------------- consistency with the mudlib
+
 
 def check_mudlib():
     """Compare KINDS and WEAPONS with the mudlib files. Exits non-zero on any difference."""
@@ -447,7 +658,8 @@ def check_mudlib():
             problems.append(f"{name}: actions {sorted(got)} in the mudlib, {have} in the simulation")
     wfiles = {"iron dagger": "iron_dagger", "enchanted dagger": "enchanted_dagger", "training spear": "training_spear",
               "rusty sword": "rusty_sword", "fine longsword": "fine_iron_longsword", "woodcutter axe": "woodcutter_axe",
-              "overseer's axe": "overseers_axe"}
+              "overseer's axe": "overseers_axe", "novice mace": "novice_mace", "apprentice staff": "apprentice_staff",
+              "hunting bow": "hunting_bow"}
     for name, f in wfiles.items():
         (lo, hi), to_hit, mod, rec = WEAPONS[name]
         text = read(f"obj/{f}.cs")
@@ -466,87 +678,109 @@ def check_mudlib():
     text = read("obj/healing_potion.cs")
     if num(text, "HealAmount") != POTION_HEAL:
         problems.append("healing potion: HealAmount differs")
+    check_classes(os.path.join(root, "..", ".."), problems, num)
     for p in problems:
         print("MISMATCH", p)
     print("simulation numbers match the mudlib" if not problems else f"{len(problems)} mismatch(es)")
     return not problems
 
 
+
+
+def check_classes(read_root, problems, num):
+    root = os.path.join(read_root, "classes")
+    for name, a in ARCHS.items():
+        with open(os.path.join(root, name + ".cs"), encoding="utf-8") as f:
+            text = f.read()
+        want = {"StartHp": a.hp, "StartReaction": a.reaction, "MaxStamina": a.stamina, "MaxMana": a.mana,
+                "StaminaRegen": a.stamina_regen, "ManaRegen": a.mana_regen, "AttackRate": a.rate, "StartGold": a.gold}
+        for field, value in want.items():
+            have = num(text, field)
+            if have != value:
+                problems.append(f"class {name}: {field} is {have} in the mudlib, {value} in the simulation")
+
+
+def stage_weapon(arch, level):
+    idx = 0 if level <= 2 else (1 if level == 3 else len(arch.weapons) - 1)
+    return arch.weapons[min(idx, len(arch.weapons) - 1)]
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "check":
         sys.exit(0 if check_mudlib() else 1)
-    runs = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
+    runs = int(sys.argv[1]) if len(sys.argv) > 1 else 1500
     random.seed(20260101)
-    armor = [SHIELD]
-    print("=" * 112)
-    print("1. Room by room, solo, at the level a sensible player has (rested to full HP, the player starts every fight).")
-    print("   Gear: rusty sword, then woodcutter axe, then fine longsword; small shield; +5 HP trinket from the Mushroom")
-    print("   Cavern on. No potions. 'Win' = the player survives. Seconds and actions are the averages of won fights.")
-    print("=" * 112)
-    header = f"{'Room':<19}{'Enemies':<22}{'Lvl':>3}  {'Weapon':<16}{'HP':>4}{'Win%':>6}{'HP lost':>9}{'Seconds':>9}{'Actions':>9}"
-    print(header)
-    print("-" * len(header))
-    profiles = [
-        ("Tavern Cellar", 1, "rusty sword", 0), ("Collapsed Passage", 1, "rusty sword", 0),
-        ("Storage Chamber", 2, "rusty sword", 0), ("Guard Post", 2, "woodcutter axe", 0),
-        ("Guard Post", 3, "woodcutter axe", 0), ("Flooded Tunnel", 3, "woodcutter axe", 0),
-        ("Mushroom Cavern", 3, "woodcutter axe", 0), ("Goblin Barracks", 4, "fine longsword", TRINKET_HP),
-        ("Goblin Barracks", 5, "fine longsword", TRINKET_HP), ("Overseer Hall", 4, "fine longsword", TRINKET_HP),
-        ("Overseer Hall", 5, "fine longsword", TRINKET_HP),
-    ]
+    names = list(ARCHS)
+    print("=" * 118)
+    print("1. Room by room, solo, rested, no potions, at the level the room asks for (REQUIRED_LEVEL), the +5 HP trinket from the")
+    print("   Mushroom Cavern on. Gear by level: the archetype's weapon progression (see ARCHS), shield where it carries one.")
+    print("   Each cell: win% / HP lost in won fights.")
+    print("=" * 118)
+    print(f"{'Room':<19}{'Lvl':>3}  " + "".join(f"{n:>16}" for n in names))
     rooms = dict(ROOMS)
-    for room, level, weapon, extra in profiles:
-        creatures = rooms[room]
-        names = {c: creatures.count(c) for c in creatures}
-        label = ", ".join(f"{n}x {c.split()[-1] if n > 1 else c}" for c, n in names.items())
-        win, lost, secs, acts = room_stats(creatures, level, weapon, armor, extra, runs)
-        print(f"{room:<19}{label[:21]:<22}{level:>3}  {weapon:<16}{player_max_hp(level, extra):>4}{win * 100:>5.0f}%{lost:>9.1f}{secs:>9.1f}{acts:>9.1f}")
-    print()
-    print("   Single creatures, one at a time, level and weapon as above (actions the player needs to kill it):")
-    singles = [("Large Rat", 1, "rusty sword"), ("Giant Rat", 1, "rusty sword"), ("Goblin Scavenger", 2, "rusty sword"),
-               ("Goblin Guard", 2, "woodcutter axe"), ("Giant Cave Toad", 3, "woodcutter axe"), ("Spore Bat", 3, "woodcutter axe"),
-               ("Goblin Warrior", 4, "fine longsword"), ("Goblin Elite Guard", 4, "fine longsword")]
-    for name, level, weapon in singles:
-        win, lost, secs, acts = room_stats([name], level, weapon, armor, TRINKET_HP if level >= 4 else 0, runs)
-        print(f"   {name:<20} L{level} {weapon:<16} win {win * 100:>3.0f}%  HP lost {lost:>5.1f}  {secs:>5.1f} s  {acts:>4.1f} player actions")
+    room_win = {n: [] for n in names}
+    for room, creatures in ROOMS:
+        level = REQUIRED_LEVEL[room]
+        extra = TRINKET_HP if level >= 4 else 0
+        cells = []
+        for n in names:
+            a = ARCHS[n]
+            win, lost, secs, acts = room_stats(n, creatures, level, stage_weapon(a, level), extra, runs)
+            room_win[n].append(win)
+            cells.append(f"{win * 100:>4.0f}% /{lost:>5.1f}")
+        print(f"{room:<19}{level:>3}  " + "".join(f"{c:>16}" for c in cells))
     print()
 
-    print("=" * 112)
-    print("2. The Goblin Overseer, solo, from full HP, in village gear only (small shield). Potions are drunk at 35% HP.")
-    print("   'Kill' = the Overseer dies before the player does (the minion may still be alive); 'Survive' = the player is")
-    print("   alive when the whole fight is over. Seconds and actions: until the Overseer dies, averaged over the kills.")
-    print("=" * 112)
-    header = f"{'Lvl':>3}  {'Weapon':<16}{'Potions':>8}{'Kill%':>7}{'Survive%':>10}{'HP lost at kill':>17}{'Seconds':>9}{'Actions':>9}"
-    print(header)
-    print("-" * len(header))
-    for level in (4, 5):
-        for weapon in ("woodcutter axe", "fine longsword"):
+    print("=" * 118)
+    print("2. The Goblin Overseer, solo, from full HP, best gear the archetype can buy in the village (+5 HP trinket), potions at 35% HP.")
+    print("   Kill% = the Overseer dies before the player. Survive% = the player is alive at the end of the whole fight.")
+    print("=" * 118)
+    print(f"{'Archetype':<12}{'Lvl':>4}{'Potions':>8}{'Kill%':>7}{'Survive%':>10}{'HP lost':>9}{'Seconds':>9}{'Actions':>9}")
+    boss = {}
+    for n in names:
+        a = ARCHS[n]
+        for level in (4, 5):
             for potions in (0, 2):
-                kill, survive, lost, secs, acts = boss_stats(level, weapon, armor, potions, runs=runs)
-                best = "  <- best village gear" if weapon == "fine longsword" and potions == 2 else ""
-                print(f"{level:>3}  {weapon:<16}{potions:>8}{kill * 100:>6.0f}%{survive * 100:>9.0f}%{lost:>17.1f}{secs:>9.1f}{acts:>9.1f}{best}")
+                kill, survive, lost, secs, acts = boss_stats(n, level, a.weapons[-1], potions, TRINKET_HP, runs)
+                boss[(n, level, potions)] = kill
+                print(f"{n:<12}{level:>4}{potions:>8}{kill * 100:>6.0f}%{survive * 100:>9.0f}%{lost:>9.1f}{secs:>9.1f}{acts:>9.1f}")
     print()
 
-    print("=" * 112)
-    print(f"3. A whole run, Tavern Cellar to the Overseer ({max(100, runs // 4)} runs). The player buys gear with loot gold, carries up to")
-    print("   2 potions, rests between rooms and farms respawns until he has the level each room wants (see REQUIRED_LEVEL).")
-    print("=" * 112)
-    done, first_try, farm, deaths, levels, secs = full_run(max(100, runs // 4))
-    total = sum(levels.values()) or 1
-    print(f"Killed the Overseer within 3 attempts: {done * 100:.0f}% of runs (first attempt: {first_try * 100:.0f}%).")
-    print(f"Average farming fights before the Overseer: {farm:.1f}. Average deaths on the way: {deaths:.2f}. Seconds spent fighting: {secs:.0f}.")
-    print("Level on reaching the Overseer: " + ", ".join(f"L{l} {n * 100 / total:.0f}%" for l, n in sorted(levels.items())))
+    print("=" * 118)
+    print(f"3. A whole run, Tavern Cellar to the Overseer ({max(100, runs // 3)} runs per archetype). The player buys gear with loot gold, keeps")
+    print("   up to 2 potions, rests between rooms and farms respawns until he has the level each room wants.")
+    print("=" * 118)
+    print(f"{'Archetype':<12}{'Killed Overseer':>16}{'1st try':>9}{'Farm fights':>12}{'Deaths':>8}{'Seconds':>9}   Level on reaching the Overseer")
+    summary = {}
+    for n in names:
+        done, first_try, farm, deaths, levels, secs = full_run(n, max(100, runs // 3))
+        total = sum(levels.values()) or 1
+        lv = ", ".join(f"L{l} {c * 100 / total:.0f}%" for l, c in sorted(levels.items()))
+        print(f"{n:<12}{done * 100:>15.0f}%{first_try * 100:>8.0f}%{farm:>12.1f}{deaths:>8.2f}{secs:>9.0f}   {lv}")
+        summary[n] = (done, first_try)
     print()
 
-    print("=" * 112)
-    print("4. Weapons: damage per second against armor 2 for a level 3 player with a small shield (all reaction modifiers included).")
-    print("=" * 112)
+    print("=" * 118)
+    print("4. How far is each archetype from the average? (points of Overseer kill% for a prepared level 4 and level 5 character with")
+    print("   2 potions, and of first-attempt success of the whole run). Target: within about 15 points.")
+    print("=" * 118)
+    for label, vals in (("Overseer kill%, L4, 2 potions", {n: boss[(n, 4, 2)] for n in names}),
+                        ("Overseer kill%, L5, 2 potions", {n: boss[(n, 5, 2)] for n in names}),
+                        ("whole run, first attempt", {n: summary[n][1] for n in names})):
+        avg = sum(vals.values()) / len(vals)
+        print(f"{label:<32}average {avg * 100:>4.0f}   " + "   ".join(f"{n} {(v - avg) * 100:+.0f}" for n, v in vals.items()))
+    print()
+
+    print("=" * 118)
+    print("5. Weapons: damage per second against a level 3 creature with armor 2 (defense 2) for a level 3 warrior, small shield.")
+    print("=" * 118)
     print(f"{'Weapon':<18}{'Damage':>8}{'To hit':>7}{'Reaction':>9}{'Delay s':>9}{'Avg dmg':>9}{'Hit%':>6}{'DPS':>7}")
-    for name in ("fists", "iron dagger", "enchanted dagger", "training spear", "rusty sword", "fine longsword", "woodcutter axe", "overseer's axe"):
-        p = make_player(3, name, armor)
+    for name in ("fists", "iron dagger", "enchanted dagger", "training spear", "rusty sword", "novice mace", "apprentice staff",
+                 "hunting bow", "fine longsword", "woodcutter axe", "overseer's axe"):
+        p = make_player("warrior", 3, name, True)
         (lo, hi), to_hit, mod, rec = WEAPONS[name]
         delay = p.delay_ms(p.acts[0]) / 1000.0
-        avg, hit = (lo + hi) / 2, hit_chance(3, to_hit, 2)
+        avg, hit = (lo + hi) / 2, hit_chance(p.attack(), 2, 2)
         print(f"{name:<18}{lo:>4}-{hi:<3}{to_hit:>7}{p.reaction:>9.1f}{delay:>9.1f}{avg:>9.1f}{hit * 100:>6.0f}{avg * hit / delay:>7.2f}")
 
 

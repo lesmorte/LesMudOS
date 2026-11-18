@@ -1,6 +1,6 @@
 // @inherit /std/skill
 
-/// <summary>Mage spell. 6-10 damage that ignores armor, needs no hit roll, and can be dodged.</summary>
+/// <summary>Mage spell. 6-9 damage that ignores armor, needs no hit roll, and can be dodged.</summary>
 public class ArcaneBoltSpell : Skill
 {
     public override void Create()
@@ -8,8 +8,8 @@ public class ArcaneBoltSpell : Skill
         Title = "Arcane Bolt";
         Command = "bolt";
         Kind = "spell";
-        Summary = "6-10 damage that ignores armor. It needs no hit roll, but the target can dodge it.";
-        ManaCost = 15;
+        Summary = "6-9 damage that ignores armor. It needs no hit roll, but the target can dodge it.";
+        ManaCost = 20;
         Preparation = 0.5;
         Recovery = 1.0;
         WindUp = "gathers crackling energy";
@@ -29,7 +29,7 @@ public class ArcaneBoltSpell : Skill
             if (room != null) TellRoom(room, $"{char.ToUpper(theirs[0]) + theirs.Substring(1)} dodges {label}'s bolt.\n", user, target);
             return;
         }
-        var damage = user.Call<int>("ScaleSpellDamage", 6 + Random(5));
+        var damage = user.Call<int>("ScaleSpellDamage", 6 + Random(4));
         TellObject(user, $"Your bolt of arcane force strikes {theirs} for {damage} damage.\n");
         TellObject(target, $"{label}'s bolt of arcane force strikes you.\n");
         if (room != null) TellRoom(room, $"{label}'s bolt of arcane force strikes {theirs}.\n", user, target);

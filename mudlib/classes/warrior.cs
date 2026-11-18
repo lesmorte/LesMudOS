@@ -10,8 +10,8 @@ public class WarriorClass : PlayerClass
         SortOrder = 1;
         Title = "Warrior";
         Tagline = "Steel and stubbornness. The sturdiest of the five, slow to act and hard to put down.";
-        Description = "The warrior fights in the front rank with any weapon, in any armor, behind a shield. Starting HP 34, slow to react (3.0), 100 Stamina and little Mana. Skill: Shield Bash. Traits: Defensive Training, Weapon Proficiency.";
-        StartHp = 34;
+        Description = "The warrior fights in the front rank with any weapon, in any armor, behind a shield. Starting HP 40, slow to react (3.0), 100 Stamina and little Mana. Skill: Shield Bash. Traits: Defensive Training, Weapon Proficiency.";
+        StartHp = 40;
         StartReaction = 3.0;
         MaxStamina = 100;
         MaxMana = 20;

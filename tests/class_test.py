@@ -345,10 +345,10 @@ def run(work, mudlib):
 
     # ===== the five archetypes: starting numbers and kit =====
     expect = {
-        "warrior": ("34", "100", "20", "10", ["rusty sword", "small shield"], "weapon: a rusty sword", "shield: a small shield"),
-        "scout": ("30", "100", "20", "10", ["hunting bow", "iron dagger"], "weapon: a hunting bow", "Armor 0"),
-        "priest": ("28", "40", "100", "15", ["novice's mace", "minor healing potion"], "weapon: a novice's mace", "Armor 0"),
-        "mage": ("26", "30", "100", "15", ["apprentice's staff", "minor healing potion"], "weapon: an apprentice's staff", "Armor 0"),
+        "warrior": ("40", "100", "20", "10", ["rusty sword", "small shield"], "weapon: a rusty sword", "shield: a small shield"),
+        "scout": ("26", "100", "20", "10", ["hunting bow", "iron dagger"], "weapon: a hunting bow", "Armor 0"),
+        "priest": ("26", "40", "100", "15", ["novice's mace", "minor healing potion"], "weapon: a novice's mace", "Armor 0"),
+        "mage": ("24", "30", "100", "15", ["apprentice's staff", "minor healing potion"], "weapon: an apprentice's staff", "Armor 0"),
         "adventurer": ("30", "70", "70", "20", ["training spear", "trail ration"], "weapon: a training spear", "Armor 0"),
     }
     chars = {}
@@ -398,7 +398,7 @@ def run(work, mudlib):
     text = old.read_until("> ")
     s = a.score_of(old)
     check("the existing character keeps level and gold, gets the new HP and no kit",
-          f"{s['level']} {s['gold']} {s['max']}", "3 77 42")
+          f"{s['level']} {s['gold']} {s['max']}", "3 77 40")
     check("no second starting kit for an existing character", str(old.command("i").count("rusty sword")), "1")
     old.command("quit")
 
@@ -450,7 +450,7 @@ def run(work, mudlib):
     out = mage.command("bolt dummy")
     time.sleep(1.2)
     hp, st, ma = res(mage)
-    check("a spell costs Mana when it begins (15 less 20% = 12)", str(86 <= ma <= 90), "True")
+    check("a spell costs Mana when it begins (20 less 20% = 16)", str(82 <= ma <= 90), "True")
     mage.command("stop")
     mage.command("drain")
     a.drain(mage, 0.6)
@@ -483,8 +483,8 @@ def run(work, mudlib):
     w = chars["warrior"]
     w.command("restore")
     s = a.score_of(w)["text"]
-    check("Defensive Training +1 armor (shield 1 + 1)", s, "Armor 2")
-    check("Weapon Proficiency +1 to hit with a weapon (level 1 + 1)", s, "To hit +2")
+    check("Defensive Training +2 armor (shield 1 + 2)", s, "Armor 3")
+    check("Weapon Proficiency +2 to hit with a weapon (level 1 + 2)", s, "To hit +3")
     w.command("unwield")
     check("no weapon, no proficiency bonus", a.score_of(w)["text"], "To hit +1")
     w.command("wield sword") if "sword" in w.command("i") else None
@@ -523,7 +523,7 @@ def run(work, mudlib):
     # ===== features: scout =====
     setroom(wiz, "tscout")
     sc = chars["scout"]
-    check("Evasion gives 10% dodge", a.score_of(sc)["text"], "Dodge 10%")
+    check("Evasion gives 8% dodge", a.score_of(sc)["text"], "Dodge 8%")
     wiz.command("goto " + TEST + "lair")
     wiz.command("goto " + TEST + "lair")
     wiz.command("clone " + TEST + "dummy")
@@ -538,7 +538,7 @@ def run(work, mudlib):
     so = sc.command("strike dummy")
     time.sleep(1.2)
     stn = res(sc)[1]
-    check("Precision Strike costs 20 Stamina and winds up", ("True" if stn <= st0 - 17 else f"{st0} {stn} {so!r}"), "True")
+    check("Precision Strike costs 25 Stamina and winds up", ("True" if stn <= st0 - 22 else f"{st0} {stn} {so!r}"), "True")
     sc.command("stop")
     for _ in range(3):
         wiz.command("slay dummy")
@@ -564,8 +564,8 @@ def run(work, mudlib):
     time.sleep(3)
     out = p.command("heal")
     out += a.quiet(p, 5)
-    check("Minor Heal restores 15 HP plus 25% (Divine Knowledge): 19", out, "restoring 19 hit points")
-    check("Minor Heal costs 20 Mana", str(res(p)[2] <= 90), "True")
+    check("Minor Heal restores 8 HP plus 25% (Divine Knowledge): 10", out, "restoring 10 hit points")
+    check("Minor Heal costs 25 Mana", str(res(p)[2] <= 90), "True")
     s0 = a.score_of(p)["text"]
     time.sleep(3)
     out = p.command("bless")
@@ -716,10 +716,25 @@ def run(work, mudlib):
         text += a.quiet(sen, 0.2)
         sen.send("restore")
     check("without the stagger the same action lands", text, "brings the club down")
-    before = num(r"ready in ([\d.]+) s", wiz.command("stat winder"))
-    sen.send("tstagger winder")
-    a.quiet(sen, 0.3)
-    after = num(r"ready in ([\d.]+) s", wiz.command("stat winder"))
+    before = after = None
+    sen.send("stop")
+    time.sleep(9)
+    a.drain(sen, 1.0)
+    for _ in range(6):
+        text = ""
+        end = time.time() + 30
+        while time.time() < end and "brings the club down" not in text:
+            text += a.quiet(sen, 0.2)
+            sen.send("restore")
+        sen.send("stop")
+        st = wiz.command("stat winder")
+        if "recovering" not in st:
+            continue
+        before = num(r"ready in ([\d.]+) s", st)
+        sen.send("tstagger winder")
+        a.quiet(sen, 0.2)
+        after = num(r"ready in ([\d.]+) s", wiz.command("stat winder"))
+        break
     check("stagger on a ready or recovering creature pushes its Ready Time back by 2 seconds", ("True" if before is not None and after is not None and after > before + 1.0 else f"{before} {after}"), "True")
     wiz.command("slay winder")
     sen.command("stop")

@@ -10,8 +10,8 @@ public class MageClass : PlayerClass
         SortOrder = 4;
         Title = "Mage";
         Tagline = "Raw arcane power, and little else. Fragile, and best at a distance.";
-        Description = "The mage fights with spells, wields dagger or staff and wears light armor only. Starting HP 26, 100 Mana but only 30 Stamina. Spell: Arcane Bolt. Skill: Magical Lore. Trait: Mana Efficiency.";
-        StartHp = 26;
+        Description = "The mage fights with spells, wields dagger or staff and wears light armor only. Starting HP 24, 100 Mana but only 30 Stamina. Spell: Arcane Bolt. Skill: Magical Lore. Trait: Mana Efficiency.";
+        StartHp = 24;
         StartReaction = 2.5;
         MaxStamina = 30;
         MaxMana = 100;
