@@ -249,7 +249,11 @@ def main():
         check("level 0: promote does not exist", a.command("promote bob 5"), "What?")
         check("level 0: help lists no wizard commands", a.command("help"), "Commands:", absent=("Wizard", "promote"))
         check("wrong secret is indistinguishable from no command", a.command("promote not-the-secret"), "What?")
-        check("secret creates the first level-10 wizard", a.command("promote " + SECRET), "You are now a level 10 wizard")
+        boot_text = a.command("promote " + SECRET)
+        check("secret creates the first level-10 wizard", boot_text, "You are now a level 10 wizard")
+        check("wizard homes: bootstrap creates the home and says so in one line", boot_text,
+              "Your wizard home directory, /wiz/alice, has been created. Type cd ~ to go there")
+        check("wizard homes: /wiz/alice exists on disk after the bootstrap", str(os.path.isdir(os.path.join(mudlib, "wiz", "alice"))), "True")
         check("secret refused once a level-10 wizard exists", b.command("promote " + SECRET), "What?")
         # The wizard help text itself contains "> ", so wait for its last line instead of the prompt.
         check("help now lists wizard commands", a.command("help", marker="stop the driver"), "Wizard commands at your level (10)", "shutdown")
@@ -312,7 +316,9 @@ public class Imposter : Item
         check("level 5 wizard can use pwd", b.command("pwd"), "/\r\n")
         check("other objects cannot list directories", b.command("peek"), "may not get-dir /secure")
         a.command("cd /domains/town")
-        check("cd with no argument returns to the root", a.command("cd"), "/\r\n")
+        # CHANGED (wizard homes): cd with no argument now goes to the home, not to /. "cd /" still goes to the root.
+        check("cd with no argument goes to the home", a.command("cd"), "/wiz/alice\r\n")
+        check("cd / still goes to the root", a.command("cd /"), "/\r\n")
         a.command("cd /domains/town")
 
         # ---- mkdir, cat and the line editor ----
@@ -520,7 +526,9 @@ public class Beacon : Item
         b.read_until("level is now")
         check("level is checked again when the answer comes", b.command("y"), "You may no longer delete that file. Not deleted.")
         check("so the file is still on disk", str(os.path.exists(os.path.join(lab, "sub", "gizmo.cs"))), "True")
-        check("level 4 cannot delete or rmdir", b.command("delete /domains/lab/sub/gizmo") + b.command("rmdir /domains/lab/ghost"), "What?", absent=("(y/n)", "not empty"))
+        # CHANGED (wizard homes): as above, a refusal naming the rule instead of "What?".
+        check("level 4 cannot delete or rmdir outside the home", b.command("delete /domains/lab/sub/gizmo") + b.command("rmdir /domains/lab/ghost"),
+              "You need wizard level 5 to change anything outside your own home directory", absent=("(y/n)", "not empty", "What?"))
         a.command("promote bob 5")
         b.read_until("level is now")
         check("other objects cannot delete files", b.command("erase"), "may not remove-file /domains/town/square.cs")
@@ -529,7 +537,10 @@ public class Beacon : Item
         a.command("promote bob 1")
         b.read_until("level is now")
         check("level 1 can read files", b.command("cat /domains/lab/notes.txt"), "remember the milk")
-        check("level 1 cannot edit or mkdir", b.command("edit /domains/lab/notes.txt") + b.command("mkdir /domains/lab/x"), "What?", absent=("editor", "Created"))
+        # CHANGED (wizard homes): a level-1 wizard now has the file commands (in their own home), so outside it they get
+        # a refusal that names the rule instead of "What?".
+        check("level 1 cannot edit or mkdir outside the home", b.command("edit /domains/lab/notes.txt") + b.command("mkdir /domains/lab/x"),
+              "You need wizard level 5 to change anything outside your own home directory, /wiz/bob.", absent=("editor", "Created", "What?"))
         with open(os.path.join(mudlib, "domains", "lab", "widget.cs")) as f:
             check("file on disk matches", f.read(), "// @inherit /std/item\n", "edited live", absent=("\r",))
         a.command("cd /domains/town")
@@ -538,6 +549,298 @@ public class Beacon : Item
         b.read_until("level is now")
         check("demoted player loses commands at once", b.command("mudstat"), "What?", absent=("Objects",))
         b.command("drop imposter")
+
+        # ---- wizard homes: /wiz/<name> ----
+        # Every wizard has a home they fully control; elsewhere the old levels apply. See docs/DRIVER_API.md section 6.
+        def on_disk(*parts):
+            return os.path.exists(os.path.join(mudlib, *parts))
+
+        def make_file(client, path, lines):
+            """Create or extend a file with the in-game line editor, exactly as a wizard would."""
+            client.ed("edit " + path)
+            client.command("a", marker="only .")
+            for line in lines:
+                client.send(line)
+            client.ed(".")
+            return client.command("x")
+
+        wiz_dir = os.path.join(mudlib, "wiz")
+        check("wizard homes: /wiz is in the mudlib", str(os.path.isfile(os.path.join(wiz_dir, "README.md"))), "True")
+        check("wizard homes: the home made at promotion exists and survived the demotion to 0", str(on_disk("wiz", "bob")), "True")
+        mudlib_project = open(os.path.join(ROOT, "mudlib", "Mudlib.csproj")).read()
+        check("wizard homes: Mudlib.csproj leaves wiz/** out of the build", mudlib_project, '<Compile Remove="wiz/**" />')
+
+        # -- creation: at promote, and at login for a wizard whose home is gone --
+        carol = Client("carol")
+        carol.read_until("> ")
+        a.command("promote carol 1")
+        text = carol.read_until("has been created")
+        check("wizard homes: promotion creates the home and tells the new wizard in one line", text, "Your wizard level is now 1.",
+              "Your wizard home directory, /wiz/carol, has been created. Type cd ~ to go there")
+        check("wizard homes: the home exists on disk", str(os.path.isdir(os.path.join(wiz_dir, "carol"))), "True")
+        a.command("promote carol 2")
+        check("wizard homes: a home that exists is not announced again", carol.command("pwd"), "level is now 2", absent=("has been created",))
+        carol.send("quit")
+        carol.read_until("Goodbye")
+        os.rmdir(os.path.join(wiz_dir, "carol"))
+        carol = Client("carol")
+        text = carol.read_until("> ")
+        check("wizard homes: login recreates a missing home and says so", text, "Welcome back, Carol", "Your wizard home directory, /wiz/carol, has been created.")
+        check("wizard homes: the recreated home is on disk", str(os.path.isdir(os.path.join(wiz_dir, "carol"))), "True")
+        carol.send("quit")
+        carol.read_until("Goodbye")
+        carol = Client("carol")
+        check("wizard homes: a login with the home in place says nothing", carol.read_until("> "), "Welcome back, Carol", absent=("has been created",))
+
+        # -- the owner at level 1 --
+        a.command("promote bob 1")
+        b.read_until("level is now 1")
+        check("wizard homes: pwd and cd at the start", b.command("cd /"), "/\r\n")
+        check("wizard homes: cd with no argument goes to the home", b.command("cd"), "/wiz/bob\r\n")
+        b.command("cd /domains")
+        check("wizard homes: cd ~ goes to the home", b.command("cd ~"), "/wiz/bob\r\n")
+        check("wizard homes: pwd shows the real path", b.command("pwd"), "/wiz/bob\r\n", absent=("~",))
+        check("wizard homes: cd / still goes to the root", b.command("cd /"), "/\r\n")
+        check("wizard homes: level 1 mkdir in the home with ~", b.command("mkdir ~/rooms"), "Created /wiz/bob/rooms/")
+        check("wizard homes: level 1 mkdir with a relative path in the home", (b.command("cd ~"), b.command("mkdir items"))[1], "Created /wiz/bob/items/")
+        check("wizard homes: list ~ shows the new directories", b.command("list ~"), "/wiz/bob:", "rooms/", "items/")
+        check("wizard homes: list ~/rooms", b.command("list ~/rooms"), "/wiz/bob/rooms:", "(empty)")
+
+        text = make_file(b, "~/items/gem", [
+            "// @inherit /std/item",
+            "public class Gem : Item",
+            "{",
+            '    public override void Create() { Name = "gem"; LongDesc = "A gem that Bob made."; }',
+            '    public override void Init() { AddAction("polish", Polish); }',
+            '    private bool Polish(string args) { if (!Id(args)) { NotifyFail("Polish what?"); return false; } Write("The gem gleams.\\n"); return true; }',
+            "}"])
+        check("wizard homes: level 1 edits an item with the line editor", text, "Wrote /wiz/bob/items/gem.cs, 7 lines", "update /wiz/bob/items/gem")
+        text = make_file(b, "~/rooms/hall", [
+            "// @inherit /std/room",
+            "public class Hall : Room",
+            "{",
+            "    public override void Create()",
+            "    {",
+            "        ShortDesc = \"Bob's Hall\";",
+            "        LongDesc = \"A hall of Bob's own making.\";",
+            '        Exits["out"] = "/domains/town/square";',
+            '        MoveObject(CloneObject("/wiz/bob/items/gem"), Self);',
+            "    }",
+            "}"])
+        check("wizard homes: level 1 edits a room with the line editor", text, "Wrote /wiz/bob/rooms/hall.cs, 11 lines")
+        check("wizard homes: the files are on disk in the home", str([on_disk("wiz", "bob", "items", "gem.cs"), on_disk("wiz", "bob", "rooms", "hall.cs")]), "[True, True]")
+        check("wizard homes: cat with ~", b.command("cat ~/rooms/hall"), "/wiz/bob/rooms/hall.cs (11 lines)", "public class Hall")
+
+        check("wizard homes: level 1 updates their own file", b.command("update ~/rooms/hall"), "Recompiled /wiz/bob/rooms/hall")
+        check("wizard homes: level 1 clones their own item", b.command("clone ~/items/gem"), "Cloned /wiz/bob/items/gem#")
+        check("wizard homes: level 1 goto their own room", b.command("goto ~/rooms/hall"), "Bob's Hall", "A hall of Bob's own making.", "Gem is here.")
+        check("wizard homes: the item they wrote works", b.command("polish gem"), "The gem gleams.")
+        check("wizard homes: update replaces the loaded room and keeps the wizard in it", b.command("update ~/rooms/hall"), "Replaced /wiz/bob/rooms/hall; moved 1 occupant(s) back in.")
+        check("wizard homes: the room they wrote has working exits", b.command("out"), "Town Square")
+        b.command("goto ~/rooms/hall")
+        b.command("out")
+
+        check("wizard homes: level 1 copy within the home", b.command("copy ~/rooms/hall ~/rooms/hall2"), "Copied /wiz/bob/rooms/hall.cs to /wiz/bob/rooms/hall2.cs.")
+        check("wizard homes: level 1 move within the home", b.command("move ~/rooms/hall2 ~/items"), "Moved /wiz/bob/rooms/hall2.cs to /wiz/bob/items/hall2.cs.")
+        check("wizard homes: level 1 rename within the home", b.command("rename ~/items/hall2 attic"), "Renamed /wiz/bob/items/hall2.cs to /wiz/bob/items/attic.cs.")
+        b.command("delete ~/items/attic", marker="(y/n) ")
+        check("wizard homes: level 1 delete asks, then deletes", b.command("y"), "Deleted /wiz/bob/items/attic.cs.")
+        check("wizard homes: the deleted file is gone from disk", str(on_disk("wiz", "bob", "items", "attic.cs")), "False")
+        b.command("mkdir ~/rooms/tmp")
+        check("wizard homes: level 1 rmdir within the home", b.command("rmdir ~/rooms/tmp"), "Removed /wiz/bob/rooms/tmp/")
+        check("wizard homes: the owner can mkdir their own existing home", b.command("mkdir /wiz/bob"), "/wiz/bob already exists")
+
+        # -- another wizard's home: read-only below level 5 --
+        a.command("mkdir /wiz/alice/sub")
+        make_file(a, "/wiz/alice/note", ["alice's note"])
+        os.mkdir(os.path.join(wiz_dir, "alice", "keep"))  # a directory bob may not remove
+        check("wizard homes: a level-1 wizard can list, cd and cat in another home", b.command("list /wiz/alice") + b.command("cat /wiz/alice/note") + b.command("cd /wiz/alice") + b.command("cd /"),
+              "/wiz/alice:", "note.cs", "sub/", "alice's note", "/wiz/alice\r\n")
+        other = "/wiz/alice is another wizard's home. Below wizard level 5 you may read it (list, cd, cat) but not change it."
+        check("wizard homes: mkdir in another home refused", b.command("mkdir /wiz/alice/x"), other, absent=("Created",))
+        check("wizard homes: edit in another home refused", b.command("edit /wiz/alice/x"), other, absent=("editor", "New file"))
+        check("wizard homes: edit of an existing file in another home refused", b.command("edit /wiz/alice/note"), other, absent=("editor", "Editing"))
+        check("wizard homes: copy into another home refused", b.command("copy ~/items/gem /wiz/alice"), other, absent=("Copied",))
+        check("wizard homes: move out of another home refused", b.command("move /wiz/alice/note ~/items"), other, absent=("Moved",))
+        check("wizard homes: move into another home refused", b.command("move ~/items/gem /wiz/alice/sub"), other, absent=("Moved",))
+        check("wizard homes: rename in another home refused", b.command("rename /wiz/alice/note memo"), other, absent=("Renamed",))
+        check("wizard homes: delete in another home refused", b.command("delete /wiz/alice/note"), other, absent=("(y/n)", "Deleted"))
+        check("wizard homes: rmdir in another home refused", b.command("rmdir /wiz/alice/sub"), other, absent=("Removed",))
+        check("wizard homes: nothing changed in the other home",
+              str([on_disk("wiz", "alice", "note.cs"), on_disk("wiz", "alice", "sub"), on_disk("wiz", "alice", "x.cs"), on_disk("wiz", "alice", "x"), on_disk("wiz", "alice", "gem.cs")]),
+              "[True, True, False, False, False]")
+        check("wizard homes: a level-1 wizard can copy FROM another home into their own", b.command("copy /wiz/alice/note ~/items/memo"), "Copied /wiz/alice/note.cs to /wiz/bob/items/memo.cs.")
+        b.command("delete ~/items/memo", marker="(y/n) ")
+        b.command("y")
+        check("wizard homes: clone and update of another wizard's files follow the old levels",
+              b.command("clone /wiz/alice/thing") + b.command("update /wiz/alice/thing"),
+              "You need wizard level 3 to clone anything outside your own home directory, /wiz/bob.",
+              "You need wizard level 5 to update anything outside your own home directory, /wiz/bob.")
+
+        # -- outside the home: the old levels --
+        outside = "You need wizard level 5 to change anything outside your own home directory, /wiz/bob."
+        check("wizard homes: mkdir in /domains refused", b.command("mkdir /domains/x"), outside, absent=("Created",))
+        check("wizard homes: edit in /domains refused", b.command("edit /domains/town/x"), outside, absent=("editor",))
+        check("wizard homes: copy into /domains refused", b.command("copy ~/items/gem /domains/town"), outside, absent=("Copied",))
+        check("wizard homes: move out of /domains refused", b.command("move /domains/town/lantern ~/items"), outside, absent=("Moved",))
+        check("wizard homes: rename in /domains refused", b.command("rename /domains/town/lantern lamp"), outside, absent=("Renamed",))
+        check("wizard homes: delete in /domains refused", b.command("delete /domains/town/lantern"), outside, absent=("(y/n)",))
+        check("wizard homes: rmdir in /domains refused", b.command("rmdir /domains/lab/sub"), outside, absent=("Removed",))
+        check("wizard homes: /std still needs level 10", b.command("edit /std/room"), "You need wizard level 10 to change /secure and /std.")
+        check("wizard homes: clone outside the home still needs level 3", b.command("clone /domains/town/lantern"), "You need wizard level 3 to clone anything outside your own home directory", absent=("Cloned",))
+        check("wizard homes: update outside the home still needs level 5", b.command("update /domains/town/square"), "You need wizard level 5 to update anything outside your own home directory", absent=("Recompiled",))
+        check("wizard homes: goto outside the home keeps its level 1 rule", b.command("goto /domains/town/square"), "Town Square")
+
+        # -- /wiz itself and the homes themselves: level 10 --
+        wiz10 = "You need wizard level 10 to change /wiz itself, a home directory (/wiz/<name>) or a file directly in /wiz. Everything under your own home, /wiz/bob, is yours."
+        check("wizard homes: nobody below 10 can rmdir their own home", b.command("rmdir /wiz/bob") + b.command("rmdir ~"), wiz10, absent=("Removed",))
+        check("wizard homes: nor rmdir /wiz", b.command("rmdir /wiz"), wiz10, absent=("Removed",))
+        check("wizard homes: nor rename or move the home", b.command("rename /wiz/bob.cs bobby2") + b.command("rename ~ x") + b.command("move ~ /domains") + b.command("move /wiz/bob.d /domains"), wiz10, absent=("Renamed", "Moved"))
+        check("wizard homes: nor move a file out to /wiz, or into it", b.command("move ~/items/gem /wiz") + b.command("copy ~/items/gem /wiz/gem") + b.command("move ~/items/gem /wiz/gem2"), wiz10, absent=("Moved", "Copied"))
+        check("wizard homes: a file directly in /wiz needs level 10", b.command("edit /wiz/notes") + b.command("delete /wiz/README.md") + b.command("rename /wiz/README.md x") + b.command("mkdir /wiz/newhome"), wiz10, absent=("editor", "(y/n)", "Renamed", "Created"))
+        check("wizard homes: a bobby home cannot be made by hand", b.command("mkdir /wiz/bobby"), wiz10, absent=("Created",))
+        check("wizard homes: the home and README are still there", str([on_disk("wiz", "bob"), on_disk("wiz", "README.md"), on_disk("wiz", "bob", "items", "gem.cs")]), "[True, True, True]")
+
+        # -- bob and bobby: whole segments, not prefixes --
+        bobby = Client("bobby")
+        bobby.read_until("> ")
+        a.command("promote bobby 1")
+        bobby.read_until("has been created")
+        check("wizard homes: bobby gets /wiz/bobby", str(os.path.isdir(os.path.join(wiz_dir, "bobby"))), "True")
+        check("wizard homes: bobby cannot change bob's home", bobby.command("mkdir /wiz/bob/x") + bobby.command("edit /wiz/bob/items/gem"), "/wiz/bob is another wizard's home.", absent=("Created", "editor"))
+        check("wizard homes: bob cannot change bobby's home", b.command("mkdir /wiz/bobby/x") + b.command("edit /wiz/bobby/y") + b.command("rmdir /wiz/bobby/x"),
+              "/wiz/bobby is another wizard's home.", absent=("Created", "editor", "Removed"))
+        check("wizard homes: bobby cannot recreate bob's directory with the exception for a home", bobby.command("mkdir /wiz/bob"), wiz10.replace("/wiz/bob,", "/wiz/bobby,"), absent=("already exists",))
+        check("wizard homes: bobby's own home works, with ~", bobby.command("mkdir ~/rooms") + bobby.command("list ~"), "Created /wiz/bobby/rooms/", "/wiz/bobby:", "rooms/")
+        check("wizard homes: bobby may clone only their own files", bobby.command("clone /wiz/bob/items/gem"), "You need wizard level 3 to clone anything outside your own home directory, /wiz/bobby.")
+        check("wizard homes: bob may change /wiz/bob/x but the prefix is no use to bobby", b.command("mkdir ~/x") + b.command("rmdir ~/x"), "Created /wiz/bob/x/", "Removed /wiz/bob/x/")
+
+        # -- case tricks and path tricks --
+        check("wizard homes: /WIZ/alice is still alice's home", b.command("mkdir /WIZ/alice/x") + b.command("edit /WIZ/alice/x") + b.command("delete /Wiz/Alice/note"), other, absent=("Created", "editor", "(y/n)"))
+        check("wizard homes: /wiz/ALICE is still alice's home", b.command("mkdir /wiz/ALICE/x") + b.command("rmdir /wiz/ALICE/sub") + b.command("copy ~/items/gem /wiz/ALICE/sub"), other.replace("/wiz/alice", "/wiz/ALICE"), absent=("Created", "Removed", "Copied"))
+        check("wizard homes: /WIZ/bobby is bobby's home", b.command("mkdir /WIZ/Bobby/x"), "/wiz/Bobby is another wizard's home.", absent=("Created",))
+        check("wizard homes: /STD is still /std", b.command("edit /STD/room") + b.command("mkdir /Secure/x"), "You need wizard level 10 to change /secure and /std.", absent=("editor", "Created"))
+        check("wizard homes: /WIZ itself and its homes in other case need level 10", b.command("rmdir /WIZ") + b.command("rmdir /wiz/BOB") + b.command("mkdir /wiz/Zed"), wiz10, absent=("Removed", "Created"))
+        check("wizard homes: the owner's own home in other case is the owner's (the driver then says it does not exist)", b.command("mkdir /wiz/BOB/up"), "No such parent directory for /wiz/BOB/up", absent=("another wizard's home", "need wizard level"))
+        check("wizard homes: ~ cannot be used to reach another wizard's home for writing", b.command("mkdir ~/../alice/x") + b.command("edit ~/../alice/x"), other, absent=("Created", "editor"))
+        check("wizard homes: ~/.. is just a path, and /wiz is not writable", b.command("mkdir ~/../zed") + b.command("edit ~/../../domains/x"), wiz10, outside, absent=("Created", "editor"))
+        check("wizard homes: ~name is not another wizard's home", b.command("cd ~alice"), "/~alice: no such directory.")
+        check("wizard homes: ~name is only an odd relative name, outside the home", b.command("mkdir ~alice/x"), outside, absent=("Created",))
+        check("wizard homes: ~ in the middle of a path is not special", b.command("mkdir /wiz/bob/~/x"), "No such parent directory", absent=("Created", "another wizard's"))
+        check("wizard homes: nothing was created by any of that", str([on_disk("wiz", "alice", "x"), on_disk("wiz", "zed"), on_disk("wiz", "bobby", "x"), on_disk("wiz", "newhome")]), "[False, False, False, False]")
+
+        # -- level 5 in another wizard's home --
+        a.command("promote carol 5")
+        carol.read_until("level is now 5")
+        check("wizard homes: level 5 mkdir in another wizard's home", carol.command("mkdir /wiz/bob/c5"), "Created /wiz/bob/c5/")
+        text = make_file(carol, "/wiz/bob/c5/f", ["carol was here"])
+        check("wizard homes: level 5 edit in another wizard's home", text, "Wrote /wiz/bob/c5/f.cs, 1 lines")
+        check("wizard homes: level 5 copy", carol.command("copy /wiz/bob/c5/f /wiz/bob/c5/g"), "Copied /wiz/bob/c5/f.cs to /wiz/bob/c5/g.cs.")
+        check("wizard homes: level 5 move", carol.command("move /wiz/bob/c5/g /wiz/bob/items"), "Moved /wiz/bob/c5/g.cs to /wiz/bob/items/g.cs.")
+        check("wizard homes: level 5 rename", carol.command("rename /wiz/bob/items/g h"), "Renamed /wiz/bob/items/g.cs to /wiz/bob/items/h.cs.")
+        carol.command("delete /wiz/bob/items/h", marker="(y/n) ")
+        check("wizard homes: level 5 delete", carol.command("y"), "Deleted /wiz/bob/items/h.cs.")
+        carol.command("delete /wiz/bob/c5/f", marker="(y/n) ")
+        carol.command("y")
+        check("wizard homes: level 5 rmdir", carol.command("rmdir /wiz/bob/c5"), "Removed /wiz/bob/c5/")
+        check("wizard homes: level 5 update and clone of bob's files", carol.command("update /wiz/bob/items/gem") + carol.command("clone /wiz/bob/items/gem"), "Recompiled /wiz/bob/items/gem", "Cloned /wiz/bob/items/gem#")
+        check("wizard homes: level 5 still cannot touch a home itself or /wiz", carol.command("rmdir /wiz/bob") + carol.command("mkdir /wiz/zed") + carol.command("delete /wiz/README.md") + carol.command("rmdir ~"),
+              "You need wizard level 10 to change /wiz itself, a home directory (/wiz/<name>) or a file directly in /wiz.", absent=("Removed", "Created", "(y/n)"))
+        check("wizard homes: level 5 still cannot change /std", carol.command("mkdir /std/x"), "You need wizard level 10 to change /secure and /std.")
+        check("wizard homes: level 10 may create and remove a home directory", a.command("mkdir /wiz/zed") + a.command("rmdir /wiz/zed"), "Created /wiz/zed/", "Removed /wiz/zed/")
+        check("wizard homes: level 10 changes in any home", a.command("mkdir /wiz/bob/by_alice") + a.command("rmdir /wiz/bob/by_alice"), "Created /wiz/bob/by_alice/", "Removed /wiz/bob/by_alice/")
+
+        # -- a level-1 wizard's code gets no privileges --
+        wizlist_before = open(os.path.join(work, "save", "secure", "wizlist.json")).read()
+        alice_before = open(os.path.join(work, "save", "players", "alice.json")).read()
+        vault_file = os.path.join(work, "save", "secure", "vault.json")
+        vault_before = open(vault_file).read() if os.path.exists(vault_file) else None
+        make_file(b, "~/items/rogue", [
+            "// @inherit /std/item",
+            "public class Rogue : Item",
+            "{",
+            '    public override void Create() { Name = "rogue"; }',
+            '    public override void Init() { AddAction("attempt", Attempt); }',
+            "    private void Run(string label, Action act)",
+            "    {",
+            '        try { act(); Write(label + "=ALLOWED\\n"); }',
+            '        catch (MudRuntimeException e) { Write(label + "=BLOCKED " + e.Message + "\\n"); }',
+            "    }",
+            "    private bool Attempt(string args)",
+            "    {",
+            '        var wiz = LoadObject("/secure/wizlist");',
+            '        var vault = LoadObject("/secure/vault");',
+            '        Run("copyfile", () => CopyFile("/domains/town/square.cs", "/wiz/bob/stolen.cs"));',
+            '        Run("writefile", () => WriteFile("/wiz/bob/own.cs", "x"));',
+            '        Run("readfile", () => ReadFile("/wiz/bob/items/gem.cs"));',
+            '        Run("getdir", () => GetDir("/wiz/bob"));',
+            '        Run("makedir", () => MakeDir("/wiz/bob/sneaky"));',
+            '        Run("renamefile", () => RenameFile("/wiz/bob/items/gem.cs", "/wiz/bob/items/gem2.cs"));',
+            '        Run("removefile", () => RemoveFile("/wiz/bob/items/gem.cs"));',
+            '        Run("removedir", () => RemoveDir("/wiz/bob/rooms"));',
+            '        Run("save-alice", () => SaveObject("/players/alice"));',
+            '        Run("restore-alice", () => RestoreObject("/players/alice"));',
+            '        Run("save-wizlist", () => SaveObject("/secure/wizlist"));',
+            '        Run("restore-wizlist", () => RestoreObject("/secure/wizlist"));',
+            '        Run("save-vault", () => SaveObject("/secure/vault"));',
+            '        Run("secret", () => CheckAdminSecret(args));',
+            '        Run("update", () => UpdateProgram("/std/room"));',
+            '        Run("shutdown", () => Shutdown());',
+            '        Run("destruct-player", () => Destruct(ThisPlayer()));',
+            '        Write("promote=" + wiz.Call<string>("Promote", "bob", 10) + "\\n");',
+            '        Write("bootstrap=" + wiz.Call<bool>("Bootstrap", args) + "\\n");',
+            '        vault.Call("Record", "bob", "1", new List<string> { "/std/item" }, 5);',
+            '        vault.Call("Clear", "alice", "1");',
+            '        Write("claim=" + string.Join(",", vault.Call<List<string>>("Claim")) + "\\n");',
+            "        return true;",
+            "    }",
+            "}"])
+        text = b.command("clone ~/items/rogue")
+        check("wizard homes: a level-1 wizard's own object compiles and clones", text, "Cloned /wiz/bob/items/rogue#")
+        text = b.command("attempt " + SECRET)
+        for label, reason in [("copyfile", "may not read-file /domains/town/square.cs"), ("writefile", "may not write-file /wiz/bob/own.cs"),
+                              ("readfile", "may not read-file /wiz/bob/items/gem.cs"), ("getdir", "may not get-dir /wiz/bob"),
+                              ("makedir", "may not make-dir /wiz/bob/sneaky"), ("renamefile", "may not write-file /wiz/bob/items/gem.cs"),
+                              ("removefile", "may not remove-file /wiz/bob/items/gem.cs"), ("removedir", "may not remove-dir /wiz/bob/rooms"),
+                              ("save-alice", "may not write /players/alice"), ("restore-alice", "may not read /players/alice"),
+                              ("save-wizlist", "may not write /secure/wizlist"), ("restore-wizlist", "may not read /secure/wizlist"),
+                              ("save-vault", "may not write /secure/vault"), ("secret", "may not check the admin secret"),
+                              ("update", "may not update /std/room"), ("shutdown", "may not shut the driver down"), ("destruct-player", "may not destruct")]:
+            check("wizard homes: code in a home cannot " + label, text, label + "=BLOCKED ", reason)
+        check("wizard homes: code in a home cannot promote", text, "promote=Only a player can do that.")
+        check("wizard homes: code in a home cannot use the bootstrap, even with the right secret", text, "bootstrap=False")
+        check("wizard homes: code in a home cannot claim from the vault", text, "claim=0\r\n")
+        check("wizard homes: nothing was allowed", text, absent=("=ALLOWED",))
+        check("wizard homes: the registry file is unchanged", str(open(os.path.join(work, "save", "secure", "wizlist.json")).read() == wizlist_before), "True")
+        check("wizard homes: alice's save file is unchanged", str(open(os.path.join(work, "save", "players", "alice.json")).read() == alice_before), "True")
+        check("wizard homes: the vault was not written", str((open(vault_file).read() if os.path.exists(vault_file) else None) == vault_before), "True")
+        check("wizard homes: bob is still level 1, the driver is still up, nothing was made by the object", a.command("wizards"), "bob (1)")
+        check("wizard homes: no file was made or removed by the object", str([on_disk("wiz", "bob", "stolen.cs"), on_disk("wiz", "bob", "own.cs"), on_disk("wiz", "bob", "sneaky"), on_disk("wiz", "bob", "items", "gem.cs"), on_disk("wiz", "bob", "rooms")]), "[False, False, False, True, True]")
+
+        # -- demotion leaves the files; re-promotion gives access back --
+        check("wizard homes: demote to 0", a.command("promote bob 0"), "bob is now wizard level 0")
+        b.read_until("level is now 0")
+        check("wizard homes: a demoted wizard has no wizard commands", b.command("cd ~") + b.command("mkdir ~/x") + b.command("cat ~/rooms/hall") + b.command("goto ~/rooms/hall") + b.command("update ~/rooms/hall"), "What?", absent=("Created", "public class", "Hall"))
+        check("wizard homes: demotion left the directory and its files", str([on_disk("wiz", "bob", "rooms", "hall.cs"), on_disk("wiz", "bob", "items", "gem.cs"), on_disk("wiz", "bob", "items", "rogue.cs")]), "[True, True, True]")
+        check("wizard homes: and others can still read them", a.command("cat /wiz/bob/rooms/hall"), "public class Hall")
+        check("wizard homes: a demoted player's objects stay compiled but they cannot edit them", b.command("edit /wiz/bob/rooms/hall"), "What?", absent=("editor",))
+        check("wizard homes: re-promote", a.command("promote bob 1"), "bob is now wizard level 1")
+        check("wizard homes: re-promotion gives the home back, without a second notice", b.read_until("level is now 1"), "Your wizard level is now 1.", absent=("has been created",))
+        check("wizard homes: the old files are there again", b.command("cat ~/rooms/hall"), "/wiz/bob/rooms/hall.cs (11 lines)")
+        check("wizard homes: and editable", b.command("mkdir ~/again"), "Created /wiz/bob/again/")
+        b.command("rmdir ~/again")
+
+        # -- tidy up for the sections below: everyone back to level 0, standing where they were --
+        b.command("goto /domains/town/square")
+        for name, who in (("bob", b), ("bobby", bobby), ("carol", carol)):
+            a.command("promote " + name + " 0")
+        bobby.send("quit")
+        bobby.read_until("Goodbye")
+        carol.send("quit")
+        carol.read_until("Goodbye")
+        a.command("cd /domains/town")
+        b.command("drop rogue")
+        b.command("look")
 
         # ---- live update of a room, with players standing in it ----
         edit(mudlib, "/domains/town/square", "a dry fountain", "a fountain that now runs with wine")
