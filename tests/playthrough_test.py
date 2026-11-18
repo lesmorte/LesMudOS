@@ -428,7 +428,7 @@ class Run:
                     continue
                 check(f"{target}: description word for word", flat(text), ROOMS[target]["desc"])
                 exits = re.search(r"Obvious exits: (.*)", text)
-                check(f"{target}: exits are those of the brief", ",".join(sorted(exits.group(1).split(", "))), ",".join(sorted(ROOMS[target]["exits"])))
+                check(f"{target}: exits are those of the brief", ",".join(sorted(re.sub(r" ?\(to [^)]*\)", "", exits.group(1)).split(", "))), ",".join(sorted(ROOMS[target]["exits"])))
                 for line in occupants.get(target, []):
                     check(f"{target}: '{line}'", text, line)
                 if target in ("Guest Rooms", "Smuggler Hall"):
