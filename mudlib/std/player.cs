@@ -332,7 +332,7 @@ public class Player : Adventurer
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "Corpses:   {cmd}loot{/} [CORPSE], {cmd}get{/} THING (or all) from CORPSE, {cmd}look in{/} CORPSE\n" +
             "Gear:      {cmd}wield{/} THING, {cmd}unwield{/}, {cmd}wear{/} THING, {cmd}remove{/} THING, {cmd}eat{/}/{cmd}drink{/} THING\n" +
-            "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING\n" +
+            "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING, {cmd}search{/} (for hidden ways)\n" +
             "Town:      {cmd}browse{/}, {cmd}buy{/} THING, {cmd}sell{/} THING, {cmd}value{/} THING (in a shop), {cmd}quests{/},\n" +
             "           {cmd}accept{/} QUEST and {cmd}report{/} (in the Adventurers Guild)\n" +
             "Colour:    command names like these are highlighted; {cmd}ansi off{/} turns colour off, {cmd}ansi on{/} turns it on.\n");

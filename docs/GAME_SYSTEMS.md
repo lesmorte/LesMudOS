@@ -30,7 +30,9 @@ mudlib/std/
   adventurer.cs  : abstract Living with the player's gameplay commands and saved character
   corpse.cs       what a dead creature or player leaves: a locked container with decay
   player.cs       now inherits adventurer; keeps login, wizard and file commands
-  room.cs         details, readable text, spawns, encounters, locked exits, safe flag, reset
+  room.cs         details, readable text, spawns, encounters, locked exits, hidden exits, danger band, safe flag, reset
+  patrol.cs      : Npc that walks a route of rooms (section 3a)
+  node.cs        : Thing that holds gatherable charges and regrows (section 3a)
 mudlib/secure/
   lost_property.cs  the lost-property store (section 9, Corpses)
 mudlib/domains/hollow/
@@ -63,6 +65,20 @@ Public functions for other objects: `QueryDetail(name)`, `QueryReadable(name)`, 
 `Long()` for a room lists, after the description and exits, the visible objects. Creatures and items are shown as today (`A ginger tavern cat is here.`); several identical shorts are merged (`Two giant rats are here.`; corpses merge as `Two corpses of a large rat are here.`).
 
 Exit names may be any single word (`north`, `up`, `down`). The one-letter abbreviation rule stays, with `u` and `d` for up and down.
+
+## 3a. World features: hidden exits, search, patrols, nodes, danger bands
+
+Built for the wilderness road (docs/PLAN-corridor-crafting.md, F2). Builder examples are in BUILDING.md; this is how they work.
+
+**Hidden exits.** `Room.HiddenExit(direction, destination, hintDetail, findChance, foundLine)` keeps the exit apart from `Exits`: `QueryExits()` and `flee` never see it, the room binds the direction for every player but `GoExit` answers only a character who has found it (to anyone else the word is not a command at all). What a character has found is the saved list `foundExits` on the adventurer, entries of the form `room path|direction`. Only a room can write to it: `RecordFoundExit(direction)` takes the room from `PreviousObject()`, refuses a clone, refuses unless the character is standing in that room and the room declares that exit, and so a record can only ever name the room that made it. Records under `/wiz` are capped at 50 per character (1000 in all), so a sandbox cannot grow a save file or reach a trusted room's record. The record is written to disk as soon as it is made. Finding happens in two places: the player's `look at` calls `Room.Examined`, and the `search` action calls `Room.Search`; both require the character to be the caller. A newly found exit tells the character the exit's `foundLine`, then calls the room's `protected virtual ExitFound(who, direction)` once. Someone watching a hidden departure reads the direction only if they have found that exit themselves; otherwise "leaves somewhere". Wizards (`QueryWizLevel() >= 1`) see all hidden exits in the list, marked, and are told "that way is hidden" if they try one they have not found; `stat here` lists them.
+
+**`search`** is a command for every player. It cannot be used while fighting. Otherwise it is an action on the combat clock (COMBAT_TIMING.md): Preparation 0, Recovery 0, reaction modifier -1.0, so it takes the character's Reaction Time less 1 (not below 0), doubled into seconds: 3 seconds at 2.5. If the character is still recovering from something else it is queued like a potion (`stop` cancels), and it is checked again when it happens, so a search queued before a fight does nothing once the fight has begun. It uses `Living.ActAsAction(action, waiting)`, a general version of `UseAsAction`, and the adventurer's `Special` override. A room with nothing to find, and a room where every roll failed, give the same line ("You search carefully but find nothing of note."), and a search always costs the same time, so the delay and the text give nothing away. The room hears "Name searches the area carefully."
+
+**Danger bands.** `Room.DangerBand(low, high)` or `BandLow`/`BandHigh` in the directory's `area.cs`; `QueryBandLow()` and `QueryBandHigh()` answer for the room, falling back to the area. `Room.MoveThrough` warns an interactive character once, after the new room's description, when the new room's low end is at least 2 above their level and the room they left was not (a room with no band counts as not dangerous). Entering by login, `goto`, or the respawn does not warn. `consider`, `score` and `look` are unchanged.
+
+**Patrols** (`/std/patrol`, an `Npc`). A route, a pace, loop or there-and-back; walks only through real, ordinary, unlocked exits; stops while fighting and for `TalkPauseSeconds` after `talk` or `ask` (the `Npc.Spoken` hook); with `DefendPlayers` joins (`BeginFight(creature, true)`, so it waits its own Reaction Time before its first action) against any creature fighting a player in its room, both when the fight starts (the room's `JoinFight` call) and when the patrol arrives; dies by leaving for `/std/void` and returning to the start of its route after `ReturnSeconds`. Cost: nothing is scheduled to walk while no player is in a room of the route; a poll every `PollSeconds` (default 15) compares the rooms of the users to a set of route names, loads nothing and moves nothing. When a player is on the route it steps every `PaceSeconds` and checks the players at each step. Safety: a patrol whose file is under `/wiz/<name>/` walks only in `/wiz/<name>/`; any other patrol never walks into `/wiz`.
+
+**Resource nodes** (`/std/node`, a `Thing`). `Kind`, `Charges`, `RegrowSeconds`, `Difficulty`, `FullDesc`, `PickedDesc`, `PickedShort`. Regrowing is lazy: each `TryGather` records the time its charge returns, and every query clears the ones that have passed, so a node has no timer and costs nothing while untouched. `TryGather(who)` needs `who` alive, a creature and in the node's room.
 
 ## 4. Living things
 
@@ -230,6 +246,7 @@ Commands, available to every player:
 | `kill <target>` (also `attack`) | Start a fight |
 | `flee` | Leave by a random exit; fails 25% of the time |
 | `consider <target>` | Rough comparison of levels |
+| `search` | Look for a hidden exit; a short timed action; not while fighting (section 3a) |
 | `wield`, `unwield`, `wear`, `remove` | Equipment |
 | `eat`, `drink`, `quaff` | Consumables |
 | `talk <npc>`, `ask <npc> about <topic>` | Dialogue |
@@ -318,6 +335,7 @@ Kills count only if they happened while the quest was active or before it was ac
 - A simulation script, `tests/balance_sim.py`, plays the combat rules on an event clock outside the driver (the same delay formula as the mudlib; `python3 tests/balance_sim.py check` parses the mudlib files and fails if the numbers differ) with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
 - `tests/playthrough_test.py` (port 4813, `LESMUDOS_TEST_PORT`) is the first-player test. It copies the mudlib unmodified (no stub rooms), makes a brand-new non-wizard level 1 character and plays the whole area: every exit of all 18 rooms in both directions, the sign, plaque and quest board, the brief's objects, every NPC's quoted lines word for word, the shop and the tavern (including the bed and logging out in the Guest Rooms), a deliberate death with corpse recovery and the locked-corpse message for a second player, then both quests with a fight loop (flee, rest, bed, potions, looting, the Hidden Cache, levelling) up to the Goblin Overseer, `report`, the rewards and the ending speech. A warden wizard account is used only to peek at state; if the solo character cannot finish, the test records a finding and falls back to `heal`, clearly labelled. It takes 15 to 20 minutes.
 - `tests/timing_test.py` (port 4815) measures real intervals between combat actions against the formula (design section 6): unarmed, sword, shield, haste, slow, fast and slow creatures, the first-action delay of creatures drawn in, the Overseer's pattern and its Power Strike warning, the potion queue and `stop`, and lifetime cases (spamming `kill`, dying with a potion queued, a target quitting during a wind-up).
+- `tests/world_test.py` (port 4823) tests the world features of section 3a: hidden exits (both ways of finding them, who sees what, saved across logout, a clean restart and a kill), `search` and its timing, danger bands, patrols (route, there and back, loop, real exits only, talk pause, defending, dying and returning, dormancy), nodes, the wizard sandbox, the docs' examples and Elder Lane in Oakenfell.
 - `tests/load_check.py` (port 4821) compiles and loads every mudlib file.
 - `tests/ansi_test.py` (port 4814) tests colour: rendering, `ansi off`, persistence, raw `cat` and editor output, escaping of player input, unclosed tags, shop columns and what a non-player object is told (section 14). `Client` in `smoke_test.py` strips ANSI sequences by default so that all other tests read plain text; `Client.raw` and `raw_command()` give the bytes.
 
