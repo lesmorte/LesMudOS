@@ -10,9 +10,12 @@
 - master: daemon preload + get-dir on /crafting and /recipes. events/craft.cs.
 - /crafting/numbers.cs, proficiencies.cs, beasts.cs.
 
+- /std/trainer, armor CarryBonus, tests/fixtures/crafting/samples, tests/craft_sim.py (passes), tests/craft_test.py
+  (254 checks, all pass on port 4901, ~4.5 min).
+
 ## Next
-- /std/trainer; test fixtures (tests/fixtures/crafting); tests/craft_test.py; tests/craft_sim.py; armor CarryBonus;
-  docs/CRAFTING.md, BUILDING.md, GAME_SYSTEMS.md; run all suites.
+- Run existing suites (smoke, area, class, item, world, find, chronicle, chronicle_play, corridor_mob, load_check).
+- Launch appendix fixture (tests/fixtures/crafting/launch) + sim; docs/CRAFTING.md, BUILDING.md, GAME_SYSTEMS.md.
 
 ## Decisions
 - Recipes and tables are C# data files (house style, type-checked by dotnet build); a file may hold many recipes
@@ -23,3 +26,6 @@
 - Clash rule: more exact (material-id) ingredients win; equally exact recipes that could take the same materials clash,
   the later-loaded (path, then order) is refused and logged.
 - Effects of crafted consumables live in the output's file (/std/crafted), not the recipe.
+- Goblin Blood: /std/blood refuses kind=goblin (scarce) unless the caller is /secure/crafting or a player body restoring
+  its save; RestoreState fails as a whole when a property is refused, so shops/CreateIn get nothing (not a smear).
+- Rare/Secret discovery events: ESS chosen so the first finder gets a Chronicle entry (rare 400, secret 900), listed=firsts.

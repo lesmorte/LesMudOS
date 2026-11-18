@@ -625,6 +625,56 @@ public class CraftingDaemon : Thing
 
     public string QueryTestRolls() => rollMode;
 
+    /// <summary>
+    /// Set a character's proficiency (tenths, 0 to 1000), for tests and wizards' tools: only trusted code acting for a wizard of
+    /// level 10. Code under /wiz can never use it. True if set.
+    /// </summary>
+    public bool WizardSetProficiency(ObjectRef who, string id, int tenths)
+    {
+        var actor = ThisPlayer();
+        if (Self.IsClone || !Trusted(PreviousObject()) || actor == null || actor.Call<int>("QueryWizLevel") < 10 || !IsPlayerBody(who)) return false;
+        EnsureLoaded();
+        if (!profs.ContainsKey(id ?? "")) return false;
+        var ok = who.Call<bool>("CraftSetProficiency", id, Math.Clamp(tenths, 0, 1000));
+        if (ok) who.Call("CraftSave");
+        return ok;
+    }
+
+    /// <summary>
+    /// Roll n harvests with the real random rolls and return how many came out at each quality (Poor .. Masterwork), then the
+    /// successes and the bonus units. No side effects: it only exercises the same code as a real harvest, for statistical tests.
+    /// </summary>
+    public List<int> RollHarvestSample(double prof, int toolQ, double work, int n)
+    {
+        EnsureLoaded();
+        var counts = new int[7];
+        var v = (int)Num1("harvest.variation", 15);
+        for (var i = 0; i < Math.Clamp(n, 0, 20000); i++)
+        {
+            var (a, b) = RollPair(v);
+            counts[HarvestTier(HarvestScore(prof, toolQ, work, a + b - v))]++;
+            if (RollPercent(SuccessChance(prof, toolQ, work), true)) counts[5]++;
+            if (RollPercent(BonusChance(prof, toolQ), false)) counts[6]++;
+        }
+        return counts.ToList();
+    }
+
+    /// <summary>Roll n crafts with the real random rolls: counts per quality (Poor .. Legendary), then bonus outputs, then returns. No side effects.</summary>
+    public List<int> RollCraftSample(double average, double prof, double work, int n)
+    {
+        EnsureLoaded();
+        var counts = new int[8];
+        var steps = (int)Num1("craft.noise_steps", 20);
+        for (var i = 0; i < Math.Clamp(n, 0, 20000); i++)
+        {
+            var (a, b) = RollPair(steps);
+            counts[CraftTier(average, prof, work, a, b)]++;
+            if (RollPercent(CraftBonusChance(prof, work), false)) counts[6]++;
+            if (RollPercent(CraftReturnChance(prof, work), false)) counts[7]++;
+        }
+        return counts.ToList();
+    }
+
     private bool RollPercent(double chance, bool forSuccess) => rollMode switch
     {
         "mid" or "low" => forSuccess,
@@ -781,17 +831,16 @@ public class CraftingDaemon : Thing
         return word;
     }
 
-    /// <summary>Raise a proficiency for one piece of successful work; tells the character when the whole number goes up.</summary>
-    private void Grow(ObjectRef who, string prof, double work)
+    /// <summary>Raise a proficiency for one piece of successful work. Returns the line that tells the character the whole number went up, or "".</summary>
+    private string Grow(ObjectRef who, string prof, double work)
     {
-        if (!profs.TryGetValue(prof, out var p)) return;
+        if (!profs.TryGetValue(prof, out var p)) return "";
         var before = Tenths(who, prof);
         var gain = Gain(before, work);
-        if (gain <= 0) return;
+        if (gain <= 0) return "";
         var after = Math.Min(1000, before + gain);
-        if (who.Call<bool>("CraftSetProficiency", prof, after) != true) return;
-        if (after / 10 > before / 10)
-            TellObject(who, $"Your {p.Name} rises to {after / 10} ({Word(after / 10)}).\n");
+        if (who.Call<bool>("CraftSetProficiency", prof, after) != true) return "";
+        return after / 10 > before / 10 ? $"Your {p.Name} rises to {after / 10} ({Word(after / 10)}).\n" : "";
     }
 
     private bool Learn(ObjectRef who, Recipe r, string how) => who.Call<bool>("CraftLearn", r.Id, how);
@@ -976,14 +1025,13 @@ public class CraftingDaemon : Thing
     {
         var corpses = CorpsesHere(who);
         if (corpses.Count == 0) return null;
-        if (args == "" || args == "corpse") return corpses.FirstOrDefault(c => (c.Call<string>("QueryYieldKind", verb) ?? "") != "" && c.Call<bool>("QueryYieldAvailable", verb)) ?? corpses[0];
+        if (args == "" || args == "corpse") return corpses.FirstOrDefault(c => c.Call<bool>("QueryYieldAvailable", verb)) ?? corpses[0];
         var id = args.ToLowerInvariant();
         if (id.StartsWith("corpse of ")) id = id.Substring(10);
-        foreach (var c in corpses)
-            if (c.Call<bool>("Id", args.ToLowerInvariant()) || c.Call<bool>("Id", "corpse of " + id) || (c.Call<string>("QueryCreatureKind") ?? "") == id
-                || (c.Call<string>("QueryName") ?? "").ToLowerInvariant().Contains(id))
-                return c;
-        return null;
+        var named = corpses.Where(c => c.Call<bool>("Id", args.ToLowerInvariant()) || c.Call<bool>("Id", "corpse of " + id) || (c.Call<string>("QueryCreatureKind") ?? "") == id
+                                       || (c.Call<string>("QueryName") ?? "").ToLowerInvariant().Contains(id)).ToList();
+        // Of several corpses that answer, the first that still has this part to give, else the first.
+        return named.FirstOrDefault(c => c.Call<bool>("QueryYieldAvailable", verb)) ?? named.FirstOrDefault();
     }
 
     /// <summary>Why this character cannot take this part from this corpse now, or null.</summary>
@@ -1126,12 +1174,12 @@ public class CraftingDaemon : Thing
         var made = CreateIn(mat.Record, units + bonus, quality, who);
         if (made == null) { TellObject(who, "Something went wrong; nothing was gathered.\n"); return; }
         var what = Named(mat.Record, units + bonus, quality, mat.Id.Replace('_', ' '));
+        var grew = Grow(who, profId, work);
+        who.Call("CraftSave"); // on disk before anyone is told, so a crash after the message cannot lose it
         TellObject(who, $"{doneText} and take {what}" +
-            $" (with your {Item.QualityNames[toolQ]} {tool.Call<string>("QueryToolType")}){(bonus > 0 ? ", one more than you hoped" : "")}.\n");
+            $" (with your {Item.QualityNames[toolQ]} {tool.Call<string>("QueryToolType")}){(bonus > 0 ? ", one more than you hoped" : "")}.\n" + grew);
         var room = Environment(who);
         if (room != null) TellRoom(room, roomText + "\n", who);
-        Grow(who, profId, work);
-        who.Call("CraftSave");
     }
 
     /// <summary>"3 wolf skins" or "a wolf skin" to "wolf skins" or "wolf skin", for building "3 fine wolf skins".</summary>
@@ -1355,7 +1403,7 @@ public class CraftingDaemon : Thing
         var giveBack = RollPercent(CraftReturnChance(prof, r.Work), false);
         var count = r.Count + (bonus ? 1 : 0);
 
-        var used = plan.Select(p => Named(p.U.Mat.Record, p.N, p.U.Quality, p.U.Mat.Id)).ToList();
+        var used = plan.OrderBy(p => r.Slots.IndexOf(p.S)).Select(p => Named(p.U.Mat.Record, p.N, p.U.Quality, p.U.Mat.Id)).ToList();
 
         // 1. Make the outputs here first, so that a broken output file costs nothing.
         foreach (var leftover in AllInventory(Self)) leftover.Call("Vanish");
@@ -1395,11 +1443,11 @@ public class CraftingDaemon : Thing
             if (CreateIn(returned.U.Mat.Record, 1, returned.U.Quality, who) != null)
                 returnText = $" You waste nothing: {MatName(returned.U.Mat.Id, 1)} is left over.";
         }
-        TellObject(who, $"You make {OutputName(r, count, quality)}{(bonus ? ", one more than the recipe promises" : "")}, using {Join(used)}.{returnText}\n");
+        var grew = Grow(who, r.Proficiency, r.Work);
+        who.Call("CraftSave"); // on disk before anyone is told, so a crash after the message cannot lose it
+        TellObject(who, $"You make {OutputName(r, count, quality)}{(bonus ? ", one more than the recipe promises" : "")}, using {Join(used)}.{returnText}\n" + grew);
         var room = Environment(who);
         if (room != null) TellRoom(room, $"{who.Call<string>("QueryName")} makes {OutputName(r, count, quality)}.\n", who);
-        Grow(who, r.Proficiency, r.Work);
-        who.Call("CraftSave");
         return true;
     }
 

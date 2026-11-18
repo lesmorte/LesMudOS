@@ -1084,7 +1084,7 @@ public abstract class Adventurer : Living
         var item = args == "" ? null : Present(args);
         if (item == null) { NotifyFail($"{Cap(verb)} what?"); return false; }
         var kind = item.Call<string>("QueryUseVerb");
-        if (kind == null || (kind == "eat") != (verb == "eat")) { Write($"You can't {verb} that.\n"); return true; }
+        if (kind == null || (kind != "eat" && kind != "drink") || (kind == "eat") != (verb == "eat")) { Write($"You can't {verb} that.\n"); return true; }
         UseAsAction(item); // an action with its own Recovery: now if ready, else queued for the next Ready Time
         return true;
     }

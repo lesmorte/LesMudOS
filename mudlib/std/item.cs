@@ -151,10 +151,11 @@ public class Item : Thing
         return string.Join("&", parts);
     }
 
-    /// <summary>Restore state written by QueryState. Unknown or malformed parts are ignored. False if refused.</summary>
+    /// <summary>Restore state written by QueryState. Unknown or malformed parts are ignored. False if refused, or if a property was refused (PropertyAllowed).</summary>
     public bool RestoreState(string state)
     {
         if (!MayChange()) return false;
+        var refused = false;
         foreach (var part in (state ?? "").Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
             var eq = part.IndexOf('=');
@@ -167,11 +168,12 @@ public class Item : Thing
             {
                 var name = Decode(key.Substring(2));
                 var text = Decode(value);
-                if (name.Length <= 64 && text.Length <= MaxPropertyLength && (properties.ContainsKey(name) || properties.Count < MaxProperties) && PropertyAllowed(name, text)) properties[name] = text;
+                if (!PropertyAllowed(name, text)) refused = true;
+                else if (name.Length <= 64 && text.Length <= MaxPropertyLength && (properties.ContainsKey(name) || properties.Count < MaxProperties)) properties[name] = text;
             }
         }
         StateChanged();
-        return true;
+        return !refused; // a property this type refuses to this caller (Goblin Blood from a shop) fails the whole restore
     }
 
     private static string Encode(string text)
