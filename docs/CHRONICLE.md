@@ -97,7 +97,7 @@ Every participant receives the event's full ESS as contribution credit. The even
 
 ### Aggregation
 
-Routine events are never listed one by one. The event service keeps counters by region and kind (goblins killed in Green Vale). A counter crossing a milestone in a data table raises an event of its own, with its own catalogue entry, which is how "The Goblin Purge of Green Vale" comes to exist.
+Routine events are never listed one by one. The event service keeps counters by region and kind (goblins killed in Greenvale). A counter crossing a milestone in a data table raises an event of its own, with its own catalogue entry, which is how "The Goblin Purge of Greenvale" comes to exist.
 
 ## 4. Events in pass 1
 
@@ -126,7 +126,7 @@ What Vincent's Hollow produces:
 
 - **The first character ever** to kill the Overseer (450) and to find the Forgotten Cellars (600) gets a Chronicle entry for each. The first to bring Rowan the orders (1,069) gets a Legendary entry, and the first to find the Hidden Cache (100) and to finish "Clear the Cellar" (220) start rumors.
 - **Every later character** doing the same things earns Renown for them but makes no history, except that finding the Forgotten Cellars for oneself (100) is still talked about in the tavern.
-- **Everyone together** makes history through the aggregates: the thousandth goblin killed in Green Vale is a featured entry no matter who strikes the blow.
+- **Everyone together** makes history through the aggregates: the thousandth goblin killed in Greenvale is a featured entry no matter who strikes the blow.
 - **Milestones** such as the first character to reach level 10 or to choose an advanced class are Realm-Shaping events with a server first. They are meant to be the entries a new player reads years later.
 
 The numbers are a starting point. The implementer tabulates what a full play-through produces for the first character and for a later one, and the table is adjusted until that reads sensibly.

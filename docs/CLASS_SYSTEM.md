@@ -8,7 +8,7 @@ Status: design. Nothing here is implemented yet.
 
 1. All 15 advanced classes are selectable, each with a title and two signature abilities. Full skill trees come later.
 2. The level cap is raised and the levelling formula is data-driven. New areas will follow.
-3. The hall where advanced classes are chosen is not in Vincent's Hollow. It is the Hall of Legends (the class brief calls it the "All Hall") in Oakenfell, the first major city of Green Vale, which is not yet built. Completing "Clear the Cellar" grants a travel pass that lets a character leave the main area of Vincent's Hollow and travel toward that city. (This replaces an earlier decision to put the hall behind a locked door in the village's Adventurers Guild.) See [WORLD.md](WORLD.md).
+3. The hall where advanced classes are chosen is not in Vincent's Hollow. It is the Hall of Legends (the class brief calls it the "All Hall") in Oakenfell, the first major city of Greenvale, which is not yet built. Completing "Clear the Cellar" grants a travel pass that lets a character leave the main area of Vincent's Hollow and travel toward that city. (This replaces an earlier decision to put the hall behind a locked door in the village's Adventurers Guild.) See [WORLD.md](WORLD.md).
 4. Existing characters choose an archetype at their next login.
 
 ## 2. Stages
@@ -16,7 +16,7 @@ Status: design. Nothing here is implemented yet.
 | Stage | Contents |
 |---|---|
 | A | Stamina and mana; the skill and spell mechanism on the combat clock; critical, dodge and block rolls; timed effects; equipment categories and access; the class framework and levelling formula, with level-scaled attack and defense; archetype choice at creation and for existing characters; the five archetypes with their starting features and equipment; the travel pass and the road out of the village; region and area names; balance and a play-through per archetype |
-| B | Oakenfell, the first major city of Green Vale (needs an area brief), with the Hall of Legends and its five hallmasters; advancement at level 5; the 15 advanced classes with two signature abilities each, including allies (summons and companions) |
+| B | Oakenfell, the first major city of Greenvale (needs an area brief), with the Hall of Legends and its five hallmasters; advancement at level 5; the 15 advanced classes with two signature abilities each, including allies (summons and companions) |
 | C | Balance simulation and tests for the advanced classes; a play-through that ends with travelling to the city and pledging a class |
 
 Stage B cannot start until the city exists. Stage A does not depend on it.
@@ -194,11 +194,11 @@ Chosen at character creation, after the password, from a short in-character pres
 - **What it is.** A pass of safe conduct issued by the Adventurers Guild of Vincent's Hollow: an item, carried like any other.
 - **How it is earned.** Guildmaster Rowan gives it with the rewards for "Clear the Cellar". A character who has completed the quest and is not carrying a pass (an existing character, or one who lost it with a corpse) is given another when they `report` or `talk` to him.
 - **What it does.** The road north out of Vincent's Hollow, on the North Road, is closed to anyone without a pass, with a refusal in keeping with the village (the wilds are no place for the untested). With the pass, the way is open.
-- **What lies beyond, for now.** One new area, the Vale Road, in Green Vale: a short stretch of road north of the village, a single room in this stage, from which the road continues toward Oakenfell and is not yet open. It is not part of the village and is not safe.
+- **What lies beyond, for now.** One new area, the Vale Road, in Greenvale: a short stretch of road north of the village, a single room in this stage, from which the road continues toward Oakenfell and is not yet open. It is not part of the village and is not safe.
 
 ### The Hall of Legends (stage B)
 
-- **Location.** In Oakenfell, the first major city of Green Vale, reached by the Vale Road. The city needs an area brief. In the design bible the Hall of Legends is also a faction, a confederation of guilds, and it keeps the Grand Chronicle.
+- **Location.** In Oakenfell, the first major city of Greenvale, reached by the Vale Road. The city needs an area brief. In the design bible the Hall of Legends is also a faction, a confederation of guilds, and it keeps the Grand Chronicle.
 - **The hall.** A great chamber built by the founders of the five callings. One room in its first form, safe, with five hallmasters, one per archetype, and a wall of fifteen banners (readable) that describes every advanced class in a line.
 - **Hallmasters.** Each speaks for one archetype: `talk` gives their welcome, and `ask <hallmaster> about <class>` describes each of their three advanced classes, what it gains, and what it costs in experience. They answer other archetypes' members politely and send them to the right hallmaster.
 - **Choosing.** A level 5 character says `pledge <class>` to the hallmaster of their own archetype. The hallmaster states plainly that the choice is permanent and names what will be gained; `pledge <class>` a second time within a minute completes it, with a short ceremony the room sees. Below level 5 the hallmaster says to return when ready. A character who already has an advanced class is refused.

@@ -7,21 +7,21 @@ Facts about the game world that the owner has fixed. Area briefs and system desi
 | Game | Legends of Hollowmere |
 | Website | legendsofhollowmere.com |
 | Engine | LesMudOS (this repository: the driver and the standard mudlib) |
-| Starting region | Green Vale |
+| Starting region | Greenvale |
 | Starting village | The Village of Vincent's Hollow |
-| First major city of Green Vale | Oakenfell. Not yet built. The Hall of Legends is there. |
+| First major city of Greenvale | Oakenfell. Not yet built. The Hall of Legends is there. |
 | Where advanced classes are chosen | The Hall of Legends, in Oakenfell (called the "All Hall" in the class brief and in earlier notes) |
 
 ## Structure
 
 - The world is divided into regions. A region contains areas: villages, cities, dungeons, roads.
 - Every room belongs to one area and, through it, to one region. Both names are data on the area, not text repeated in each room.
-- Green Vale is the first region. Its areas so far are The Village of Vincent's Hollow (levels 1-5) and The Forgotten Cellars beneath it (levels 2-5). See [areas/vincents-hollow.md](areas/vincents-hollow.md).
+- Greenvale is the first region. Its areas so far are The Village of Vincent's Hollow (levels 1-5) and The Forgotten Cellars beneath it (levels 2-5). See [areas/vincents-hollow.md](areas/vincents-hollow.md).
 
 ## Leaving the village
 
 - A new character cannot leave the main area of Vincent's Hollow. The road north is closed to them.
-- Completing the first quest, "Clear the Cellar", grants a travel pass. With it, the road north out of Vincent's Hollow is open, and leads toward Oakenfell, the first major city of Green Vale.
+- Completing the first quest, "Clear the Cellar", grants a travel pass. With it, the road north out of Vincent's Hollow is open, and leads toward Oakenfell, the first major city of Greenvale.
 - The pass replaces the earlier idea of a key to a hall inside the village. The Hall of Legends is in Oakenfell.
 - Until Oakenfell is built, the road beyond the village is a short stretch that ends with the way ahead not yet open.
 
@@ -44,7 +44,8 @@ The owner's design bible ([specs/design-bible.md](specs/design-bible.md)) adds f
 
 At launch, Vincent's Hollow has strong Assembly influence, moderate Merchant Consortium influence, a minor Riverwatch presence, hidden Circle of Ash activity and occasional Thorn Pact interaction.
 
-## Open questions on names
+## Names, settled by the owner
 
-- The owner's messages and the bible's title say "Oakenfell"; the bible's text says "Oakenfall". The game uses Oakenfell until told otherwise.
-- The owner's message gave the region as "Green Vale"; the bible writes "Greenvale" throughout, including in faction names (the Greenvale Assembly). The game uses Green Vale for the region and keeps faction names as the bible gives them, until told otherwise.
+- The city is Oakenfell. (The design bible and the ESS specification write "Oakenfall"; those documents are kept as supplied, and the game uses Oakenfell.)
+- The region is Greenvale, one word, as in the Greenvale Assembly.
+- The owner will supply a city design document for Oakenfell. Nothing in the city is designed until it arrives.
