@@ -171,7 +171,7 @@ public class Lantern : Item
 |---|---|
 | `src/LesMudOS.Api` | The contract mudlib code compiles against: `MudObject` (applies and efuns), `ObjectRef`, `IMaster`, `[Saved]` |
 | `src/LesMudOS.Driver` | The host: kernel and game loop, Roslyn compiler, tick injector, sandbox analyzer, telnet server, save store |
-| `mudlib` | Sample mudlib: `/secure` (master, login, wizard registry), `/std` (thing, item, room, living, npc, monster, shopkeeper, weapon, armor, consumable, coins, corpse, adventurer, player, void), `/secure/vault` (lost-property vault), `/domains/town` (technical demo), `/domains/hollow` (Vincent's Hollow) |
+| `mudlib` | Sample mudlib: `/secure` (master, login, wizard registry), `/std` (thing, item, room, living, npc, monster, shopkeeper, weapon, armor, consumable, coins, corpse, adventurer, player, void), `/secure/lost_property` (lost-property store), `/domains/town` (technical demo), `/domains/hollow` (Vincent's Hollow) |
 | `mudlib/Mudlib.csproj` | Not used at run time. Gives IntelliSense for mudlib files and lets `dotnet build` check the whole mudlib. |
 | `tests/smoke_test.py` | End-to-end test of the driver over TCP (port 4811 in the examples below) |
 | `tests/area_test.py` | End-to-end test of the game systems and of the Hollow's content, with test rooms and wizard help (port 4812, about 8 minutes) |

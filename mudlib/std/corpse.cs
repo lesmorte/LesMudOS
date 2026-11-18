@@ -58,13 +58,13 @@ public class Corpse : Thing
         Report(false);
     }
 
-    /// <summary>Write the contents of a player's corpse through to the lost-property vault.</summary>
+    /// <summary>Write the contents of a player's corpse through to the lost-property store.</summary>
     private void Report(bool gone)
     {
         if (!playerCorpse) return;
         try
         {
-            var vault = LoadObject("/secure/vault");
+            var store = LoadObject("/secure/lost_property");
             var paths = new List<string>();
             var coins = 0;
             foreach (var item in Contents())
@@ -72,12 +72,12 @@ public class Corpse : Thing
                 var amount = item.Call<int>("QueryAmount");
                 if (amount > 0) coins += amount; else paths.Add(item.ProgramPath);
             }
-            if (gone || (paths.Count == 0 && coins == 0)) vault.Call("Clear", deceasedName, corpseId);
-            else vault.Call("Record", deceasedName, corpseId, paths, coins);
+            if (gone || (paths.Count == 0 && coins == 0)) store.Call("Clear", deceasedName, corpseId);
+            else store.Call("Record", deceasedName, corpseId, paths, coins);
         }
         catch (MudRuntimeException)
         {
-            // Without a vault the corpse still works; only the restart protection is missing.
+            // Without the store the corpse still works; only the restart protection is missing.
         }
     }
 

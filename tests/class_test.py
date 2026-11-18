@@ -291,6 +291,10 @@ def main():
         h.write(mudlib, "/skills/" + name, source)
     for name, source in CLASSES.items():
         h.write(mudlib, "/classes/" + name, source)
+    # An old save from before /secure/vault was renamed /secure/lost_property: its records must still be handed back.
+    os.makedirs(os.path.join(work, "save", "secure"), exist_ok=True)
+    with open(os.path.join(work, "save", "secure", "vault.json"), "w") as f:
+        json.dump({"gold": {"legacy|1-/std/corpse#1": 7}, "items": {"legacy|1-/std/corpse#1": ["/domains/hollow/obj/iron_dagger"]}}, f)
     proc, log = a.start_driver(work, mudlib)
     try:
         run(work, mudlib)
@@ -313,6 +317,14 @@ def run(work, mudlib):
     wiz = h.Client("chief", archetype="warrior")
     wiz.read_until("> ")
     check("the secret makes the first wizard", wiz.command("promote " + h.SECRET), "level 10 wizard")
+
+    # ===== lost property saved under the old name =====
+    lg = h.Client("legacy", archetype="warrior")
+    lg_text = lg.read_until("> ")
+    check("a record saved by the old vault is handed back after the upgrade", lg_text, "You recover an item and 7 gold.")
+    lg.command("quit")
+    time.sleep(0.5)
+    check("the store now saves under its new name", "ok" if os.path.exists(os.path.join(work, "save", "secure", "lost_property.json")) else "missing", "ok")
 
     # ===== the choice at creation =====
     c = h.Client("picker", login=False)

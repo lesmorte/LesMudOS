@@ -272,7 +272,7 @@ File names given to `cat`, `edit`, `copy`, `move`, `rename` and `delete` get `.c
 
 After `a`, `i` or `c`, every line typed or pasted goes into the file, indentation included, until a line containing only `.`. Saving does not load the code; the editor prints the `update` command to run.
 
-`goto`, `stat`, `heal` and `smite` live in `/std/adventurer` with the other gameplay commands. `/secure/vault` is a second blueprint-only daemon beside the wizard registry: the master lets only the vault blueprint read and write its save file `/secure/vault`, and the vault accepts records only from `/std/corpse` clones (see GAME_SYSTEMS.md, Corpses).
+`goto`, `stat`, `restore` and `slay` live in `/std/adventurer` with the other gameplay commands. `/secure/lost_property` is a second blueprint-only daemon beside the wizard registry: the master lets only the lost-property blueprint read and write its save file `/secure/lost_property` (and read the old `/secure/vault`, once, to carry old records over), and the store accepts records only from `/std/corpse` clones (see GAME_SYSTEMS.md, Corpses).
 
 Below the required level a command answers `What?`, the same as a verb that does not exist. Levels are checked on every use, so a demotion takes effect immediately.
 

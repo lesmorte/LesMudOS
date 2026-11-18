@@ -186,7 +186,7 @@ with a `ChooseAction(target)` override for the pattern (it uses `ActionsTaken()`
 
 ## 5. What does not change
 
-Armor, levels, experience, death, corpses, the vault, loot, quests, shops, safe rooms, peaceful villagers, players unable to attack players, and enemies being forgotten 30 seconds after they are out of the room.
+Armor, levels, experience, death, corpses, lost property, loot, quests, shops, safe rooms, peaceful villagers, players unable to attack players, and enemies being forgotten 30 seconds after they are out of the room.
 
 ## 5a. What the class system added to the clock
 

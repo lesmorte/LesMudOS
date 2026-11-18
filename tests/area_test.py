@@ -115,9 +115,9 @@ public class VTool : Item
     }
     private bool Run(string args)
     {
-        var vault = LoadObject("/secure/vault");
-        vault.Call("Record", "tester", "fake-id", new List<string> { "/domains/hollow/obj/rusty_sword" }, 5);
-        var claim = vault.Call<List<string>>("Claim");
+        var store = LoadObject("/secure/lost_property");
+        store.Call("Record", "tester", "fake-id", new List<string> { "/domains/hollow/obj/rusty_sword" }, 5);
+        var claim = store.Call<List<string>>("Claim");
         Write("claim count " + (claim == null ? -1 : claim.Count) + " gold " + (claim == null ? "?" : claim[0]) + "\\n");
         return true;
     }
@@ -377,7 +377,7 @@ def main():
     box[0], box[1] = start_driver(work, mudlib)
     try:
         run(work, mudlib)
-        run_vault(work, mudlib, box)
+        run_lost_property(work, mudlib, box)
         box[1].flush()
         logged = open(os.path.join(work, "driver.log")).read()
         h.check("the driver logged no errors", "ok" if "ERROR" not in logged else logged[logged.index("ERROR"):][:800], "ok")
@@ -430,7 +430,7 @@ def die_in_pit(wiz, name, items_to_carry):
     return c, before, text
 
 
-def run_vault(work, mudlib, box):
+def run_lost_property(work, mudlib, box):
     check = h.check
     sword = (HOLLOW + "obj/rusty_sword", "rusty sword")
     shield = (HOLLOW + "obj/small_shield", "small shield")
@@ -451,8 +451,8 @@ def run_vault(work, mudlib, box):
     fee = before // 10
     check("the corpse holds the belongings and the fee", (wiz.command("goto " + TEST + "pit"), wiz.command("look in corpse of mourn"))[1],
           "a rusty sword", "a small shield", f"{fee} gold coins")
-    vault = open(os.path.join(work, "save", "secure", "vault.json")).read()
-    check("the vault already holds the record (write-through)", vault, "rusty_sword", "small_shield", '"mourn|')
+    store_text = open(os.path.join(work, "save", "secure", "lost_property.json")).read()
+    check("the lost-property store already holds the record (write-through)", store_text, "rusty_sword", "small_shield", '"mourn|')
     gold_after_death = score_of(mourn)["gold"]
     mourn.send("quit")
     mourn.read_until("Goodbye")
@@ -467,8 +467,8 @@ def run_vault(work, mudlib, box):
     check("after a clean restart the owner gets the belongings back", text, "Harland, the innkeeper of the Hollowman's Rest", "You recover 2 items and %d gold." % fee)
     check("the items are in the inventory", mourn.command("i"), "a rusty sword", "a small shield")
     check("and the gold is back", str(score_of(mourn)["gold"]), str(gold_after_death + fee))
-    vault = open(os.path.join(work, "save", "secure", "vault.json")).read()
-    check("the record is deleted", vault, absent=("mourn|", "rusty_sword"))
+    store_text = open(os.path.join(work, "save", "secure", "lost_property.json")).read()
+    check("the record is deleted", store_text, absent=("mourn|", "rusty_sword"))
     mourn.send("quit")
     mourn.read_until("Goodbye")
     mourn = h.Client("mourn")
@@ -490,9 +490,9 @@ def run_vault(work, mudlib, box):
     for step in ("d", "north", "down", "pit"):
         crasher.command(step)
     check("the owner loots only the sword", crasher.command("get rusty sword from corpse of crasher"), "You take a rusty sword from the corpse of Crasher.")
-    vault = open(os.path.join(work, "save", "secure", "vault.json")).read()
-    check("the vault follows the corpse", vault, "small_shield", '"crasher|')
-    check("the sword has left the vault record", str("rusty_sword" in vault.split('"crasher|')[1]), "False")
+    store_text = open(os.path.join(work, "save", "secure", "lost_property.json")).read()
+    check("the lost-property store follows the corpse", store_text, "small_shield", '"crasher|')
+    check("the sword has left the lost-property record", str("rusty_sword" in store_text.split('"crasher|')[1]), "False")
     restart(work, mudlib, box, "kill")
     crasher = h.Client("crasher")
     text = crasher.read_until("> ")

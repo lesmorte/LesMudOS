@@ -5,11 +5,12 @@
 public class Master : MudObject, IMaster
 {
     private const string WizList = "/secure/wizlist";
-    private const string Vault = "/secure/vault";
+    private const string LostProperty = "/secure/lost_property";
+    private const string LegacyVault = "/secure/vault";  // the old name of the lost-property save file, read once by the upgrade
 
     public ObjectRef Connect() => CloneObject("/secure/login");
 
-    public IEnumerable<string> Preload() => new[] { WizList, Vault, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
+    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
 
     // Save files: player bodies own /players/*, the wizard registry owns its own file.
     public bool ValidRead(string path, ObjectRef caller) => OwnsSaveFile(path, caller);
@@ -18,7 +19,7 @@ public class Master : MudObject, IMaster
     private static bool OwnsSaveFile(string path, ObjectRef caller)
     {
         if (path == WizList) return IsWizList(caller);
-        if (path == Vault) return !caller.IsClone && caller.ProgramPath == Vault;
+        if (path == LostProperty || path == LegacyVault) return !caller.IsClone && caller.ProgramPath == LostProperty;
         return path.StartsWith("/players/") && IsPlayerBody(caller);
     }
 

@@ -549,7 +549,7 @@ public abstract class Adventurer : Living
     protected void ClaimLostProperty()
     {
         List<string> claim;
-        try { claim = LoadObject("/secure/vault").Call<List<string>>("Claim") ?? new List<string>(); }
+        try { claim = LoadObject("/secure/lost_property").Call<List<string>>("Claim") ?? new List<string>(); }
         catch (MudRuntimeException) { return; }
         if (claim.Count == 0) return;
         var coins = int.TryParse(claim[0], out var parsed) ? parsed : 0;

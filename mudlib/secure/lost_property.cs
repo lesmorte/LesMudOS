@@ -1,5 +1,5 @@
 /// <summary>
-/// The lost-property vault. When a player dies, the belongings and gold in
+/// The lost-property store. When a player dies, the belongings and gold in
 /// their corpse are written here as well, and every change to the corpse is
 /// written through, so a crash or restart cannot lose them. After a restart
 /// every record on disk refers to a corpse that no longer exists; the owner
@@ -10,9 +10,12 @@
 /// from the calling object, never from an argument). Monster corpses are never
 /// recorded.
 /// </summary>
-public class Vault : MudObject
+public class LostProperty : MudObject
 {
-    private const string SaveFile = "/secure/vault";
+    private const string SaveFile = "/secure/lost_property";
+
+    /// <summary>The save file of the store when it was still called the vault. Read once, if the new file does not exist yet.</summary>
+    private const string LegacySaveFile = "/secure/vault";
 
     /// <summary>"name|corpse id" to the program paths of the items in that corpse.</summary>
     [Saved] private Dictionary<string, List<string>> items = new();
@@ -25,7 +28,8 @@ public class Vault : MudObject
 
     public override void Create()
     {
-        if (!Self.IsClone) RestoreObject(SaveFile);
+        if (Self.IsClone) return;
+        if (!RestoreObject(SaveFile) && RestoreObject(LegacySaveFile)) SaveObject(SaveFile);  // upgrade: carry the old records over
     }
 
     private static string Key(string player, string corpseId) => player.ToLowerInvariant() + "|" + corpseId;
