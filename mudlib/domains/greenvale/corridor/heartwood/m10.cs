@@ -15,6 +15,9 @@ public class HwM10 : Room
         AddDetail("smoke,smell,air,woodsmoke", "The smell of woodsmoke comes down the road from the north, thin and domestic. Somewhere ahead people are burning hearths.");
         AddDetail("road,dust,ground", "The road is wider here and drier, with fresh wheel marks in the dust and the print of a mule. Someone has been clearing deadfall off the verge.");
         AddDetail("blaze,blazes,ring,trunks,stump,stumps", "The trunks at the road's edge carry old Riverwatch blazes, rings cut through the bark and healed over into thick scars. There are also stumps, cut clean with a saw, the first you have seen since the Green Road.");
+
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
+        AddNode("/domains/greenvale/corridor/obj/wildflowers");
         AddEncounter("/domains/greenvale/corridor/mob/black_bear", 8);
     }
 }

@@ -16,5 +16,7 @@ public class OaW1 : Room
         AddDetail("ferns,fern,bracken,herbs,plants,elder", "Hart's-tongue fern and elder fill the gaps, and where the soil is deep, clumps of herbs have taken hold, feverfew and yarrow and wild thyme. Someone has trodden a path through them, and not so very long ago.");
         AddDetail("circle,pale stones,stones,seven stones,ring", "Around the foot of one standing pier lie seven pale stones, laid in an exact ring. No ivy touches them, and the grass is cropped short around them, as if by something that respects the circle. If they mean anything, nobody here can tell you what.");
         AddDetail("jackdaws,birds,jackdaw", "Jackdaws live in the high joints of the ruin, and a loud colony it is. They watch you with pale eyes, the way a guard watches a stranger.");
+
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
     }
 }

@@ -16,6 +16,7 @@ public class OaW4 : Room
         AddDetail("spoil,spoil heaps,heaps,bramble,briar,brambles,berries", "Bramble has taken the spoil heaps and made them its own; the berries are fat and black, if you can reach them past the thorns. Wasps work the ripest.");
         AddDetail("pool,green water,water,quarry pool", "A pool of green, still water lies at the foot of the face, deep and cold. Its surface is dead calm, and a little silt cloud rises now and then from the bottom.");
         AddDetail("hammer,sound,clink,clinking,noise", "Somewhere in the cutting a hard, patient clink answers every few moments, as if someone were sharpening a blade on stone. It stops when you stop to listen.");
+        AddNode("/domains/greenvale/corridor/obj/berry_bush");
 
         AddSpawn("/domains/greenvale/corridor/mob/rogue_goblin_veteran");
     }

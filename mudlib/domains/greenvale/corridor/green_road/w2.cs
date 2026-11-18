@@ -16,6 +16,7 @@ public class GrTheRaidersFord : Room
         AddDetail("brush,pile,cut brush,hide,hiding place", "A heap of cut alder, piled to make a blind. There is a hollow in it where somebody has lain, and it is still flattened.");
         AddDetail("herbs,herb,plants,patch,watercress,yarrow", "Watercress grows in the shallows and yarrow on the bank, a good patch for anyone who knows what to pick.");
         AddDetail("prints,footprints,tracks,mud", "Boot prints and bare feet, one set larger and heavier than the rest. They go across, and none come back.");
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
 
         AddSpawn("/domains/greenvale/corridor/mob/boar_brute");
     }

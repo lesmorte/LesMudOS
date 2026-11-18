@@ -16,6 +16,7 @@ public class GrTheWebbedGlade : Room
         AddDetail("path,trail,ground,leaf litter", "A path of trodden leaf runs through the glade. Somebody cut the webs along it once, and they have been rebuilt, thicker than before.");
         AddDetail("dew,drops,droplets", "Dew beads on every strand. Each drop holds a tiny upside-down glade.");
         AddDetail("flowers,wildflowers,foxglove,foxgloves,herbs,herb,patch", "At the glade's edge, where the webs thin out, foxgloves and wild garlic grow in a patch, and a few herbs besides. Somebody has been picking from it, carefully, with a stick.");
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
 
         AddSpawn("/domains/greenvale/corridor/mob/woodland_spider", 2);
     }

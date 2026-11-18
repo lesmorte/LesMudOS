@@ -17,6 +17,7 @@ public class OaM01 : Room
         AddDetail("larks,birds,lark", "Larks climb out of the verge grass and hang singing above the road. You have not heard them since the farmland of the south.");
         AddDetail("ruts,wheel ruts,tracks", "Wheel ruts, two hands deep, run down both sides of the road, but the first flat stones of paving are beginning to show in the middle where the earth has been scraped away.");
         AddReadable("notice,riverwatch notice,sign,tree", "RIVERWATCH RANGERS, NOTICE TO TRAVELERS\nThe road to Oakenfell is watched from the Toll House northward. Beyond the verge, in the western woods, it is not.\nTravelers who meet armed men on the road are to report them at the Greenvale Toll House.\nEver Vigilant.", "A weathered notice is nailed to a tree at the edge of the verge. You could {cmd}read{/} it.");
+        AddNode("/domains/greenvale/corridor/obj/wildflowers");
 
         AddEncounter("/domains/greenvale/corridor/mob/highway_bandit", 8);
     }

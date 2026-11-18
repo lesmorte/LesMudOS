@@ -17,6 +17,7 @@ public class EeDeerLawn : Room
         AddDetail("herbs,herb patch,patch,betony,sorrel,marjoram", "On the sunny bank above the spring grow thyme, betony and wild marjoram in thick patches. A herb-gatherer would find a good morning's work here.");
         AddDetail("hoofprints,prints,tracks,deer tracks", "The tracks are everywhere, the neat cloven hooves of roe deer, with now and then a fawn's, tiny and sharp. The wolves, you notice, have walked round the edge of the lawn and not across it.");
         AddDetail("paths,path,trails,game trails", "Narrow deer paths enter the trees at every point of the compass. Only one, the broader to the east, has been trodden by anything heavier than a deer.");
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
 
         AddSpawn("/domains/greenvale/corridor/mob/roe_deer", 2);
     }

@@ -16,6 +16,7 @@ public class EePatrolMile : Room
         AddDetail("oaks,trees,moss,light", "The oaks along the Patrol Mile are among the biggest you have ever seen, trunks wider than doorways, their moss thick as velvet. Sunlight falls on them in slow gold bars.");
         AddDetail("thistle,thistles,verge thistles,flowers", "Thistles flourish in the sunny gaps the rangers have cut, purple heads nodding. The rangers leave them for the bees.");
         AddDetail("ruts,road,surface,gravel", "The road surface has been dressed with gravel carried in from the river, and drains cut across it at intervals to carry off the wet.");
+        AddNode("/domains/greenvale/corridor/obj/thistle_patch");
 
         AddEncounter("/domains/greenvale/corridor/mob/forest_wolf", 6);
         AddEncounter("/domains/greenvale/corridor/mob/forest_spider", 5);

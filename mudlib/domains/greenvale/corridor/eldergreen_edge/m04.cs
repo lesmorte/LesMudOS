@@ -16,6 +16,7 @@ public class EeUnderEaves : Room
         AddDetail("ditch,leaves,rot,mould", "The ditch holds black water and drifts of last autumn's leaves. Something small has been rooting in the mould, and left neat holes.");
         AddDetail("tracks,paw prints,prints,scratches,bark", "On the bark of the nearest trunk are four parallel scratches, higher than your head. Whatever made them has not gone far, or has not forgotten the place.");
         AddDetail("road", "The road is still firm and wide enough for a wagon, but roots have begun to lift its edges, and moss grows in the wheel ruts.");
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
 
         AddEncounter("/domains/greenvale/corridor/mob/forest_spider", 8);
         AddEncounter("/domains/greenvale/corridor/mob/forest_wolf", 8);

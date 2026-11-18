@@ -16,6 +16,7 @@ public class SrW5 : Room
         AddDetail("grasshoppers,grasshopper,insects", "A grasshopper clicks from every third stem. Step and they stop; stand still and they start again.");
         AddDetail("track,farm track,east,chimney,inn", "The track runs east to the yard of Traveler's Rest. You can smell the kitchen from here.");
         AddDetail("path,sheep-path,sheep path,west,gap,hedge,ruin", "The sheep-path climbs from the gap in the hedge toward a broken line of stones on the ridge. The shepherds say the sheep go that way only to be fetched back.");
+        AddNode("/domains/greenvale/corridor/obj/wildflowers");
 
         AddSpawn("/domains/greenvale/corridor/mob/field_rabbit", 2);
         AddSpawn("/domains/greenvale/corridor/mob/roe_deer");

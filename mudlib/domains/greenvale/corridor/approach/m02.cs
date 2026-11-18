@@ -16,6 +16,7 @@ public class OaM02 : Room
         AddDetail("pale shape,skyline,cloud,north,horizon,something", "Between the oaks the far horizon holds a long, pale, level smudge, too straight to be a cloud and too distant to be anything else. When a breeze moves the leaves it disappears, and when they part it is there again.");
         AddDetail("oaks,oak,old oaks,trees", "Two old oaks stand either side of the road like gateposts, their lower limbs sawn away to let high wagons through. Both carry a blaze of white paint at head height.");
         AddDetail("horseshoe,shoe,iron", "A horseshoe lies in the gutter, thin as a wafer, worn through at the toe. It has been walked a long way and then lost.");
+        AddNode("/domains/greenvale/corridor/obj/berry_bush");
 
         AddEncounter("/domains/greenvale/corridor/mob/highway_bandit", 8);
     }

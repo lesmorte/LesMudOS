@@ -16,6 +16,7 @@ public class SrW4 : Room
         AddDetail("hawthorns,hawthorn,ring,saplings,trees", "Seven young hawthorns stand in a neat ring, too regular for chance. Their bark is unmarked, and there is not a bird's nest in any of them.");
         AddDetail("bare ground,patch,ground,wool,rags,ribbons", "In the middle of the ring is a circle of bare, bitten-down earth, though nothing has been grazed there. Faded strips of wool and cloth are knotted to the lowest branch, wind-whitened and old.");
         AddDetail("wildflowers,flowers,bank", "Ox-eye daisies, red clover and purple vetch, a wild bank of colour. Bees work it from sunrise.");
+        AddNode("/domains/greenvale/corridor/obj/wildflowers");
 
         AddSpawn("/domains/greenvale/corridor/mob/roe_deer");
         AddSpawn("/domains/greenvale/corridor/mob/grey_fox");

@@ -17,6 +17,7 @@ public class EeLastFences : Room
         AddDetail("swallows,birds,swallow", "Swallows swoop low over the stubble after midges, and one flicks past your head and away toward the wood.");
         AddDetail("thistle,thistles,verge thistles", "Thistles stand head-high along the verge, purple-crowned and humming with bees. Their prickly stalks would reward a careful gatherer.");
         AddReadable("post,boundary post,brand", "Burned deep into the leaning gatepost, under a farmer's brand:\n\"THE STONE BRIDGE HOLDINGS END HERE.\"\nSomeone has scratched below it, in a different hand: \"And so does the kindness.\"", "A weathered gatepost with writing burned into it stands at the roadside. You could {cmd}read{/} it.");
+        AddNode("/domains/greenvale/corridor/obj/thistle_patch");
 
         AddEncounter("/domains/greenvale/corridor/mob/forest_spider", 5);
         AddEncounter("/domains/greenvale/corridor/mob/forest_wolf", 8);

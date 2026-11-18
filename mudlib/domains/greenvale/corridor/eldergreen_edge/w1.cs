@@ -16,6 +16,7 @@ public class EeWoodcuttersRide : Room
         AddDetail("thistle,thistles,gaps,sun", "Thistles fill every sunny gap, thick-stemmed and spiny and full of goldfinches. A gatherer could harvest a good many without leaving the ride.");
         AddDetail("axe,sound,ring,chopping", "The axe falls in a slow regular rhythm, a pause between each stroke, as if its owner were thinking between blows.");
         AddDetail("sawpit,pit,saw", "A sawpit has been dug beside the ride, a long trench with a log laid across it. A pit-saw hangs from a branch nearby, its teeth bright.");
+        AddNode("/domains/greenvale/corridor/obj/thistle_patch");
 
         AddSpawn("/domains/greenvale/corridor/eldergreen_edge/npc/finnian");
     }

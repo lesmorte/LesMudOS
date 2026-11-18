@@ -16,6 +16,7 @@ public class SrM06 : Room
         AddDetail("thistles,thistle,corners", "Purple-headed thistles stand around the margins of the walk, tall as a man's chest. The sheep eat everything else.");
         AddDetail("hut,shepherd's hut,turf hut", "A low hut walled with turf and slated with flat stone, a chimney of three stones, and a crook propped by the door. It smells of wet wool and woodsmoke.");
         AddDetail("wool,tufts", "Greasy tufts of wool on every wire. A child could knit a scarf out of the walk's verge if they had the patience.");
+        AddNode("/domains/greenvale/corridor/obj/thistle_patch");
 
         AddSpawn("/domains/greenvale/corridor/south_road/npc/shepherd_bram");
     }

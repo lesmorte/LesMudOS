@@ -19,6 +19,8 @@ public class HwW1 : Room
         AddDetail("dish,basin,hollow,water,rainwater", "The shallow dish in the paving is eleven paces across, perfectly round, and the lip of it is carved with a groove that runs once around. Whatever stood on the dish is gone.");
         AddDetail("west,trail,path,road", "The trail runs back westward between two fallen blocks. It is the only way in that has not been closed by thorn or deadfall.");
         AddReadable("band,carving,carvings,frieze,figures,pattern,border", "You follow the band round the court. The procession goes always one way, with the raised arms, and every seventh figure carries something that might be a staff or a branch. At the end, where the band should close, it does not. The last figure has no arm raised, and the border under it stops in an unfinished line. There are no letters. The carving is crisp wherever the roof once shielded it.", "A band of carving runs round the court. You could {cmd}read{/} it.");
+
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
         AddSpawn("/domains/greenvale/corridor/mob/heartwood_goblin", 2);
     }
 }

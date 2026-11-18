@@ -16,5 +16,7 @@ public class HwW3 : Room
         AddDetail("deer,hind,doe,animal,animals", "The deer is a hind with a notched ear. She drinks at the pool while you stand there, and when she is done she walks slowly away through the ferns and does not look back. Nothing else comes out to take her place.");
         AddDetail("moss,cropped,grass,ground", "The moss near the spring is kept as short as a lawn, by teeth. Farther out it grows long and loose, as it does everywhere else.");
         AddDetail("east,path,deer path,bracken,trail", "A deer path leads east through the bracken, a groove in the green about as wide as a beast's flank. It is the only way on that has been kept, and by animals.");
+
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
     }
 }

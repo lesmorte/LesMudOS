@@ -16,5 +16,8 @@ public class GrThePedlarsPath : Room
         AddDetail("trees,wood,forest,trunks", "Hornbeam and beech, closely set, with ivy winding up the trunks. The path barely fits between them.");
         AddDetail("herbs,herb,plants,patch,mint,sorrel,comfrey", "Along the path grows a patch of herbs, mint and sorrel and tall comfrey with bell flowers. Pedlars gather it as they walk.");
         AddDetail("flowers,wildflowers,bluebells,campion", "A few wildflowers hold on in the thin light, pale campion and a scatter of late bluebells.");
+
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
+        AddNode("/domains/greenvale/corridor/obj/wildflowers");
     }
 }

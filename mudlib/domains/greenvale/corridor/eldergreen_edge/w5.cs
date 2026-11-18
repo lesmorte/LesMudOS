@@ -17,6 +17,7 @@ public class EeBirchStand : Room
         AddDetail("birds,birdsong,song", "Finches, tits and a great many others sing in the birch crowns, a loud mixed chorus that suddenly stops, and then begins again.");
         AddDetail("thistle,thistles,herb,herbs,patch,clearing", "Where an old birch has fallen, the sun reaches the ground and thistles have claimed the hole, with a few sprigs of valerian among them.");
         AddDetail("path,east,slope,climb", "The path east rises through thinning birches towards darker trees, and the birds seem fewer that way. A scrap of grey cord is tied to a twig at the foot of it.");
+        AddNode("/domains/greenvale/corridor/obj/thistle_patch");
 
         AddSpawn("/domains/greenvale/corridor/mob/forest_wolf", 1);
     }

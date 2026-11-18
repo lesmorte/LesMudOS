@@ -17,6 +17,8 @@ public class GrTheBearTrees : Room
         AddDetail("ground,earth,torn earth,digging,den", "The soil is turned over in rough patches where something dug for roots. There is no den here, but the digging says it is near.");
         AddDetail("track,rough track,west,trail,paths", "A rough track leaves westward between two trunks. It is trampled rather than cut, and the smell on the air grows stronger along it.");
         AddDetail("herbs,herb,patch,flowers,wildflowers,sorrel", "A few herbs and wildflowers grow in the light gaps between the trees, and the bear seems not to have found them yet.");
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
+        AddNode("/domains/greenvale/corridor/obj/wildflowers");
 
         AddSpawn("/domains/greenvale/corridor/mob/young_black_bear");
     }

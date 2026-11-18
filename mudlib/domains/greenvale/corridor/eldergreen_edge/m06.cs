@@ -16,6 +16,7 @@ public class EeFernBanks : Room
         AddDetail("deer,slots,mud,tracks,prints", "The deer have left their neat split prints all through the mud, and among them, newer and larger, the broad pad of a wolf, which seems to be following them.");
         AddDetail("ash,beech,trees,oaks", "Smooth grey beeches stand among the oaks now, and a pair of ash trees lean together over the road like gossips.");
         AddDetail("midges,insects,air", "The midges rise in little clouds each time you step through a shaft of sun, and settle again behind you.");
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
 
         AddEncounter("/domains/greenvale/corridor/mob/forest_spider", 10);
         AddEncounter("/domains/greenvale/corridor/mob/forest_wolf", 8);

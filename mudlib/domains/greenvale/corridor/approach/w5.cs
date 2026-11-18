@@ -17,5 +17,9 @@ public class OaW5 : Room
         AddDetail("brambles,bramble,thickets,berries,blackberries,hedgerow,wildflowers", "Blackberries hang in clusters on the hedge-banks, and between them grow poppies, cornflowers and tall yellow ragwort. Women from the hamlet pick here in the early morning.");
         AddDetail("hedge,last hedge,west,tree-line,woodland,trees", "The last hedge is a thick wall of hawthorn and blackthorn, and no gap has been cut in it. Beyond it the land rises into a gloomy tangle, with tracks that seem to lead only inward.");
         AddDetail("sheaf,last sheaf,post,corn dolly,custom", "A single sheaf of barley is tied to a post at the corner of the last field, the custom of the hamlet, and no one has taken it. 'It is for whatever is out there,' a child told a traveler once, and refused to say more.");
+
+        AddNode("/domains/greenvale/corridor/obj/wildflowers");
+        AddNode("/domains/greenvale/corridor/obj/berry_bush");
+        AddNode("/domains/greenvale/corridor/obj/herb_patch");
     }
 }

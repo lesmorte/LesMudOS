@@ -15,6 +15,7 @@ public class SrW2 : Room
         AddDetail("windfalls,wasps,fruit,apples,pears", "Windfalls lie in the grass already browning, loud with wasps. The bees ignore them. The wasps ignore everything.");
         AddDetail("bramble,brambles,hedge,berries,blackberries", "A tall bramble hedge, black with ripening blackberries in the sunniest corners. Birds have already eaten the lowest ones; the best still hang high.");
         AddDetail("path,hill,earth", "A worn path crosses the orchard, bare earth between grass, and climbs away beyond the north hedge. A cartwheel's width of it has been laid with flat stones for wet weather.");
+        AddNode("/domains/greenvale/corridor/obj/berry_bush");
 
         AddSpawn("/domains/greenvale/corridor/mob/field_rabbit", 2);
     }
