@@ -31,6 +31,8 @@ public abstract class Adventurer : Living
     [Saved] private Dictionary<string, int> quests = new();
     [Saved] private Dictionary<string, string> questTitles = new();
     [Saved] private List<string> killed = new();
+    // One save record per carried object: its program path, then "?" and its state (quality, quantity, properties) unless
+    // that is the default. Saves made before item state existed hold bare paths, which load as items in the default state.
     [Saved] private List<string> carried = new();
     [Saved] private List<int> carriedEquipped = new();
     [Saved] private string logoutRoom = "";
@@ -472,7 +474,7 @@ public abstract class Adventurer : Living
         carriedEquipped.Clear();
         foreach (var item in AllInventory())
         {
-            carried.Add(item.ProgramPath);
+            carried.Add(RecordOf(item));
             if (IsEquipped(item)) carriedEquipped.Add(carried.Count - 1);
         }
         var room = Environment();
@@ -494,6 +496,7 @@ public abstract class Adventurer : Living
         AddAction("take", CmdGet);
         AddAction("loot", CmdLoot);
         AddAction("drop", CmdDrop);
+        AddAction("give", CmdGive);
         AddAction("inventory", CmdInventory);
         AddAction("i", CmdInventory);
         AddAction("kill", CmdKill);
@@ -534,8 +537,8 @@ public abstract class Adventurer : Living
         {
             try
             {
-                var item = CloneObject(carried[i]);
-                MoveObject(item, Self);
+                var item = CloneRecord(carried[i], Self);
+                if (item == null) continue;
                 var slot = item.Call<string>("QuerySlot") ?? "";
                 var put = carriedEquipped.Contains(i) || (equipKit && (slot == "weapon" || slot == "shield") && QueryEquipped(slot) == null);
                 if (put && AccessRefusal(item) == null) Equip(item);
@@ -566,8 +569,7 @@ public abstract class Adventurer : Living
         {
             try
             {
-                MoveObject(CloneObject(claim[i]), Self);
-                returned++;
+                if (CloneRecord(claim[i], Self) != null) returned += RecordQuantity(claim[i]);
             }
             catch (MudRuntimeException)
             {
@@ -697,15 +699,76 @@ public abstract class Adventurer : Living
         var room = Environment();
         var from = args.IndexOf(" from ", StringComparison.Ordinal);
         if (from > 0) return GetFromCorpse(args.Substring(0, from).Trim(), args.Substring(from + 6).Trim());
-        var item = room == null ? null : Present(args, room);
-        if (item == null || item == Self) { NotifyFail("Get what?"); return false; }
-        if (!item.Call<bool>("CanGet")) { Write("You can't take that.\n"); return true; }
-        var description = item.Call<string>("Short");
-        MoveObject(item, Self);
+        if (room == null || !ParseAmount(args, out var count, out var all, out var noun)) { NotifyFail("Get what?"); return false; }
+        if (!all && count == 1)
+        {
+            var item = Present(noun, room);
+            if (item == null || item == Self) { NotifyFail("Get what?"); return false; }
+            if (!item.Call<bool>("CanGet")) { Write("You can't take that.\n"); return true; }
+            Pick(item, 1);
+            return true;
+        }
+        var named = Matching(room, noun);
+        var found = named.Where(o => o.Call<bool>("CanGet")).ToList();
+        if (found.Count == 0)
+        {
+            if (all && noun == "") { Write("There is nothing here to take.\n"); return true; }
+            if (named.Count > 0) { Write("You can't take that.\n"); return true; }
+            NotifyFail("Get what?");
+            return false;
+        }
+        var here = found.Sum(QuantityOf);
+        if (!all && here < count) { Write($"There {(here == 1 ? "is" : "are")} only {here} here.\n"); return true; }
+        var left = all ? int.MaxValue : count;
+        foreach (var item in found)
+        {
+            if (left <= 0) break;
+            var n = Math.Min(left, QuantityOf(item));
+            Pick(item, n);
+            left -= n;
+        }
+        return true;
+    }
+
+    /// <summary>Pick up n of an item lying in the room, with the messages.</summary>
+    private void Pick(ObjectRef item, int n)
+    {
+        var description = Describe(item, n);
+        var held = MovePortion(item, n, Self);
+        if (held == null) { Write($"You cannot take {description}.\n"); return; }
         Write($"You take {description}.\n");
         Say($"{Name} takes {description}.\n");
-        item.Call("Taken", Self);
-        return true;
+        held.Call("Taken", Self);
+    }
+
+    /// <summary>
+    /// What a command that takes an amount acts on in the inventory, as (object, how many of it). Null if nothing carried
+    /// answers to the name. With refusal set, the player has fewer than asked and nothing should happen. "all" leaves
+    /// equipped things alone; naming one picks it as before.
+    /// </summary>
+    private List<(ObjectRef item, int n)>? FromInventory(int count, bool all, string noun, out string? refusal)
+    {
+        refusal = null;
+        List<ObjectRef> found;
+        if (!all && count == 1)
+        {
+            var one = Present(noun.ToLowerInvariant());
+            found = one == null ? new List<ObjectRef>() : new List<ObjectRef> { one };
+        }
+        else found = Matching(Self, noun).Where(o => !(all && IsEquipped(o))).ToList();
+        if (found.Count == 0) return null;
+        var have = found.Sum(QuantityOf);
+        if (!all && have < count) { refusal = $"You have only {have}."; return new List<(ObjectRef, int)>(); }
+        var plan = new List<(ObjectRef item, int n)>();
+        var left = all ? int.MaxValue : count;
+        foreach (var ob in found)
+        {
+            if (left <= 0) break;
+            var n = Math.Min(left, QuantityOf(ob));
+            plan.Add((ob, n));
+            left -= n;
+        }
+        return plan;
     }
 
     private ObjectRef? CorpseHere(string name)
@@ -749,12 +812,61 @@ public abstract class Adventurer : Living
     private bool CmdDrop(string args)
     {
         var room = Environment();
-        var item = Present(args);
-        if (item == null || room == null) { NotifyFail("Drop what?"); return false; }
-        var description = item.Call<string>("Short");
-        MoveObject(item, room);
-        Write($"You drop {description}.\n");
-        Say($"{Name} drops {description}.\n");
+        if (room == null || !ParseAmount(args, out var count, out var all, out var noun)) { NotifyFail("Drop what?"); return false; }
+        var plan = FromInventory(count, all, noun, out var refusal);
+        if (plan == null) { NotifyFail("Drop what?"); return false; }
+        if (refusal != null) { Write(refusal + "\n"); return true; }
+        foreach (var (item, n) in plan)
+        {
+            var description = Describe(item, n);
+            if (MovePortion(item, n, room) == null) { Write($"You cannot drop {description}.\n"); continue; }
+            Write($"You drop {description}.\n");
+            Say($"{Name} drops {description}.\n");
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// "give [NUMBER|all] THING to PLAYER": hand things to another player in the room. Quest items cannot be given (the
+    /// travel pass and the Overseer's Orders prove what their holder did). Both characters are saved at once, the giver
+    /// first, so that a crash straight after a gift cannot leave the item in both save files.
+    /// </summary>
+    private bool CmdGive(string args)
+    {
+        var room = Environment();
+        var to = args.LastIndexOf(" to ", StringComparison.Ordinal);
+        if (room == null || to <= 0) { NotifyFail("Usage: {cmd}give{/} [NUMBER] THING {cmd}to{/} PLAYER"); return false; }
+        var whom = args.Substring(to + 4).Trim().ToLowerInvariant();
+        var receiver = whom == "" ? null : Present(whom, room);
+        if (receiver == Self) { Write("You already have it.\n"); return true; }
+        if (receiver == null) { NotifyFail($"There is no one called '{Esc(whom)}' here."); return false; }
+        if (!receiver.Call<bool>("IsPlayerCharacter") || !Interactive(receiver))
+        {
+            Write($"{Cap(receiver.Call<string>("QueryLabel") ?? receiver.Call<string>("Short") ?? "It")} does not take things from you. You can give things only to other players.\n");
+            return true;
+        }
+        if (!ParseAmount(args.Substring(0, to), out var count, out var all, out var noun)) { NotifyFail("Give what?"); return false; }
+        var plan = FromInventory(count, all, noun, out var refusal);
+        if (plan == null) { NotifyFail(all && noun == "" ? "You have nothing to give." : $"You have no '{Esc(noun)}'."); return false; }
+        if (refusal != null) { Write(refusal + "\n"); return true; }
+        var important = plan.Where(p => p.item.Call<bool>("QueryQuestItem")).ToList();
+        if (important.Count > 0 && !all) { Write($"You cannot give away {Describe(important[0].item, important[0].n)}; it is too important.\n"); return true; }
+        foreach (var (item, _) in important) Write($"You keep {item.Call<string>("Short")}; it is too important to give away.\n");
+        var given = 0;
+        var other = receiver.Call<string>("QueryName") ?? "them";
+        foreach (var (item, n) in plan)
+        {
+            if (important.Any(p => p.item == item)) continue;
+            var description = Describe(item, n);
+            if (MovePortion(item, n, receiver) == null) { Write($"You cannot give {description}.\n"); continue; }
+            given++;
+            Write($"You give {description} to {other}.\n");
+            TellObject(receiver, $"{Name} gives you {description}.\n");
+            TellRoom(room, $"{Name} gives {description} to {other}.\n", Self, receiver);
+        }
+        if (given == 0) return true;
+        PersistNow();
+        receiver.Call("SaveAfterTrade");
         return true;
     }
 
