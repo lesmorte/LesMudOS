@@ -9,7 +9,7 @@ Facts about the game world that the owner has fixed. Area briefs and system desi
 | Engine | LesMudOS (this repository: the driver and the standard mudlib) |
 | Starting region | Greenvale |
 | Starting village | The Village of Vincent's Hollow |
-| First major city of Greenvale | Not yet named or built. The All Hall is there. |
+| First major city of Greenvale | Oakenfell (not yet built). The Hall of Legends is there. |
 
 ## Structure
 
@@ -20,8 +20,8 @@ Facts about the game world that the owner has fixed. Area briefs and system desi
 ## Leaving the village
 
 - A new character cannot leave the main area of Vincent's Hollow. The road north is closed to them.
-- Completing the first quest, "Clear the Cellar", grants a travel pass. With it, the road north out of Vincent's Hollow is open, and leads toward the first major city of Greenvale.
-- The pass replaces the earlier idea of a key to an All Hall inside the village. The All Hall is in the city.
+- Completing the first quest, "Clear the Cellar", grants a travel pass. With it, the road north out of Vincent's Hollow is open, and leads toward Oakenfell, the first major city of Greenvale.
+- The pass replaces the earlier idea of a key to a hall inside the village. The Hall of Legends is in Oakenfell.
 - Until the city is built, the road beyond the village is a short stretch that ends with the way ahead not yet open.
 
 ## Names in the game
