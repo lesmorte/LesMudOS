@@ -22,7 +22,7 @@ public class SrPedlarJocosa : Npc
         AddTopic("camp,merchant camp,merchants,caravan", "Past the outpost, there's a camp where the caravans halt at night. They set guards and sell food and potions. It's the one place in the deep wood I'd call cheerful.");
         AddTopic("shrine,old shrine,pilgrims", "There's a wayside shrine, old and tended. Pilgrims leave candle-ends. I leave a ribbon. You can't be too careful.");
         AddTopic("crossroads,stone,crossroads stone,track", "Further on, a standing stone where an overgrown track leaves the road. Don't take it. I took it once. I got out.");
-        AddTopic("oakenfell,city,toll", "Oakenfell has walls you can see from a day away. There's a toll house and a hamlet below it, and a good market. I sell best at the market.");
+        AddTopic("oakenfell,city,toll", "Oakenfell has walls you can see from miles away. There's a toll house and a hamlet below it, and a good market. I sell best at the market.");
         AddTopic("ribbons,wares,goods,pack", "Ribbons, pins and a very fine tin whistle. I'm not selling today, I'm resting. I'm just looking at your purse the way a friend does.");
         AddEmote("Jocosa untangles a skein of ribbon with deft fingers.", 8);
         AddEmote("Jocosa tests a tin whistle and winces.", 6);

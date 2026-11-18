@@ -12,6 +12,7 @@ public class GrTheGoblinRaidersCamp : Room
 
         AddDetail("camp,hollow,ground,clearing", "A trampled hollow of mud, ash and bones, and the sour smell of goblins. The raiders are not hiding anything. They know no one comes here and returns.");
         AddDetail("palisade,stakes,stake,fence,wall", "A fence of green stakes, sharpened at the tops and lashed with strips of hide. It is not strong but it is intended to be seen.");
+        AddDetail("gate,gatepost,notches,three notches,mark", "The post at the gap in the palisade is cut with three deep notches, one above another, and the cuts have been rubbed with red earth. It is the only thing in the camp that looks kept.");
         AddDetail("shelters,shelter,huts,hut,tents,hides,canvas", "Low lean-tos of branches, with ox hides and stolen wagon canvas for roofs. The canvas has a Consortium scale painted on it.");
         AddDetail("post,scratches,scratchings,pictures,drawing,drawings,figures", "Low on a shelter post, at the height a small child could reach, a nail has scratched a row of stick figures holding hands under a round sun with rays. One figure is larger than the rest, and under it, in wobbling capitals: BIG GRIT.");
         AddDetail("fire,cookfire,spit,haunch,ash,embers", "A fire pit of black stones. On the spit is a haunch of venison, or what the goblins have chosen to call venison.");

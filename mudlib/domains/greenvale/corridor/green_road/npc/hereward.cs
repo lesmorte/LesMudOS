@@ -23,7 +23,7 @@ public class GrHereward : Npc
         AddTopic("rangers,riverwatch,patrol,tower,watchtower", "The Rangers walk the road when they can. They kept a post on the knoll past the Leaning Stones once, but it is empty now, and I have heard every kind of reason why. I give none of them credit.");
         AddTopic("bandits,rogues,lookout", "Bandits have a lookout somewhere in the deep wood, so the drovers say. They watch the road for a wagon with a thin guard. Mine is not thin.");
         AddTopic("work,job,hire,escort", "I take no new hands in the middle of a run. If you are going north, walk with us at dawn and keep your blade sheathed until I say.");
-        AddTopic("crossroads,heartwood,north", "Three miles on, the Crossroads Stone. We go straight on for the Heartwood and the city. I have never taken the Old Way, and do not mean to.");
+        AddTopic("crossroads,heartwood,north", "Six miles on, the Crossroads Stone. We go straight on for the Heartwood and the city. I have never taken the Old Way, and do not mean to.");
         AddEmote("Hereward walks the ring of wagons, thumping each wheel with the butt of his spear.", 6);
         AddEmote("Hereward stares into the trees for a long moment, then nods to a drover and moves on.", 6);
     }

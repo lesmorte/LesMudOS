@@ -51,6 +51,21 @@ Answers to the numbered questions in [corridor-lore-review.md](corridor-lore-rev
 | 5.21 Dark content | Keep. | No change. |
 | 5.22 Aldith asking questions | Remove. | Nothing to remove: Aldith asks no questions in the files. The reviewer's note was wrong. The sign's "NO QUESTIONS ASKED" stands. |
 
+| 5.3 Milestones | The road is 41 miles (Oakenfell 5, the Hollow 36 at Milestone Row), about three-quarters of a mile to a main-road room. | The watchtower milestone now reads "EDGE POST 8 MI. CROSSROADS 2 MI."; Hereward's Crossroads is six miles past the camp; Jocosa sees the walls "from miles away". |
+| 5.8 "No one is to know that we were ever here" | Keep. | No change. |
+| 5.13 The forecourt dish | "Smaller than the great dish in the ruined court in the wood." | Changed. |
+| 5.20 Surnames | Fine. | No change. |
+| 5.23 The Old Way | A future area. | No change; listed under Future mechanics. |
+| Q10.1 Four chiselled-out names | Coincidence. | No change. |
+| Q10.2 The Rangers thinning | Deliberate. | No change. |
+| Q10.3 People who vanish on the road | None are future quests. The road is dangerous. | No change. |
+| Q10.4 "Somebody's army" | Keep. | No change. |
+| Section 4, the invented facts | Keep all: ages, the Assembly's tolls, the customs, the prices (prices can vary from place to place), Watchfort Crossing's hall of names. | No change. |
+| The Barrow Guardian in the Long Gallery | Fine there. | No change. |
+| The goblins | All four groups and the Warrens are tied together. | One mark, three notches one above another, rubbed with red earth: on the pegs of the scouts' counting cords, the raiders' tally sticks and gatepost, a doorway of the Mossgate court, the veterans' banner and tally sticks, and the tunnelers' barricade in the Warrens. |
+| The Thorn Pact's type | "Druidic Alliance", as the faction file has it. | No change. |
+| Coin stashes | Once for each character, and worth less to each new finder until nothing is left. | Being built. |
+
 ## Canon for later writers
 
 - **The older people.** One people, before Greenvale. Dark green-grey stone that is not local; blocks fitted without mortar, joints a hair wide; pointed arches and vaults, tall and narrow; carving interlaced in groups of seven; a procession of blank-faced figures; no letters anyone can read. Their three signs: a ring crossed by a bar; a single wavering line, like water; a ring with a gap in it, open to the north. They are given no name.
@@ -82,9 +97,11 @@ The text of the road promises these, and none exists yet. By the owner's decisio
 | Philippa Reeve and the toll book | The informer | The quest that uncovers her (Q8.1) |
 | The Old Way, east of the Crossroads Stone | A track nobody takes | An area at its end (5.23) |
 
+- **The road** is 41 miles and two days on foot; the forest begins on the second day; heavily laden wagons take three.
+- **The goblins** of the corridor are one people under one mark: three notches, one above another, rubbed with red earth. The veterans were soldiers "in somebody's army"; whose is open.
+- **The Riverwatch Rangers** are thinning, and this is deliberate. Their emblem is a silver eye on green and grey.
+- **The road is dangerous.** The people who have vanished on it are not quests waiting to be solved.
+
 ## Still open
 
-- 5.3 (milestones), 5.8 (how plain the Circle is), 5.13 (the forecourt dish): the owner asked for suggestions.
-- 5.20 (surnames), 5.23 (the Old Way), 5.24 (duplicate names): the owner asked what these mean.
-- Q10.1 to Q10.6, the further threads.
-- The checklist in section 4 of the review.
+Nothing in the lore review. Every numbered question has an answer.

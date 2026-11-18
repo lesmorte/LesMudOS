@@ -11,7 +11,7 @@ public class EeGoblinTrail : Room
         ResetSeconds = 120;
 
         AddDetail("trail,path,footprints,prints,tracks", "The prints are small, bare and splay-toed, no longer than your hand. They go in single file and in both directions, and the newest overlie the old.");
-        AddDetail("cords,cord,knots,strands,branches", "The cords are plaited from bark fibre, each with a number of knots in it. One knot to a wagon, two to an armed party; a goblin who passes the road counts the traffic.");
+        AddDetail("cords,cord,knots,strands,branches", "The cords are plaited from bark fibre, each with a number of knots in it. One knot to a wagon, two to an armed party; a goblin who passes the road counts the traffic. Each cord ends in a peg of wood cut with three notches.");
         AddDetail("scratches,bark,signs,symbols,marks,scratch", "The scratches are crude arrows and crosses, cut with a knife and inked with something black. They point towards the road, and then away from it.");
         AddDetail("roots,knees,walls,oak,trees", "The roots form a labyrinth of walls and knees, in which a small creature could hide with no trouble at all.");
         AddDetail("giant beech,great beech,great tree,beech tree,fork,ivy,east,spikes,holes,hole", "The giant beech stands a little east of the trail behind a curtain of ivy that has been combed aside, and let fall again, many times. High in its fork, forty feet up, something that looks like a platform of branches is almost hidden by leaves, and in the grey bark below the ivy are neat square holes, in a line, like the rungs of a ladder. Nobody climbs trees by accident, but somebody has climbed this one.");

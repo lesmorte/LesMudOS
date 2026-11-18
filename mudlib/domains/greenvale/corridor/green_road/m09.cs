@@ -16,7 +16,7 @@ public class GrBelowTheWatchtower : Room
         AddDetail("trees,wood,woods,forest", "Tall pines and oaks, black against the slope. The knoll above is thickly wooded, and the rock of the old tower shows through only in places.");
         AddDetail("road,verge,ditch,shadow", "A ditch runs along the roadside, half choked with leaf. Rangers cleared it once and no one has since.");
         AddDetail("smoke,fire,light,lights", "No smoke rises from the tower, and nobody has seen a light there in years, although drovers swear they have heard something from it at night.");
-        AddReadable("milestone words,words,chiseled words,inscription,figures", "On the stone, in figures and then in a harder, later hand:\n\nELDERGREEN 12 MI.\nCROSSROADS 3 MI.\n\nRIVERWATCH POST. EVER VIGILANT.\n(Beneath, scratched in with a knife:) NOBODY HOME.", "Figures and a few words are cut into the milestone. You could {cmd}read{/} them.");
+        AddReadable("milestone words,words,chiseled words,inscription,figures", "On the stone, in figures and then in a harder, later hand:\n\nEDGE POST 8 MI.\nCROSSROADS 2 MI.\n\nRIVERWATCH POST. EVER VIGILANT.\n(Beneath, scratched in with a knife:) NOBODY HOME.", "Figures and a few words are cut into the milestone. You could {cmd}read{/} them.");
 
         AddEncounter("/domains/greenvale/corridor/mob/goblin_raider", 10);
     }
