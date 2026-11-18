@@ -293,8 +293,13 @@ public class Item : Thing
         return text;
     }
 
-    /// <summary>The plural name: Plural, or the short description without its article plus "s".</summary>
-    public string QueryPlural() => Plural ?? StripArticle(ShortDesc ?? Name, out _) + "s";
+    /// <summary>The plural name: Plural, or the short description without its article plus "s" ("es" after s, x, z, ch, sh).</summary>
+    public string QueryPlural()
+    {
+        if (Plural != null) return Plural;
+        var single = StripArticle(ShortDesc ?? Name, out _);
+        return single + (single.EndsWith("s") || single.EndsWith("x") || single.EndsWith("z") || single.EndsWith("ch") || single.EndsWith("sh") ? "es" : "s");
+    }
 
     /// <summary>How n of these are described: "a fine wolf skin", "3 fine wolf skins". Common has no prefix.</summary>
     public string DescribeCount(int n)

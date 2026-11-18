@@ -80,7 +80,10 @@ public class Shopkeeper : Npc
     /// <summary>What happens when a purchase of several of a stackable item has been paid for: one stack. Return false to refuse (the buyer is refunded).</summary>
     protected virtual bool OnBuyStack(ObjectRef buyer, string path, int count) => CreateIn(path, count, StockQuality(path), buyer) != null;
 
-    private int StockQuality(string path) => stock.FirstOrDefault(s => s.Path == path)?.Quality ?? 1;
+    /// <summary>The quality of the stock entry being bought (several entries may sell one file at different qualities).</summary>
+    private int StockQuality(string path) => buying != null && buying.Path == path ? buying.Quality : stock.FirstOrDefault(s => s.Path == path)?.Quality ?? 1;
+
+    private Stock? buying;
 
     protected override void Noticed(ObjectRef other)
     {
@@ -123,8 +126,12 @@ public class Shopkeeper : Npc
             Write(count == 1 ? $"You cannot afford that. It costs {total} gold.\n" : $"You cannot afford that. {count} cost {total} gold.\n");
             return true;
         }
-        var what = count == 1 ? sample.Call<string>("Short") : Describe(sample, count);
-        if (!(count == 1 ? OnBuy(buyer, entry.Path) : OnBuyStack(buyer, entry.Path, count)))
+        var what = count == 1 ? sample.Call<string>("Short") : sample.Call<string>("DescribeCount", count) ?? sample.Call<string>("Short");
+        bool bought;
+        buying = entry;
+        try { bought = count == 1 ? OnBuy(buyer, entry.Path) : OnBuyStack(buyer, entry.Path, count); }
+        finally { buying = null; }
+        if (!bought)
         {
             buyer.Call("AddGold", (int)total);
             return true;
