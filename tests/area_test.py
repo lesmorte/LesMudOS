@@ -1008,7 +1008,7 @@ def run(work, mudlib):
     text = wiz.command("look")
     check("the Overseer Chamber", text, "Overseer Chamber", "Unlike the rest of the dungeon, this room is surprisingly organized.", "The Goblin Overseer is here.")
     check("look at a detail of the chamber", wiz.command("look at crow"), "crude black crow")
-    check("stat on the boss", wiz.command("stat overseer"), "Level 5, HP 114/114", "Damage 4-7, to hit 2, armor 3", "xp 250", "loot 4",
+    check("stat on the boss", wiz.command("stat overseer"), "Level 5, HP 114/114", "Damage 4-7, attack 7 (rate 1), defense 4, armor 3", "xp 250", "loot 4",
           "Reaction Time: base 4.0", "Axe Slash: preparation 0.0, recovery 1.0", "delay 10.0 s", "Power Strike: preparation 1.0, recovery 2.0", "delay 12.0 s",
           "Battle Cry", "Summon Goblin Minion")
     wiz.command("clone " + HOLLOW + "obj/overseers_axe")
@@ -1204,7 +1204,7 @@ def run(work, mudlib):
     wiz2.command("goto " + TEST + "scratch")
     # The wizard's own state came back: level 5 wizard, quests done, equipment.
     s = score_of(wiz2)
-    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 5", "Damage 17-25", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
+    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 6", "Damage 17-25", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
     wiz2.send("quit")
     wiz2.read_until("Goodbye")
 
