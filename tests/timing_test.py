@@ -213,7 +213,7 @@ def keep_alive(p):
 
     def run():
         while not stop.is_set():
-            p.send("heal")
+            p.send("restore")
             stop.wait(1.5)
     t = threading.Thread(target=run, daemon=True)
     t.start()
@@ -230,7 +230,7 @@ def stop_healing(p):
 def clean_arena(wiz, hero_list=()):
     for word in ("fast", "mid", "slow", "twin", "sword", "gear", "brute", "overseer", "minion", "corpse"):
         for _ in range(3):
-            if "dies." not in wiz.command("smite " + word, 0.2):
+            if "dies." not in wiz.command("slay " + word, 0.2):
                 break
     time.sleep(0.3)
 
@@ -240,7 +240,7 @@ def clean_arena(wiz, hero_list=()):
 def main():
     work = tempfile.mkdtemp(prefix="lesmudos-timing-")
     mudlib = os.path.join(work, "mudlib")
-    h.copy_mudlib(mudlib)
+    h.copy_mudlib(mudlib, novice=True)
     os.makedirs(os.path.join(mudlib, "domains", "timing"))
     for name, source in TEST_FILES.items():
         h.write(mudlib, TIMING + name, source)
@@ -302,8 +302,8 @@ def run():
     check("score shows the Reaction Time and the delay of the basic attack", text, "Reaction Time 2.5 (base 2.5).", "Your attack takes 6.0 seconds.")
     text = hero.command("consider mid", 0.8)
     check("consider compares speed (8 s against 6 s)", text, "It strikes less often than you.")
-    wiz.command("smite mid", 0.3)
-    wiz.command("smite mid", 0.3)
+    wiz.command("slay mid", 0.3)
+    wiz.command("slay mid", 0.3)
     wiz.command("clone " + TIMING + "fast", 0.4)
     wiz.command("clone " + TIMING + "slow", 0.4)
     check("consider a fast creature", hero.command("consider fast", 0.8), "It strikes more often than you.")
@@ -482,7 +482,7 @@ def run():
     hero.wait_for(r"You (scratch|hit|smash|miss) a slow anvil", m, 3)
     time.sleep(1.0)
     hero.command("drink potion", 0.4)
-    wiz.command("smite hero", 0.4)
+    wiz.command("slay hero", 0.4)
     q = hero.mark()
     time.sleep(9)
     after = hero.text(q)

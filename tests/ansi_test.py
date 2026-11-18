@@ -184,7 +184,7 @@ def main():
     check = h.check
     work = tempfile.mkdtemp(prefix="lesmudos-ansi-")
     mudlib = os.path.join(work, "mudlib")
-    h.copy_mudlib(mudlib)
+    h.copy_mudlib(mudlib, novice=True)
     os.makedirs(os.path.join(mudlib, "domains", "atest"))
     for name, source in FILES.items():
         h.write(mudlib, A + name, source)

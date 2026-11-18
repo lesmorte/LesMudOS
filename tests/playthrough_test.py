@@ -19,7 +19,7 @@ plays the area from the start, the way a player would:
 The player is never a wizard. A second account ("warden") is used for out-of-game checks
 only (room flags via `stat here`, the rare stock, the first-wizard bootstrap). If the solo
 run cannot finish in time or after too many deaths, that is reported as a FINDING and the
-rest of the flow is verified with wizard help (`heal`) on the same character, clearly
+rest of the flow is verified with wizard help (`restore`) on the same character, clearly
 labelled in the output.
 
 Combat is random, so every run is different. Combat runs on the event clock of docs/COMBAT_TIMING.md: actions are
@@ -589,8 +589,8 @@ class Run:
     def enable_fallback(self, why):
         """The solo run does not finish: say so, and ask the wizard to make the character a wizard (for `heal`)."""
         self.fallback = True
-        self.stats["notes"].append(f"FINDING: the solo run did not finish in time ({why}); wizard help (heal) was used from {self.elapsed():.0f}s on")
-        print(f"\n      *** FINDING: the solo run did not finish ({why}). From here on the character uses WIZARD HELP (heal). ***\n", flush=True)
+        self.stats["notes"].append(f"FINDING: the solo run did not finish in time ({why}); wizard help (restore) was used from {self.elapsed():.0f}s on")
+        print(f"\n      *** FINDING: the solo run did not finish ({why}). From here on the character uses WIZARD HELP (restore). ***\n", flush=True)
         w = self.warden_in()
         w.command("promote hero 5")
         self.warden_out()
@@ -619,7 +619,7 @@ class Run:
             time.sleep(4)
             hero.cmd("hp")
             if self.fallback:
-                hero.cmd("heal")
+                hero.cmd("restore")
         self.stats["rest_hp"] = self.stats.get("rest_hp", 0) + max(0, hero.hp - start)
         self.stats["rest_s"] = self.stats.get("rest_s", 0) + (time.time() - t0)
         return hero.hp
@@ -628,7 +628,7 @@ class Run:
         """Get healthy: a bed if there is the gold (it also restores everything at once), else rest."""
         hero = self.hero
         if self.fallback:
-            hero.cmd("heal")
+            hero.cmd("restore")
             return
         if hero.hp >= hero.max_hp * want_fraction:
             return
@@ -737,7 +737,7 @@ class Run:
                 word = self.target_word(enemies)
                 hero.cmd("kill " + word)
             if self.fallback and hero.hp < hero.max_hp * 0.6:
-                hero.cmd("heal")
+                hero.cmd("restore")
                 continue
             if hero.potion_log and "potion_checked" not in self.stats:
                 self.stats["potion_checked"] = True
