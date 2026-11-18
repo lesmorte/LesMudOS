@@ -11,9 +11,9 @@ The brief is large. It is built in passes so that each one leaves the game playa
 | Pass | Contents | Status |
 |---|---|---|
 | 1 | The clock: Reaction Time, per-action Recovery, Preparation, the timing formula, equipment reaction modifiers, haste and slow, an action queue per combatant, creatures and the boss defined as action lists, consumables as actions, the area rebalanced and retested | Implemented |
-| 2 | Stamina; item-granted skills (Triple Thrust and the other examples); a `skills` list; critical, dodge and block rolls | Later |
+| 2 | Stamina; item-granted skills (Triple Thrust and the other examples); a `skills` list; critical, dodge and block rolls | Stamina, the `skills` list, the item-granted-skill mechanism and the three rolls are implemented by the class system (stage A, [CLASS_SYSTEM.md](CLASS_SYSTEM.md)); the Triple Thrust style examples are not |
 | 3 | Interrupts during Preparation (stun, knockdown, silence, fear, disarm) and status effects | Later |
-| 4 | Mana and spells | Later |
+| 4 | Mana and spells | Mana, spells and the first interrupt (stagger, which cancels an action in its Preparation) are implemented by the class system; the rest of pass 3 stays later |
 | 5 | Item weight and encumbrance | Later |
 
 Pass 1 must not paint later passes into a corner: every field the brief names for an action (resource cost, preparation, recovery, reaction modifier) exists on the action type from the start, even where pass 1 does not use it.
@@ -186,7 +186,11 @@ with a `ChooseAction(target)` override for the pattern (it uses `ActionsTaken()`
 
 ## 5. What does not change
 
-To-hit and damage rolls, armor, levels, experience, death, corpses, the vault, loot, quests, shops, safe rooms, peaceful villagers, players unable to attack players, and enemies being forgotten 30 seconds after they are out of the room.
+Armor, levels, experience, death, corpses, the vault, loot, quests, shops, safe rooms, peaceful villagers, players unable to attack players, and enemies being forgotten 30 seconds after they are out of the room.
+
+## 5a. What the class system added to the clock
+
+Skills and spells are ordinary actions on this clock (Preparation, Recovery, reaction modifier; a Stamina or Mana cost paid when the action begins). Level now matters on both sides of a hit: `d20 + Attack >= 10 + Armor + Defense`, with `Attack = round(attack rate x level) + bonuses` and `Defense = level - 1`. The defender's dodge is rolled first, a hit may be critical (x1.5), and a block halves the damage. Timed effects (haste and slow among them) carry the speed factor. Stagger interrupts an action in its Preparation (half its cost is lost, half its Recovery is still paid) or pushes a ready creature's next action back. See [CLASS_SYSTEM.md](CLASS_SYSTEM.md) and `tests/balance_sim.py`.
 
 ## 6. Testing
 

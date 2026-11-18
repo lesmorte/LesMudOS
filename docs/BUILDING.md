@@ -272,7 +272,7 @@ Every item has `Name`, `Ids` (words that name it), `ShortDesc` (with article, fo
 
 ### A weapon
 
-`wield` it. Damage replaces the unarmed 2-5; `ToHit` is added to attack rolls. Two timing fields: `ReactionMod` is added to the wielder's Reaction Time for as long as it is wielded (heavy weapons are slow to bring to bear), and `Recovery` is the Recovery of a basic attack with it. A player with Reaction Time 2.5 attacks every `(2.5 + ReactionMod + Recovery) x 2` seconds: 6 with fists, 9 with this sword (`0.5` and `1.0`). A slower weapon must hit harder so that its damage per second is no worse (see the weapon table in GAME_SYSTEMS.md).
+`wield` it. Damage replaces the unarmed 2-5; `ToHit` is added to attack rolls. Two timing fields: `ReactionMod` is added to the wielder's Reaction Time for as long as it is wielded (heavy weapons are slow to bring to bear), and `Recovery` is the Recovery of a basic attack with it. A player with Reaction Time 2.5 attacks every `(2.5 + ReactionMod + Recovery) x 2` seconds: 6 with fists, 9 with this sword (`0.5` and `1.0`). A slower weapon must hit harder so that its damage per second is no worse (see the weapon table in GAME_SYSTEMS.md). Set `Category` to one of `dagger`, `sword`, `spear`, `axe`, `mace`, `staff`, `bow`: a character may only wield categories their calling allows (`Magic = "the blade is enchanted: +2 to hit"` is a note shown by Appraise and Magical Lore).
 
 ```csharp
 // File: /domains/example/sword.cs
@@ -297,7 +297,7 @@ public class ExampleSword : Weapon
 
 ### Armor
 
-`wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxHpBonus` (optional) adds to maximum HP while worn. `ReactionMod` (optional, default 0) is added to the wearer's Reaction Time while worn: a shield or heavy armor makes its wearer a little slower.
+`wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxHpBonus` (optional) adds to maximum HP while worn. `ReactionMod` (optional, default 0) is added to the wearer's Reaction Time while worn: a shield or heavy armor makes its wearer a little slower. `Category` is `light`, `medium` or `heavy` for body and head armor (it decides who may wear it; a shield or trinket needs none).
 
 ```csharp
 // File: /domains/example/helm.cs
@@ -385,13 +385,32 @@ public class ExampleKey : Item
 }
 ```
 
+## Areas, regions, skills and classes
+
+**Area and region names.** Put an `area.cs` in the directory of your rooms. Every room in that directory then belongs to the area it names, and `score` shows "Area ...   Region ...". Nothing is repeated in the rooms.
+
+```
+// Path: /domains/example/area.cs
+// @inherit /std/area
+public class ExampleArea : Area
+{
+    public override void Create() { AreaName = "The Example"; RegionName = "Greenvale"; }
+}
+```
+
+**A locked exit that opens with an item.** Override `QueryExitPath(string direction)` in the room (see `/domains/hollow/village/north_road.cs`, which closes the road north without the travel pass).
+
+**A skill, spell or trait** is one file in `/skills`, found by the registry without any list to edit. It inherits `/std/skill` (a `Command` word, `StaminaCost` or `ManaCost`, `Preparation`, `Recovery`, `Target` of `enemy`, `friend` or `item`, and `Resolve(user, target)`) or `/std/trait` (`Mods["armor"] = 1;` and the other modifier keys listed in CLASS_SYSTEM.md section 12). Items grant skills by overriding `QueryGrantedSkills()`.
+
+**A class** is one file in `/classes` inheriting `/std/pclass`: tier, parent, `Require("level", "5")`, `ExpModifier`, `AttackRate`, `Skills`, `Traits`, `Weapons`, `ArmorTypes`, `Enabled`. Advanced classes are given with `player.Call<string>("ApplyClass", id)`. CLASS_SYSTEM.md section 12 has the full story.
+
 ## Corpses, in one paragraph
 
 You do not build corpses; `Monster` and the player's death make them. For a builder it means: loot and gold are in the corpse (`loot`, `get X from corpse`, `look in corpse`), nothing falls to the floor, the killer has half an hour to themselves, an empty corpse is gone after two minutes, and a monster corpse still holding loot rots after an hour. Items you want a monster to always drop: `AddLoot(path, 100)`. Items lying on the floor of a room are done with `AddSpawn`.
 
 ## Testing in the game
 
-Log in as a wizard (level 5 lets you do everything below except `smite`).
+Log in as a wizard (level 5 lets you do everything below except `slay`).
 
 ```
 update /domains/example/hall      compile (or recompile) a room and put you back in it
@@ -400,8 +419,8 @@ clone /domains/example/sword      put a new object in your inventory
 stat here                         the room: safe flag, spawns and how many are alive, exits
 stat rat                          a creature or item in the room: level, HP, damage, loot
 stat me                           your own numbers
-heal                              restore your HP (level 5); heal <creature> too
-smite rat                         kill something at once with normal death (level 10)
+restore                           restore your HP, Stamina and Mana (level 5); restore <creature> too
+slay rat                          kill something at once with normal death (level 10)
 ```
 
 A good loop: edit the file with `edit`, `update` it, `goto` the room, then try it as a player would (`ansi off` shows the plain text, `cat` shows your tags as you wrote them): `look`, `look at` every detail, `read`, `talk`, `ask ... about`, `browse`/`buy`, `kill`, `loot`. Compile errors and sandbox complaints are shown when the file loads. `update` of a room rebuilds its non-player occupants; to refresh a creature, `update` its file and then `update` the room that spawns it. Rooms re-spawn creatures at their reset time; set `ResetSeconds = 10` while testing.

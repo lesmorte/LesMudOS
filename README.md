@@ -125,11 +125,11 @@ Introduce a syntax error and update again: the error comes back with file and li
 
 New characters now start in the Village Square of Vincent's Hollow (the start room is the `StartRoom` constant in `mudlib/std/player.cs`; `/domains/town` stays as the small technical demo). The gameplay systems are described in [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md), and builders should read [docs/BUILDING.md](docs/BUILDING.md).
 
-Player commands: `ansi`, `kill`/`attack`, `flee`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
+Player commands: `ansi`, `kill`/`attack`, `flee`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `skills`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
 
 Combat has no rounds. Each fighter acts when its own Reaction Time and the Recovery of its last action have passed (an unarmed player strikes every 6 seconds, one with a sword every 8), and `score`, `consider` and `stat` show the numbers. Drinking a potion mid-fight is queued for your next ready moment; `stop` cancels it. See docs/COMBAT_TIMING.md.
 
-Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `heal [TARGET]` and `speed TARGET PERCENT [SECONDS]` (5), `smite TARGET` (10), plus `update` and `clone` as before.
+Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `restore [TARGET]` and `speed TARGET PERCENT [SECONDS]` (5), `slay TARGET` (10), plus `update` and `clone` as before.
 
 ### Colour
 

@@ -90,7 +90,7 @@ Combat has no rounds. Each fighter has its own clock, described fully in [COMBAT
 - An action with a Preparation shows a wind-up line when it begins and takes effect Preparation x 2 seconds later (inside its delay, not added to it). If the target has died or left in between, the blow is wasted.
 - One call-out per fighter drives the clock. Heartbeats are used only for regeneration and idle NPC behaviour.
 - A player can queue one action (a potion, food) while recovering; it happens at the next ready moment in place of an attack. A newer command replaces it and `stop` clears it.
-- **To hit:** `d20 + attacker level + QueryToHit() >= 10 + defender QueryArmor()`. A natural 20 always hits, a natural 1 always misses.
+- **To hit:** the defender's dodge is rolled first; then `d20 + attacker QueryAttack() + action bonus >= 10 + defender QueryArmor() + defender QueryDefense()`, where `QueryAttack() = round(attack rate x level) + QueryToHit()` and `QueryDefense() = level - 1`. A natural 20 always hits, a natural 1 always misses. A hit is critical with 5% (x1.5); a defender with a shield blocks 15% of hits (damage halved). See [CLASS_SYSTEM.md](CLASS_SYSTEM.md).
 - **Damage:** uniform in the action's damage range (times the action's multiplier), minimum 1.
 - Enemies that are no longer in the room are forgotten after 30 seconds, so walking away ends a fight, and a creature does not chase.
 - Messages: the attacker, the defender and bystanders each get a line, varying by damage (miss, scratch, hit, hard hit). One line per attack per observer.
@@ -205,15 +205,19 @@ Services use the same class with a different stock:
 
 `Shopkeeper` has `protected virtual bool OnBuy(ObjectRef buyer, string path)` so a service can do something other than hand over an item. Stock samples are kept inside the shopkeeper so that `buy sword` and `value sword` find them by name. The Traveling Merchant sells potions at 15 and rations at 5. Harland sells stew (4), ale (2) and the bed (5); buying the bed heals the buyer fully and takes them up to the Guest Rooms.
 
+## 8a. Classes, skills and areas
+
+The five callings, their skills and traits, equipment categories and access, the level-scaled attack rule, the travel pass and the Vale Road are described in [CLASS_SYSTEM.md](CLASS_SYSTEM.md). Every living thing has Stamina and Mana. Weapons and armor have a `Category`. Rooms get their area and region names from an `area.cs` in their directory (`score` shows them). Creature numbers in the tables here are unchanged by the class system; `tests/balance_sim.py` shows how each archetype fares against them.
+
 ## 9. The player character
 
 `Adventurer` (abstract, inherits `Living`) carries everything about playing the game; `Player` inherits it and keeps accounts, wizard tools and files.
 
 Saved with the player: level, experience, HP, gold, quest states, the program paths of carried items and which are equipped, and the logout room.
 
-- **New character:** level 1, 30 HP, 25 gold, unarmed 1-3.
-- **Experience to reach level:** 2: 100, 3: 250, 4: 500, 5: 900. Level 5 is the cap for now.
-- **Each level:** +8 max HP, and full heal on levelling. (The +1 to hit comes from level in the attack roll.)
+- **New character:** chooses one of five callings after the password (Warrior, Scout, Priest, Mage, Adventurer); level 1, the calling's HP, gold, resources and starting kit (CLASS_SYSTEM.md section 7); unarmed 1-3.
+- **Experience to reach level n:** 50 x n x (n - 1) times the experience modifier of the character's classes (2: 100, 3: 300, 4: 600, 5: 1000). The level cap is 100.
+- **Each level:** +8 max HP, and full heal on levelling. (Attack grows by the class's attack rate per level and Defense by 1.)
 - **Regeneration:** 1 HP every 10 seconds out of combat; 3 in a safe room.
 - **Death:** the player is told so, and a **corpse** in the room where they died takes everything they carry (equipment included) and a gold fee of 10% of their purse. They wake in the Guest Rooms at full HP, with experience and level intact, and must walk back to the corpse and `loot` it. Their killer forgets them. The loss is saved at once.
 - **Logout room:** quitting in a room whose `QueryLogoutRoom()` is true (the Guest Rooms) makes that the next login room. Otherwise players enter at the Village Square.
@@ -235,7 +239,8 @@ Commands, available to every player:
 | `accept`, `report` | In the Adventurers Guild |
 | `ansi [on\|off]` (also `color`, `colour`) | Show or change ANSI colour (section 14) |
 | `score` (also `sc`) | Level, experience and what the next level needs, HP, gold, equipment, quests |
-| `hp` | One-line health |
+| `hp` | One-line health, Stamina and Mana |
+| `skills` | Your skills, spells and traits with costs and timing |
 | `quests` | Quest log |
 
 `look at <thing>` falls back to room details, and `look at <creature>` adds a rough health line. `stat <thing>` accepts `me`, `here` or a name present in the room.
@@ -248,8 +253,8 @@ Public functions on the player for other objects: `QueryLevel`, `QueryHp`, `Quer
 |---|---|---|
 | `goto <room path or player>` | 1 | Move to a room, or to where a player is |
 | `stat <thing>` | 1 | Show a living thing's or item's numbers |
-| `heal [<target>]` | 5 | Restore full HP |
-| `smite <target>` | 10 | Kill a creature at once, with normal death processing and kill credit |
+| `restore [<target>]` | 5 | Restore full HP, Stamina and Mana (was `heal`; the word now belongs to the Priest's spell) |
+| `slay <target>` | 10 | Kill a creature at once, with normal death processing and kill credit |
 
 These follow the existing rule: below the level, the command answers "What?". `shutdown` now saves every online player before the driver stops.
 
