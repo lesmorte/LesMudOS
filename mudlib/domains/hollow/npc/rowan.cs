@@ -143,6 +143,12 @@ public class Rowan : Npc
         player.Call("AddXp", xp);
         player.Call("AddGold", gold);
         Write($"Rowan pays you {gold} gold{extra}.\n");
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", quest == Orders ? "quest.overseers_orders" : "quest.clear_the_cellar", player,
+                new List<ObjectRef> { player }, Environment(), quest, new Dictionary<string, string> { ["name"] = Title(quest) });
+        }
+        catch (MudRuntimeException) { }
     }
 
     private void FinishCellar(ObjectRef player)
