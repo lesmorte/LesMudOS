@@ -7,6 +7,9 @@ public class FdElderLane : Room
         ShortDesc = "Elder Lane";
         LongDesc = "Elder Lane is a dead end, a short and silent lane of the oldest houses in Oakenfell, their dark lower stones laid long before the street beyond them was paved. The doors here are low and the windows small, most of them shuttered, and the noise of the city drops away until you can hear your own boots on the stone. At the far end the lane stops against a high old wall, almost wholly hidden under a thick curtain of ivy. The paving beneath your feet is worn into a shallow groove down the middle, and the groove runs straight on toward the wall.";
         Exits["east"] = "/domains/greenvale/oakenfell/founders/old_stone_street";
+        // The gap behind the ivy: found by looking at it, or, less surely, by searching.
+        HiddenExit("west", "/domains/greenvale/oakenfell/grove/overgrown_way", "gap,darkness,dark,shadow,hole,opening,behind the leaves,behind ivy", 20,
+            "You part the thin leaves on the left and find that the darkness is a low doorway through the wall, with the worn groove running on into it. A way leads {cmd}west{/}.");
 
         AddDetail("lane,street,dead end,end", "A lane of old houses that stops dead against a wall. It does not look as if anyone is meant to come here, and yet the stones have been walked.");
         AddDetail("houses,house,doors,windows,shutters,stones,lower stones", "Low, deep-set houses of black-grey stone, the oldest anywhere in the city. Their doors are narrow, their windows small and shuttered, and their lower courses are rounded and softened by weather. Behind the shutters a clock ticks, a long way off.");

@@ -1086,6 +1086,25 @@ public abstract class Living : Thing
         Kick();
     }
 
+    /// <summary>
+    /// Do any action on the clock (its Kind is handled in Special, as for a builder's own kind): at once if ready, otherwise queued
+    /// for the next Ready Time in place of an attack. waiting completes "You will ... as soon as you can" ("search").
+    /// </summary>
+    protected void ActAsAction(CombatAction action, string waiting)
+    {
+        if (QueryReady())
+        {
+            queued = null;
+            Begin(action, null);
+            return;
+        }
+        var replaced = queued != null;
+        queued = action;
+        queuedTarget = null;
+        Tell($"You are not ready yet. You will {waiting} as soon as you can" + (replaced ? ", instead of what you had planned" : "") + ". ({cmd}stop{/} cancels.)\n");
+        Kick();
+    }
+
     /// <summary>Clear the queued action. True if there was one.</summary>
     protected bool ClearQueued()
     {

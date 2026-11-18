@@ -585,7 +585,7 @@ def run(work, mudlib):
     wiz.command("east")
     wiz.command("clone " + TEST + "goldpile")
     wiz.command("drop coins")
-    check("coins on the floor are merged into one line", hero.command("look"), "100 gold coins is here", absent=("Two",))
+    check("coins on the floor are merged into one line", hero.command("look"), "100 gold coins are here", absent=("Two",))
     text = hero.command("get coins")
     check("picking up coins adds gold", text, "You take 100 gold coins.", "You add 100 gold to your purse.")
     check("the coins are gone and the purse is fuller", str(score_of(hero)["gold"]), "103")

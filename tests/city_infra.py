@@ -153,12 +153,19 @@ class Source:
 def ask_model(topics, typed):
     """Which topic answers 'ask <npc> about <typed>': exactly the matching code of /std/npc.cs (Ask). An index or None."""
     typed = typed.strip().lower()
+    best, best_length, loose = None, 0, None
     for i, (keywords, _) in enumerate(topics):
         for raw in keywords.lower().split(","):
             key = raw.strip()
-            if key != "" and (key in typed or (len(typed) >= 3 and typed in key)):
+            if key == "":
+                continue
+            if key == typed:
                 return i
-    return None
+            if key in typed and len(key) > best_length:
+                best, best_length = i, len(key)
+            elif loose is None and len(typed) >= 3 and typed in key:
+                loose = i
+    return best if best is not None else loose
 
 
 # ------------------------------------------------------------------ the build document
