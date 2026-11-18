@@ -18,4 +18,18 @@ public class EeHuntersHide : Room
         AddReadable("notes,journal,pages,tally,notebook,book,writing", "A little oilskin notebook, its pages scrawled in a quick tidy hand:\n\n\"Morwenna, her book. Goblins on the trail, by the moon.\n\nNew moon: three scouts, northbound, cords at the belt, no spears. Counting.\nFirst quarter: two, southbound, with a pack. They stopped at the beech and sniffed, then left. Did they know?\nFull moon: five, in a line, very quiet. They went to the Oak and stopped twenty paces short. Walked round it, left hand always inward, as though round a grave. They will not touch the swept ground. I wonder who sweeps it.\nLast quarter: they count the road. One knot a wagon, two for an armed party. Told no one. The commander should be told. Am going to the Edge Post at first light, will tell her myself, and then I will go to the Oak and look properly.\"\n\nThe last page has been torn out.", "A small oilskin notebook lies on the bedroll. You could {cmd}read{/} it.");
 
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.hidden", who, new List<ObjectRef> { who }, Self, "hunters-hide",
+                new Dictionary<string, string> { ["name"] = "the Hunter's Hide" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

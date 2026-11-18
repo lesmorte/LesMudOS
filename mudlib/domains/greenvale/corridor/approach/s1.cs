@@ -19,4 +19,18 @@ public class OaS1 : Room
 
         AddSpawn("/domains/greenvale/corridor/approach/obj/old_coins");   // a find: each character takes it once, for less each time
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.hidden", who, new List<ObjectRef> { who }, Self, "sealed-culvert",
+                new Dictionary<string, string> { ["name"] = "the Sealed Culvert" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

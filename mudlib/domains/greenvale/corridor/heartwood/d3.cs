@@ -15,6 +15,9 @@ public class HwD3 : Room
         AddDetail("rubble,blocks,block,pile,roof", "The blocks of the roof lie heaped, some on their sides, some on their faces. One has been cut into a shallow bowl and another into a low step. All of them are very heavy, and none has been moved in a long time.");
         AddDetail("trail,path,end,south,west", "The trail that brought you here is narrow and does not look used. It was cut by animals, then widened by one or two with a blade, then lost to the thorn again. West it returns toward the Stalker's Run.");
         AddDetail("moss,fern,ferns,silence,quiet", "The moss on the rubble is thick and unbroken, except along the lip of the gap, where it has been rubbed away. There is no sound at all, not even the rustle of leaves.");
+
+        HiddenExit("in", "/domains/greenvale/corridor/barrow/entrance", "gap,slabs,slab,leaning,behind,black,dark,opening,crack,entrance", 10,
+            "You turn your shoulders to the gap behind the lintel, where the moss has been rubbed from the lip, and the leaning slabs let you through into the cold, dry air of stone. A way leads {cmd}in{/}, sloping down into the dark.");
         AddSpawn("/domains/greenvale/corridor/mob/forest_stalker", 1);
         AddSpawn("/domains/greenvale/corridor/mob/thorn_woodling", 1);
     }

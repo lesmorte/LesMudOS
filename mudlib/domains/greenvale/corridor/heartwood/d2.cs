@@ -15,6 +15,9 @@ public class HwD2 : Room
         AddDetail("east,dead,dead thorn,brittle,died back,grey,grey thorn,east side,gap,stems,cut,cuts", "On the east side, a stretch of thicket the width of a doorway has died, and the stems are grey and brittle. Many have been cut, once, a long time ago, with a blade, and the thicket has grown back over the cuts and then died again. The pattern of the dead stems is a rough arch. Behind it, the dark is a little deeper than it should be.");
         AddDetail("ground,leaf,earth,floor", "The ground under the thorn is black, soft and bare, strewn with the hulls of sloes. Mice have made runs in it.");
         AddDetail("light,glow,brown,sky", "The sky is not to be seen. The thorns above make a roof so dense that the light is a dim brown stain, as in a cellar with a grating.");
+
+        HiddenExit("east", "/domains/greenvale/corridor/heartwood/s1", "east,dead,dead thorn,brittle,died back,grey,grey thorn,east side,gap,stems,cut,cuts", 15,
+            "You lay a hand on the grey stems where they make their rough arch, and they come away in brittle handfuls, old cuts and all. Behind them a low way opens in the thicket {cmd}east{/}.");
         AddSpawn("/domains/greenvale/corridor/mob/thorn_woodling", 2);
         AddSpawn("/domains/greenvale/corridor/mob/forest_stalker", 1);
     }

@@ -15,6 +15,9 @@ public class HwW2 : Room
         AddDetail("tracks,prints,trodden,trampled,ground", "The ground at the mouth of the hollow is trodden bare in a path from the trail to the dark, worn by small hard feet in a great number. The tracks are mostly old, and mostly lead in.");
         AddDetail("trunk,tree,giant,bark", "The trunk lies along the trail for sixty paces, with its limbs snapped under it. It was an oak, or had been. Heart-rot has hollowed it, and the inside is full of pale beetle-gnawed wood.");
         AddDetail("moss,fern,ferns,stones,stone","The moss on the trunk is deep and green, and ferns have rooted along its upper side in a long, even line. Among the roots of the plate dead fern hangs in brown hanks, and the stones in the soil are rounded and wet.");
+
+        HiddenExit("down", "/domains/greenvale/corridor/root_warrens/entrance", "hollow,hole,pit,gap,dark,beneath,under,below,draught,draft,air,smell,wind,tracks,prints,trodden,trampled", 10,
+            "You lift the curtain of roots at the lip of the hollow and find, as the draught has been telling you, that they have been cut into a stair, square and old. A way leads {cmd}down{/} among them, into the cold.");
         AddSpawn("/domains/greenvale/corridor/mob/black_bear", 1);
     }
 }

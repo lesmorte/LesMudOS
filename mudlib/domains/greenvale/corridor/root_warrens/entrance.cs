@@ -16,4 +16,18 @@ public class RwEntrance : Room
         AddDetail("floor,clay,ground,tracks,prints,feet", "The clay of the floor has been beaten smooth and hard. Small prints of hard feet and of clawed pads cross each other thickly, mostly leading in. A few are broader and flat-heeled, and those are old and half filled with dust.");
         AddDetail("daylight,light,sky,green,above", "The light that falls through the roots is the green of the forest canopy, and it ends a few paces in, as if a door had been shut on it.");
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.secret_dungeon", who, new List<ObjectRef> { who }, Self, "root-warrens",
+                new Dictionary<string, string> { ["name"] = "The Root Warrens" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

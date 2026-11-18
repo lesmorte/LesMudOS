@@ -21,5 +21,8 @@ public class GrTheAbandonedWatchtower : Room
         AddDetail("rumor,rumors,why,garrison,rangers,riverwatch", "Travelers say the Rangers left because the well went bad, or because the post was starved of pay, or because of something in the cellar. The Rangers, when asked, say only that the post served its purpose.");
         AddDetail("trail,faint trail,west trail,goblin trail", "A narrow trail, kept open by passing feet, leads down off the west side of the knoll. The feet are small and bare.");
         AddReadable("scratches,graffiti,wall scratches,carved words,wall", "Cut into the stone beside the door, by many hands over many years:\n\nEVER VIGILANT\nR. HOLM, 3RD WATCH\nSEND PAY OR SEND RELIEF\nDON'T GO DOWN FOR WATER\n(and the last, in a neater hand, the letters struck out)", "Words are scratched into the stone beside the door. You could {cmd}read{/} them.");
+
+        HiddenExit("down", "/domains/greenvale/corridor/green_road/s1", "floor,flagstones,flags,hearth,fireplace,cellar,trapdoor,hatch,rubble", 15,
+            "You set your shoulder to the flag that rang hollow and drag it back along the scuffed half-circle. It slides on a worn groove, and cold air breathes up from a stair in the dark beneath the hearth. A way leads {cmd}down{/}.");
     }
 }

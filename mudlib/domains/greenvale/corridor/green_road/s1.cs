@@ -17,4 +17,18 @@ public class GrTheWatchtowerCellar : Room
         AddDetail("floor,dust,scuffs,flags", "The dust on the floor is thick except in one path, from the stair to the table to the wall. That path has been walked a good deal.");
         AddReadable("ledger,log,logbook,book,garrison log,black ledger", "The last pages of the ledger, in a cramped, careful hand:\n\n...day 61. No relief. Pay is five months owing. Stores sound. Sergeant Holm has forbidden anyone the lower stair after dark and will not say why.\n\n...day 64. Two men gone from the night watch, their beds made. Holm says desertion. Their boots are by the door.\n\n...day 66. Found the mark on the cellar wall. It was not there on the day we took stock. Holm says leave it be. I have copied it, and I am sorry I did.\n\n...day 67. We go at first light. Holm will bar the door from within and go out by the roof. If any Ranger reads this: do not stay in the cellar after dusk, and do not trust the well.\n\n...day 68. I do not think we are all going to...\n\nThe entry ends there.", "A black ledger lies open on the table. You could {cmd}read{/} it.");
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.hidden", who, new List<ObjectRef> { who }, Self, "watchtower-cellar",
+                new Dictionary<string, string> { ["name"] = "the Watchtower Cellar" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

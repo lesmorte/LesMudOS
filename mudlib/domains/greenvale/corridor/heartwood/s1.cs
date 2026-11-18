@@ -20,4 +20,18 @@ public class HwS1 : Room
         AddReadable("third journal,third,journal three,third book,3", "The last book was thrown on the heap, and the fire reached only the cover. The final page reads:\n\n\"...the shrine in the deep wood is shut from within or fallen. I do not like what the cold air smells of. [burned] ...if it lies below, it is for those who come after me, and they will have better tools. Leave nothing. This book goes into the fire with the rest of--\"\n\nThe line stops there, in the middle of a stroke.", "A journal, charred at the edges. You could {cmd}read{/} the third journal.");
         AddSpawn("/domains/greenvale/corridor/heartwood/obj/scorched_satchel");
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.hidden", who, new List<ObjectRef> { who }, Self, "heartwood-cache",
+                new Dictionary<string, string> { ["name"] = "the Hidden Cache" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

@@ -18,4 +18,18 @@ public class SrS1 : Room
 
         AddSpawn("/domains/greenvale/corridor/south_road/obj/old_purse");   // a find: each character takes it once, for less each time
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.hidden", who, new List<ObjectRef> { who }, Self, "dry-well",
+                new Dictionary<string, string> { ["name"] = "the Dry Well" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }

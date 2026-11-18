@@ -16,6 +16,8 @@ public class OaD1 : Room
         AddDetail("holes,shafts,light,roof holes,sky", "Round holes in the vault, a stride across, let down shafts of grey daylight where, once, water was drawn through. Ferns grow down toward them on thin roots.");
         AddDetail("seep,walls,water,wall,drip,drips", "A thin film of water slides down the wall and drips into a stone channel, as it has done for longer than anyone can say. It leaves an orange stain.");
         AddDetail("sump,corner,farthest corner,low corner,lower stones,different stones,blocked arch,arch,masonry,draught,gap,culvert", "In the low corner the floor drops to a shallow sump, and beyond it a pointed arch has been filled solid with blocks of a paler, finer-grained stone, fitted so closely that no mortar shows. At the very top of the filling one block has slipped, leaving a black gap a person could wriggle through. A thin cold air breathes out of it, dry, as if from a place that is a long way down, and a careful person might well go down into it.");
+        HiddenExit("down", "/domains/greenvale/corridor/approach/s1", "sump,corner,farthest corner,low corner,lower stones,different stones,blocked arch,arch,masonry,gap,culvert", 15,
+            "You wade the shallow sump and climb the pale, close-fitted filling to the block that has slipped, and the black gap above it is wide enough to wriggle through. A way leads {cmd}down{/}, into dry cold air.");
 
         AddSpawn("/domains/greenvale/corridor/mob/rogue_goblin_veteran");
     }

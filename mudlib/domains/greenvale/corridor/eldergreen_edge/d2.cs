@@ -16,6 +16,8 @@ public class EeGoblinTrail : Room
         AddDetail("roots,knees,walls,oak,trees", "The roots form a labyrinth of walls and knees, in which a small creature could hide with no trouble at all.");
         AddDetail("giant beech,great beech,great tree,beech tree,fork,ivy,east,spikes,holes,hole", "The giant beech stands a little east of the trail behind a curtain of ivy that has been combed aside, and let fall again, many times. High in its fork, forty feet up, something that looks like a platform of branches is almost hidden by leaves, and in the grey bark below the ivy are neat square holes, in a line, like the rungs of a ladder. Nobody climbs trees by accident, but somebody has climbed this one.");
         AddDetail("silence,quiet,wood", "No birds sing here. The silence is the silence of a held breath.");
+        HiddenExit("east", "/domains/greenvale/corridor/eldergreen_edge/s1", "giant beech,great beech,great tree,beech tree,fork,ivy,east,spikes,holes,hole", 20,
+            "You comb the ivy aside as others have done before you and set a hand to the square holes in the grey bark. They are rungs, old and still sound, and they climb to the fork. A way leads {cmd}east{/}, up into the beech.");
 
         AddSpawn("/domains/greenvale/corridor/mob/goblin_scout", 2);
     }

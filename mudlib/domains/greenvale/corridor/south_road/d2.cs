@@ -16,6 +16,8 @@ public class SrD2 : Room
         AddDetail("west wall,western wall,arch,square,stones,stonework", "Along the west side the brambles arch smoothly over a square shape. Between the canes you glimpse mortared stone, mossed and old.");
         AddDetail("tied canes,snapped canes,tied back,stumps", "A few thick canes on the west side have been cut and bent back with twine long since rotted into the wood. Someone once made a doorway here, and the thorns have been healing it ever since.");
         AddDetail("cloak,tatter,cloth,rag", "A rotted scrap of green wool, caught on the thorns at head height. It has been there longer than any of the brambles around it.");
+        HiddenExit("west", "/domains/greenvale/corridor/south_road/s1", "west wall,western wall,arch,square,stones,stonework,tied canes,snapped canes,tied back,stumps", 20,
+            "You work along the west wall, lift the old tied canes and bend them back as the hand that tied them meant them to go. Behind the arch the brambles part on a square shape of mossed stone, and a way opens {cmd}west{/}.");
 
         AddSpawn("/domains/greenvale/corridor/mob/stray_wolf");
     }

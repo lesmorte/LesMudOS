@@ -16,4 +16,18 @@ public class FbEntrance : Room
         AddDetail("draught,draft,air,cold,wind", "The air flows up the stair from below, steadily, as though the place were breathing out. It smells of nothing but dry stone and cold, and it carries no damp, no rot and no smoke.");
         AddDetail("soot,smear,lintel,smudge,slab", "Just inside the gap, over your head, a slab of the old wall juts out like a lintel. On its underside is a smear of soot the width of a hand, black and soft to the finger: a lamp carried too high by someone who did not stoop. The rain has not been in to touch it.");
     }
+
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.secret_dungeon", who, new List<ObjectRef> { who }, Self, "forgotten-barrow",
+                new Dictionary<string, string> { ["name"] = "The Forgotten Barrow" });
+        }
+        catch (MudRuntimeException) { }
+    }
 }
