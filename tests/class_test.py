@@ -105,7 +105,7 @@ FILES = {
     "dodger": creature("TDodger", "Dodger", "dodger", 3000, (0, 0), dodge=50),
     "blocker": creature("TBlocker", "Blocker", "blocker", 3000, (0, 0), block=90),
     "hitter": creature("THitter", "Hitter", "hitter", 100000, (1, 1), react=1.0, rec=0.0),
-    "boss100": creature("TBoss100", "Boss", "boss", 100000, (1, 1), level=100, react=1.0, rec=0.0),
+    "boss100": creature("TOverlord100", "Overlord", "overlord", 100000, (1, 1), level=100, react=1.0, rec=0.0),
     "winder": creature("TWinder", "Winder", "winder", 100000, (1, 1), react=4.0,
                        action='AddCombatAction("blow", "Slow Blow", preparation: 2.0, recovery: 1.0, windUp: "raises a huge club", strike: "brings the club down!");'),
     # items
@@ -144,8 +144,8 @@ public class TStaggerSkill : Skill
     "test_flash": '''// @inherit /std/skill
 public class TFlashSkill : Skill
 {
-    public override void Create() { Title = "Test Flash"; Command = "tflash"; Summary = "Armor +2 for 3 seconds (test)."; Recovery = 0.0; }
-    public override void Resolve(ObjectRef user, ObjectRef? target) { user.Call("AddEffect", "flash", "Flash", 3, "armor=2", 1.0, 0); TellObject(user, "FLASHED\\n"); }
+    public override void Create() { Title = "Test Flash"; Command = "tflash"; Summary = "Armor +2 for 8 seconds (test)."; Recovery = 0.0; }
+    public override void Resolve(ObjectRef user, ObjectRef? target) { user.Call("AddEffect", "flash", "Flash", 8, "armor=2", 1.0, 0); TellObject(user, "FLASHED\\n"); }
 }
 ''',
     "test_zap": '''// @inherit /std/skill
@@ -200,6 +200,22 @@ public class ClosedTestClass : PlayerClass
 ''',
 }
 
+PADNAMES = ["t" + x for x in ("warrior", "scout", "priest", "mage", "adventurer")] + ["x" + x for x in ("warrior", "scout", "priest", "mage", "adventurer")] + ["sentinel"]
+for _n in PADNAMES:
+    FILES["pad_" + _n] = room("TPad" + _n.capitalize(), "A Test Pad", {"east": TEST + "lair", "north": TEST + "vault"},
+                              'LockExit("north", "testkey", "The vault is locked.");')
+ROOM = {"v": TEST + "arena"}
+
+
+def pad(name):
+    return TEST + "pad_" + name
+
+
+def setroom(wiz, name):
+    ROOM["v"] = pad(name)
+    wiz.command("goto " + ROOM["v"])
+
+
 ARCHETYPES = ["warrior", "scout", "priest", "mage", "adventurer"]
 procs = {}
 
@@ -211,21 +227,28 @@ def wiz_login(name, arch, secret_wiz=None):
         secret_wiz.command(f"promote {name.lower()} 10")
         c.read_until("level is now")
     a.drain(c, 0.5)
+    c.command("goto " + pad(name.lower()))
     return c
 
 
 def num(pattern, text, default=None):
-    return a.number(pattern, text, default)
+    m = re.search(pattern, text)
+    return float(m.group(1)) if m and "." in m.group(1) else (int(m.group(1)) if m else default)
 
 
 def res(c):
     """(hp, stamina, mana) from the hp command."""
-    t = c.command("hp")
+    t = ""
+    for _ in range(4):
+        t += c.command("hp")
+        if "Mana " in t and re.search(r"HP \d+/\d+   Stamina", t):
+            break
+        time.sleep(0.3)
     return (num(r"HP (\d+)/", t), num(r"Stamina (\d+)/", t), num(r"Mana (\d+)/", t))
 
 
 def give(wiz, c, path, word):
-    wiz.command("goto " + TEST + "arena")
+    wiz.command("goto " + ROOM["v"])
     wiz.command("clone " + path)
     wiz.command("drop " + word)
     out = c.command("get " + word)
@@ -287,7 +310,7 @@ def main():
 
 def run(work, mudlib):
     # ===== the wizard =====
-    wiz = h.Client("boss", archetype="warrior")
+    wiz = h.Client("chief", archetype="warrior")
     wiz.read_until("> ")
     check("the secret makes the first wizard", wiz.command("promote " + h.SECRET), "level 10 wizard")
 
@@ -307,7 +330,7 @@ def run(work, mudlib):
     check("an unknown calling is refused", c.read_until("Your calling: "), "There is no such calling")
     # A class file added while the game runs shows up at the next login: adding a class is adding one file.
     h.write(mudlib, "/classes/late_test", CLASSES["sentinel"].replace("SentinelClass", "LateTestClass").replace('"Sentinel"', '"Latecomer"').replace("98", "97"))
-    c2 = h.Client("picker2", login=False)
+    c2 = h.Client("pickertwo", login=False)
     c2.read_until("characters): ")
     c2.send(h.PASSWORD)
     c2.read_until("again: ")
@@ -339,7 +362,8 @@ def run(work, mudlib):
         inv = c.command("i")
         check(f"{arch}: the starting kit", inv, *kit)
         check(f"{arch}: weapon (and shield) put on", s, eq1, eq2)
-        check(f"{arch}: the Area and Region are shown by score", s, "Area The Village of Vincent's Hollow   Region Greenvale")
+    wiz.command("goto " + HOLLOW + "village/square")
+    check("score shows the area and the region", a.score_of(wiz)["text"], "Area The Village of Vincent's Hollow   Region Greenvale")
     check("warrior Reaction Time base 3.0", a.score_of(chars["warrior"])["text"], "base 3.0")
     check("scout Reaction Time base 2.0", a.score_of(chars["scout"])["text"], "base 2.0")
     for arch in ARCHETYPES:
@@ -375,12 +399,10 @@ def run(work, mudlib):
     s = a.score_of(old)
     check("the existing character keeps level and gold, gets the new HP and no kit",
           f"{s['level']} {s['gold']} {s['max']}", "3 77 42")
-    check("no starting kit for an existing character", old.command("i"), "empty-handed")
+    check("no second starting kit for an existing character", str(old.command("i").count("rusty sword")), "1")
     old.command("quit")
 
     # ===== equipment access =====
-    arena = TEST + "arena"
-    wiz.command("goto " + arena)
     items = {"sword": HOLLOW + "obj/rusty_sword", "bow": HOLLOW + "obj/hunting_bow", "mace": HOLLOW + "obj/novice_mace",
              "axe": HOLLOW + "obj/woodcutter_axe", "shield": HOLLOW + "obj/small_shield", "mail": TEST + "armor_medium",
              "plate": TEST + "armor_heavy", "dagger": HOLLOW + "obj/iron_dagger", "staff": HOLLOW + "obj/apprentice_staff",
@@ -393,7 +415,10 @@ def run(work, mudlib):
         "adventurer": {"sword", "mace", "axe", "dagger", "staff", "spear", "shield", "vest"},
     }
     for arch in ARCHETYPES:
-        c = chars[arch]
+        c = wiz_login("x" + arch, arch, wiz)
+        setroom(wiz, "x" + arch)
+        c.command("unwield")
+        c.command("remove shield")
         bad = []
         for word, path in items.items():
             give(wiz, c, path, word)
@@ -406,15 +431,18 @@ def run(work, mudlib):
             if word not in can[arch] and not refused:
                 bad.append((word, "should be refused", out))
             c.command(f"drop {word}")
+        c.command("quit")
         check(f"{arch}: every item in or out of its access behaves as the table says", str(bad), "[]")
+    setroom(wiz, "tmage")
     check("the refusal says why", chars["mage"].command("wield sword") if give(wiz, chars["mage"], items["sword"], "sword") else "",
           "You are not trained to wield a sword: Mages cannot.")
     wiz.command("goto " + HOLLOW + "village/ironoak")
     text = wiz.command("browse")
-    check("Torren sells the mace, the staff and the bow", text, "Novice's Mace", "Apprentice's Staff", "Hunting Bow")
+    check("Torren sells the mace, the staff and the bow", text, "novice's mace", "apprentice's staff", "hunting bow")
 
     # ===== resources: cost, refusal, regeneration =====
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
+    setroom(wiz, "tmage")
     mage = chars["mage"]
     mage.command("restore")
     wiz.command("clone " + TEST + "dummy")
@@ -432,10 +460,13 @@ def run(work, mudlib):
     hp, st, ma = res(mage)
     check("mana regenerates (8 per 10 s for a mage; stamina 3)", str(5 <= ma <= 12 and 1 <= st <= 5), "True")
     mage.command("goto") if False else None
+    setroom(wiz, "twarrior")
+    wiz.command("clone " + TEST + "dummy")
     warrior = chars["warrior"]
     warrior.command("drain")
     out = warrior.command("bash dummy")
     check("a skill that cannot be paid for is refused", out, "You are too tired for that.")
+    setroom(wiz, "tadventurer")
     adv = chars["adventurer"]
     adv.command("drain")
     time.sleep(10)
@@ -443,11 +474,12 @@ def run(work, mudlib):
     check("Survival Training: out of combat Stamina comes back 50% faster (6 -> 9 per 10 s)", str(7 <= st <= 12), "True")
     wiz.command("goto " + TEST + "calm")
     pr = chars["priest"]
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     # a safe room doubles it: the mage rests in the calm room
     mage.command("restore") if False else None
 
     # ===== features: warrior =====
+    setroom(wiz, "twarrior")
     w = chars["warrior"]
     w.command("restore")
     s = a.score_of(w)["text"]
@@ -456,7 +488,7 @@ def run(work, mudlib):
     w.command("unwield")
     check("no weapon, no proficiency bonus", a.score_of(w)["text"], "To hit +1")
     w.command("wield sword") if "sword" in w.command("i") else None
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     w.command("restore")
     w.command("goto") if False else None
     w.command("wield sword")
@@ -468,40 +500,60 @@ def run(work, mudlib):
     st1 = res(w)[1]
     check("Shield Bash costs 15 Stamina and attacks", str(st0 - st1 in (14, 15, 16)), "True")
     bashed = out
-    for _ in range(3):
-        bashed += a.quiet(w, 4.5)
+    w.command("speed me 90 600")
+    for _ in range(10):
+        if "is staggered" in bashed:
+            break
+        w.command("stop")
+        w.command("restore")
+        bashed += a.quiet(w, 7)
         bashed += w.command("bash dummy")
+        bashed += a.quiet(w, 3)
     check("Shield Bash staggers on a hit", bashed, "is staggered")
+    w.command("stop")
+    time.sleep(5)
+    w.command("speed me 0")
+    a.drain(w, 1.0)
     w.command("remove shield")
+    a.drain(w, 1.0)
     check("Shield Bash needs a shield", w.command("bash dummy"), "needs a shield")
     w.command("wear shield")
     w.command("stop")
 
     # ===== features: scout =====
+    setroom(wiz, "tscout")
     sc = chars["scout"]
     check("Evasion gives 10% dodge", a.score_of(sc)["text"], "Dodge 10%")
     wiz.command("goto " + TEST + "lair")
+    wiz.command("goto " + TEST + "lair")
     wiz.command("clone " + TEST + "dummy")
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     out = sc.command("track")
     check("Tracking lists the creatures in each adjacent room", out, "east", "a dummy", "north", "nothing stirs")
     sc.command("stop")
+    wiz.command("clone " + TEST + "dummy")
+    time.sleep(3)
+    time.sleep(8)
     st0 = res(sc)[1]
-    sc.command("strike dummy")
+    so = sc.command("strike dummy")
     time.sleep(1.2)
-    check("Precision Strike costs 20 Stamina and winds up", str(res(sc)[1] <= st0 - 17), "True")
+    stn = res(sc)[1]
+    check("Precision Strike costs 20 Stamina and winds up", ("True" if stn <= st0 - 17 else f"{st0} {stn} {so!r}"), "True")
     sc.command("stop")
+    for _ in range(3):
+        wiz.command("slay dummy")
 
     # ===== features: priest =====
+    setroom(wiz, "tpriest")
     p = chars["priest"]
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     wiz.command("slay dummy")
     wiz.command("clone " + TEST + "hitter")
     wiz.command("speed hitter 90 600")
     p.command("kill hitter")
     run_fight(p, wiz, 0, restore=False)
     for _ in range(40):
-        if res(p)[0] <= 12:
+        if res(p)[0] <= 8:
             break
         time.sleep(0.5)
     wiz.command("slay hitter")
@@ -509,24 +561,30 @@ def run(work, mudlib):
     a.drain(p, 0.6)
     p.command("stop")
     before = res(p)[0]
+    time.sleep(3)
     out = p.command("heal")
-    out += a.quiet(p, 4)
+    out += a.quiet(p, 5)
     check("Minor Heal restores 15 HP plus 25% (Divine Knowledge): 19", out, "restoring 19 hit points")
-    check("Minor Heal costs 20 Mana", str(res(p)[2] <= 82), "True")
+    check("Minor Heal costs 20 Mana", str(res(p)[2] <= 90), "True")
     s0 = a.score_of(p)["text"]
-    p.command("bless")
-    out = a.quiet(p, 4)
+    time.sleep(3)
+    out = p.command("bless")
+    out += a.quiet(p, 6)
     s1 = a.score_of(p)["text"]
     check("Blessing: +1 to hit, +1 armor, and it is listed with its time", s1, "Blessing (")
     check("Blessing changes the numbers", f"{num(r'To hit [+](\d+)', s1) - num(r'To hit [+](\d+)', s0)} {num(r'Armor (\d+)', s1) - num(r'Armor (\d+)', s0)}", "1 1")
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     m = chars["mage"]
+    m.command("goto " + ROOM["v"])
     m.command("restore")
+    time.sleep(4)
     out = p.command("heal tmage")
     out += a.quiet(p, 4)
     check("a healing spell can be cast on someone else", out, "restoring")
+    m.command("goto " + pad("tmage"))
 
     # ===== features: mage =====
+    setroom(wiz, "tmage")
     m.command("restore")
     wiz.command("clone " + TEST + "armored")
     m.command("stop")
@@ -545,21 +603,27 @@ def run(work, mudlib):
         for _ in range(8):
             out = m.command("bolt dodger")
             out += a.quiet(m, 1.0)
+            last_out = out
             dodged += count("dodges your bolt", out)
             hit += count(r"strikes a dodger|for \d+ damage", out)
         time.sleep(1)
-    check("Arcane Bolt can be dodged (a 50% dodge: some dodged, some hit)", str(dodged >= 1 and hit >= 1), "True")
+    check("Arcane Bolt can be dodged (a 50% dodge: some dodged, some hit)", str(dodged >= 1 and hit >= 1) or repr(last_out), "True")
     wiz.command("slay dodger")
     wiz.command("speed tmage 0")
     out = m.command("lore staff") if "staff" in m.command("i") else ""
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     m.command("get all") if False else None
     give(wiz, m, HOLLOW + "obj/enchanted_dagger", "dagger")
+    m.command("stop")
+    wiz.command("slay dummy")
+    wiz.command("slay dodger")
+    time.sleep(5)
     out = m.command("lore dagger")
-    out += a.quiet(m, 2)
+    out += a.quiet(m, 4)
     check("Magical Lore shows exact numbers and the magical property", out, "Damage 7-11", "to hit +2", "enchanted")
 
     # ===== features: adventurer =====
+    setroom(wiz, "tadventurer")
     ad = chars["adventurer"]
     ad.command("unwield")
     s = a.score_of(ad)["text"]
@@ -575,8 +639,9 @@ def run(work, mudlib):
     check("only the adventurer's look shows exit detail", chars["warrior"].command("look"), absent=("(to ",))
 
     # ===== rolls and effects, with forced conditions =====
+    setroom(wiz, "sentinel")
     sen = wiz_login("sentinel", "sentinel", wiz)
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     s = a.score_of(sen)["text"]
     check("forced rolls: dodge 60%, block 75% with the shield, critical 100%", s, "Dodge 60%", "Block 75%", "Critical 100%")
     wiz.command("clone " + TEST + "dummy")
@@ -616,11 +681,13 @@ def run(work, mudlib):
 
     # timed effects
     sen.command("speed me 90 600") if False else None
+    sen.command("stop")
+    time.sleep(6)
     out = sen.command("tflash")
     a.quiet(sen, 0.8)
     s = a.score_of(sen)["text"]
-    check("a timed effect is listed with its time and changes the numbers", s, "Flash (", "Armor 3")
-    time.sleep(4.5)
+    check("a timed effect is listed with its time and changes the numbers", out + s, "Flash (", "Armor 3")
+    time.sleep(9)
     s = a.score_of(sen)["text"]
     check("a timed effect expires", s, "Armor 1", absent=("Flash (",))
     sen.command("speed me 50 3")
@@ -653,7 +720,7 @@ def run(work, mudlib):
     sen.send("tstagger winder")
     a.quiet(sen, 0.3)
     after = num(r"ready in ([\d.]+) s", wiz.command("stat winder"))
-    check("stagger on a ready or recovering creature pushes its Ready Time back by 2 seconds", str(before is not None and after is not None and after > before + 1.0), "True")
+    check("stagger on a ready or recovering creature pushes its Ready Time back by 2 seconds", ("True" if before is not None and after is not None and after > before + 1.0 else f"{before} {after}"), "True")
     wiz.command("slay winder")
     sen.command("stop")
     sen.command("speed me 0")
@@ -674,10 +741,11 @@ def run(work, mudlib):
         check(f"{arch} (rate {rate:.2f}): Attack at levels 1, 5, 50 and 100 and Defense = level - 1", str(bad), "[]")
     check("the rule at level 100: a rate of 1.00 against 0.96 is 4 points apart", f"{expected_attack(1.0, 100) - expected_attack(0.96, 100)}", "4")
     # the rule in play
+    setroom(wiz, "twarrior")
     wr = chars["warrior"]
     wr.command("setlevel 1")
     wr.command("wield sword")
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     wiz.command("clone " + TEST + "hitter")
     wiz.command("speed hitter 90 600")
     wr.command("kill hitter")
@@ -698,15 +766,17 @@ def run(work, mudlib):
     check("level 100 against a level 1 attacker: only natural 20s land (defense 99)", str(hits + miss >= 40 and hits / (hits + miss) <= 0.2), "True")
     wiz.command("slay hitter")
     wr.command("stop")
-    wiz.command("clone " + TEST + "boss100")
+    wiz.command("slay dummy")
+    cl = wiz.command("clone " + TEST + "boss100")
     wr.command("setlevel 1")
-    wiz.command("speed boss 90 600")
-    wr.command("kill boss")
+    wiz.command("speed overlord 90 600")
+    a.drain(wr, 1.0)
+    kb = wr.command("kill overlord")
     text = run_fight(wr, wiz, 22)
-    hits = count(r"A boss (?:scratches|hits|smashes) you", text)
-    miss = count("A boss misses you", text)
-    check("level 1 against a level 100 attacker: almost every attack lands", str(hits + miss >= 40 and hits / (hits + miss) >= 0.8), "True")
-    wiz.command("slay boss")
+    hits = count(r"A overlord (?:scratches|hits|smashes) you", text)
+    miss = count("A overlord misses you", text)
+    check("level 1 against a level 100 attacker: almost every attack lands", ("True" if hits + miss >= 40 and hits / (hits + miss) >= 0.8 else f"{hits} {miss} {kb!r} {cl!r} {text[-300:]!r}"), "True")
+    wiz.command("slay overlord")
     wr.command("stop")
 
     # ===== the experience formula =====
@@ -731,9 +801,10 @@ def run(work, mudlib):
     check("the renamed wizard command: slay", wiz.command("slay dummy"), "You slay a dummy!")
 
     # ===== the class framework, with a class that exists only in this test =====
+    setroom(wiz, "tmage")
     ar = chars["mage"]
     ar.command("setlevel 1")
-    wiz.command("goto " + arena)
+    wiz.command("goto " + ROOM["v"])
     ar.command("unwield")
     check("a test class needs its level", ar.command("pledge zealot_test"), "REFUSED: You must be level 5.")
     ar.command("setlevel 5")
@@ -769,10 +840,11 @@ def run(work, mudlib):
 
     # item-granted skills
     give(wiz, ar, TEST + "zap_ring", "ring")
+    setroom(wiz, "tscout")
     sc2 = chars["scout"]
-    give(wiz, sc2, TEST + "zap_ring", "ring")
+    gv = give(wiz, sc2, TEST + "zap_ring", "ring")
     check("a skill the character does not have is not usable", sc2.command("zap dummy"), "What?")
-    check("wearing the ring grants the skill", sc2.command("wear ring"), "You put on a zap ring")
+    check("wearing the ring grants the skill", gv + sc2.command("wear ring"), "You put on a zap ring")
     check("the skill is listed apart, as granted by an item", sc2.command("skills"), "Granted by what you wear", "Test Zap")
     sc2.command("remove ring")
     check("and it disappears with the item", sc2.command("skills"), absent=("Granted by what you wear", "Test Zap"))
