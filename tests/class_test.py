@@ -107,7 +107,7 @@ FILES = {
     "hitter": creature("THitter", "Hitter", "hitter", 100000, (1, 1), react=1.0, rec=0.0),
     "boss100": creature("TOverlord100", "Overlord", "overlord", 100000, (1, 1), level=100, react=1.0, rec=0.0),
     "winder": creature("TWinder", "Winder", "winder", 100000, (1, 1), react=4.0,
-                       action='AddCombatAction("blow", "Slow Blow", preparation: 2.0, recovery: 1.0, windUp: "raises a huge club", strike: "brings the club down!");'),
+                       action='AddCombatAction("blow", "Slow Blow", preparation: 2.0, recovery: 5.0, windUp: "raises a huge club", strike: "brings the club down!");'),
     # items
     "armor_medium": armor("TMediumArmor", "Medium Mail", "mail", "medium"),
     "armor_heavy": armor("THeavyPlate", "Heavy Plate", "plate", "heavy"),
@@ -730,12 +730,16 @@ def run(work, mudlib):
         st = wiz.command("stat winder")
         if "recovering" not in st:
             continue
+        t_before = time.time()
         before = num(r"ready in ([\d.]+) s", st)
         sen.send("tstagger winder")
-        a.quiet(sen, 0.2)
+        so2 = a.quiet(sen, 5.0)
+        t_after = time.time()
         after = num(r"ready in ([\d.]+) s", wiz.command("stat winder"))
+        if before is not None and after is not None:
+            before, after = before + t_before, after + t_after
         break
-    check("stagger on a ready or recovering creature pushes its Ready Time back by 2 seconds", ("True" if before is not None and after is not None and after > before + 1.0 else f"{before} {after}"), "True")
+    check("stagger on a ready or recovering creature pushes its Ready Time back by 2 seconds", ("True" if before is not None and after is not None and after > before + 1.0 else f"{before} {after} {locals().get('so2')!r}"), "True")
     wiz.command("slay winder")
     sen.command("stop")
     sen.command("speed me 0")

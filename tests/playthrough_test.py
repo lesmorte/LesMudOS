@@ -42,6 +42,29 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import smoke_test as h  # noqa: E402
 import area_test as a  # noqa: E402
 
+# The archetype the hero chooses at creation (LESMUDOS_ARCHETYPE; the default is the warrior).
+ARCH = os.environ.get("LESMUDOS_ARCHETYPE", "warrior")
+h.DEFAULT_ARCHETYPE = ARCH
+# What the five archetypes start with (CLASS_SYSTEM.md section 7): HP, gold, Stamina, Mana, the kit (as `i` lists it), the weapon
+# and shield worn at the start, and the weapons the hero prefers, best first (word to wield, name in the inventory).
+ARCH_START = {
+    "warrior": dict(hp=40, gold=10, stamina=100, mana=20, kit=["a rusty sword", "a small shield"], shield=True,
+                    prefer=[("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("sword", "rusty sword")]),
+    "scout": dict(hp=26, gold=10, stamina=100, mana=20, kit=["a hunting bow", "an iron dagger"], shield=False,
+                  prefer=[("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("bow", "hunting bow"), ("dagger", "iron dagger")]),
+    "priest": dict(hp=26, gold=15, stamina=40, mana=100, kit=["a novice's mace", "a minor healing potion"], shield=False,
+                   prefer=[("mace", "novice's mace"), ("staff", "apprentice's staff")]),
+    "mage": dict(hp=24, gold=15, stamina=30, mana=100, kit=["an apprentice's staff", "a minor healing potion"], shield=False,
+                 prefer=[("dagger", "enchanted dagger"), ("staff", "apprentice's staff"), ("dagger", "iron dagger")]),
+    "adventurer": dict(hp=30, gold=20, stamina=70, mana=70, kit=["a training spear", "a trail ration"], shield=False,
+                       prefer=[("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("spear", "training spear")]),
+}
+SPEC = ARCH_START[ARCH]
+# Armor and shield access, for what the hero buys.
+CAN_SHIELD = ARCH in ("warrior", "priest", "adventurer")
+CAN_AXE = ARCH in ("warrior", "adventurer")
+CAN_LONGSWORD = ARCH in ("warrior", "scout", "adventurer")
+
 ROOT = h.ROOT
 check = h.check
 BRIEF = open(os.path.join(ROOT, "docs", "areas", "vincents-hollow.md")).read()
@@ -162,7 +185,9 @@ class Hero:
         self.deadline = deadline
         self.c = h.Client(name)
         self.welcome = self.c.read_until("> ")
-        self.hp, self.max_hp, self.level, self.gold, self.xp = 30, 30, 1, 25, 0
+        self.hp, self.max_hp, self.level, self.gold, self.xp = SPEC["hp"], SPEC["hp"], 1, SPEC["gold"], 0
+        self.stamina = self.mana = 0
+        self.max_stamina, self.max_mana = SPEC["stamina"], SPEC["mana"]
         self.pos = None
         self.entered = {}
         self.died = False
@@ -198,6 +223,8 @@ class Hero:
             self.entered[room] = time.time()
         for m in re.finditer(r"HP (\d+)/(\d+)", text):
             self.hp, self.max_hp = int(m.group(1)), int(m.group(2))
+        for m in re.finditer(r"Stamina (\d+)/(\d+)   Mana (\d+)/(\d+)", text):
+            self.stamina, self.max_stamina, self.mana, self.max_mana = (int(m.group(i)) for i in range(1, 5))
         return text
 
     def cmd(self, line, timeout=30):
@@ -285,12 +312,13 @@ class Hero:
     def equip_all(self):
         items = self.inventory()
         low = " | ".join(items).lower()
-        for word, name in WEAPONS:
+        for word, name in SPEC["prefer"]:
             if name in low:
-                if not any(name in i.lower() and "(wielded)" in i for i in items):
-                    self.cmd("wield " + ("overseer axe" if name == "overseer's axe" else name if name in ("enchanted dagger",) else word))
-                break
-        for name, word in (("small shield", "shield"), ("guild initiate's helm", "helm"), ("leather commander's vest", "vest"), ("magical trinket", "trinket")):
+                if any(name in i.lower() and "(wielded)" in i for i in items):
+                    break
+                if "You wield" in self.cmd("wield " + ("overseer axe" if name == "overseer's axe" else name if name in ("enchanted dagger",) else word)):
+                    break
+        for name, word in ((("small shield", "shield"),) if CAN_SHIELD else ()) + ( ("guild initiate's helm", "helm"), ("leather commander's vest", "vest"), ("magical trinket", "trinket")):
             for item in items:
                 if name in item.lower() and "(worn)" not in item:
                     self.cmd("wear " + word)
@@ -354,9 +382,11 @@ class Run:
 
         hero = self.hero = Hero("hero", self.stats, deadline=self.t_hard)
         check("a new character arrives in the Village Square", hero.welcome, "Welcome, Hero.", "Village Square", ROOMS["Village Square"]["desc"])
-        check("score of a new character", hero.score(), "Level 1   Experience 0 (100 more for level 2)", "HP 30/30   Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "You have no quests.")
+        check("score of a new character", hero.score(), "Level 1   Experience 0 (100 more for level 2)", f"Calling {ARCH.capitalize()}",
+              f"HP {SPEC['hp']}/{SPEC['hp']}   Stamina {SPEC['stamina']}/{SPEC['stamina']}   Mana {SPEC['mana']}/{SPEC['mana']}   Gold {SPEC['gold']}", "You have no quests.")
         check("quests of a new character", hero.cmd("quests"), "You have no quests.")
-        check("a new character carries nothing", hero.cmd("i"), "You are empty-handed.")
+        check("a new character carries the starting kit of the calling", hero.cmd("i"), *SPEC["kit"])
+        check("the calling's skills are listed", hero.cmd("skills"), "Skills" if ARCH != "adventurer" else "Appraise")
 
     def walk_everything(self):
         """Every exit of every room, in both directions, with the brief's room, exit and occupant lists."""
@@ -434,7 +464,7 @@ class Run:
             quote(line)
         check("the Village Sign reads as in the brief", clean(hero.cmd("read sign")), sign_text)
         check("look at the sign", hero.cmd("look at sign"), "carved wooden sign", "You could read it.")
-        check("the road north is not open yet", hero.cmd("north"), "not yet open to travelers")
+        check("the road north is closed without the travel pass", hero.cmd("north"), "need a travel pass")
         # Village Gate
         at("Village Gate")
         check("look at the Village Guard", hero.cmd("look at guard"), "square-jawed man")
@@ -470,8 +500,8 @@ class Run:
         check("Blacksmith Torren's line is the brief's", hero.cmd("talk torren"),
               'Torren says: "%s"' % quote("Quality steel saves lives. Cheap steel fills graveyards."))
         shop = hero.cmd("browse")
-        check("Torren sells the five items of the brief", shop, "A rusty sword", "10 gold", "A training spear", "8 gold", "An iron dagger", "6 gold",
-              "A woodcutter axe", "18 gold", "A small shield", "12 gold")
+        check("Torren sells the five items of the brief and the three new ones", shop, "A rusty sword", "10 gold", "A training spear", "8 gold", "An iron dagger", "6 gold",
+              "A woodcutter axe", "18 gold", "A small shield", "12 gold", "A novice's mace", "An apprentice's staff", "A hunting bow")
         self.longsword_listed = "fine iron longsword" in shop
         if self.longsword_listed:
             check("the rare Fine Iron Longsword is on the rack at 60 gold", shop, "A fine iron longsword", "60 gold")
@@ -502,11 +532,9 @@ class Run:
     def first_purchases(self):
         hero = self.hero
         hero.go(SMITH)
-        text = hero.cmd("buy sword")
-        check("buy the Rusty Sword for 10 gold", text, "You buy a rusty sword for 10 gold.")
-        check("wield it", hero.cmd("wield sword"), "You wield a rusty sword.")
-        check("the shield is too dear for now (15 gold left)", hero.cmd("buy axe"), "You cannot afford that. It costs 18 gold.")
-        check("score shows the sword", hero.score(), "Damage 9-14", "weapon: a rusty sword", "Gold 15", "Reaction Time 3.0 (base 2.5, a rusty sword +0.5). Your attack takes 8.0 seconds.")
+        if SPEC["gold"] < 18:
+            check("the axe is too dear for the starting gold", hero.cmd("buy axe"), "You cannot afford that. It costs 18 gold.")
+        check("the kit is worn and wielded at the start", hero.score(), "weapon: " + SPEC["kit"][0])
         hero.go(GUILD)
         check("accept Clear the Cellar", hero.cmd("accept cellar"), "Quest accepted: Clear the Cellar.", "The goblins answer to an Overseer. Kill him, and come back and report.")
         check("accepting again is refused politely", hero.cmd("accept cellar"), "You have already taken \"Clear the Cellar\".")
@@ -524,12 +552,12 @@ class Run:
         text = ""
         while not hero.died and time.time() - t0 < 240:
             text += hero.pump(0.5)
-        check("two goblin elite guards kill a level 1 character", text, "You have died!", "You wake in the Guest Rooms, bruised but alive. The healer's fee costs you 1 gold.")
+        check("two goblin elite guards kill a level 1 character", text, "You have died!", "You wake in the Guest Rooms, bruised but alive. The healer's fee costs you %d gold." % max(1, SPEC["gold"] // 10))
         hero.settle(1.0)
         hero.died = False
         check("the dead character wakes in the Guest Rooms", hero.pos, GUEST)
         check("the belongings stayed with the corpse", hero.cmd("i"), "You are empty-handed.")
-        check("score after the death", hero.score(), "HP 30/30   Gold 14", "nothing equipped", "Active quests: Clear the Cellar")
+        check("score after the death", hero.score(), f"HP {SPEC['hp']}/{SPEC['hp']}", "Gold %d" % (SPEC["gold"] - max(1, SPEC["gold"] // 10)), "nothing equipped", "Active quests: Clear the Cellar")
         self.stats["notes"].append("deliberate death in the Overseer Hall at level 1 (2 elite guards)")
 
     def second_player_sees_locked_corpse(self):
@@ -537,7 +565,7 @@ class Run:
         thief.go("Overseer Hall")
         text = thief.cmd("look")
         check("a second player sees the corpse of Hero", text, "The corpse of Hero is here.")
-        check("the lock is announced", thief.cmd("look at corpse of hero"), "It holds: a rusty sword, a gold coin.", "only those involved may touch it.")
+        check("the lock is announced", thief.cmd("look at corpse of hero"), "It holds:", SPEC["kit"][0], "only those involved may touch it.")
         check("loot is refused for a second player", thief.cmd("loot corpse of hero"), "The corpse of Hero is not yours to loot yet.")
         check("taking one thing is refused too", thief.cmd("get sword from corpse of hero"), "The corpse of Hero is not yours to loot yet.")
         thief.go(START)
@@ -558,20 +586,21 @@ class Run:
         room = hero.death_room or "Overseer Hall"
         hero.go(room)
         text = hero.cmd("loot corpse of hero")
-        check("the dead player loots the corpse and gets the sword and the fee back", text, "You take a rusty sword from the corpse of Hero.") if "rusty sword" in text else check("loot", text, "You take")
+        check("the dead player loots the corpse and gets the kit and the fee back", text, "You take " + SPEC["kit"][0] + " from the corpse of Hero.")
         text += hero.cmd("loot corpse of hero")
         hero.go("Goblin Barracks") if room == "Overseer Hall" else None
         self.note("corpse fetched from the " + room)
         hero.go(START)
         hero.equip_all()
         hero.score()
-        check("the sword is wielded again and the gold is back", "Damage 9-14 gold %s" % ("15" if hero.gold >= 15 else hero.gold), "Damage 9-14", "gold 15")
+        check("the weapon is wielded again and the gold is back", "weapon: %s gold %s" % (SPEC["kit"][0] in hero.score(), hero.gold), "weapon: True", "gold %d" % SPEC["gold"])
 
     def shield_and_ale(self):
         hero = self.hero
-        hero.go(SMITH)
-        check("buy the Small Shield", hero.cmd("buy shield"), "You buy a small shield for 12 gold.")
-        check("wear it", hero.cmd("wear shield"), "You put on a small shield.")
+        if CAN_SHIELD and not SPEC["shield"] and hero.gold >= 14:
+            hero.go(SMITH)
+            check("buy the Small Shield", hero.cmd("buy shield"), "You buy a small shield for 12 gold.")
+            check("wear it", hero.cmd("wear shield"), "You put on a small shield.")
         hero.go(TAVERN)
         check("buy a mug of ale", hero.cmd("buy ale"), "You buy a mug of ale for 2 gold.")
         check("drink it", hero.cmd("drink ale"), "You drink the ale down in a few long swallows.")
@@ -644,12 +673,12 @@ class Run:
         items = hero.inventory()
         low = " ".join(items)
         keep = 6  # a bed and a little more
-        if hero.gold >= keep + 12 and "small shield" not in low:
+        if CAN_SHIELD and hero.gold >= keep + 12 and "small shield" not in low:
             hero.go(SMITH)
             hero.cmd("buy shield")
             hero.cmd("wear shield")
             hero.score()
-        if hero.gold >= keep + 13 and "woodcutter axe" not in low and "longsword" not in low and "overseer" not in low:
+        if CAN_AXE and hero.gold >= keep + 13 and "woodcutter axe" not in low and "longsword" not in low and "overseer" not in low:
             hero.go(SMITH)
             text = hero.cmd("buy axe")
             if "You buy a woodcutter axe" in text:
@@ -663,7 +692,7 @@ class Run:
             hero.score()
         if "enchanted dagger" in low or "magical" in low:
             pass
-        if hero.gold >= keep + 60 and "overseer" not in low and "longsword" not in low:
+        if CAN_LONGSWORD and hero.gold >= keep + 60 and "overseer" not in low and "longsword" not in low:
             hero.go(SMITH)
             if "fine iron longsword" in hero.cmd("browse"):
                 text = hero.cmd("buy longsword")
@@ -712,9 +741,11 @@ class Run:
         text = hero.cmd("kill " + word)
         self.stats["fights"] += 1
         last_combat = time.time()
+        skill_state = {"t": 0.0, "blessed": False}
         while True:
             time.sleep(0.45)
             out = hero.cmd("hp")
+            self.skill_step(word, skill_state, boss, enemies)
             if boss:
                 self.boss_text += text + out
             text = ""
@@ -774,6 +805,34 @@ class Run:
                 word = self.target_word(enemies)
                 hero.cmd("kill " + word)
                 last_combat = time.time()
+
+    def skill_step(self, word, state, boss, enemies):
+        """What a player of this calling does besides the basic attack: the mage bolts, the scout strikes, the priest heals and
+        blesses, the warrior bashes when Stamina is plentiful. A skill typed while not ready is queued for the next ready moment."""
+        hero = self.hero
+        now = time.time()
+        if now - state["t"] < 3.0 or hero.died:
+            return
+        line = None
+        if ARCH == "mage" and hero.mana >= 16:
+            line = "bolt " + word
+        elif ARCH == "scout" and hero.stamina >= 25:
+            line = "strike " + word
+        elif ARCH == "priest":
+            if hero.hp <= hero.max_hp * 0.5 and hero.mana >= 25:
+                line = "heal"
+            elif boss and not state["blessed"] and hero.mana >= 50:
+                state["blessed"] = True
+                line = "bless"
+        elif ARCH == "warrior" and hero.stamina >= 60:
+            line = "bash " + word
+        if line:
+            state["t"] = now
+            text = hero.cmd(line)
+            self.stats["skills_used"] = self.stats.get("skills_used", 0) + 1
+            if "skill_checked" not in self.stats and ("not ready" in text or "You" in text):
+                self.stats["skill_checked"] = True
+                check("a skill typed in a fight is accepted (used, or queued for the next ready moment)", text, "You")
 
     @staticmethod
     def target_word(enemies):
@@ -1058,10 +1117,11 @@ class Run:
         hero.cmd("drop orders")  # first the cellar quest alone; the orders are handed in afterwards
         text = hero.cmd("report")
         check("report: Clear the Cellar is completed", text, "Quest complete: Clear the Cellar!", "Rowan pays you 50 gold and gives you a Guild Initiate's Helm.", "You gain 150 experience.",
-              "New quest: Recover the Overseer's Orders.")
+              "Rowan gives you a travel pass.", "New quest: Recover the Overseer's Orders.")
         hero.score()
         check("150 XP and 50 gold arrived", "%d %d" % (hero.xp - xp0 - 0, hero.gold - gold0), "%d %d" % (hero.xp - xp0, hero.gold - gold0))
         check("the helm", hero.cmd("wear helm"), "You put on a Guild Initiate's helm.")
+        check("the travel pass is in the pack", hero.cmd("i"), "a travel pass")
         check("quests: one done, one active", hero.cmd("quests"), "Active quests: Recover the Overseer's Orders", "Completed quests: Clear the Cellar")
         xp1, gold1 = hero.xp, hero.gold
         hero.cmd("get orders")
@@ -1081,6 +1141,13 @@ class Run:
         check("Rowan's line after the quests", hero.cmd("talk rowan"), "We have learned a great deal, and I like none of it.")
         check("the board shows both contracts done", hero.cmd("read board"), "Clear the Cellar (done)", "Recover the Overseer's Orders (done)")
         check("report again: nothing left to do", hero.cmd("report"), "You have done everything I asked.")
+        hero.go("North Road")
+        text = hero.cmd("north")
+        check("with the pass the road north is open: the hero walks out onto the Vale Road", text, "The Vale Road")
+        check("score names the new area and the region", hero.score(), "Area The Vale Road   Region Greenvale")
+        check("the road beyond is not open yet", hero.cmd("north"), "not open yet")
+        hero.cmd("south")
+        hero.go(GUILD)
         check("score at the end", hero.score(), "Completed quests: Clear the Cellar, Recover the Overseer's Orders", "weapon:", "head: a Guild Initiate's helm")
         # the village after the first quest
         hero.go(TAVERN)
