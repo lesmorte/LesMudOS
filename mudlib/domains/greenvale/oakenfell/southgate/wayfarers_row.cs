@@ -13,7 +13,7 @@ public class SgWayfarersRow : Room
         ResetSeconds = 120;
 
         AddDetail("signs,sign,painted signs", "The signs are hand-painted and bright: a boot for the cobbler, a pillow for a boarding house, a bowl for the cookshop, two crossed swords for the Free Lodge. Several are older than the shops beneath them.");
-        AddDetail("cart,food cart,stove", "The food cart is a brazier and a griddle on iron wheels, with a canvas awning that smells of woodsmoke and hot fat. Pies are stacked on the shelf behind its owner.");
+        AddDetail("food cart,brazier,stove", "The food cart is a brazier and a griddle on iron wheels, with a canvas awning that smells of woodsmoke and hot fat. Pies are stacked on the shelf behind its owner.");
         AddDetail("boarding houses,houses,lodgings,beds", "Narrow houses three or four storeys high, with rooms let by the night or the week to anyone with coin. Their doors stand open, and their landladies lean from windows to watch the street.");
         AddDetail("cobbles,street,kerb", "The cobbles are worn into shallow troughs down the middle, where the carts run, and polished by feet at the edges. Little has changed for a hundred years but the filth.");
         AddDetail("banner,banners,company banner", "Over the Free Lodge door hangs a red-and-black banner showing a coin on a field of black. It has been mended with lighter thread in several places.");

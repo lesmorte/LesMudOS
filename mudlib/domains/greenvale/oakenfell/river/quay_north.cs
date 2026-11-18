@@ -16,7 +16,7 @@ public class RvQuayNorth : Room
         AddDetail("pots,lobster pots,heap,weed,traps", "A heap of wicker traps stacked beside the wall, green with weed and rattling as the wind passes through them.");
         AddDetail("awning,fish market,market,west", "A broad tarred awning shelters the fish market to the west, with slabs, tubs of ice and a hand-painted board over the opening. It is easy to find by the smell.");
         AddDetail("yard,shipyard,gate,east,shipwright", "A wide plank gate stands open on the shipwright's yard to the east. Behind it you can see timber stacks, a steaming box and a great curved hull on the slip.");
-        AddDetail("water-gate,water gate,gate,arch,wall,north,rivergate", "To the north the quay narrows to a steep stone arch, with a portcullis raised above it, where the Mere passes out through the city wall. A small landing runs beside it for the watch.");
+        AddDetail("water-gate,water gate,arch,wall,north,rivergate", "To the north the quay narrows to a steep stone arch, with a portcullis raised above it, where the Mere passes out through the city wall. A small landing runs beside it for the watch.");
         AddDetail("gulls,gull,birds,roofs", "Gulls stand on every roof and post, quarrelling over scraps with their wings half-spread.");
 
         AddSpawn("/domains/greenvale/oakenfell/river/npc/sal_cobb");

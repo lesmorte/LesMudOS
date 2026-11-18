@@ -86,16 +86,23 @@ public class Npc : Living
     public virtual string? Ask(ObjectRef who, string topic)
     {
         Spoken(who);
-        topic = topic.ToLowerInvariant();
+        topic = topic.ToLowerInvariant().Trim();
+        // The best match wins, not the first: an exact key; else the longest key found in what was asked
+        // ("oakenfell" before "oak"); else the first key that contains what was asked (three letters or more).
+        var best = -1; var bestLength = 0; var loose = -1;
         for (var i = 0; i < topicKeys.Count; i++)
         {
             foreach (var raw in topicKeys[i].Split(','))
             {
                 var key = raw.Trim();
-                if (key != "" && (topic.Contains(key) || (topic.Length >= 3 && key.Contains(topic))))
-                    return Speech(topicLines[i]);
+                if (key == "") continue;
+                if (key == topic) return Speech(topicLines[i]);
+                if (topic.Contains(key) && key.Length > bestLength) { best = i; bestLength = key.Length; }
+                else if (loose < 0 && topic.Length >= 3 && key.Contains(topic)) loose = i;
             }
         }
+        if (best >= 0) return Speech(topicLines[best]);
+        if (loose >= 0) return Speech(topicLines[loose]);
         return $"{Name} shrugs. \"I can't tell you anything about that.\"";
     }
 

@@ -355,6 +355,12 @@ public abstract class Room : MudObject
         foreach (var desc in order)
         {
             var n = counts[desc];
+            // A stack names its own count ("3 wolf skins"): it reads as a plural and is never counted again.
+            if (desc.Length > 0 && char.IsDigit(desc[0]))
+            {
+                for (var i = 0; i < n; i++) text.Append(Cap(desc) + " are here.\n");
+                continue;
+            }
             text.Append(n == 1 ? Cap(desc) : $"{(n < CountWords.Length ? CountWords[n] : n.ToString())} {Plural(desc)}");
             text.Append(n == 1 ? " is here.\n" : " are here.\n");
         }
