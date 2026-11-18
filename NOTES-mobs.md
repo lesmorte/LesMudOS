@@ -2,15 +2,14 @@
 
 Task: 31 creature files in mudlib/domains/greenvale/corridor/mob/, the pace model and a proposed experience table in tests/balance_sim.py, docs/CORRIDOR_BALANCE.md, tests/corridor_mob_test.py. Work only in /home/claude/wt-mobs. No push, merge or branch switch. Do not edit existing mudlib/src files.
 
-## Done
-- Simulator engine extended (timed effects on both sides, slow/stagger/weaken/buff/summon actions, player stagger, creature dodge). Roster of 31 draft in `CORRIDOR` (tests/balance_sim.py).
+## Done (all three parts)
+- Part 1: pace model (`python3 tests/balance_sim.py pace 250`), table 6:5400 7:12000 8:21700 9:34100 10:49300, tail T10*(n/10)^3.
+- Part 2: 31 creature files; build 0 warnings 0 errors; load_check all OK.
+- Part 3: `check` compares the 31 files; `corridor` prints the win table; tests/corridor_mob_test.py (port 4966-4969) passes; docs/CORRIDOR_BALANCE.md written.
 
 ## Next
-1. Tune bosses by hand (HP, specials), remove outliers (priest vs fast hitters), pace model, xp numbers, table.
-2. Generate the 31 .cs files (generator lives in /tmp/mobs_work, not committed), `check` mode for corridor files.
-3. docs/CORRIDOR_BALANCE.md, tests/corridor_mob_test.py, load_check.
+- Nothing on this branch. The lead applies section 4.3 of the doc to /std/adventurer.cs ExperienceFor, and the tests named there.
 
-## Assumptions (so far)
-- Gear: village only. Warrior/Adventurer Overseer's axe + small shield; Scout Fine Iron Longsword; Priest Novice's Mace + shield; Mage Iron Dagger. All: vest 3 + helm 1, +5 HP trinket.
-- Player HP regen 1 HP/10 s (adventurer x1.5); potions 15 gold for 20 HP.
-- 4 s per room, 3 rooms between kills, 3 s to loot.
+## Assumptions
+- Gear: village only. 4 s per room, 3 rooms between kills, 3 s to loot, regen 0.1 HP/s, potions 15 gold per 20 HP, havens by level (see the doc, 2.3).
+- Low animals (rabbit, deer, fox) pay token XP, a deliberate deviation from "more than the village".

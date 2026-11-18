@@ -32,6 +32,7 @@ import heapq
 import os
 import random
 import re
+import math
 import sys
 from dataclasses import dataclass
 
@@ -1059,12 +1060,157 @@ def check_mudlib():
     if num(text, "HealAmount") != POTION_HEAL:
         problems.append("healing potion: HealAmount differs")
     check_classes(os.path.join(root, "..", ".."), problems, num)
+    check_corridor(problems)
     for p in problems:
         print("MISMATCH", p)
     print("simulation numbers match the mudlib" if not problems else f"{len(problems)} mismatch(es)")
     return not problems
 
 
+
+def check_corridor(problems):
+    """Compare the 31 corridor creatures in CORRIDOR with their files in domains/greenvale/corridor/mob."""
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "mudlib", "domains", "greenvale", "corridor", "mob")
+
+    def num(text, field):
+        m = re.search(rf"\b{field} = (-?[\d.]+);", text)
+        return float(m.group(1)) if m else 0.0
+
+    def arr(text, name):
+        m = re.search(r"\[\] " + name + r" = (?:new \w+\[0\]|\{([^}]*)\});", text)
+        if not m or m.group(1) is None:
+            return []
+        return [x.strip().strip('"') for x in m.group(1).split(",") if x.strip()]
+
+    for k in CORRIDOR:
+        path = os.path.join(root, k.id + ".cs")
+        if not os.path.exists(path):
+            problems.append(f"{k.id}: file missing")
+            continue
+        text = open(path, encoding="utf-8").read()
+        want = {"Level": k.level, "MaxHp": k.hp, "DamageMin": k.dmg[0], "DamageMax": k.dmg[1], "ToHit": k.to_hit,
+                "Armor": k.armor, "XpValue": k.xp, "BaseReaction": k.reaction, "Dodge": k.dodge,
+                "GoldMin": k.gold[0], "GoldMax": k.gold[1]}
+        for field, value in want.items():
+            if num(text, field) != value:
+                problems.append(f"{k.id}: {field} is {num(text, field)} in the file, {value} in the simulation")
+        if ("Aggressive = true;" in text) != k.aggressive:
+            problems.append(f"{k.id}: Aggressive differs")
+        got = {}
+        for m in re.finditer(r'AddCombatAction\("(\w+)", "([^"]+)", preparation: ([\d.]+), recovery: ([\d.]+)([^;]*?)\);', text):
+            rest = m.group(5)
+            mult = re.search(r"damageMultiplier: (\d+)", rest)
+            kind = re.search(r'kind: "(\w+)"', rest)
+            got[m.group(1)] = [m.group(2), float(m.group(3)), float(m.group(4)), int(mult.group(1)) if mult else 1,
+                               kind.group(1) if kind else "attack", 1.0, 0]
+        for m in re.finditer(r'FindAction\("(\w+)"\)!\.(DamageFactor|ToHitBonus) = (-?[\d.]+);', text):
+            if m.group(1) in got:
+                got[m.group(1)][5 if m.group(2) == "DamageFactor" else 6] = float(m.group(3))
+        have = {a.id: [a.name, a.prep, a.rec, a.mult, a.kind, a.factor, a.hit] for a in k.acts}
+        if got != have:
+            problems.append(f"{k.id}: actions {got} in the file, {have} in the simulation")
+        opening, cycle, trig = arr(text, "opening"), arr(text, "cycle"), arr(text, "triggerHp")
+        tact = arr(text, "triggerAction")
+        first, cyc, at = k.pattern
+        if not cycle and not opening and len(k.acts) == 1:
+            cycle = list(cyc)   # a creature with one attack has no pattern arrays
+        if opening != list(first) or cycle != list(cyc) or [(int(a), b) for a, b in zip(trig, tact)] != [(a, b) for a, b in at]:
+            problems.append(f"{k.id}: pattern {opening}/{cycle}/{list(zip(trig, tact))} in the file, {k.pattern} in the simulation")
+        # the on-hit effects of the special attacks
+        fa, fk, fv, fs, fm = (arr(text, n) for n in ("fxAction", "fxKind", "fxValue", "fxSeconds", "fxMods"))
+        fgot = sorted((a, kind, float(v), int(sec), mods) for a, kind, v, sec, mods in zip(fa, fk, fv, fs, fm))
+        fwant = []
+        for a in k.acts:
+            if a.kind != "attack" or not a.fx:
+                continue
+            parts = a.fx.split(":")
+            if parts[0] == "slow":
+                fwant.append((a.id, "slow", float(parts[1]), int(parts[2]), ""))
+            elif parts[0] == "stagger":
+                fwant.append((a.id, "stagger", float(parts[1]), 0, ""))
+            else:
+                fwant.append((a.id, "weaken", 0.0, int(parts[2]), parts[1].replace(",", ";")))
+        if fgot != sorted(fwant):
+            problems.append(f"{k.id}: on-hit effects {fgot} in the file, {sorted(fwant)} in the simulation")
+        lgot = sorted((i, int(c)) for i, c in re.findall(r'AddLoot\("/domains/\w+/obj/(\w+)", (\d+)\)', text))
+        if lgot != sorted((i, c) for i, c in k.loot):
+            problems.append(f"{k.id}: loot {lgot} in the file, {sorted(k.loot)} in the simulation")
+
+def corridor_table(runs=400, only=()):
+    """Win rate (percent) of each calling against each corridor creature at the low, middle and high level of its band, with the
+    gap of the furthest calling from the five-calling average. Bosses are fought with CORRIDOR_POTIONS potions."""
+    random.seed(11)
+    print(f"{'creature':22}{'L':>3} {'pl':>3}  " + "".join(f"{a[:3]:>5}" for a in ARCHS) + f" {'avg':>5} {'spread':>7} {'sec':>5} {'hp lost':>8}")
+    worst = 0.0
+    for k in CORRIDOR:
+        if only and k.id not in only:
+            continue
+        lo, hi = k.band
+        for lv in sorted({lo, hi, (lo + hi) // 2}):
+            ws, ts, ls = [], [], []
+            for c in ARCHS:
+                r = cfight(c, lv, k.id, CORRIDOR_POTIONS if k.boss else 0, runs)
+                ws.append(r["win"] * 100)
+                ts.append(r["sec"])
+                ls.append(r["lost"])
+            avg = sum(ws) / len(ws)
+            spread = max(abs(w - avg) for w in ws)
+            if not k.boss:
+                worst = max(worst, spread)
+            print(f"{k.id:22}{k.level:>3} {lv:>3}  " + "".join(f"{w:5.0f}" for w in ws)
+                  + f" {avg:5.0f} {spread:7.0f} {sum(ts) / 5:5.0f} {sum(ls) / 5:8.0f}")
+    print(f"largest gap to the average on an ordinary creature: {worst:.0f} points")
+
+PACE_HOURS = {5: 2.0, 6: 2.5, 7: 3.0, 8: 3.5, 9: 4.0}   # the target hours to leave level L, for a perfect-knowledge player
+TAIL_P = 3.0                                              # exponent of the proposed continuation beyond level 10
+
+
+def xp_to_reach(n, table, p=TAIL_P):
+    """The proposed experience needed to reach level n (modifier 1.0): the old formula to 5, the table 6..10, a power law after."""
+    if n <= 5:
+        return 0 if n <= 1 else 50 * n * (n - 1)
+    if n <= 10:
+        return table[n]
+    return int(round(table[10] * (n / 10.0) ** p))
+
+
+def pace_report(runs=250):
+    """Experience per hour by calling and level, the proposed experience table and what it implies. About four minutes."""
+    random.seed(31)
+    callings = list(ARCHS)
+    variants = (("perfect (own gold buys potions, rests in a haven)", {}), ("no haven", {"haven": False}),
+                ("no potions", {"funded": False}), ("neither", {"funded": False, "haven": False}))
+    res = {}
+    for name, kw in variants:
+        print(f"experience per hour, {name}")
+        print("level " + "".join(f"{c[:6]:>9}" for c in callings) + "   harmonic mean")
+        for lv in range(5, 10):
+            row = [pace_mix(c, lv, runs, **kw)["xph"] for c in callings]
+            res[(name, lv)] = row
+            print(f"{lv:>5} " + "".join(f"{x:9.0f}" for x in row) + f"{len(row) / sum(1 / x for x in row):12.0f}")
+    perfect = variants[0][0]
+    hm = {lv: 5 / sum(1 / x for x in res[(perfect, lv)]) for lv in range(5, 10)}
+    table = {5: 1000}
+    for lv in range(5, 10):
+        table[lv + 1] = int(round((table[lv] + PACE_HOURS[lv] * hm[lv]) / 100.0) * 100)
+    print("\nproposed experience to reach level:", {k: v for k, v in table.items() if k >= 6})
+    print("hours per level and calling at the perfect pace (and cumulative from level 5):")
+    tot = [0.0] * 5
+    for lv in range(5, 10):
+        hrs = [(table[lv + 1] - table[lv]) / x for x in res[(perfect, lv)]]
+        tot = [a + b for a, b in zip(tot, hrs)]
+        print(f"  {lv}->{lv + 1} " + "".join(f"{h:7.2f}" for h in hrs) + f"   mean {sum(hrs) / 5:5.2f}   cumulative " + "".join(f"{t:7.2f}" for t in tot))
+    # the experience per hour beyond 9: a power law fitted to the harmonic means
+    q = math.log(hm[9] / hm[5]) / math.log(9 / 5)
+    print(f"\nexperience per hour fitted: {hm[9]:.0f} x (L/9)^{q:.2f}; continuation exponent p={TAIL_P}")
+    for p in (2.5, 3.0, TAIL_P):
+        out = []
+        hours = 15.0
+        for n in range(10, 100):
+            hours += (xp_to_reach(n + 1, table, p) - xp_to_reach(n, table, p)) / (hm[9] * ((n / 9.0) ** q))
+            if n + 1 in (11, 20, 50, 100):
+                out.append(f"level {n + 1}: T={xp_to_reach(n + 1, table, p):,} xp, {hours:,.0f} h")
+        print(f"  p={p}: " + "; ".join(out))
 
 
 def check_classes(read_root, problems, num):
@@ -1088,6 +1234,12 @@ def stage_weapon(arch, level):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "check":
         sys.exit(0 if check_mudlib() else 1)
+    if len(sys.argv) > 1 and sys.argv[1] == "corridor":
+        corridor_table(int(sys.argv[2]) if len(sys.argv) > 2 else 400, tuple(sys.argv[3:]))
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "pace":
+        pace_report(int(sys.argv[2]) if len(sys.argv) > 2 else 250)
+        return
     runs = int(sys.argv[1]) if len(sys.argv) > 1 else 1500
     random.seed(20260101)
     names = list(ARCHS)
