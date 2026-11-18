@@ -4,13 +4,13 @@ public class RvSergeantCalla : Npc
 {
     public override void Create()
     {
-        Name = "Calla Wren";
-        Ids.Add("calla");
-        Ids.Add("wren");
+        Name = "Maren Stroud";
+        Ids.Add("maren");
+        Ids.Add("stroud");
         Ids.Add("sergeant");
         Ids.Add("duty sergeant");
         Ids.Add("ranger");
-        ShortDesc = "Calla Wren, the duty sergeant";
+        ShortDesc = "Maren Stroud, the duty sergeant";
         LongDesc = "A lean, sun-browned woman in a long green cloak, with a pale shield sewn on the breast and a scar across the back of one hand. Her eyes never quite settle on you; they keep returning to the door.";
         Level = 4;
         MaxHp = 55;
@@ -24,7 +24,7 @@ public class RvSergeantCalla : Npc
         AddTopic("assembly,allies,consortium,hall of legends,friends", "We work with the Assembly, which gives us our charge, and the Hall of Legends, which gives us recruits. The Consortium pays for the roads they travel, and so we are on good terms.");
         AddTopic("enemies,rivals,raiders,monsters,thorn pact,thorn", "Monsters, raiders and what the old reports call extremists of the Thorn Pact. That last I will not discuss further. Not with strangers.");
         AddTopic("join,recruit,enlist,work,help,quest", "We have no work for strangers at this desk yet. The Rangers know their own, and we will know you when you have earned it. Keep your eyes open on the road and come back.");
-        AddEmote("Calla Wren runs a finger down a patrol report and makes a note in the margin.", 6);
-        AddEmote("Calla Wren glances at the door, at the map and back at the door.", 5);
+        AddEmote("Maren Stroud runs a finger down a patrol report and makes a note in the margin.", 6);
+        AddEmote("Maren Stroud glances at the door, at the map and back at the door.", 5);
     }
 }

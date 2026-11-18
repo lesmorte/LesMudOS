@@ -19,6 +19,6 @@ public class RvMereBridge : Room
         AddDetail("market,west,north rows,noise", "To the west the noise of the market rolls out of the North Rows: a fishwife's shriek, a hammer, a barrel organ with one broken note.");
 
         AddSpawn("/domains/greenvale/oakenfell/river/npc/wat_ellery");
-        AddSpawn("/domains/greenvale/oakenfell/river/npc/nan_hobb");
+        AddSpawn("/domains/greenvale/oakenfell/river/npc/agnes_pell");
     }
 }

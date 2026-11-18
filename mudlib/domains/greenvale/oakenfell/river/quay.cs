@@ -21,6 +21,6 @@ public class RvQuay : Room
 
         AddSpawn("/domains/greenvale/oakenfell/river/npc/corm_teague");
         AddSpawn("/domains/greenvale/oakenfell/river/npc/brit_halloran");
-        AddSpawn("/domains/greenvale/oakenfell/river/npc/harbormaster_isolde");
+        AddSpawn("/domains/greenvale/oakenfell/river/npc/harbormaster_rosamund");
     }
 }

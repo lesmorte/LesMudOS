@@ -15,6 +15,6 @@ public class RvShipwright : Room
         AddDetail("tools,adze,adzes,mallets,mallet,caulking,pitch,tar,pot", "Adzes, mallets, caulking irons and a smoking pitch-pot hang from hooks or lie at the foot of the slip, each worn smooth by a master's hand.");
         AddReadable("plans,plan,door,hut,notice", "The plans pinned to the office door are covered in figures. A card in a big, square hand reads:\n\"BARGES BUILT, REPAIRED AND CAULKED. Seasoned timber only. No orders taken for sea-going vessels; the Mere is quite enough river for us.\"", "Plans and a card are pinned to the door of the office. You could {cmd}read{/} them.");
 
-        AddSpawn("/domains/greenvale/oakenfell/river/npc/osric_fenn");
+        AddSpawn("/domains/greenvale/oakenfell/river/npc/gunnar_holt");
     }
 }

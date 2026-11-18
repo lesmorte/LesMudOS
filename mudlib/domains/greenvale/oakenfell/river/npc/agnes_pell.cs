@@ -4,12 +4,12 @@ public class RvNanHobb : Npc
 {
     public override void Create()
     {
-        Name = "Nan Hobb";
-        Ids.Add("nan");
-        Ids.Add("hobb");
+        Name = "Agnes Pell";
+        Ids.Add("agnes");
+        Ids.Add("pell");
         Ids.Add("angler");
         Ids.Add("woman");
-        ShortDesc = "Nan Hobb, an angler";
+        ShortDesc = "Agnes Pell, an angler";
         LongDesc = "A broad, weather-reddened woman sitting astride the parapet with a short rod, a flask and a basket full of silver perch. She looks inordinately pleased with herself.";
         Level = 1;
         MaxHp = 15;
@@ -19,7 +19,7 @@ public class RvNanHobb : Npc
         AddTopic("fish,fishing,perch,bait,secret", "Worms from behind the Fish Market, and patience from my late husband. Neither costs a thing.");
         AddTopic("wat,ellery,old wat", "Wat is a fine man and a wretched angler. Thirty years, and I have never seen him land anything bigger than his hat.");
         AddTopic("river,mere,barges,quay", "Go down the stair at the north end for the quay. You will see the barges, the crane and the harbormaster, who is polite until a barge is left in the wrong place.");
-        AddEmote("Nan Hobb hauls in a silver perch, unhooks it with a flick, and drops it in her basket with a satisfied grunt.", 6);
-        AddEmote("Nan Hobb takes a long swig from her flask and smacks her lips.", 5);
+        AddEmote("Agnes Pell hauls in a silver perch, unhooks it with a flick, and drops it in her basket with a satisfied grunt.", 6);
+        AddEmote("Agnes Pell takes a long swig from her flask and smacks her lips.", 5);
     }
 }

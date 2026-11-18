@@ -26,6 +26,6 @@ public class FdSquare : Room
 
         AddSpawn("/domains/greenvale/oakenfell/founders/npc/town_crier");
         AddSpawn("/domains/greenvale/oakenfell/founders/npc/dalla_pryce");
-        AddSpawn("/domains/greenvale/oakenfell/founders/npc/tomas_wick");
+        AddSpawn("/domains/greenvale/oakenfell/founders/npc/tomas_linch");
     }
 }

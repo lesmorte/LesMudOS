@@ -14,7 +14,7 @@ public class RvTradeOffice : Room
         AddDetail("chart,river chart,river,map,mere", "A faded chart of the River Mere, with Oakenfell in the middle, the upper end curling off the wall. Little inked arrows mark the shoals, and a note in the margin reads 'Mind the Hag'.");
         AddReadable("rates,rate card,rate cards,card,notice,board", "A card on the wall reads:\n\"RIVER TRADE OFFICE. Freight by barge at the posted rates, by weight and distance. Bills of lading stamped while you wait. Passage for travelers: NOT YET OFFERED. Enquire later.\"", "A neatly lettered rate card hangs by the counter. You could {cmd}read{/} it.");
 
-        AddSpawn("/domains/greenvale/oakenfell/river/npc/lenna_sorrel");
-        AddSpawn("/domains/greenvale/oakenfell/river/npc/hugh_pardew");
+        AddSpawn("/domains/greenvale/oakenfell/river/npc/lenna_quill");
+        AddSpawn("/domains/greenvale/oakenfell/river/npc/giles_pardew");
     }
 }

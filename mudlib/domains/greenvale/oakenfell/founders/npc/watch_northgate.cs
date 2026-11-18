@@ -4,13 +4,13 @@ public class FdWatchNorthgate : Npc
 {
     public override void Create()
     {
-        Name = "Dorrin Pike";
-        Ids.Add("dorrin");
+        Name = "Halvard Pike";
+        Ids.Add("halvard");
         Ids.Add("pike");
         Ids.Add("watchman");
         Ids.Add("watch");
         Ids.Add("guard");
-        ShortDesc = "Dorrin Pike, a city watchman";
+        ShortDesc = "Halvard Pike, a city watchman";
         LongDesc = "A lean, long-faced watchman in a green surcoat marked with a white oak, a long spear in his hand and an old horn at his belt. His eyes are never still, and he has the habit of looking at the horizon when speaking to you.";
         Level = 3;
         MaxHp = 40;
@@ -20,7 +20,7 @@ public class FdWatchNorthgate : Npc
         AddTopic("road,northern road,north,beyond,mountains", "The Northern Road runs up toward the mountains, and there is not much on it but farms, then forest, then rock. It is not yet open to travelers. The watch has had no orders to let anyone pass.");
         AddTopic("watch,gate,duty,city watch", "We keep the gates, we keep the peace in the streets, and we keep our opinions to ourselves. It is a quiet post. Mostly.");
         AddTopic("old stone street,elder lane,lane,oak", "Elder Lane is a dead end, friend. A fine place for a quiet walk, and not much else.");
-        AddEmote("Dorrin Pike shifts his spear and looks up the Northern Road for a long moment.", 6);
-        AddEmote("Dorrin Pike checks a cart as it rolls through the arch, nods, and waves it along.", 5);
+        AddEmote("Halvard Pike shifts his spear and looks up the Northern Road for a long moment.", 6);
+        AddEmote("Halvard Pike checks a cart as it rolls through the arch, nods, and waves it along.", 5);
     }
 }

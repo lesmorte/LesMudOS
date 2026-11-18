@@ -18,7 +18,7 @@ public class FdOldStoneStreet : Room
         AddDetail("lane,narrow lane,elder lane,west", "A narrow lane ducks off to the west between two of the oldest houses, so low and quiet that it looks more like an alley than a street. Its mouth is shaded by the overhang of the houses.");
         AddReadable("plaque,house plaque,brass plaque,small plaque", "A small brass plaque is bolted beside one of the doors:\n\"Here dwelt Edda Marsh, bellfounder, who cast the first bell of the town. This house was raised in the second generation after the founding and rebuilt after the Burning.\"", "A small brass plaque is bolted beside one of the doorways. You could {cmd}read{/} it.");
 
-        AddSpawn("/domains/greenvale/oakenfell/founders/npc/jory_vance");
-        AddSpawn("/domains/greenvale/oakenfell/founders/npc/widow_perrin");
+        AddSpawn("/domains/greenvale/oakenfell/founders/npc/garrett_vance");
+        AddSpawn("/domains/greenvale/oakenfell/founders/npc/widow_thackeray");
     }
 }

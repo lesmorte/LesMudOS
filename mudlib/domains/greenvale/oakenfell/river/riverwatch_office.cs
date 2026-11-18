@@ -16,6 +16,6 @@ public class RvRiverwatchOffice : Room
         AddDetail("cloaks,cloak,rack,green cloaks,boots", "A rack of long green cloaks, mud-stained at the hems and mended in a dozen places, hangs by the door. Beneath it, a row of boots stand dripping.");
         AddReadable("roster,duty roster,patrols,list,notice", "The duty roster nailed up beside the banner lists patrols by road: Crossing Road, Vale Road, Westwood (as far as the second milestone), the Northern Road, the river. Every column has a name in it. A line at the foot has been underlined twice:\n\"All hands to report anything moving on the roads that should not be.\"", "A duty roster is nailed up beside the banner. You could {cmd}read{/} it.");
 
-        AddSpawn("/domains/greenvale/oakenfell/river/npc/sergeant_calla");
+        AddSpawn("/domains/greenvale/oakenfell/river/npc/sergeant_maren");
     }
 }

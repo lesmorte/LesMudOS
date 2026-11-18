@@ -4,12 +4,12 @@ public class RvHughPardew : Npc
 {
     public override void Create()
     {
-        Name = "Hugh Pardew";
-        Ids.Add("hugh");
+        Name = "Giles Pardew";
+        Ids.Add("giles");
         Ids.Add("pardew");
         Ids.Add("clerk");
         Ids.Add("senior clerk");
-        ShortDesc = "Hugh Pardew, a senior clerk";
+        ShortDesc = "Giles Pardew, a senior clerk";
         LongDesc = "A heavy, balding man with a drooping moustache, sleeves protectors on his forearms and a large brass key on a chain at his belt. He sighs often and always at the paperwork.";
         Level = 1;
         MaxHp = 18;
@@ -19,7 +19,7 @@ public class RvHughPardew : Npc
         AddTopic("passage,downriver,ticket,travelers,travel", "No, no. We do not sell passage. Not yet. There are barges, certainly, but they carry grain and fish, not people. The Assembly will want a form for it first.");
         AddTopic("assembly,forms,form,paperwork,stamp", "The Assembly requires a form for everything. I have a form for forms. It is a rather good form.");
         AddTopic("consortium,merchants,caravan,trade", "The Consortium books most of our freight, and they pay promptly. We keep them happy. Everything else follows from that.");
-        AddEmote("Hugh Pardew sighs gustily and turns a page.", 6);
-        AddEmote("Hugh Pardew polishes his brass key on his sleeve, looks at it, and polishes it again.", 4);
+        AddEmote("Giles Pardew sighs gustily and turns a page.", 6);
+        AddEmote("Giles Pardew polishes his brass key on his sleeve, looks at it, and polishes it again.", 4);
     }
 }
