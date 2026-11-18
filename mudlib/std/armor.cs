@@ -22,7 +22,7 @@ public class Armor : Item
     public string QueryCategory() => Slot == "shield" || Slot == "trinket" ? Slot : Category;
 
     public override string Appraisal() =>
-        $"{Cap(Short() ?? Name)}: {(QueryCategory() == "" ? "armor" : QueryCategory() + (Slot == "shield" || Slot == "trinket" ? "" : " armor"))}, slot {Slot}. Armor {ArmorValue}, max HP +{MaxHpBonus}, reaction modifier {Num(ReactionMod)}. Worth {Value} gold." +
+        $"{Cap(Short() ?? Name)}: {(QueryCategory() == "" ? "armor" : QueryCategory() + (Slot == "shield" || Slot == "trinket" ? "" : " armor"))}, slot {Slot}. Armor {ArmorValue}, max HP +{MaxHpBonus}, reaction modifier {Num(ReactionMod)}. Worth {QueryValue()} gold." + AppraisalQuality() +
         (Magic != "" ? $" Magical property: {Magic}." : " It holds no magic.") + "\n";
 
     public int QueryMaxHpBonus() => MaxHpBonus;

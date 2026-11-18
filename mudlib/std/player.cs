@@ -94,6 +94,16 @@ public class Player : Adventurer
         if (ready && PreviousObject() is { ProgramPath: "/std/player" }) Save();
     }
 
+    /// <summary>
+    /// Called by another player's body right after it gave this player something (the give command), so that both save
+    /// files agree. Only a player body acting for its own command may ask.
+    /// </summary>
+    public void SaveAfterTrade()
+    {
+        var caller = PreviousObject();
+        if (ready && caller is { IsClone: true, ProgramPath: "/std/player" } && caller != Self && caller == ThisPlayer()) Save();
+    }
+
     private void Save()
     {
         PrepareSave();
@@ -316,7 +326,7 @@ public class Player : Adventurer
         Save();
         Write("Goodbye.\n");
         Say($"{Name} leaves the game.\n");
-        ReleaseInventory(); // the carried items are saved by path and come back at the next login
+        ReleaseInventory(); // the carried items are saved as records (path and state) and come back at the next login
         Destruct(); // the connection closes
         return true;
     }
@@ -324,7 +334,7 @@ public class Player : Adventurer
     private bool CmdHelp(string args)
     {
         Write(
-            "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} THING, {cmd}drop{/} THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
+            "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
             "          {cmd}who{/}, {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
             "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/}, {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/}),\n" +
@@ -332,7 +342,8 @@ public class Player : Adventurer
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "Corpses:   {cmd}loot{/} [CORPSE], {cmd}get{/} THING (or all) from CORPSE, {cmd}look in{/} CORPSE\n" +
             "Gear:      {cmd}wield{/} THING, {cmd}unwield{/}, {cmd}wear{/} THING, {cmd}remove{/} THING, {cmd}eat{/}/{cmd}drink{/} THING\n" +
-            "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING\n" +
+            "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING,\n" +
+            "           {cmd}give{/} [N|all] THING {cmd}to{/} PLAYER\n" +
             "Town:      {cmd}browse{/}, {cmd}buy{/} THING, {cmd}sell{/} THING, {cmd}value{/} THING (in a shop), {cmd}quests{/},\n" +
             "           {cmd}accept{/} QUEST and {cmd}report{/} (in the Adventurers Guild)\n" +
             "Colour:    command names like these are highlighted; {cmd}ansi off{/} turns colour off, {cmd}ansi on{/} turns it on.\n");
