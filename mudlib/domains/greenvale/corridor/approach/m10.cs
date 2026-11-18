@@ -17,6 +17,5 @@ public class OaM10 : Room
         AddDetail("carts,traffic,road", "Carts, wagons and strings of pack mules crowd the road below, and walkers thread between them. The traffic thickens toward the gate, and you can hear the cries of drovers from here.");
         AddDetail("smoke,bells", "A haze of woodsmoke hangs above the rooftops, gold in the light. Under it, thin and sweet, you hear bells ringing the hour.");
         AddDetail("aqueduct,old aqueduct,broken arches,arches", "Far to the west, the line of the old aqueduct strides across the fields toward the city and stops, its last arches ending in the open air a mile short of the walls. Whatever it was built to serve, it was not Oakenfell.");
-        AddReadable("boulder,stone carvings,carved names,names", "Rhosyn and Tam, the spring they came. Old Garrick, home at last. J.M., 'I did not know it was so big.' Three notches and an arrow: SOUTHGATE, BEST PIES. Beneath all these, in deeper letters: THE ROAD IS SHORT, IF YOU KEEP WALKING.", "Names and short messages are scratched into the boulder. You could {cmd}read{/} them.");
     }
 }

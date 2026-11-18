@@ -17,7 +17,7 @@ public class OaW3 : Room
         AddDetail("stakes,palisade,fence,sharpened stakes", "A ring of fire-hardened stakes, angled outward and chest-high. They are not meant to stop an army, only to make a charge awkward and a retreat loud.");
         AddDetail("lookout,lookout post,poles,post,platform", "A platform of poles lashed in a tree-fork, with a ladder, high enough to watch both the south track and the glint of the aqueduct. A horn hangs from its rail.");
         AddDetail("carcass,deer,game,branch", "A fat roe deer hangs from a branch, gutted and skinned, still dripping. The bandits eat well.");
-        AddReadable("ledger,tally,tally board,board,toll book", "Scratched in charcoal on a board, in a crabbed hand:\nTHE TOLL BOOK\n Wool, 40 bales, Row 2, third Tuesday: let go, escort.\n Salt wagons, 6, no escort: take.\n Consortium clerk with the cash chest: 'Reeve', pays on the Rise. Not yet.\n Do not touch the Rangers' signal post. Ever.\nMonthly share to the Boss, paid in kind.", "A charcoal tally has been scratched on a board by the largest tent. You could {cmd}read{/} it.");
+        AddReadable("ledger,tally,tally board,board,toll book", "Scratched in charcoal on a board, in a crabbed hand:\nTHE TOLL BOOK\n Wool, 40 bales, Row 2, the 15th of each month: let go, escort.\n Salt wagons, 6, no escort: take.\n Consortium clerk with the cash chest: pays on the Rise. Not yet.\n Do not touch the Rangers' signal post. Ever.\nMonthly share to the Boss, paid in kind.", "A charcoal tally has been scratched on a board by the largest tent. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/greenvale/corridor/mob/bandit_leader");
         AddSpawn("/domains/greenvale/corridor/mob/highway_bandit", 3);

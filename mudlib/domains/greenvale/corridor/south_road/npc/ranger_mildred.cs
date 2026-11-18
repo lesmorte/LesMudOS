@@ -24,7 +24,7 @@ public class SrRangerMildred : Npc
         AddTopic("wolf,wolves,stray,fox", "Strays this year, thin and hungry. The big packs are deeper in the wood. Keep to the road, and keep a light at night.");
         AddTopic("bandit,bandits,lookout,sheepfold", "There's been a watcher on the old sheepfold ridge for a fortnight. I've been up and he's been gone. I don't like it.");
         AddTopic("thorn,thorn pact,hawthorn,ring,markings", "There are hawthorn rings and rag-knots in some of the pastures. Old custom, the farmers say, or something else. I don't ask. I keep the road, and I leave the rest where it lies.");
-        AddTopic("outpost,wood,eldergreen,north,forest", "Beyond the bridge the road narrows and the trees begin. By the third day it's real forest. You'll see sunlight for a while yet. Count it, and keep going.");
+        AddTopic("outpost,wood,eldergreen,north,forest", "Beyond the bridge the road narrows and the trees begin. By the second day it's real forest. You'll see sunlight for a while yet. Count it, and keep going.");
         AddEmote("Mildred scans the far bank and the treeline.", 8);
         AddEmote("The ranger runs a thumb along her bowstring and nods to herself.", 6);
     }

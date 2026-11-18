@@ -16,7 +16,7 @@ public class SrW3 : Room
         AddDetail("forest,wood,eldergreen,dark band,north", "A long wall of trees, solid and dark, across the whole northern sky. Nothing in the farmland has prepared you for the size of it.");
         AddDetail("flour,dust,flour dust", "Fine white flour on everything, floating in the sunbeams. It tickles the nose and writes on the sleeves.");
         AddDetail("slope,tangle,thorn,west,western slope", "The western slope falls away into rough ground, thorn and bramble and the dark mouths of burrows. Sheep do not go there, and the shepherds do not like to talk about why.");
-        AddReadable("tally,tally board,board,mill board", "A board by the mill door carries chalked tallies and a few lines of a miller's hand:\n\"Tuesday: 14 sacks Pollard's barley. Wednesday: wind from the north-west, good milling. Thursday: wolf took a lamb from Bram's flock at dusk. Friday: mended the tail pole.\"", "A chalked tally board hangs on the mill wall. You could {cmd}read{/} it.");
+        AddReadable("tally,tally board,board,mill board", "A board by the mill door carries chalked tallies and a few lines of a miller's hand:\n\"The 12th: 14 sacks Pollard's barley. The 13th: wind from the north-west, good milling. The 14th: wolf took a lamb from Bram's flock at dusk. The 15th: mended the tail pole.\"", "A chalked tally board hangs on the mill wall. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/greenvale/corridor/south_road/npc/millhand_hamo");
     }

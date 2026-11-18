@@ -24,6 +24,7 @@ public class OaTollGuard : Npc
         AddTopic("assembly,guard,guards,duty", "The Assembly pays me to stand at the pole and be seen. Half of my work is being seen.");
         AddTopic("rangers,riverwatch,ranger", "The Rangers walk the road to the city, and the road is safer for it. There is one at the River Bend, a day-and-night sort of woman. Ever vigilant, they say.");
         AddTopic("aqueduct,arches,old arches", "Old arches. Older than the city, older than the road. My granddad said the Assembly keeps the one over the road standing out of habit.");
+        AddTopic("hale,hale's acre,family,farm,name", "Hale's Acre, down by the Hollow? That was ours, my grandmother's people. The well failed and they walked away from it, and the thorn has it now. I have never seen the place. A man can carry a name a long way from the ground it came from.");
         AddEmote("Oswin Hale shifts his spear and scans the hedgerow.", 8);
         AddEmote("The guard waves a wagon through and mutters something about axle grease.", 6);
     }

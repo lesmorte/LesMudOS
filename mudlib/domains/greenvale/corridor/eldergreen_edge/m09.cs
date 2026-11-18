@@ -5,14 +5,14 @@ public class EeRiverwatchOutpost : Room
     public override void Create()
     {
         ShortDesc = "The Riverwatch Outpost";
-        LongDesc = "A stout palisade of oak stakes encloses a trampled yard on the east side of the road, its gate standing open and a green pennant with a pale shield stirring on a tall pole above. Inside are a log-built bunkhouse, a lean-to stable, a rack of bows and a watch platform from which a ranger scans the road in both directions. The yard smells of horses, boot-grease, woodsmoke and stew, and the noise of the forest seems to stop at the stakes. A board of notices stands beside the gate where every traveler must pass it.";
+        LongDesc = "A stout palisade of oak stakes encloses a trampled yard on the east side of the road, its gate standing open and a green-and-grey pennant with a silver eye stirring on a tall pole above. Inside are a log-built bunkhouse, a lean-to stable, a rack of bows and a watch platform from which a ranger scans the road in both directions. The yard smells of horses, boot-grease, woodsmoke and stew, and the noise of the forest seems to stop at the stakes. A board of notices stands beside the gate where every traveler must pass it.";
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m08";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m10";
         Safe = true;
         ResetSeconds = 120;
 
         AddDetail("palisade,stakes,wall,gate,yard", "The palisade is a hedge of sharpened oak stakes taller than a mounted man, lashed with iron bands and weathered grey. The gate is open by day, and a ranger stands near it, nodding to every traveler.");
-        AddDetail("pennant,pole,flag,banner,shield,pale shield", "A green pennant bearing a pale shield flies from a tall pole. It is the same device that hangs in the Rangers' office in Oakenfell, and beneath it, painted on the pole in white, are the words \"Ever Vigilant\".");
+        AddDetail("pennant,pole,flag,banner,eye,silver eye", "A green-and-grey pennant bearing a silver eye flies from a tall pole. It is the same device that hangs in the Rangers' office in Oakenfell, and beneath it, painted on the pole in white, are the words \"Ever Vigilant\".");
         AddDetail("bunkhouse,bunks,barracks,building", "The bunkhouse is a long low building of logs with a stone chimney and a row of shuttered windows. Through the open door come the smells of stew and wet wool.");
         AddDetail("stable,lean-to,horses,horse", "Five rangers' horses stand in the lean-to, mud to the hocks and stamping at flies. They are small, hairy, sensible animals bred for the forest.");
         AddDetail("bows,bow,rack,arrows,longbows", "A rack of longbows stands by the bunkhouse door with a barrel of arrows beside it, fletched in green and white. None of them is for sale.");

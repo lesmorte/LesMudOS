@@ -31,7 +31,7 @@ public class OaFarmWife : Shopkeeper
         AddEmote("Griselda Hobday shifts the baby on her hip and straightens a row of loaves.", 8);
         AddEmote("The farm wife shouts across the green, \"Adelina! Emmeline! Not in the pond!\"", 8);
 
-        AddStock("/domains/greenvale/corridor/approach/obj/bread_and_cheese", 4);
+        AddStock("/domains/greenvale/corridor/south_road/obj/bread_and_cheese", 3);
         AddStock("/domains/greenvale/corridor/approach/obj/baked_apple", 2);
     }
 }

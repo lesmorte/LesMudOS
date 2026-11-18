@@ -4,7 +4,7 @@ public class HwW3 : Room
 {
     public override void Create()
     {
-        ShortDesc = "The Dryad Spring";
+        ShortDesc = "The Dryad's Spring";
         LongDesc = "A spring wells up in a hollow between four great roots, and its water is so clear that the stones and the pale sand at the bottom seem to float. Round it the moss is cropped short, and there are hoof-prints in the mud at the edge, and the prints of birds, and the prints of something large and soft-footed. A deer lifts its head from the far side as you come, looks at you, and goes on drinking. Everything here is quiet, and nothing is afraid. A deer path leads east into the bracken.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/w2";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/w4";

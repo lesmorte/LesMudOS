@@ -217,7 +217,7 @@ Hidden way to the secret room: from `d2`, `east`, to `s1`. A cache of burned jou
 | `m11` | The Heartwood Road, the Last Great Oak | main | 7-8 | south m10; north `/domains/greenvale/corridor/approach/m01` |
 | `w1` | The Mossgate Ruins, the Inner Court | woodland | 8-9 | west m03; north w2 |
 | `w2` | The Uprooted Giant | woodland | 8-9 | south w1; north w3 |
-| `w3` | The Dryad Spring | woodland | 8-9 | south w2; north w4; east d1 |
+| `w3` | The Dryad's Spring | woodland | 8-9 | south w2; north w4; east d1 |
 | `w4` | The Ritual Stones | woodland | 8-9 | south w3; north w5 |
 | `w5` | The Stalker's Run | woodland | 8-9 | south w4; west m07; east d3 |
 | `d1` | The Ancient Wolf's Dell | deep | 9-10 | west w3; north d2 |
