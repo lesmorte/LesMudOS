@@ -239,4 +239,4 @@ The full list is in [DESIGN.md](docs/DESIGN.md#13-proof-of-concept-status).
 
 ## License
 
-No license has been chosen yet. Until one is added, the code is published for reading only.
+The repository holds two things under different terms. The LesMudOS engine (the driver, the standard objects, the tests and the deployment scripts) is under the MIT license: see [LICENSE](LICENSE). The game built on it, Legends of Hollowmere (its world, classes, factions and design documents), is all rights reserved: see [LICENSE-GAME.md](LICENSE-GAME.md). [LICENSING.md](LICENSING.md) lists which files are which.
