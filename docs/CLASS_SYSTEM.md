@@ -8,16 +8,18 @@ Status: design. Nothing here is implemented yet.
 
 1. All 15 advanced classes are selectable, each with a title and two signature abilities. Full skill trees come later.
 2. The level cap is raised and the levelling formula is data-driven. New areas will follow.
-3. The All Hall is reached by a new exit from the Adventurers Guild in Vincent's Hollow. The exit is locked. The key is given for completing the quest to kill the goblin boss ("Clear the Cellar").
+3. The All Hall is not in Vincent's Hollow. It is in the first major city of Green Vale, which is not yet named or built. Completing "Clear the Cellar" grants a travel pass that lets a character leave the main area of Vincent's Hollow and travel toward that city. (This replaces an earlier decision to put the All Hall behind a locked door in the village's Adventurers Guild.) See [WORLD.md](WORLD.md).
 4. Existing characters choose an archetype at their next login.
 
 ## 2. Stages
 
 | Stage | Contents |
 |---|---|
-| A | Stamina and mana; the skill and spell mechanism on the combat clock; critical, dodge and block rolls; timed effects; equipment categories and access; the class framework and levelling formula; archetype choice at creation and for existing characters; the five archetypes with their starting features and equipment |
-| B | The All Hall, its key and its five hallmasters; advancement at level 5; the 15 advanced classes with two signature abilities each, including allies (summons and companions) |
-| C | Balance simulation per archetype, tests, a play-through per archetype, documentation |
+| A | Stamina and mana; the skill and spell mechanism on the combat clock; critical, dodge and block rolls; timed effects; equipment categories and access; the class framework and levelling formula, with level-scaled attack and defense; archetype choice at creation and for existing characters; the five archetypes with their starting features and equipment; the travel pass and the road out of the village; region and area names; balance and a play-through per archetype |
+| B | The first major city of Green Vale (needs a name and an area brief from the owner), with the All Hall and its five hallmasters; advancement at level 5; the 15 advanced classes with two signature abilities each, including allies (summons and companions) |
+| C | Balance simulation and tests for the advanced classes; a play-through that ends with travelling to the city and pledging a class |
+
+Stage B cannot start until the city exists. Stage A does not depend on it.
 
 Subclasses (level 10) and prestige classes exist in the framework from stage A but have no content and cannot be chosen.
 
@@ -185,11 +187,19 @@ Chosen at character creation, after the password, from a short in-character pres
 
 (The wizard-only `heal` command is renamed `restore` to free the word for the Priest's spell.)
 
-## 8. The All Hall
+## 8. The travel pass and the All Hall
 
-- **Location.** A new exit `north` from the Adventurers Guild leads to the All Hall. It is locked with the All Hall Key.
-- **The key.** Guildmaster Rowan gives it with the rewards for "Clear the Cellar". A character who has completed the quest and is not carrying the key (an existing character, or one who lost it) is given another when they `report` or `talk` to him.
-- **The hall.** A great chamber built by the founders of the five callings, older than the village around it. One room in this pass, safe, with five hallmasters, one per archetype, and a wall of fifteen banners (readable) that describes every advanced class in a line.
+### The travel pass (stage A)
+
+- **What it is.** A pass of safe conduct issued by the Adventurers Guild of Vincent's Hollow: an item, carried like any other.
+- **How it is earned.** Guildmaster Rowan gives it with the rewards for "Clear the Cellar". A character who has completed the quest and is not carrying a pass (an existing character, or one who lost it with a corpse) is given another when they `report` or `talk` to him.
+- **What it does.** The road north out of Vincent's Hollow, on the North Road, is closed to anyone without a pass, with a refusal in keeping with the village (the wilds are no place for the untested). With the pass, the way is open.
+- **What lies beyond, for now.** One new area, the Vale Road, in Green Vale: a short stretch of road north of the village, a single room in this stage, from which the road continues toward the city and is not yet open. It is not part of the village and is not safe.
+
+### The All Hall (stage B)
+
+- **Location.** In the first major city of Green Vale, reached by the Vale Road. The city needs a name and an area brief.
+- **The hall.** A great chamber built by the founders of the five callings. One room in its first form, safe, with five hallmasters, one per archetype, and a wall of fifteen banners (readable) that describes every advanced class in a line.
 - **Hallmasters.** Each speaks for one archetype: `talk` gives their welcome, and `ask <hallmaster> about <class>` describes each of their three advanced classes, what it gains, and what it costs in experience. They answer other archetypes' members politely and send them to the right hallmaster.
 - **Choosing.** A level 5 character says `pledge <class>` to the hallmaster of their own archetype. The hallmaster states plainly that the choice is permanent and names what will be gained; `pledge <class>` a second time within a minute completes it, with a short ceremony the room sees. Below level 5 the hallmaster says to return when ready. A character who already has an advanced class is refused.
 - **On choosing.** The character gains the class title (shown in `who` and `score`), the two signature abilities, the added equipment access, and guild membership (recorded as the guild id; guild content comes later). Everything from the archetype is kept.
@@ -273,5 +283,5 @@ Everything already built: the combat clock, corpses and the vault, quests, shops
 
 - The simulation gains archetypes and advanced classes. Target: each of the five archetypes can complete Vincent's Hollow solo by level 5, with win rates against the boss within the band already used (roughly 50-75% for a prepared level 4-5 character), and no archetype more than about 15 points better or worse than the average. Caster archetypes are expected to lean on their spells and run out of Mana in long fights; that is intended, and the numbers are tuned so they are not helpless when they do.
 - Advanced classes cannot be fought with in the Hollow beyond repeating the dungeon at level 5, so their abilities are tested for correctness, not for balance against content that does not exist yet.
-- Tests: creation with each archetype; an existing character being asked at login; every starting feature; equipment access refusals; resources and regeneration; dodge, block and critical rolls with controlled test creatures; timed effects expiring; stagger; the key from Rowan including re-issue; the locked door; each hallmaster; the two-step pledge and its refusals; every one of the 30 signature features; allies' lifetimes and credit; the experience formula and the Spellblade modifier; a class file added in the test's temporary mudlib being selectable without touching other files; persistence of all of it.
-- The play-through is run once per archetype. Each must complete both quests solo without wizard help, then obtain the key, enter the All Hall and pledge an advanced class.
+- Tests: creation with each archetype; an existing character being asked at login; every starting feature; equipment access refusals; resources and regeneration; dodge, block and critical rolls with controlled test creatures; timed effects expiring; stagger; the travel pass from Rowan including re-issue; the closed road with and without the pass; (stage B and C:) each hallmaster; the two-step pledge and its refusals; every one of the 30 signature features; allies' lifetimes and credit; the experience formula and the Spellblade modifier; a class file added in the test's temporary mudlib being selectable without touching other files; persistence of all of it.
+- The play-through is run once per archetype. Each must complete both quests solo without wizard help, receive the travel pass and walk out onto the Vale Road. From stage C it continues to the city and pledges an advanced class.
