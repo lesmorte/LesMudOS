@@ -12,6 +12,15 @@
     <NoWarn>$(NoWarn);CS8618;CS8603;CS8602;CS8604;CS8600;CS8601;CS8625</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <!--
+      Wizards write their own rooms, creatures and items under wiz/ at run time.
+      Those files are compiled by the driver in the game, not by this project:
+      a duplicate class name or a sandbox-only construct there must not break
+      `dotnet build` (or CI).
+    -->
+    <Compile Remove="wiz/**" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Mirrors the global usings the driver injects into every mudlib file. -->
     <Using Include="System" />
     <Using Include="System.Collections.Generic" />

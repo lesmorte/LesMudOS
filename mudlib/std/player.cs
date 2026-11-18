@@ -12,9 +12,10 @@ public class Player : Adventurer
     private const string WizList = "/secure/wizlist";
 
     // Wizard level needed for each wizard command. Level 0 has none of them.
-    private const int LevelFiles = 1; // pwd, cd, list, cat
-    private const int LevelEdit = 5; // mkdir, edit, copy, move, rename, delete, rmdir
-    private const int LevelSystemFiles = 10; // mkdir, edit, copy, move, rename, delete, rmdir under /secure and /std
+    private const int LevelFiles = 1; // pwd, cd, list, cat; and every changing command inside the wizard's own home
+    private const int LevelEdit = 5; // mkdir, edit, copy, move, rename, delete, rmdir, update outside the wizard's own home (and in other wizards' homes)
+    private const int LevelSystemFiles = 10; // the same under /secure and /std, and for /wiz itself and the home directories in it
+    private const string WizRoot = "/wiz"; // every wizard has a home directory /wiz/<name>
     private const int MaxEditLines = 5000;
     private const int LevelMudstat = 1;
     private const int LevelClone = 3;
@@ -217,6 +218,7 @@ public class Player : Adventurer
         AddAction("shutdown", CmdShutdown);
 
         Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type '{{cmd}}help{{/}}' for commands.\n\n");
+        EnsureHome(); // a wizard whose home is missing gets it back
         EnterWorld(StartRoom);
         ClaimLostProperty();
         Say($"{Name} enters the game.\n");
@@ -340,14 +342,16 @@ public class Player : Adventurer
               "          {cmd}promote{/} <player> <level>   set a lower wizard's level, up to your own\n" +
               "          {cmd}wizards{/}                    list all wizards\n" +
               "          {cmd}pwd{/}                        show the mudlib directory you are in\n" +
-              "          {cmd}cd{/} [<dir>]                 change directory (.. goes up, no argument goes to /)\n" +
+              "          {cmd}cd{/} [<dir>]                 change directory (.. goes up, no argument goes to your home)\n" +
               "          {cmd}list{/} [<dir>]               list a directory (also: ls)\n" +
               "          {cmd}cat{/} <file>                 show a file with line numbers\n" +
               "          {cmd}goto{/} <room path or player> move yourself to a room or to a player\n" +
-              "          {cmd}stat{/} <thing|me|here>       show the numbers of a creature, item or room\n");
+              "          {cmd}stat{/} <thing|me|here>       show the numbers of a creature, item or room\n" +
+              $"          Your home directory is {{cmd}}{HomePath}{{/}}; ~ in a path means it. In your home you may use every file\n" +
+              "          command below, plus update and clone, at any wizard level.\n");
         if (level >= LevelMudstat) Write("          {cmd}mudstat{/}                    driver statistics\n");
-        if (level >= LevelClone) Write("          {cmd}clone{/} <path>               clone an object into your inventory or room\n");
-        if (level >= LevelEdit) Write(
+        Write("          {cmd}clone{/} <path>               clone an object into your inventory or room (level 3 outside your home)\n" +
+              "          {cmd}update{/} <path>              recompile a file and replace the loaded object (level 5 outside your home)\n" +
               "          {cmd}mkdir{/} <dir>                create a directory\n" +
               "          {cmd}edit{/} <file>                create or change a file in the line editor\n" +
               "          {cmd}copy{/} <from> <to>           copy a file (into a directory: same name)\n" +
@@ -355,11 +359,11 @@ public class Player : Adventurer
               "          {cmd}rename{/} <file> <newname>    rename a file within its directory\n" +
               "          {cmd}delete{/} <file>              delete a file, after you confirm (cannot be undone)\n" +
               "          {cmd}rmdir{/} <dir>                remove an empty directory\n" +
-              "                                     (level 10 for files under /secure and /std)\n");
+              "                                     (those seven need level 5 outside your home, and in other wizards' homes;\n" +
+              "                                     level 10 for /secure, /std, /wiz itself and the home directories)\n");
         if (level >= 5) Write("          {cmd}heal{/} [<target>]            restore a creature (or yourself) to full HP\n");
         if (level >= 5) Write("          {cmd}speed{/} <target> <percent> [<seconds>]  haste (positive) or slow (negative) a creature's Reaction Time; 0 clears\n");
         if (level >= 10) Write("          {cmd}smite{/} <target>             kill a creature at once, with kill credit\n");
-        if (level >= LevelUpdate) Write("          {cmd}update{/} <path>              recompile a file and replace the loaded object\n");
         if (level >= LevelShutdown) Write("          {cmd}shutdown{/}                   stop the driver\n");
         return true;
     }
@@ -399,6 +403,7 @@ public class Player : Adventurer
         if (!isPromotion && args != "" && registry.Call<bool>("Bootstrap", args))
         {
             Write("The secret is accepted. You are now a level 10 wizard. Type '{cmd}help{/}'.\n");
+            EnsureHome();
             return true;
         }
         if (!IsWizard(1)) return false;
@@ -409,6 +414,12 @@ public class Player : Adventurer
         }
         var refusal = registry.Call<string>("Promote", words[0], level);
         Write(refusal == null ? $"{Esc(words[0])} is now wizard level {level}.\n" : Esc(refusal) + "\n");
+        if (refusal == null && level >= LevelFiles)
+        {
+            // The new wizard's own body makes the home, from its own name.
+            var promoted = Users().FirstOrDefault(u => string.Equals(u.Call<string>("QueryName"), words[0], StringComparison.OrdinalIgnoreCase));
+            promoted?.Call("PrepareHome");
+        }
         return true;
     }
 
@@ -421,6 +432,8 @@ public class Player : Adventurer
     {
         var parts = new List<string>();
         var start = path.StartsWith("/") ? "" : cwd;
+        // "~" or "~/..." at the start is this player's own home, never anyone else's ("~bob" is just an odd relative name).
+        if (path == "~" || path.StartsWith("~/")) { start = ""; path = HomePath + path.Substring(1); }
         foreach (var part in (start + "/" + path).Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
             if (part == ".") continue;
@@ -440,7 +453,7 @@ public class Player : Adventurer
     private bool CmdCd(string args)
     {
         if (!IsWizard(LevelFiles)) return false;
-        var target = ResolvePath(args == "" ? "/" : args);
+        var target = ResolvePath(args == "" ? "~" : args);
         if (GetDir(target) == null) { Write($"{Esc(target)}: no such directory.\n"); return true; }
         cwd = target;
         Write(Esc(cwd) + "\n");
@@ -472,13 +485,93 @@ public class Player : Adventurer
         return last == "" || last.Contains('.') ? path : path + ".cs";
     }
 
+    // ---- Wizard homes and the one rule about changing files ----
+
+    /// <summary>This player's home directory, /wiz/&lt;name&gt;. The name is the player's own, in lower case; it is never taken from typed text.</summary>
+    private string HomePath => WizRoot + "/" + Name.ToLowerInvariant();
+
     /// <summary>
-    /// The level needed to change a path. The code under /secure and /std is
-    /// what enforces wizard levels, so only the top level may change it.
+    /// Make sure /wiz and this wizard's home exist; tell the wizard in one
+    /// line when the home is created. Does nothing below wizard level 1.
+    /// The player body makes the directory because the master lets only
+    /// player bodies call MakeDir.
     /// </summary>
-    private static int LevelToWrite(string path)
-        // Compared without case: on a case-insensitive file system /STD is /std.
-        => (path + "/").ToUpperInvariant().StartsWith("/SECURE/") || (path + "/").ToUpperInvariant().StartsWith("/STD/") ? LevelSystemFiles : LevelEdit;
+    private void EnsureHome()
+    {
+        if (!ready || QueryWizLevel() < LevelFiles) return;
+        try
+        {
+            MakeDir(WizRoot);
+            if (MakeDir(HomePath))
+                TellObject(Self, $"Your wizard home directory, {{cmd}}{Esc(HomePath)}{{/}}, has been created. Type {{cmd}}cd ~{{/}} to go there; ~ in any path means your home.\n");
+        }
+        catch (MudRuntimeException) { /* the home is retried at the next login or promotion */ }
+    }
+
+    /// <summary>
+    /// Called by another player's body (the promoter's) after this player was
+    /// made a wizard: create the home from this body's own name. Harmless to
+    /// call at any time: it only ever makes this player's own home.
+    /// </summary>
+    public void PrepareHome()
+    {
+        var caller = PreviousObject();
+        if (caller == null || !caller.IsClone || caller.ProgramPath != "/std/player") return;
+        EnsureHome();
+    }
+
+    /// <summary>
+    /// THE rule: why this wizard may not change this path, or null if they may.
+    /// Every command that creates, writes, copies to, moves, renames or removes
+    /// a file or directory asks here, for each path it touches, and the editor
+    /// and delete ask again when they save or confirm.
+    ///
+    ///   /secure, /std                      level 10
+    ///   /wiz, /wiz/&lt;x&gt; (a home itself, or a file directly in /wiz)   level 10 (own home: mkdir only)
+    ///   /wiz/&lt;me&gt;/...                      any wizard (level 1 up)
+    ///   /wiz/&lt;other&gt;/...                   level 5
+    ///   anywhere else                      level 5
+    ///
+    /// Names are compared whole-segment and without case (on a case-insensitive
+    /// file system /WIZ/Bob is /wiz/bob), so bob does not reach bobby's home.
+    /// Paths come from ResolvePath, which has already removed "." and "..".
+    /// </summary>
+    private string? ChangeRefusal(string path, bool makeDir = false)
+    {
+        var level = QueryWizLevel();
+        if (level < LevelFiles) return "You are not a wizard.";
+        var raw = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var segs = raw.Select(x => x.Trim()).ToArray();
+        if (segs.Any(x => x == "." || x == "..")) return "Illegal path.";
+        bool Is(int i, string name) => segs.Length > i && string.Equals(segs[i], name, StringComparison.OrdinalIgnoreCase);
+
+        if (Is(0, "secure") || Is(0, "std"))
+            return level >= LevelSystemFiles ? null : $"You need wizard level {LevelSystemFiles} to change /secure and /std.";
+
+        if (Is(0, "wiz"))
+        {
+            if (level >= LevelSystemFiles) return null;
+            if (segs.Length <= 2)
+            {
+                // The one thing allowed here: creating your own home (it normally exists already). Exact name, not trimmed.
+                if (makeDir && segs.Length == 2 && string.Equals(raw[1], Name, StringComparison.OrdinalIgnoreCase)) return null;
+                return $"You need wizard level {LevelSystemFiles} to change /wiz itself, a home directory (/wiz/<name>) or a file directly in /wiz. Everything under your own home, {Esc(HomePath)}, is yours.";
+            }
+            if (Is(1, Name)) return null;
+            if (level >= LevelEdit) return null;
+            return $"/wiz/{Esc(segs[1])} is another wizard's home. Below wizard level {LevelEdit} you may read it ({{cmd}}list{{/}}, {{cmd}}cd{{/}}, {{cmd}}cat{{/}}) but not change it.";
+        }
+
+        return level >= LevelEdit ? null : $"You need wizard level {LevelEdit} to change anything outside your own home directory, {Esc(HomePath)}.";
+    }
+
+    /// <summary>True if the path is a file or directory inside this wizard's own home (not the home directory itself).</summary>
+    private bool InOwnHome(string path)
+    {
+        var segs = path.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray();
+        return segs.Length >= 3 && segs.All(x => x != "." && x != "..")
+            && string.Equals(segs[0], "wiz", StringComparison.OrdinalIgnoreCase) && string.Equals(segs[1], Name, StringComparison.OrdinalIgnoreCase);
+    }
 
     private static List<string> SplitLines(string text)
     {
@@ -508,10 +601,10 @@ public class Player : Adventurer
 
     private bool CmdMkdir(string args)
     {
-        if (!IsWizard(LevelEdit)) return false;
+        if (!IsWizard(LevelFiles)) return false;
         if (args == "") { NotifyFail("Usage: {cmd}mkdir{/} <dir>"); return false; }
         var target = ResolvePath(args);
-        if (!IsWizard(LevelToWrite(target))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+        if (ChangeRefusal(target, makeDir: true) is { } refused) { Write(refused + "\n"); return true; }
         Write(MakeDir(target) ? $"Created {Esc(target)}/\n" : $"{Esc(target)} already exists.\n");
         return true;
     }
@@ -528,7 +621,7 @@ public class Player : Adventurer
     /// </summary>
     private bool TransferFile(string args, bool move)
     {
-        if (!IsWizard(LevelEdit)) return false;
+        if (!IsWizard(LevelFiles)) return false;
         var verb = move ? "move" : "copy";
         var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length != 2) { NotifyFail($"Usage: {{cmd}}{verb}{{/}} <from> <to>"); return false; }
@@ -537,8 +630,8 @@ public class Player : Adventurer
             var from = ResolveFile(words[0]);
             var to = ResolvePath(words[1]);
             to = GetDir(to) != null ? (to == "/" ? "" : to) + from.Substring(from.LastIndexOf('/')) : ResolveFile(words[1]);
-            var level = move ? Math.Max(LevelToWrite(from), LevelToWrite(to)) : LevelToWrite(to);
-            if (!IsWizard(level)) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+            var refused = (move ? ChangeRefusal(from) : null) ?? ChangeRefusal(to);
+            if (refused != null) { Write(refused + "\n"); return true; }
             var done = move ? RenameFile(from, to) : CopyFile(from, to);
             Write(done ? $"{(move ? "Moved" : "Copied")} {Esc(from)} to {Esc(to)}.\n" : $"{Esc(from)}: no such file.\n");
         }
@@ -555,7 +648,7 @@ public class Player : Adventurer
     /// </summary>
     private bool CmdRename(string args)
     {
-        if (!IsWizard(LevelEdit)) return false;
+        if (!IsWizard(LevelFiles)) return false;
         var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (words.Length != 2) { NotifyFail("Usage: {cmd}rename{/} <file> <newname>"); return false; }
         if (words[1].Contains('/')) { Write("The new name cannot contain '/'. Use {cmd}move{/} to change directory.\n"); return true; }
@@ -565,7 +658,7 @@ public class Player : Adventurer
             // Built directly rather than with ResolvePath, so ".." cannot turn
             // into a parent directory; the driver refuses dot names itself.
             var to = from.Substring(0, from.LastIndexOf('/') + 1) + (words[1].Contains('.') ? words[1] : words[1] + ".cs");
-            if (!IsWizard(Math.Max(LevelToWrite(from), LevelToWrite(to)))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+            if ((ChangeRefusal(from) ?? ChangeRefusal(to)) is { } refused) { Write(refused + "\n"); return true; }
             Write(RenameFile(from, to) ? $"Renamed {Esc(from)} to {Esc(to)}.\n" : $"{Esc(from)}: no such file.\n");
         }
         catch (MudRuntimeException refusal)
@@ -582,13 +675,13 @@ public class Player : Adventurer
     /// </summary>
     private bool CmdDelete(string args)
     {
-        if (!IsWizard(LevelEdit)) return false;
+        if (!IsWizard(LevelFiles)) return false;
         args = args.Trim();
         if (args == "") { NotifyFail("Usage: {cmd}delete{/} <file>"); return false; }
         try
         {
             var file = ResolveFile(args);
-            if (!IsWizard(LevelToWrite(file))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+            if (ChangeRefusal(file) is { } refused) { Write(refused + "\n"); return true; }
             if (!IsFile(file))
             {
                 // "delete sub" looks for sub.cs, but the wizard may have meant the directory sub.
@@ -612,7 +705,7 @@ public class Player : Adventurer
         var reply = answer.Trim().ToLowerInvariant();
         if (reply != "y" && reply != "yes") { Write("Not deleted.\n"); return; }
         // Checked again here: the level may have changed while the question was open.
-        if (!IsWizard(LevelToWrite(file))) { Write("You may no longer delete that file. Not deleted.\n"); return; }
+        if (ChangeRefusal(file) != null) { Write("You may no longer delete that file. Not deleted.\n"); return; }
         if (messagesShown != asked) { Write($"Other messages arrived after the question, so {Esc(file)} was not deleted. Type {{cmd}}delete{{/}} again.\n"); return; }
         try
         {
@@ -647,11 +740,11 @@ public class Player : Adventurer
     /// </summary>
     private bool CmdRmdir(string args)
     {
-        if (!IsWizard(LevelEdit)) return false;
+        if (!IsWizard(LevelFiles)) return false;
         args = args.Trim();
         if (args == "") { NotifyFail("Usage: {cmd}rmdir{/} <dir>"); return false; }
         var target = ResolvePath(args);
-        if (!IsWizard(LevelToWrite(target))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+        if (ChangeRefusal(target) is { } refused) { Write(refused + "\n"); return true; }
         // The root is left to the driver, which refuses it with its own message.
         if (target == cwd && target != "/") { Write("You are in that directory.\n"); return true; }
         if (target != "/" && cwd.StartsWith(target + "/")) { Write("You are inside that directory.\n"); return true; }
@@ -672,10 +765,10 @@ public class Player : Adventurer
     /// </summary>
     private bool CmdEdit(string args)
     {
-        if (!IsWizard(LevelEdit)) return false;
+        if (!IsWizard(LevelFiles)) return false;
         if (args == "") { NotifyFail("Usage: {cmd}edit{/} <file>"); return false; }
         var file = ResolveFile(args);
-        if (!IsWizard(LevelToWrite(file))) { Write($"You need wizard level {LevelSystemFiles} to change /secure and /std.\n"); return true; }
+        if (ChangeRefusal(file) is { } refused) { Write(refused + "\n"); return true; }
 
         var text = ReadFile(file);
         var slash = file.LastIndexOf('/');
@@ -799,7 +892,7 @@ public class Player : Adventurer
     {
         if (edLines == null) return false;
         // Checked again here: the level may have changed since the editor was opened.
-        if (!IsWizard(LevelToWrite(edPath))) { Write("You may no longer write that file.\n"); return false; }
+        if (ChangeRefusal(edPath) is { } refused) { Write("You may no longer write that file. " + refused + "\n"); return false; }
         try
         {
             WriteFile(edPath, string.Join("\n", edLines) + "\n");
@@ -838,10 +931,11 @@ public class Player : Adventurer
     /// </summary>
     private bool CmdUpdate(string args)
     {
-        if (!IsWizard(LevelUpdate)) return false;
+        if (!IsWizard(LevelFiles)) return false;
         if (args == "") { NotifyFail("Usage: {cmd}update{/} <path>"); return false; }
 
         args = ResolvePath(args); // relative to the current directory
+        if (!IsWizard(LevelUpdate) && !InOwnHome(args)) { Write($"You need wizard level {LevelUpdate} to update anything outside your own home directory, {Esc(HomePath)}.\n"); return true; }
         var old = FindObject(args);
         var stale = UpdateProgram(args); // throws with compiler errors; nothing has been touched yet
         Write($"Recompiled {Esc(args)}; {stale.Count} program(s) invalidated: {Esc(string.Join(", ", stale))}\n");
@@ -862,9 +956,11 @@ public class Player : Adventurer
 
     private bool CmdClone(string args)
     {
-        if (!IsWizard(LevelClone)) return false;
+        if (!IsWizard(LevelFiles)) return false;
         if (args == "") { NotifyFail("Usage: {cmd}clone{/} <path>"); return false; }
-        var ob = CloneObject(ResolvePath(args));
+        var path = ResolvePath(args);
+        if (!IsWizard(LevelClone) && !InOwnHome(path)) { Write($"You need wizard level {LevelClone} to clone anything outside your own home directory, {Esc(HomePath)}.\n"); return true; }
+        var ob = CloneObject(path);
         var room = Environment();
         MoveObject(ob, ob.Call<bool>("CanGet") || room == null ? Self : room);
         Write($"Cloned {Esc(ob.Name)}.\n");
