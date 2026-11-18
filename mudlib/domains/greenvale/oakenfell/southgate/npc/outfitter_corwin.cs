@@ -1,6 +1,6 @@
 // @inherit /std/shopkeeper
 
-public class SgOutfitterPerrin : Shopkeeper
+public class SgOutfitterCorwin : Shopkeeper
 {
     public override void Create()
     {

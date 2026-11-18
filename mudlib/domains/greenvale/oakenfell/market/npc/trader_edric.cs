@@ -1,6 +1,6 @@
 // @inherit /std/npc
 
-public class MkTraderOsric : Npc
+public class MkTraderEdric : Npc
 {
     public override void Create()
     {

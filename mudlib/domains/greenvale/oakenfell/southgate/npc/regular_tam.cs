@@ -1,6 +1,6 @@
 // @inherit /std/npc
 
-public class SgRegularWick : Npc
+public class SgRegularTam : Npc
 {
     public override void Create()
     {

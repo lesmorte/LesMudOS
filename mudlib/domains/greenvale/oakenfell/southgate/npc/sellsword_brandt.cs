@@ -1,6 +1,6 @@
 // @inherit /std/npc
 
-public class SgSellswordJory : Npc
+public class SgSellswordBrandt : Npc
 {
     public override void Create()
     {
