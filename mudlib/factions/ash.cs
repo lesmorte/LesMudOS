@@ -11,7 +11,7 @@ public class FactionAsh : Faction
         Motto = "Knowledge Demands Sacrifice";
         Headquarters = "Hidden";
         Kind = "Secret Arcane Society";
-        Description = "Officially the Circle does not exist. Rumors suggest the organization studies forbidden magic, ancient civilizations, necromancy, and artifacts predating Greenvale itself. Most stories are likely exaggerated. Not all are. The Circle should begin as a mysterious faction discovered later in the game.";
+        Description = "Officially the Circle does not exist. Rumors suggest the organization studies forbidden magic, ancient civilizations, necromancy, and artifacts predating Greenvale itself. Most stories are likely exaggerated. Not all are.";
         Hidden = true;
         StartsKnown = false;
         Relations = new Dictionary<string, int>();

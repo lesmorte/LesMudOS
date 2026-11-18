@@ -1,6 +1,6 @@
 // @inherit /std/faction
 
-/// <summary>The Thorn Pact. Data for docs/FACTIONS.md. The bible's Thorn Pact chapter gives no Type or Description; see the report.</summary>
+/// <summary>The Thorn Pact. Data for docs/FACTIONS.md.</summary>
 public class FactionThornpact : Faction
 {
     public override void Create()
@@ -10,7 +10,7 @@ public class FactionThornpact : Faction
         ShortName = "the Thorn Pact";
         Motto = "The Forest Remembers";
         Headquarters = "Unknown";
-        Kind = "";
+        Kind = "Druidic Alliance";
         Description = "The Thorn Pact believes Greenvale is expanding too quickly. Forests are cleared. Ancient sites are disturbed. Wild places disappear each year. While many members simply seek balance, radical factions have begun sabotaging logging camps and trade roads. The Assembly considers them troublesome. The Pact views itself as necessary.";
         Hidden = false;
         StartsKnown = false;

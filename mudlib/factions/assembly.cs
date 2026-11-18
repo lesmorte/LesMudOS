@@ -30,7 +30,7 @@ public class FactionAssembly : Faction
             "",                                                                                  // 3 Neutral
             "The Assembly is glad to see you, and its doors are open to you.",                   // 4 Friendly
             "You have served the Assembly well, and it is prepared to rely on you.",             // 5 Trusted
-            "The Assembly records your service with gratitude, and the town is better for it.", // 6 Honored
+            "The Assembly records your service with gratitude, and Greenvale is better for it.", // 6 Honored
             "The Assembly's councillors speak of you with respect whenever your name comes before them.", // 7 Exalted
             "Your conduct is set before the Assembly's new members as an example of civic duty.", // 8 Legendary
         };
