@@ -50,11 +50,23 @@ public class Node : Thing
     /// </summary>
     public bool TryGather(ObjectRef who)
     {
+        // A node in a trusted tree can be gathered only by trusted code (the crafting daemon), so a wizard's sandbox cannot strip
+        // real nodes bare. A node under /wiz answers anyone, for wizards' own tests.
+        if (InTrusted(Self.ProgramPath) && !InTrusted(PreviousObject()?.ProgramPath ?? "")) return false;
         var room = Environment();
         if (room == null || !who.IsAlive || Environment(who) != room || !who.Call<bool>("IsCreature")) return false;
         if (QueryCharges() <= 0) return false;
         regrowAt.Add(TimeMs() + RegrowSeconds * 1000L);
         return true;
+    }
+
+    private static readonly string[] TrustedTrees = { "/std/", "/secure/", "/domains/", "/classes/", "/skills/", "/events/" };
+
+    private static bool InTrusted(string path)
+    {
+        if (path.Contains("..")) return false;
+        foreach (var tree in TrustedTrees) if (path.StartsWith(tree, StringComparison.Ordinal)) return true;
+        return false;
     }
 
     public override bool Id(string id) => base.Id(id) || Kind.ToLowerInvariant() == id || Kind.ToLowerInvariant().Split(' ').Contains(id);

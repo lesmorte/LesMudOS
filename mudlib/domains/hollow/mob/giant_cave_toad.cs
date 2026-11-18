@@ -6,6 +6,12 @@
 /// </summary>
 public class GiantCaveToad : Monster
 {
+    /// <summary>The kind of skin this creature yields to the crafting system ("toad"), or empty. See docs/CRAFTING.md.</summary>
+    public string Skin { get; set; } = "toad";
+
+    /// <summary>The kind of blood this creature yields to the crafting system, or empty.</summary>
+    public string Blood { get; set; } = "toad";
+
     public override void Create()
     {
         Name = "Giant Cave Toad";

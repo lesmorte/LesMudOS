@@ -29,6 +29,17 @@ public class Corpse : Thing
     private bool emptyArmed;
     private string corpseId = "";
 
+    // What the creature was and what it yields to the crafting system (docs/CRAFTING.md): read from the dying creature in
+    // Setup, only when the creature itself makes the call and its file lies in a trusted tree. Each part is taken once.
+    private string creatureKind = "";
+    private int creatureLevel;
+    private string skinKind = "";
+    private string bloodKind = "";
+    private bool skinTaken;
+    private bool bloodTaken;
+    private long diedAtMs;
+    private static readonly string[] TrustedTrees = { "/std/", "/secure/", "/domains/", "/classes/", "/skills/", "/events/" };
+
     public override bool CanGet() => false;
 
     public bool IsCorpse() => true;
@@ -44,6 +55,8 @@ public class Corpse : Thing
         ready = true;
         label = deadLabel;
         diedAt = Time();
+        diedAtMs = TimeMs();
+        ReadYields(deceased);
         killerName = NameOfPlayer(killer);
         deceasedName = NameOfPlayer(deceased);
         playerCorpse = deceasedName != "";
@@ -56,6 +69,70 @@ public class Corpse : Thing
         LongDesc = $"The lifeless body of {deadLabel} lies here.";
         Arm();
         Report(false);
+    }
+
+    private static bool InTrustedTree(string path)
+    {
+        if (path.Contains("..")) return false;
+        foreach (var tree in TrustedTrees) if (path.StartsWith(tree, StringComparison.Ordinal)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Remember the creature's kind, level, skin and blood. Only the creature itself, dying, may describe itself (the caller of
+    /// Setup must be the deceased), and only a creature from a trusted tree: a corpse set up by anything else, or a creature
+    /// from a wizard's /wiz home, yields nothing. A creature declares its parts with public string properties Skin and Blood.
+    /// </summary>
+    private void ReadYields(ObjectRef deceased)
+    {
+        if (deceased == null || !deceased.IsAlive || PreviousObject() != deceased || !InTrustedTree(deceased.ProgramPath)) return;
+        if (deceased.Call<bool>("IsPlayerCharacter")) return;
+        var file = deceased.ProgramPath.Substring(deceased.ProgramPath.LastIndexOf('/') + 1);
+        var chronicle = deceased.Call<string>("get_ChronicleKind") ?? "";
+        creatureKind = chronicle != "" ? chronicle : file;
+        creatureLevel = deceased.Call<int>("QueryLevel");
+        skinKind = Clean(deceased.Call<string>("get_Skin"));
+        bloodKind = Clean(deceased.Call<string>("get_Blood"));
+    }
+
+    private static string Clean(string? kind) => (kind ?? "").Trim().ToLowerInvariant();
+
+    public string QueryCreatureKind() => creatureKind;
+
+    public int QueryCreatureLevel() => creatureLevel;
+
+    /// <summary>Milliseconds since the death.</summary>
+    public long QueryAgeMs() => TimeMs() - diedAtMs;
+
+    /// <summary>The kind of part this corpse yields for "skin" or "bleed" ("wolf"), or "" for none.</summary>
+    public string QueryYieldKind(string verb) => verb == "skin" ? skinKind : verb == "bleed" ? bloodKind : "";
+
+    /// <summary>Has the part for "skin" or "bleed" not been taken yet (the corpse declares one and nobody has tried)?</summary>
+    public bool QueryYieldAvailable(string verb) => verb == "skin" ? skinKind != "" && !skinTaken : verb == "bleed" && bloodKind != "" && !bloodTaken;
+
+    /// <summary>May this character skin or bleed the corpse now? The loot lock: during it, only the killer and the deceased.</summary>
+    public bool MayHarvest(ObjectRef who) => !LockedFor(who);
+
+    /// <summary>
+    /// Use the one chance for "skin" or "bleed". Only the crafting daemon may call it; it then rolls for the part. True if the
+    /// part was there to take.
+    /// </summary>
+    public bool TakeYield(string verb)
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller.IsClone || caller.ProgramPath != "/secure/crafting" || !QueryYieldAvailable(verb)) return false;
+        if (verb == "skin") skinTaken = true; else bloodTaken = true;
+        if (Contents().Count == 0 && !HasYields()) ArmEmpty();
+        return true;
+    }
+
+    /// <summary>A part still to take: a skin, or blood while it is fresh. A corpse with one does not crumble like an empty one.</summary>
+    private bool HasYields() => (skinKind != "" && !skinTaken) || (bloodKind != "" && !bloodTaken && QueryAgeMs() < BleedFreshMs());
+
+    private long BleedFreshMs()
+    {
+        try { return (long)(LoadObject("/secure/crafting").Call<Dictionary<string, List<double>>>("QueryNumbers")?.GetValueOrDefault("bleed.fresh_seconds")?.FirstOrDefault() ?? 300) * 1000; }
+        catch (MudRuntimeException) { return 300000; }
     }
 
     /// <summary>Write the contents of a player's corpse through to the lost-property store.</summary>
@@ -129,6 +206,8 @@ public class Corpse : Thing
         var shorts = Contents().Select(i => i.Call<string>("Short")).Where(s => s != null).ToList();
         text.Append(shorts.Count == 0 ? "It is empty.\n" : "It holds: " + string.Join(", ", shorts) + ".\n");
         if (LockedFor(ThisPlayer())) text.Append("It was felled moments ago; only those involved may touch it.\n");
+        if (QueryYieldAvailable("skin")) text.Append("Its hide could still be taken ({cmd}skin{/}).\n");
+        if (QueryYieldAvailable("bleed") && QueryAgeMs() < BleedFreshMs()) text.Append("It is fresh enough to {cmd}bleed{/}.\n");
         return text.ToString();
     }
 
@@ -187,14 +266,24 @@ public class Corpse : Thing
     private void AfterTaking()
     {
         Report(false);
-        if (Contents().Count == 0) ArmEmpty();
+        if (Contents().Count == 0 && !HasYields()) ArmEmpty();
     }
 
     // ---- Decay ----
 
     private void Arm()
     {
-        if (Contents().Count == 0) { ArmEmpty(); return; }
+        if (Contents().Count == 0 && !HasYields())
+        {
+            ArmEmpty();
+            return;
+        }
+        if (bloodKind != "" && !bloodTaken)
+        {
+            // Blood to take: once it has gone cold, a corpse with nothing else left is as good as empty.
+            var cold = Math.Max(1, (BleedFreshMs() - QueryAgeMs()) / 1000.0);
+            CallOut(() => { if (Contents().Count == 0 && !HasYields()) ArmEmpty(); }, cold);
+        }
         var generation = ++fullGeneration;
         CallOut(() => { if (generation == fullGeneration) RotAway(); }, fullSeconds);
     }
@@ -204,7 +293,7 @@ public class Corpse : Thing
         if (emptyArmed) return;
         emptyArmed = true;
         var generation = ++emptyGeneration;
-        CallOut(() => { if (generation == emptyGeneration) { emptyArmed = false; if (Contents().Count == 0) RotAway(); } }, emptySeconds);
+        CallOut(() => { if (generation == emptyGeneration) { emptyArmed = false; if (Contents().Count == 0 && !HasYields()) RotAway(); } }, emptySeconds);
     }
 
     private void RotAway()
@@ -225,5 +314,6 @@ public class Corpse : Thing
         Destruct();
     }
 
-    public override string Stat() => base.Stat() + $"  Corpse of {label}: killer '{killerName}', deceased '{deceasedName}', lock {Math.Max(0, lockSeconds - (Time() - diedAt))}s left, holds {Contents().Count}\n";
+    public override string Stat() => base.Stat() + $"  Corpse of {label}: killer '{killerName}', deceased '{deceasedName}', lock {Math.Max(0, lockSeconds - (Time() - diedAt))}s left, holds {Contents().Count}\n" +
+        $"  Creature '{creatureKind}' level {creatureLevel}, skin '{skinKind}'{(skinTaken ? " (taken)" : "")}, blood '{bloodKind}'{(bloodTaken ? " (taken)" : "")}, age {QueryAgeMs() / 1000}s\n";
 }

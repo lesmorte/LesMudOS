@@ -118,11 +118,23 @@ public class Item : Thing
     public bool SetProperty(string key, string? value)
     {
         if (!MayChange() || string.IsNullOrEmpty(key) || key.Length > 64) return false;
-        if (string.IsNullOrEmpty(value)) { properties.Remove(key); return true; }
+        if (!PropertyAllowed(key, value ?? "")) return false;
+        if (string.IsNullOrEmpty(value)) { properties.Remove(key); StateChanged(); return true; }
         if (value.Length > MaxPropertyLength || (!properties.ContainsKey(key) && properties.Count >= MaxProperties)) return false;
         properties[key] = value;
+        StateChanged();
         return true;
     }
+
+    /// <summary>
+    /// May this property be given this value now? A type whose identity is a property (the generic skin and blood of /std/skin and
+    /// /std/blood) overrides it to refuse some values to some callers; PreviousObject() is still the caller of SetProperty or
+    /// RestoreState. Default: allowed.
+    /// </summary>
+    protected virtual bool PropertyAllowed(string key, string value) => true;
+
+    /// <summary>Called after the quality, the quantity or a property changed through SetProperty, RestoreState or a split. Default: nothing.</summary>
+    protected virtual void StateChanged() { }
 
     // ---- Saving the state ----
 
@@ -155,9 +167,10 @@ public class Item : Thing
             {
                 var name = Decode(key.Substring(2));
                 var text = Decode(value);
-                if (name.Length <= 64 && text.Length <= MaxPropertyLength && (properties.ContainsKey(name) || properties.Count < MaxProperties)) properties[name] = text;
+                if (name.Length <= 64 && text.Length <= MaxPropertyLength && (properties.ContainsKey(name) || properties.Count < MaxProperties) && PropertyAllowed(name, text)) properties[name] = text;
             }
         }
+        StateChanged();
         return true;
     }
 
@@ -273,6 +286,7 @@ public class Item : Thing
         }
         quality = q;
         quantity = n;
+        StateChanged();
         return true;
     }
 

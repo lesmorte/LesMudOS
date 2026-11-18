@@ -3,6 +3,12 @@
 /// <summary>The first dungeon enemy: a larger, meaner cousin of the large rat, found in the Collapsed Passage.</summary>
 public class GiantRat : Monster
 {
+    /// <summary>The kind of skin this creature yields to the crafting system ("rat"), or empty. See docs/CRAFTING.md.</summary>
+    public string Skin { get; set; } = "rat";
+
+    /// <summary>The kind of blood this creature yields to the crafting system, or empty.</summary>
+    public string Blood { get; set; } = "rat";
+
     public override void Create()
     {
         Name = "Giant Rat";

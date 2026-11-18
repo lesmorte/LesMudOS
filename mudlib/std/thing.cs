@@ -207,7 +207,8 @@ public abstract class Thing : MudObject
     /// <summary>
     /// Create count items of a file at a quality in a container, in one call: one stack if the file is stackable (merged
     /// with a matching stack already there), otherwise count separate objects (at most 100). Returns the object holding
-    /// them (the last one, for separate objects), or null if refused.
+    /// them (the last one, for separate objects), or null if refused. The path may be a save record with properties
+    /// ("/std/skin?p.kind=wolf", see CloneStated); its "n=" and "q=" are overridden by count and quality.
     /// </summary>
     protected ObjectRef? CreateIn(string path, int count, int quality, ObjectRef container)
     {
@@ -215,11 +216,13 @@ public abstract class Thing : MudObject
         ObjectRef? result = null;
         for (var made = 0; made < count;)
         {
-            var item = CloneObject(path);
+            var item = CloneStated(path);
+            if (item == null) return result;
             var stack = item.Call<bool>("QueryStackable");
             if (!stack && count > 100) { item.Call("Vanish"); return null; }
             var n = stack ? count : 1;
-            if ((quality != 1 && item.Call<bool>("SetQuality", quality) != true) || (n > 1 && item.Call<bool>("SetQuantity", n) != true))
+            if ((item.Call("QueryQuality") is int iq ? iq != quality : quality != 1) && item.Call<bool>("SetQuality", quality) != true
+                || (item.Call("QueryQuantity") is int iqn ? iqn != n : n > 1) && item.Call<bool>("SetQuantity", n) != true)
             {
                 item.Call("Vanish");
                 return result;
@@ -229,6 +232,22 @@ public abstract class Thing : MudObject
             made += n;
         }
         return result;
+    }
+
+    /// <summary>
+    /// Clone the item a save record names, in the state the record gives (quality, quantity and properties after the "?"; a
+    /// bare path is the default state), without putting it anywhere. Null if the item refused that state (it is then gone).
+    /// Throws (MudRuntimeException) if the file is gone or does not compile. CreateIn and shop stock accept such records, so a
+    /// generic item whose kind is a property ("/std/skin?p.kind=rabbit") can be made and sold like any other.
+    /// </summary>
+    protected ObjectRef? CloneStated(string record)
+    {
+        var mark = record.IndexOf('?');
+        var item = CloneObject(mark < 0 ? record : record.Substring(0, mark));
+        if (mark < 0 || mark == record.Length - 1) return item;
+        if (item.Call("RestoreState", record.Substring(mark + 1)) is true) return item;
+        item.Call("Vanish");
+        return null;
     }
 
     /// <summary>
