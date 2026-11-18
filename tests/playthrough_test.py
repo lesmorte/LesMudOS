@@ -903,7 +903,7 @@ class Run:
         self.checked_messages.add(room)
         cap = short[0].upper() + short[1:]
         check(f"{room}: combat lines name the creature ({short})", text, f"{cap} ") if re.search(r"(attacks|hits|misses|scratches|smashes) you", text) else None
-        check(f"{room}: you hit or miss {short}", "yes" if re.search(r"You (hit|miss|scratch|smash) %s" % re.escape(short), text) else "no", "yes")
+        check(f"{room}: you hit or miss {short}", "yes" if re.search(r"(You (hit|miss|scratch|smash) |strikes |dodges your (bolt|attack))%s|%s dodges your (bolt|attack)" % (re.escape(short), re.escape(short.capitalize())), text) else "no", "yes")
         if room != CHAMBER:
             check(f"{room}: '{cap} dies.'", text, f"{cap} dies.")
         look = self.hero.cmd("look")
