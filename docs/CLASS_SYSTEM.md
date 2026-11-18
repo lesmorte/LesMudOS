@@ -112,10 +112,12 @@ Suggested layout: `/classes/<id>.cs` and `/skills/<id>.cs`, each inheriting a sm
 One character level, shared by all classes. The cap becomes 100.
 
 ```
-Experience to reach level n = 50 × n × (n − 1) × experience modifier
+Levels 2 to 5:   50 × n × (n − 1) × experience modifier    (100, 300, 600, 1000)
+Levels 6 to 10:  5,400, 12,000, 21,700, 34,100, 49,300 × experience modifier
+Levels above 10: 49,300 × (n / 10)³ × experience modifier
 ```
 
-That gives 100, 300, 600 and 1000 for levels 2 to 5 (it was 100, 250, 500, 900). The result is rounded to a whole number. The constants live in one place. The experience modifier is the largest modifier among the character's classes: 1.0 for standard classes, 1.25 for Spellblade as the brief gives it, higher for future prestige classes. A character who gains a modifier keeps their level and experience; only the experience needed for later levels changes.
+The first four levels are unchanged from the original design (it was 100, 250, 500, 900 before the five callings). Levels 6 to 10 are a table measured against the corridor's pace (about 15 hours from level 5 to level 10 for a character playing well; [CORRIDOR_BALANCE.md](CORRIDOR_BALANCE.md) section 4). **The curve beyond level 10 is provisional**: a power law through level 10 that continues the last step smoothly (level 11 needs 65,618, level 20 needs 394,400, level 100 needs 49,300,000). It is an order of magnitude and nothing more, and it is to be re-fitted when there is content for levels above 10. The result is rounded to a whole number. The table and the power law live in one place (`Adventurer.ExperienceFor`). The experience modifier is the largest modifier among the character's classes: 1.0 for standard classes, 1.25 for Spellblade as the brief gives it, higher for future prestige classes. A character who gains a modifier keeps their level and experience; only the experience needed for later levels changes.
 
 Per level: +8 maximum HP, as now.
 

@@ -255,8 +255,15 @@ def give(wiz, c, path, word):
     return out
 
 
+# Experience to reach each level (docs/CORRIDOR_BALANCE.md section 4.3): the table to level 10, a power law beyond it.
+XP_TABLE = {2: 100, 3: 300, 4: 600, 5: 1000, 6: 5400, 7: 12000, 8: 21700, 9: 34100, 10: 49300}
+
+
 def xp_for(n, mod=1.0):
-    return 0 if n <= 1 else int(round(50 * n * (n - 1) * mod))
+    if n <= 1:
+        return 0
+    basis = XP_TABLE[n] if n in XP_TABLE else 49300 * (n / 10.0) ** 3
+    return int(basis * mod + 0.5)
 
 
 def expected_attack(rate, level):
@@ -813,14 +820,16 @@ def run(work, mudlib):
     # ===== the experience formula =====
     ma = chars["mage"]
     bad = []
-    for n in (1, 2, 3, 4, 5, 10, 25, 50, 99):
+    for n in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 25, 50, 99):
         ma.command(f"setlevel {n}")
         s = a.score_of(ma)
         want = f"Level {n}   Experience {xp_for(n)} ({xp_for(n + 1) - xp_for(n)} more for level {n + 1})"
         if want not in s["text"]:
             bad.append((n, want))
-    check("experience to reach level n = 50 n (n-1): levels 1 to 99", str(bad), "[]")
+    check("experience to reach level n: the table to level 10, the power law beyond: levels 1 to 99", str(bad), "[]")
     check("the table of the design: 100, 300, 600, 1000", f"{xp_for(2)} {xp_for(3)} {xp_for(4)} {xp_for(5)}", "100 300 600 1000")
+    check("the corridor table: 5400, 12000, 21700, 34100, 49300", f"{xp_for(6)} {xp_for(7)} {xp_for(8)} {xp_for(9)} {xp_for(10)}", "5400 12000 21700 34100 49300")
+    check("beyond level 10 the provisional power law: level 11 needs 65618, level 20 needs 394400", f"{xp_for(11)} {xp_for(20)}", "65618 394400")
     ma.command("setlevel 100")
     check("level 100 is the highest", a.score_of(ma)["text"], f"Level 100   Experience {xp_for(100)} (highest level)")
     check("above the cap is refused", ma.command("setlevel 101"), "Usage")
@@ -851,7 +860,7 @@ def run(work, mudlib):
     check("the added equipment access works", ar.command("wield sword"), "You wield a rusty sword")
     check("the granted skill appears in skills", ar.command("skills"), "zap", "Test Zap", "Sure Crit")
     check("the granted trait changes the numbers (critical 100%)", a.score_of(ar)["text"], "Critical 100%")
-    check("the experience modifier 1.25 raises the next level (level 6: 1.25 x 1500 = 1875)",
+    check("the experience modifier 1.25 raises the next level (level 6: 1.25 x 5400 = 6750)",
           a.score_of(ar)["text"], f"Experience {xp_for(5)} ({xp_for(6, 1.25) - xp_for(5)} more for level 6)")
     check("a class cannot be taken twice", ar.command("pledge zealot_test"), "REFUSED: You already have a advanced class.")
     ar.command("setlevel 50")

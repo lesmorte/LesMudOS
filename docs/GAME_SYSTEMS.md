@@ -246,7 +246,7 @@ The five callings, their skills and traits, equipment categories and access, the
 Saved with the player: level, experience, HP, gold, quest states, a save record (path and state, section 7) for each carried item and which are equipped, and the logout room.
 
 - **New character:** chooses one of five callings after the password (Warrior, Scout, Priest, Mage, Adventurer); level 1, the calling's HP, gold, resources and starting kit (CLASS_SYSTEM.md section 7); unarmed 1-3.
-- **Experience to reach level n:** 50 x n x (n - 1) times the experience modifier of the character's classes (2: 100, 3: 300, 4: 600, 5: 1000). The level cap is 100.
+- **Experience to reach level n**, times the experience modifier of the character's classes: 100, 300, 600 and 1000 for levels 2 to 5 (50 x n x (n - 1)); 5,400, 12,000, 21,700, 34,100 and 49,300 for levels 6 to 10 (the corridor pace model, [CORRIDOR_BALANCE.md](CORRIDOR_BALANCE.md) section 4); and 49,300 x (n / 10)^3 above level 10. **The curve beyond level 10 is provisional**: it only continues the last step smoothly and is to be re-fitted when there is content for those levels. The level cap is 100.
 - **Each level:** +8 max HP, and full heal on levelling. (Attack grows by the class's attack rate per level and Defense by 1.)
 - **Regeneration:** 1 HP every 10 seconds out of combat; 3 in a safe room.
 - **Death:** the player is told so, and a **corpse** in the room where they died takes everything they carry (equipment included) and a gold fee of 10% of their purse. They wake in the Guest Rooms at full HP, with experience and level intact, and must walk back to the corpse and `loot` it. Their killer forgets them. The loss is saved at once.

@@ -1,8 +1,7 @@
 # Corridor balance: creatures, pace and the experience table
 
 Author: the `work/mobs` branch. Everything here is produced by `tests/balance_sim.py` (modes `check`, `corridor`, `pace`) and verified in
-the driver by `tests/corridor_mob_test.py` and `tests/load_check.py corridor/mob`. This document PROPOSES an experience table; it changes
-no file under `mudlib/std`. The lead applies section 4.
+the driver by `tests/corridor_mob_test.py` and `tests/load_check.py corridor/mob`. This document proposed an experience table; the integration of the corridor applied it (section 4.3, `Adventurer.ExperienceFor`). The curve beyond level 10 is provisional.
 
 ## 1. What was built
 
@@ -141,7 +140,7 @@ that content exists for those levels, and that the pace of a player at level 50 
 play, travel and the whole economy change). The numbers up to level 10 are measured; beyond that they only give the right order of magnitude
 and a curve that does not kink. Re-fit when levels 11 to 20 content exists. Note the cap is 100 (`MaxLevel`).
 
-### 4.3 The exact change in the game (not applied by this branch)
+### 4.3 The exact change in the game (applied in the integration of the corridor)
 
 File `mudlib/std/adventurer.cs`, method `ExperienceFor` (currently line 121), replace
 
