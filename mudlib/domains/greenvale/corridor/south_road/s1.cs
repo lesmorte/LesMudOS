@@ -16,6 +16,6 @@ public class SrS1 : Room
         AddDetail("satchel,leather,pouch,bag,bones", "A rotted satchel lies against the stones, its leather gone black. Whoever carried it never came back for it.");
         AddReadable("note,tablet,scrap,wax tablet,wax,paper", "Pressed in the wax of a small tablet, in a hurried hand:\n\"Hale's Acre failed the winter the well went dry. We carried what we could to the Hollow and left the rest to the thorn. I hid the purse in the well where no stranger would think to look, for the road is long and the wood is not what it was. If I do not come back for it, let it feed someone who is hungrier than I am. - M.\"", "A wax tablet lies tucked in the niche. You could {cmd}read{/} it.");
 
-        AddSpawn("/domains/greenvale/corridor/south_road/obj/old_purse");
+        AddSpawn("/domains/greenvale/corridor/south_road/obj/old_purse");   // a find: each character takes it once, for less each time
     }
 }

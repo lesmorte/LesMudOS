@@ -17,6 +17,6 @@ public class FbBorrowedTomb : Room
         AddDetail("pin,cloak pin,brooch,clasp,thorn,silver", "Among the buckles lies a cloak pin of blackened silver, the one thing here that has not rotted. It is made as a short straight stem with three barbs, like a twig of thorn. You have seen that shape cut into standing stones in the wood above.");
         AddReadable("walls,wall,carving,carvings,panels,scraped,scrape,scrapes,pattern", "The carving here is cut with a precision that outdoes every other room, interlaced lines so fine that they make a grey shimmer of the stone. In six places on the nearest wall someone has tried to scrape it away, or to dig between the strokes with a knife, and has made no impression beyond a few bright scratches. The scratches are old, and the knife has long since rusted. The pattern, here too, ends in groups of seven.", "Carving covers the walls, scratched at in places. You could {cmd}read{/} it.");
         AddSpawn("/domains/greenvale/corridor/mob/fallen_knight", 1);
-        AddSpawn("/domains/greenvale/corridor/barrow/obj/tomb_coins");
+        AddSpawn("/domains/greenvale/corridor/barrow/obj/tomb_coins");   // a find: each character takes it once, for less each time
     }
 }

@@ -1,6 +1,7 @@
-// @inherit /std/coins
+// @inherit /std/find
 
-public class SrOldPurse : Coins
+/// <summary>The purse in the niche of the Dry Well: a find (thirty gold for the first finder, then less), taken once by each character.</summary>
+public class SrOldPurse : Find
 {
     public override void Create()
     {
@@ -10,7 +11,11 @@ public class SrOldPurse : Coins
         Ids.Add("coins");
         ShortDesc = "a mouldering purse";
         LongDesc = "A small leather purse gone green with age, the strings rotted but the coins inside still good.";
-        AmountMin = 15;
-        AmountMax = 30;
+        TakenShort = "a mouldering purse, emptied by you";
+        TakenLong = "The purse you emptied lies slack in the leaves, its strings rotted through and its mouth open. There is nothing more in it for you.";
+        EmptyShort = "a mouldering purse, slack and flat";
+        EmptyLong = "A small leather purse gone green with age, lying open with its strings rotted through. It is flat. Someone has been here before you, and nothing is left in it.";
+        GoldLine = "You loosen what is left of the strings and tip %gold% gold into your hand.";
+        Gold = 30;
     }
 }

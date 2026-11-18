@@ -15,7 +15,6 @@ public class RwLarder : Room
         AddDetail("hearth,flue,wall,back,warmth", "The back wall of the larder is the other face of the hearth, and the clay there is still faintly warm and baked hard. That warmth is why the stores lasted so long.");
         AddDetail("clay,floor,walls,dry,air", "The walls and floor are of clay baked as hard as brick, with not a trace of damp. No rat has ever dug here, and the only prints in the dust are the ones you are making.");
 
-        MoveObject(CloneObject("/domains/hollow/obj/cache_gold"), Self);
-        MoveObject(CloneObject("/domains/hollow/obj/healing_potion"), Self);
+        AddSpawn("/domains/greenvale/corridor/root_warrens/obj/larder_chest");   // a find: each character takes it once, for less each time
     }
 }

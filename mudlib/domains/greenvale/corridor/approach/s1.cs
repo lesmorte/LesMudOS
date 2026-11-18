@@ -17,6 +17,6 @@ public class OaS1 : Room
         AddDetail("dust,floor dust,footprints,prints", "A fine pale dust lies over everything, and in it there are no footprints but your own.");
         AddReadable("marks,carved marks,signs,carvings,symbols,glyphs,line of marks", "The marks are cut in rows along the wall at shoulder height, small and regular. Three recur: a ring crossed by a bar; a single wavering line, like water; and a ring with a gap in it, open to the north. Between them are columns of short strokes, always in groups of seven. They are not letters of the city, nor of any tongue the Assembly keeps. The ring-and-bar is the same sign that is worn into the piers of the arch on the road.", "Rows of small clean marks are carved into the wall. You could {cmd}read{/} them, or at least try.");
 
-        AddSpawn("/domains/greenvale/corridor/approach/obj/old_coins");
+        AddSpawn("/domains/greenvale/corridor/approach/obj/old_coins");   // a find: each character takes it once, for less each time
     }
 }

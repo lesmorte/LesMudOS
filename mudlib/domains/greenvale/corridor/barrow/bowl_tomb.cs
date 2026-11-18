@@ -15,6 +15,6 @@ public class FbBowlTomb : Room
         AddDetail("door,doorway,west,threshold,jamb", "The doorway is the same tall, narrow shape as all the others. On the jamb, at the height of a man's shoulder, there are seven short strokes cut in a row. They are the only marks here that are not part of the pattern.");
         AddReadable("walls,wall,carving,carvings,scene,figures,figure,panel,pattern", "The carving is one scene, repeated on both walls. A single figure lies on a bier, and seven others stand about it, each holding a bowl in the hand that is not raised. A branch, bound with a cord, is held at the head. At the feet stands a last figure whose arm is not raised, as it was not in the court in the wood. The faces are as blank as ever. Nothing says who lies on the bier.", "A single scene is carved on the walls. You could {cmd}read{/} it.");
         AddSpawn("/domains/greenvale/corridor/mob/ancient_skeleton", 2);
-        AddSpawn("/domains/greenvale/corridor/barrow/obj/grave_token");
+        AddSpawn("/domains/greenvale/corridor/barrow/obj/bowl_token");   // a find: one grave token for each character, ever
     }
 }
