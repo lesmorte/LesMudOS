@@ -10,6 +10,7 @@ public class GrTheWagonHalt : Room
         Exits["north"] = "/domains/greenvale/corridor/green_road/m08";
         Exits["west"] = "/domains/greenvale/corridor/green_road/w5";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("halt,clearing,space,turning place", "A broad patch of bare ground where a road widens to let wagons pass each other and stop. Axle grease stains the ground and a cart wheel has been left leaning against a tree, abandoned.");
         AddDetail("rail,hitching rail,rope,ropes,hitching", "A squared timber on posts, chewed along its top by bored horses and worn with rope.");

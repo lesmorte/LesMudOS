@@ -10,6 +10,7 @@ public class EeForestersCabin : Room
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m04";
         Exits["east"] = "/domains/greenvale/corridor/eldergreen_edge/w1";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("cabin,lodge,logs,roof,moss", "The cabin is built of squared oak logs fitted so closely that no chinking shows. Moss has taken the roof, and a small window with horn panes looks out on the road.");
         AddDetail("woodpile,pile,firewood,wood", "Split billets are stacked in ranks as neat as a mason's work, bark-side up against the rain. The oldest ranks are grey, and the newest still weep sap.");

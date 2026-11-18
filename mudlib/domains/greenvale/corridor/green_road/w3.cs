@@ -10,6 +10,7 @@ public class GrTheAbandonedWatchtower : Room
         Exits["north"] = "/domains/greenvale/corridor/green_road/w4";
         Exits["west"] = "/domains/greenvale/corridor/green_road/d1";
         Safe = false;
+        DangerBand(7, 8);
 
         AddDetail("tower,watchtower,walls,wall,shell,stone", "A tower of grey blocks, thirty feet high, built to the Riverwatch pattern with arrow slits and a corbelled parapet. The upper floor has fallen in and the lower floors are choked with leaf, fallen stone and bird droppings.");
         AddDetail("door,hinge,gate,doorway", "An oak door of two leaves, one gone and one hanging by its top hinge. The inside of it has been barred, and the bar is still there, snapped off, on the inner side.");

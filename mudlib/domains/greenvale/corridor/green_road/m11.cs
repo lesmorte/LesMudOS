@@ -9,6 +9,7 @@ public class GrCrossroadsStone : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/m10";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m01";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("stone,marker,crossroads stone,marker stone,pillar", "A square pillar of dark stone waist-high, set in the ground long before the road was cut. Its top is worn into a shallow dish that holds rainwater and a few dead leaves.");
         AddDetail("track,overgrown track,old way,path,east track,heartwood track", "An old way, no wider than a cart, running off east between the trunks and nearly lost under bramble and fern. It heads east toward the Heartwood, and the carvings on the stone call it the Old Way.");

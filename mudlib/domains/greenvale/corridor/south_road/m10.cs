@@ -9,6 +9,7 @@ public class SrM10 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m09";
         Exits["north"] = "/domains/greenvale/corridor/south_road/m11";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("bridge,arches,arch,stone,stonework", "Three round arches of dressed stone, mossed above the waterline and polished below. The mason who built them took trouble over every voussoir.");
         AddDetail("river,water,current,green water", "A wide green river, slow and deep, with weed streaming in it like hair. A trout turns in the shadow of the middle arch.");

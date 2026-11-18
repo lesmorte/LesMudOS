@@ -9,6 +9,7 @@ public class HwW1 : Room
         Exits["west"] = "/domains/greenvale/corridor/heartwood/m03";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/w2";
         ResetSeconds = 300;
+        DangerBand(8, 9);
 
         AddDetail("court,flagstones,flagstone,paving,floor,flags", "The flags are the size of a table and cut so true that the tree roots have found only the smallest crack to enter. In the middle of the court the paving has been worn by something into a long shallow dish, deepest at the centre. Rainwater lies in it and does not spill.");
         AddDetail("walls,wall,masonry,stone,stones", "The wall is built as the wall on the road was built: long blocks, no mortar, each course leaning a little inward. The top is gone in places, and the broken edge shows that the stone is solid all through, with no rubble fill.");

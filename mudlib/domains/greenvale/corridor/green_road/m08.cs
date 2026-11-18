@@ -9,6 +9,7 @@ public class GrTheLeaningStones : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/m07";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m09";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("stones,stone,ring,circle,standing stones,leaning stones", "Nine grey stones, taller than a man and each leaning a little outward. The fourth side of each is bare of moss, as though rubbed by a hand, though the stones are too high to rub.");
         AddDetail("moss,lichen,bare side,bare", "Soft green moss thick on three faces and clean grey stone on the fourth. The line between them is as sharp as a cut.");

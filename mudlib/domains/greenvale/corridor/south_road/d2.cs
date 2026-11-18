@@ -9,6 +9,7 @@ public class SrD2 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/d1";
         Exits["north"] = "/domains/greenvale/corridor/south_road/d3";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("brambles,bramble,canes,thorns,arches", "Brambles in great arching hoops, grown over and through each other for decades. The thorns have hooked into a tatter of an old cloak.");
         AddDetail("blackberries,berries,fruit", "Big dark blackberries, so ripe they fall at a touch. Getting at them without bleeding is another matter.");

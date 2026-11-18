@@ -9,6 +9,7 @@ public class RwBroodPassage : Room
         Exits["up"] = "/domains/greenvale/corridor/root_warrens/root_hall";
         Exits["down"] = "/domains/greenvale/corridor/root_warrens/nest";
         ResetSeconds = 300;
+        DangerBand(7, 8);
 
         AddDetail("slope,floor,steps,step,ramp", "The floor is polished like the inside of a bowl, shallow in the middle and rising at the sides, where something large has dragged itself up and down. The old goblin steps can be found only as faint ridges in the glaze.");
         AddDetail("walls,wall,gouges,gouge,teeth,marks", "The gouges are deep, long and in pairs, the width of two fingers apart. They begin at about the height of your waist and rise to well above your head, the work of something that gnaws as it walks.");

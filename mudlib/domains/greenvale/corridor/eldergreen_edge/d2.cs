@@ -9,6 +9,7 @@ public class EeGoblinTrail : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/d1";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/d3";
         ResetSeconds = 120;
+        DangerBand(7, 8);
 
         AddDetail("trail,path,footprints,prints,tracks", "The prints are small, bare and splay-toed, no longer than your hand. They go in single file and in both directions, and the newest overlie the old.");
         AddDetail("cords,cord,knots,strands,branches", "The cords are plaited from bark fibre, each with a number of knots in it. One knot to a wagon, two to an armed party; a goblin who passes the road counts the traffic. Each cord ends in a peg of wood cut with three notches.");

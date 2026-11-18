@@ -9,6 +9,7 @@ public class SrD3 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/d2";
         Exits["east"] = "/domains/greenvale/corridor/south_road/w5";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("fold,sheepfold,walls,wall,stones,ring", "The walls of the fold stand knee high where they stand at all. They were built to keep sheep in and wolves out, and they have done neither for a long time.");
         AddDetail("hut,roof,shepherd's hut,ruin", "The roof timbers of the hut are rotted through and lie in a wedge on the floor. A rusted iron crook is still hooked on a nail.");

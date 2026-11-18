@@ -9,6 +9,7 @@ public class EeMarkedOak : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/d2";
         Exits["west"] = "/domains/greenvale/corridor/eldergreen_edge/w5";
         ResetSeconds = 120;
+        DangerBand(7, 8);
 
         AddDetail("oak,tree,bark,trunk,limbs,boughs", "The oak is vast beyond reckoning, with a trunk like a tower and a canopy that covers the whole clearing. It looks a thousand years old, and it looks watchful.");
         AddDetail("wreaths,withy,plait,plaits,bones,feathers,hangings,charms", "The wreaths are plaited willow bent into rings, and each ring holds small bones laid in a pattern, a fox's skull, a bird's wing, three teeth. Some are green-fresh, and some have rotted to a thread.");

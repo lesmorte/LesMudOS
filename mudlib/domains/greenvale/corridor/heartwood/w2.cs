@@ -8,6 +8,7 @@ public class HwW2 : Room
         LongDesc = "A great tree has gone over here, and lies where it fell with its crown wrecked among the trunks it brought down. Its root plate stands on end, twice the height of a man and wider than a barn door, a wall of dark earth and interlocked roots hung with stones and dead fern. Where the plate has torn out of the ground a deep hollow gapes beneath it, shaded and wet. The trunk beyond is as long as a street, and it is clothed in moss from end to end. The trail runs on to the north, along its flank.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/w1";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/w3";
+        DangerBand(8, 9);
 
         AddDetail("root plate,plate,roots,root,wall,earth", "The plate is a disc of earth and tangled roots torn upright, taller than a house, with a skin of fern and moss across the top. Stones as big as your head are still bedded in the soil between the roots, as though the tree had held them close. The bottom of the plate meets the ground in a ragged line of dark.");
         AddDetail("hollow,hole,pit,gap,dark,beneath,under,below", "Under the lower edge of the root plate the ground drops into a dark hollow, deeper than a man is tall. The earth there is damp and smells of rot and cold stone, and a draught moves out of it, slow and steady. The roots hang across the mouth like a curtain. You could climb down among them, if you looked closely at how the roots make a stair.");

@@ -9,6 +9,7 @@ public class GrThePedlarsPath : Room
         Exits["east"] = "/domains/greenvale/corridor/green_road/m03";
         Exits["north"] = "/domains/greenvale/corridor/green_road/w2";
         Safe = false;
+        DangerBand(7, 8);
 
         AddDetail("path,narrow path,trail,pedlars path", "A foot-wide path, twisting and worn, with the earth packed hard. Pedlars have walked it long enough to set stones in the boggy places.");
         AddDetail("charms,charm,tin,feather,wool,boughs", "Scraps hung on twine from the low branches: a bent tin whistle, a jay feather, a bit of red wool. Pedlars hang them for luck, and one or two look much older than the rest.");

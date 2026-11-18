@@ -8,6 +8,7 @@ public class HwS1 : Room
         LongDesc = "A cleft among the old stones, walled by the thorn on the one side and by the base of a very old wall on the other, so low that you must stoop to enter. The air is dry and bitter and smells of burning. The floor is dusted with black flakes, and in the corner stands a stack of books and papers that were set alight and not allowed to finish: their edges are charred to lace, and a satchel of scorched leather lies on top. Someone came here with a purpose, and then took pains that the purpose should not be known.";
         Exits["west"] = "/domains/greenvale/corridor/heartwood/d2";
         ResetSeconds = 600;
+        DangerBand(9, 10);
 
         AddDetail("cleft,cache,hollow,stones,wall,thorn,roof", "The cleft is no wider than a table, roofed with a slab and a tangle of thorn, so that you would pass it a hundred times without knowing. The stones of the wall at its back are of the dark green-grey and are the same as the ruins on the road.");
         AddDetail("flakes,black,char,charcoal,floor,dust,cinders,cinder,soot", "The black flakes on the floor are the remains of pages, crumbling at the touch and leaving a smear on the fingers. The cinders in the corner have been raked into a heap and then not lit.");

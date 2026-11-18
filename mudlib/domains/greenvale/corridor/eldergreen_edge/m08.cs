@@ -9,6 +9,7 @@ public class EeNarrows : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m07";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m09";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("bank,roots,root,tangle", "The bank on the west is a wall of earth and roots, with oak roots as thick as a man's thigh knotted into it like cables.");
         AddDetail("gully,drop,slope,ravine", "The gully on the east is a green well of ferns and fallen branches, far enough down that its stream is only a sound. A careless carter could lose a wheel over the edge.");

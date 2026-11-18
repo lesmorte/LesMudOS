@@ -9,6 +9,7 @@ public class OaD1 : Room
         Exits["east"] = "/domains/greenvale/corridor/approach/w3";
         Exits["north"] = "/domains/greenvale/corridor/approach/d2";
         ResetSeconds = 120;
+        DangerBand(9, 10);
 
         AddDetail("cistern,chamber,vault,roof,pillars,pillar", "The pillars are square and without ornament, of a dark green-grey stone, and the vault they carry rises to a point along its whole length. It is the work of masons who knew they were building for ever.");
         AddDetail("steps,broken steps,stair,staircase", "The steps are broad, shallow and crumbled at the edges, worn hollow by footsteps older than any record. They have been used recently, by someone with hobnails.");

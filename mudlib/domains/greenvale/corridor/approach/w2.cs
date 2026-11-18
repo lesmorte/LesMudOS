@@ -9,6 +9,7 @@ public class OaW2 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/w1";
         Exits["north"] = "/domains/greenvale/corridor/approach/w3";
         ResetSeconds = 120;
+        DangerBand(8, 9);
 
         AddDetail("ruts,track,boots,trampled,ground,tracks", "Heavy, hobnailed boots, a dozen pairs at least, have worn the track to bare earth. Between them, deep and narrow, are the grooves of a handcart that has been dragged out heavily loaded.");
         AddDetail("cord,tripwire,wire,string,bell", "A tarred cord, ankle-high, stretched between hazels. Following it with your eye you find the bell, a cracked cow-bell tied in a laurel, and a second cord that leads off north to someone who would hear it.");

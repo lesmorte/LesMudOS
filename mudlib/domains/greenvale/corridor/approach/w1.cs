@@ -9,6 +9,7 @@ public class OaW1 : Room
         Exits["east"] = "/domains/greenvale/corridor/approach/m03";
         Exits["north"] = "/domains/greenvale/corridor/approach/w2";
         ResetSeconds = 120;
+        DangerBand(8, 9);
 
         AddDetail("span,broken span,break,ends,arcade", "Two great stumps of masonry reach out from the standing piers and stop in empty air. Looking along the line, you can count seven arches before the ruin ends, and trace where the rest used to march.");
         AddDetail("blocks,fallen blocks,stone,rubble,tumble", "The fallen blocks lie where they fell, each as big as a cart, half sunk in the earth, dark green-grey under their fur of moss. None of them has a chisel mark, and the faces are as smooth as river stones.");

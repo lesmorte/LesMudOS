@@ -8,6 +8,7 @@ public class HwM11 : Room
         LongDesc = "One great oak stands alone beside the road where the wood ends, its crown spread over the road like the roof of a hall. It is older than any tree in the farmland to the north, and its trunk is wider than the cottages of the Hollow. Its limbs are propped in two places by timber baulks that someone has set, and the bark is cut with initials and rings to the height of a rider's hand. Beyond it the trees thin and the road runs out toward plain daylight.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m10";
         Exits["north"] = "/domains/greenvale/corridor/approach/m01";
+        DangerBand(7, 8);
 
         AddDetail("oak,tree,great oak,trunk,last oak,last great oak", "The oak has a trunk of forty paces' girth at the base, ridged and furrowed like a hill. Three limbs, each larger than most trees, leave it at the height of two men. It does not feel like the great trees behind you: it feels like the last of them, and aware of it.");
         AddDetail("initials,carvings,carving,names,letters,cut,marks", "The bark is carved from the roots to as high as an arm will reach with initials and hearts and short words. The oldest are healed over into pale seams, and the newest are white and sharp. You could {cmd}read{/} the carvings.");

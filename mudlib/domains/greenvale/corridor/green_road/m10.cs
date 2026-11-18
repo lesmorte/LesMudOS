@@ -9,6 +9,7 @@ public class GrTheDarkHollow : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/m09";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m11";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("hollow,dip,dark hollow,bowl,dell", "A steep-sided dip in the land, where the road runs between banks the height of a man. A highwayman could not have built a better place.");
         AddDetail("banks,bank,roots,root,earth", "Exposed earth and a mat of roots, grey with age. Gaps between them are dark and dry, and one or two look like they were dug.");

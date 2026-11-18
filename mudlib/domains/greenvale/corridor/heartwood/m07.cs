@@ -9,6 +9,7 @@ public class HwM07 : Room
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m06";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m08";
         Exits["east"] = "/domains/greenvale/corridor/heartwood/w5";
+        DangerBand(7, 8);
 
         AddDetail("cairn,stones,stone,river-stones,river stones,pile", "The cairn is built of rounded stones carried a long way from a river bed, laid dry and without any order that you can see. Some are fresh and white, and others are grey with lichen. Each stone was set there by someone who knew the names.");
         AddDetail("slab,slate,plaque,memorial,inscription,stone slab", "A slab of dark slate is set into the face of the cairn at the height of a man's chest. It is cut with a ring of linked chain at the head and a long inscription below, and the cut letters are filled with moss in places. You could {cmd}read{/} it.");
@@ -18,6 +19,8 @@ public class HwM07 : Room
         AddDetail("trail,east,path,track", "The trail east is narrow and trodden by something that does not mind the dark. It leads between the trunks and is lost to sight in twenty paces.");
         AddDetail("pebbles,small stones,offerings,top", "The small stones on the top of the cairn are not all of one kind. There are flat river pebbles, a bright quartz, a button, an arrowhead and a child's marble. Nobody has taken any away.");
         AddReadable("slab,slate,plaque,memorial,inscription,stone slab", "The inscription reads:\n\nTO THE HUNTERS OF THE RIVERWATCH\nwho went into the Heartwood and did not come out of it.\n\nEDRIC VANE      JOAN PRYOR\nHOB TARRANT      SEFA LUND\nAND ONE WHOSE NAME WAS NEVER KNOWN\n\nThe forest took them. We carried the stones.\nEVER VIGILANT.\n\nBelow, in newer and shallower letters, a hand has scratched: \"Room left.\"", "A slab of dark slate is set into the cairn. You could {cmd}read{/} it.");
+
+        AddSpawn("/domains/greenvale/corridor/npc/patrol_heartwood");
         AddSpawn("/domains/greenvale/corridor/heartwood/npc/cassian");
     }
 }

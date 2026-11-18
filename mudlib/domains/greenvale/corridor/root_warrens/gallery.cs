@@ -9,6 +9,7 @@ public class RwGallery : Room
         Exits["north"] = "/domains/greenvale/corridor/root_warrens/quarters";
         Exits["west"] = "/domains/greenvale/corridor/root_warrens/root_hall";
         ResetSeconds = 300;
+        DangerBand(7, 8);
 
         AddDetail("timbers,timber,props,prop,posts,post,beams,waists", "The oak is dark with age and the teeth marks are pale and fresh, in neat parallel pairs. In a few places a prop has been gnawed through and the roof has begun to settle onto its stump. The rats are bringing the gallery down a mouthful at a time.");
         AddDetail("nests,nest,bedding,shreds,hide,splinters,litter", "The nests are dense heaps of shredded hide, fur and splinters, packed hard and lined with something soft. In the bigger heaps are the bones of whatever the rats have eaten: cave fish, birds, the long bones of a deer, and the cracked shells of beetles. Nothing in them is of any use.");

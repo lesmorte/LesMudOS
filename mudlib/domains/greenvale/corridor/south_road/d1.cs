@@ -9,6 +9,7 @@ public class SrD1 : Room
         Exits["east"] = "/domains/greenvale/corridor/south_road/w3";
         Exits["north"] = "/domains/greenvale/corridor/south_road/d2";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("blackthorn,hazel,thicket,covert,branches", "Blackthorn with thorns as long as a finger, and hazel bent in the wind. Every path through it is low and sidelong.");
         AddDetail("burrows,earth,runs,holes", "A network of holes and runs. Some are narrow as a cat; one, larger than the rest, is scored deep by claws.");

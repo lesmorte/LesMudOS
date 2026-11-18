@@ -9,6 +9,7 @@ public class SrW1 : Room
         Exits["east"] = "/domains/greenvale/corridor/south_road/m03";
         Exits["north"] = "/domains/greenvale/corridor/south_road/w2";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("farmhouse,house,thatch,door", "Stone below and thatch above, with a doorway low enough that tall men learn humility. Geraniums crowd a cracked pot on the sill.");
         AddDetail("barn,barn door,doors", "A barn the size of a chapel, its huge doors propped open on a mow of hay. Swallows nest in the rafters.");

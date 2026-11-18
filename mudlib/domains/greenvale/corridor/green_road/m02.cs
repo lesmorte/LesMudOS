@@ -9,6 +9,7 @@ public class GrTheCanopy : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/m01";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m03";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("tunnel,canopy,roof,leaves,branches", "Beech and oak, all reaching for the same scrap of sky. The roof is so close and so thick that you could take it for a vaulted hall.");
         AddDetail("water,ruts,puddles,puddle,rut", "The standing water is brown and cold, with a skin of old leaves. Hoof prints are pressed into the mud at its edge, and one of them is a good deal larger than a horse's.");

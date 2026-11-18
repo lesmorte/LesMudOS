@@ -9,6 +9,7 @@ public class OaM09 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/m08";
         Exits["north"] = "/domains/greenvale/corridor/approach/m10";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("mill,stone mill,watermill,millstones", "A tall, narrow mill of grey stone with a slate roof and a hoist beam jutting from the loft. Inside, through the open lower door, you can see the stones grinding, and hear them, more than anything else.");
         AddDetail("wheel,mill wheel,waterwheel,leat,water", "The wheel is oak, black with water, and turns with a long wet sigh at each stroke. The leat that feeds it runs fast and cold from a stream above, and eventually joins the Mere.");

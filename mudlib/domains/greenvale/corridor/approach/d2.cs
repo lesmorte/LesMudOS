@@ -8,7 +8,8 @@ public class OaD2 : Room
         LongDesc = "A wide ledge of sun-warmed rock juts from the hillside above a ravine, screened by yews and overlooking the whole broken line of the aqueduct. The stone is scored with deep claw-marks, strewn with the bones of deer, and polished by the passing of something heavy and soft-footed, and the air has a musky, big-cat smell. Through a gap in the trees to the north the towers of Oakenfell stand small and clear on the horizon, which offers little comfort, because they are a long way off and you are not alone here.";
         Exits["south"] = "/domains/greenvale/corridor/approach/d1";
         Exits["north"] = "/domains/greenvale/corridor/approach/d3";
-        ResetSeconds = 120;
+        ResetSeconds = 1800;
+        DangerBand(9, 10);
 
         AddDetail("ledge,rock,stone,sun,warm rock", "A flat shelf of limestone, twenty paces long, baked in the afternoon sun. The rock beneath your feet is warm, and you suspect that someone has been lying on it.");
         AddDetail("claw marks,claws,scratches,marks,scars", "Four parallel grooves, each the width of a finger, are raked into the trunk of the nearest yew at the height of a man's chest. The sap beside them is still bright.");

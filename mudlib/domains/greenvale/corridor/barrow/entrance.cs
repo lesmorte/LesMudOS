@@ -8,6 +8,7 @@ public class FbEntrance : Room
         LongDesc = "A steep ramp of fallen blocks runs down from the gap above, and at its foot the floor becomes cut stone: a wide, shallow stair going on into the dark. The cold draught that you felt at the shrine is steady here and perfectly dry, and it moves past you toward the light without a sound. Everything the roots and the rain have not reached is clean and pale with fine dust, as if the weather had stopped at the gap. Over your head a smear of soot darkens the underside of a jutting slab. Far above, the way out is a narrow wedge of green daylight.";
         Exits["out"] = "/domains/greenvale/corridor/heartwood/d3";
         Exits["down"] = "/domains/greenvale/corridor/barrow/forecourt";
+        DangerBand(9, 10);
 
         AddDetail("gap,wedge,light,daylight,above,way out", "The gap is a slot of leaf-green light, so high and so narrow that it looks cut from paper. No sound comes down from it. The edge of the daylight ends on the ramp in a line as sharp as a knife, and below the line the stone is grey.");
         AddDetail("ramp,blocks,block,rubble,slope,fallen", "The blocks of the ramp are the green-grey stone of the shrine, tumbled where the roof of some outer chamber came down. Someone has been over them with care: the loose ones are wedged, and the worst of the edges are scuffed, as by a pack carried through a tight place.");

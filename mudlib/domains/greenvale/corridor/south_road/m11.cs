@@ -9,6 +9,7 @@ public class SrM11 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m10";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m01";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("oaks,oak,elms,elm,trees,trunks", "Oaks with trunks you could not reach round, and elms drowned in ivy. Their lowest branches reach out over the road like arms.");
         AddDetail("bracken,bramble,banks", "Steep banks of bracken, shoulder high, with a few blackberries ripening among them. Rabbits' runs thread through the bottom.");

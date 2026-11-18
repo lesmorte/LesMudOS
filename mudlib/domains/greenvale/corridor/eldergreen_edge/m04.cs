@@ -9,6 +9,7 @@ public class EeUnderEaves : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m03";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m05";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("eaves,branches,trees,boughs,roof", "The branches overhead interlace in an uneven arch. Where one has fallen, the gap lets in a shaft of sun as solid-looking as a plank.");
         AddDetail("light,shafts,sun,sunlight,pollen,dust", "Pollen turns every sunbeam into a bright pillar. Where the road passes between two shafts the shade between them is cool as a cellar.");

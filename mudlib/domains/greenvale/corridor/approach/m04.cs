@@ -9,6 +9,7 @@ public class OaM04 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/m03";
         Exits["north"] = "/domains/greenvale/corridor/approach/m05";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("milestones,stones,milestone,numbers", "The stones stand knee-high and leaning slightly, as milestones do, each with its numeral cut deep and filled with black paint. Travelers have rubbed the oak on the nearest to a shine.");
         AddDetail("wall,grey line,city wall,horizon,line", "It lies low and level across the north, grey against the paler sky, and it does not end at either side of your view. You are still miles away, and it is already the largest made thing you have ever seen.");

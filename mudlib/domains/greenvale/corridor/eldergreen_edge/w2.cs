@@ -9,6 +9,7 @@ public class EeHuntersCamp : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/w1";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/w3";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("tents,tent,hide tents,lean-to,leanto,shelter", "The tents are hide stretched over bent saplings, patched with other hides in other colours. Under the lean-to, bedrolls are laid out in a row with a bow beside each, and one bedroll has not been slept in for a long time.");
         AddDetail("fire,fire pit,pit,stones,ash", "The fire pit is ringed with river stones blackened by use. A spit stands over the embers with a hare turning on it, and a kettle sits at the edge, ticking.");

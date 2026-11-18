@@ -9,6 +9,7 @@ public class OaM01 : Room
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m11";
         Exits["north"] = "/domains/greenvale/corridor/approach/m02";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("stumps,stump,woodcutters,felled oaks", "The stumps are broad as tables and cut clean, the sawn faces still yellow. Someone fells oaks here by licence and with care: every stump has a notched tag nailed to its top.");
         AddDetail("edging stones,stones,verge,kerb", "Squared grey stones, each a stride long, bed the road's edge like the first teeth of a new mouth. They are plain work, and recently laid, though the road beneath them is ancient.");

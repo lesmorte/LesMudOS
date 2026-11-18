@@ -9,6 +9,7 @@ public class OaM11 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/m10";
         Exits["north"] = "/domains/greenvale/vale_road/approach";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("wall,city wall,sky,towers", "At this distance the wall is no longer a line but a cliff, grey and streaked, with square towers crowning it and small figures walking the parapet between them. The size of it sinks in all at once.");
         AddDetail("carters,carters' yards,yards,stables,sheds", "Carters' yards line both sides, their gates open on cobbled courts where wagons are backed in for loading. Men in leather aprons call to each other across the lane, and everyone is in a hurry.");

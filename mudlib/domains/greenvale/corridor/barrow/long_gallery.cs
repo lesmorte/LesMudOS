@@ -10,6 +10,8 @@ public class FbLongGallery : Room
         Exits["north"] = "/domains/greenvale/corridor/barrow/guardian_hall";
         Exits["east"] = "/domains/greenvale/corridor/barrow/bowl_tomb";
         Exits["west"] = "/domains/greenvale/corridor/barrow/inscribed_tomb";
+        ResetSeconds = 1800;
+        DangerBand(9, 10);
 
         AddDetail("gallery,paving,floor,flags,slabs", "The paving is laid in long and short slabs that repeat every seventh course, as on the road in the wood, and it is not worn into a trough as that is. Nothing walked here in numbers. The slabs are so true that a dropped coin would not roll.");
         AddDetail("vault,roof,ceiling,arch,dark", "The vault is lost in the dark, and the walls seem to lean toward one another as they rise. Here and there a faint sheen on the stone shows where the lamplight has found a facet, and then gone.");

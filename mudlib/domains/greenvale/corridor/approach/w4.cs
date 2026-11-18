@@ -9,6 +9,7 @@ public class OaW4 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/w3";
         Exits["north"] = "/domains/greenvale/corridor/approach/w5";
         ResetSeconds = 120;
+        DangerBand(8, 9);
 
         AddDetail("quarry,pale scar,scar,hillside,quarry face,workings", "The quarry face is a pale grey cliff, sheer and scored with wedge-marks, its floor a shallow pool of green water. The stone cut here made the courses of the city wall.");
         AddDetail("blocks,half-dressed blocks,stones,rubble,dressed stone", "Half-squared blocks sit where the wagons left them, their faces chiselled smooth on one side and rough on the others. A mason's mark, the oak, is cut small in each corner.");

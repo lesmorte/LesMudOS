@@ -9,6 +9,7 @@ public class OaM06 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/m05";
         Exits["north"] = "/domains/greenvale/corridor/approach/m07";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("arch,vault,arches,old aqueduct,aqueduct", "The arch is as tall as three wagons stacked and narrow for its height, rising to a point, its blocks the size of ploughshares and fitted without mortar. Those who built it did not stint, and did not ask permission; Oakenfell is nearly four centuries old, and this has plainly stood longer than that.");
         AddDetail("piers,pier,foot,base,masonry,blocks", "The piers are laid of huge blocks fitted so close that you could not slip a knife between them, with no trace of mortar. Round each at head height runs a band of shallow marks, weathered nearly smooth.");

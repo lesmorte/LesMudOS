@@ -9,6 +9,7 @@ public class OaD3 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/d2";
         Exits["east"] = "/domains/greenvale/corridor/approach/w5";
         ResetSeconds = 120;
+        DangerBand(9, 10);
 
         AddDetail("den,hollow,slab,masonry,roof", "A great slab of tumbled stone, fallen from some older wall, has been propped on stacked rubble to make a low hall. Inside it is dark and dry and smells of leather.");
         AddDetail("weapons,rack,racks,spears,swords,axes", "Spears, hatchets and short swords lie in racks, oiled and counted. Not one of them is a goblin's make; every blade came from a human armoury.");

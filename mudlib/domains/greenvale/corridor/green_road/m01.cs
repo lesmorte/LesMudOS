@@ -9,6 +9,7 @@ public class GrIntoTheDeepWood : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m11";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m02";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("road,ruts,rut,track", "Two deep ruts with a hump of moss between them. Wheels have kept the way open, but the wood has been taking back the verges a little each year.");
         AddDetail("trees,oaks,beeches,oak,beech,trunks,trunk", "Big, grey-barked trees standing shoulder to shoulder. Nothing grows beneath them but fern and pale, leggy saplings that will never see the sun.");

@@ -9,6 +9,7 @@ public class SrM05 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m04";
         Exits["north"] = "/domains/greenvale/corridor/south_road/m06";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("hill,slope,windmill hill,crown", "A steep green hill with a flat crown, kept short by sheep. The mill sits on top like a hen on an egg.");
         AddDetail("windmill,mill,sails", "The sails are as long as a cart and a half, canvas stretched on lattices of wood. Their creak comes down the hill with each turn.");

@@ -9,6 +9,7 @@ public class SrM02 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m01";
         Exits["north"] = "/domains/greenvale/corridor/south_road/m03";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("hedges,hedge,hazel,blackthorn,tangle", "Hazel and blackthorn, dog rose and honeysuckle, all pleached together by generations of hedgers. The old stems are as thick as a man's wrist and bent into tight green knots.");
         AddDetail("wrens,wren,birds,sparrows", "A wren is sitting on the topmost twig, enormously offended by you. It is about the size of a walnut.");

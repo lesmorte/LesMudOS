@@ -8,6 +8,7 @@ public class HwM09 : Room
         LongDesc = "For a hundred paces the road climbs onto paving: great flat slabs of dark stone laid edge to edge under the dirt, scoured clean by traffic and laid bare in the middle. The slabs are huge, each one a long man's height, and they have been set so true that the road has not shifted in all the years since. A low kerb runs on each side, buried in moss, and a shallow gutter along the east. At the end of the paving the dirt resumes, and the road forgets it was ever anything else.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m08";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m10";
+        DangerBand(7, 8);
 
         AddDetail("paving,slabs,slab,flagstones,flags,stone,stones", "The slabs are of the same green-grey stone as the arch. Each is cut to a long rectangle and fitted to the next without mortar. They are laid in a pattern of long and short that repeats every seventh course. The middle of the road is worn into a shallow trough by feet, not by wheels, and the worn part is a pace wide.");
         AddDetail("kerb,kerbs,kerbstone,edge,edges", "A low kerb of squared stone lines each side, half buried and green with moss. It is cut with a bevel that no mason of Oakenfell would put on a kerb, and which sheds water neatly in either direction.");

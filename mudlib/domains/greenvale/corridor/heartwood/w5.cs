@@ -9,6 +9,7 @@ public class HwW5 : Room
         Exits["south"] = "/domains/greenvale/corridor/heartwood/w4";
         Exits["west"] = "/domains/greenvale/corridor/heartwood/m07";
         Exits["east"] = "/domains/greenvale/corridor/heartwood/d3";
+        DangerBand(8, 9);
 
         AddDetail("run,path,trail,ground,floor,track", "The path is bare earth, packed so hard by many passes that it rings under a boot. It is not the trail of a herd. It is a single line, walked and walked by one thing that takes the same road at the same hour.");
         AddDetail("grooves,scratches,bark,scored,claw,claws,marks", "The grooves are in threes, a finger deep, and each set is a little longer than the one before it as the run goes on. Where it ends in the east the bark has been torn off in strips.");

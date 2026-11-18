@@ -10,6 +10,7 @@ public class EeCharcoalClearing : Room
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m08";
         Exits["east"] = "/domains/greenvale/corridor/eldergreen_edge/w5";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("clearing,ground,dust,black dust,soot,ash", "The ground of the clearing is black with charcoal fines, soft as soot, and every footprint in it is sharply cut. Even the grass at its edge is grey with dust.");
         AddDetail("mounds,mound,clamps,clamp,turf,kilns,kiln,smoke", "A clamp is a stack of split oak billets covered with turf and left to smoulder for days without ever catching flame. The nearest sweats blue smoke from vents along its top; the other has burned out and been opened, and its black heart steams.");

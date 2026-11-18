@@ -9,6 +9,7 @@ public class GrTheSunlessMile : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/m03";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m05";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("mile,road,straight,line", "A long, straight, empty road. It was driven through the forest by someone who wanted it to be quick, and the forest has never forgiven it.");
         AddDetail("trees,trunks,pines,firs,boughs,canopy,dark", "The trunks rise bare for forty feet before the first branch, as if the lower boughs had given up reaching for light and died. Above that, the crowns knit into a roof.");

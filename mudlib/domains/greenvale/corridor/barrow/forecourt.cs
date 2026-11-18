@@ -8,6 +8,7 @@ public class FbForecourt : Room
         LongDesc = "The stair ends in a square court sunk in the rock, with walls of dark green-grey stone that rise out of the reach of any light you carry. A band of carving runs round them at the height of the eye, the same interlaced line as the court in the wood, and it takes up where that one broke off. In the paving lies a shallow round dish with a groove that runs from its lip to a tall, narrow doorway in the north wall. Low on the left jamb is a small white chalk mark. The silence has weight.";
         Exits["up"] = "/domains/greenvale/corridor/barrow/entrance";
         Exits["north"] = "/domains/greenvale/corridor/barrow/descending_way";
+        DangerBand(9, 10);
 
         AddDetail("walls,wall,stone,masonry,court,vault", "The walls are laid without mortar, in courses that lean a little inward as they rise, until they are lost in the dark. The joints are a hair wide. Nothing here has settled or cracked in all the time it has been below the earth.");
         AddDetail("dish,basin,bowl,hollow,paving,floor", "The dish is seven paces across and perfectly round, cut into the paving so that its rim is level with the floor. It is smaller than the great dish in the ruined court in the wood, and like it, it is empty and dry. The groove around its lip runs once about and then leaves it toward the doorway.");

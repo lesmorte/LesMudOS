@@ -9,6 +9,7 @@ public class GrTheOldShrine : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/m05";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m07";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("shrine,hut,niche,roof,slate,stone", "A hut of fitted grey stones, no taller than a man with an arm raised, and without a door. The stone is old and the slate is new: someone keeps it roofed.");
         AddDetail("lamp,flame,oil,wick", "A small oil lamp with a horn shield, trimmed and filled and burning. Whoever tends it has never let it go out in living memory.");

@@ -9,6 +9,7 @@ public class OaM10 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/m09";
         Exits["north"] = "/domains/greenvale/corridor/approach/m11";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("city,oakenfell,town", "Oakenfell fills the plain from the river to the western fields: thousands of roofs, hundreds of chimneys, towers, domes and spires, with the road running straight to its southern gate. Nowhere in the valley is there anything of such size.");
         AddDetail("walls,wall,towers,tower", "The city walls are grey stone, thirty feet high, with square towers at intervals. They are old, mended in many shades of stone and twice rebuilt, and above the parapet you can see the glint of helms.");

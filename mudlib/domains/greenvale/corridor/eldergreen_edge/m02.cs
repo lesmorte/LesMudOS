@@ -9,6 +9,7 @@ public class EeFirstOaks : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m01";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m03";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("oaks,oak,trees,tree,trunks", "The nearest oak is older than the road. Its bark is cut into ridges deep enough to hide a hand, and its lowest branch is thicker than most trees on the farms.");
         AddDetail("crown,crowns,canopy,sun,sunlight,light,coins", "The leaves overhead are green gold where the sun comes through them, and the light moves on the road in slow patches as the branches stir.");

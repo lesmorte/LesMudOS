@@ -9,7 +9,8 @@ public class OaW3 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/w2";
         Exits["north"] = "/domains/greenvale/corridor/approach/w4";
         Exits["west"] = "/domains/greenvale/corridor/approach/d1";
-        ResetSeconds = 120;
+        ResetSeconds = 1800;
+        DangerBand(8, 9);
 
         AddDetail("tents,tent,patched tents,camp,bedrolls", "A dozen patched tents in three shades of grey, pitched round a trampled space. The largest is slightly apart and has a real door-flap, a chair outside it, and a cracked mirror hung from a pole.");
         AddDetail("fire,firepit,fire pit,cooking,pot", "A shallow pit, ringed with stones, with an iron pot bubbling on a tripod. The stew has gone grey; at its edge somebody's trophy, a Riverwatch badge, has been nailed to a post.");

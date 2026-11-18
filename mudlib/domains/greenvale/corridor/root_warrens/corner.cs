@@ -8,6 +8,7 @@ public class RwCorner : Room
         LongDesc = "A barricade of timber, sharpened stakes and packed clay seals the mouth of this chamber, and every stake points north, the way you came. Behind it, in a space no larger than a cottage kitchen, a handful of goblins have made a last stand into a life, with bedrolls against the walls, a smoky fire in a pit and a pile of picks stacked like spears. The air is thick with smoke and the smell of cooked rat. Burned stumps of root lie heaped by the fire, the leavings of a long and bitter war. On the largest post of the barricade, a tally has been cut.";
         Exits["north"] = "/domains/greenvale/corridor/root_warrens/root_hall";
         ResetSeconds = 300;
+        DangerBand(7, 8);
 
         AddDetail("barricade,barricades,wall,stakes,stake,timber,timbers,clay", "The barricade is built of old shoring timber, split and lashed, and every stake is sharpened and fire-hardened. It was built facing into the warren, to keep out what came up from below, and it has been mended so many times that the original work is hard to find. A gap has been left at one end, narrow enough to hold with one spear.");
         AddDetail("notches,three notches,mark,head,post head", "At the head of the tallest post of the barricade, above the tally, three notches are cut one above another and rubbed with red earth. Whatever else these goblins have lost, they have kept their mark.");

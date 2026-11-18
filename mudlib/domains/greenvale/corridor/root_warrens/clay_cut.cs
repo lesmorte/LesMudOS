@@ -9,6 +9,7 @@ public class RwClayCut : Room
         Exits["north"] = "/domains/greenvale/corridor/root_warrens/spoil_heap";
         Exits["east"] = "/domains/greenvale/corridor/root_warrens/root_hall";
         ResetSeconds = 300;
+        DangerBand(7, 8);
 
         AddDetail("seam,clay,walls,wall,cut,grey-white", "The seam is as fine as flour and cold as a stone. Where the diggers cut it, it has a glossy surface printed with the marks of their broad hands and the grain of the picks. It would take a fine glaze, a potter might say, and fire hard.");
         AddDetail("camp,bedroll,bed,pan,tin", "The bedroll has rotted to a mat, and mould furs the blanket. The pan is a prospector's pan, rimmed with rust, and still holds a crust of old clay in the bottom where someone was washing a sample.");

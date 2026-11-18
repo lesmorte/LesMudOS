@@ -9,6 +9,7 @@ public class GrTheGoblinRaidersCamp : Room
         Exits["east"] = "/domains/greenvale/corridor/green_road/w3";
         Exits["north"] = "/domains/greenvale/corridor/green_road/d2";
         Safe = false;
+        DangerBand(8, 9);
 
         AddDetail("camp,hollow,ground,clearing", "A trampled hollow of mud, ash and bones, and the sour smell of goblins. The raiders are not hiding anything. They know no one comes here and returns.");
         AddDetail("palisade,stakes,stake,fence,wall", "A fence of green stakes, sharpened at the tops and lashed with strips of hide. It is not strong but it is intended to be seen.");

@@ -9,6 +9,7 @@ public class GrTheRaidersFord : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/w1";
         Exits["north"] = "/domains/greenvale/corridor/green_road/w3";
         Safe = false;
+        DangerBand(7, 8);
 
         AddDetail("stream,ford,brook,water,gravel,bed", "A shallow, quick stream over a gravel bed, ankle deep at the crossing and hip deep either side of it. Boot prints and small bare feet have chewed up the mud on both banks.");
         AddDetail("banks,bank,alder,alders,thicket,thickets", "Alders overhang the water, and their roots make a ladder up the bank. A man could lie flat on the top and see everyone crossing.");

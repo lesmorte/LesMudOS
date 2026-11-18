@@ -9,6 +9,7 @@ public class RwRootStair : Room
         Exits["up"] = "/domains/greenvale/corridor/root_warrens/entrance";
         Exits["south"] = "/domains/greenvale/corridor/root_warrens/junction";
         ResetSeconds = 300;
+        DangerBand(7, 8);
 
         AddDetail("stair,steps,step,treads,tread", "The treads are the width of a short man's stride and cut with such care that the edges are still sharp. In the middle of each, a shallow dip has been worn by the passage of a great many feet.");
         AddDetail("walls,wall,clay,scars,picks,pick marks", "Pick marks run down the walls in neat slanted rows, each cut the length of a goblin's arm. At head height the clay has been scraped in a bright band, as if by fur, where something has been using this stair for years.");

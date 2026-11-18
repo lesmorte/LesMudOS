@@ -8,6 +8,7 @@ public class SrS1 : Room
         LongDesc = "A tiny round clearing opens behind the brambles, walled in by thorn and floored with soft dead leaves. In the middle stands the stone ring of a well-head, waist high, its bucket-frame long rotted away, and the shaft inside is bone dry. Beside it a farmstead's old hearthstone lies sunk in the earth, and the air smells of earth, stone and long forgotten things. Someone once rested here with his back to the well, and left something behind in a niche of the stones.";
         Exits["east"] = "/domains/greenvale/corridor/south_road/d2";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("well,well-head,ring,shaft,stones", "A ring of fitted stone, mossed to the lip, over a shaft that drops away into dark. When you drop a pebble in, it takes a long time to land, and the sound is dry.");
         AddDetail("hearthstone,hearth,farmstead,foundation", "A broad flat stone worn hollow by feet, the last trace of a farmhouse that stood here before the brambles. The soil around it still shows a square of nettles where the walls were.");

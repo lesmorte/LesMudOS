@@ -8,6 +8,7 @@ public class HwD1 : Room
         LongDesc = "The ground falls away into a round dell, steep-sided and ringed with ferns, with a floor of flattened bracken and old bone. The bed in the middle is the size of a cart, pressed into the earth by a body that has lain there year after year. Grey hair is snagged on every thorn along the rim, coarse as horsehair and as long as your forearm. The air is heavy and warm and smells of wet fur, and the only sound is a slow, deep breathing from somewhere close.";
         Exits["west"] = "/domains/greenvale/corridor/heartwood/w3";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/d2";
+        DangerBand(9, 10);
 
         AddDetail("dell,hollow,bowl,rim,slope,sides", "The dell is nearly round, twenty paces across and the depth of two men, with sides too steep for a deer to climb comfortably. It was not dug, but it has been kept clear, and the thorn has been allowed to grow in a ring on the rim.");
         AddDetail("bed,lair,den,bracken,flattened", "The bed is a hollow worn into the floor and lined with bracken crushed flat and dry. It is much too large for a wolf as you know wolves. In the middle, a long shape has pressed itself into the earth, and the earth has not recovered.");

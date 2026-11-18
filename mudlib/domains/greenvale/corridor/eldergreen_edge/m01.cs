@@ -9,6 +9,7 @@ public class EeLastFences : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m11";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m02";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("fences,fence,rails,rail,posts", "The fence rails are split oak, silvered by weather and bowed where cattle have leaned on them. Past this point nobody has bothered to put up another.");
         AddDetail("pasture,bramble,brambles,fields,stubble", "Rough pasture runs up to a tangle of bramble, the ground too stony and too far from any yard to be worth the plough. A few sheep have been here, and left tufts of wool on the thorns.");

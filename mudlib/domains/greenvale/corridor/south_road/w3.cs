@@ -10,6 +10,7 @@ public class SrW3 : Room
         Exits["north"] = "/domains/greenvale/corridor/south_road/w4";
         Exits["west"] = "/domains/greenvale/corridor/south_road/d1";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("windmill,mill,tower,timber,sails", "A post-mill of tarred oak, turned into the wind by a great tail pole. Every board and beam trembles with the work.");
         AddDetail("view,road,ribbon,farms,hollow,smoke", "Standing here the whole country makes sense: road, farms, brook, bridge. Far south, a fleck of smoke is Vincent's Hollow.");

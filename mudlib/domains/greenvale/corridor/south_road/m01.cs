@@ -9,6 +9,7 @@ public class SrM01 : Room
         Exits["south"] = "/domains/greenvale/vale_road/road";
         Exits["north"] = "/domains/greenvale/corridor/south_road/m02";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("road,ruts,track,grass", "The ruts are deep and old, filled with the dried mud of last month's rain. The grass between them is flattened by hooves but never quite dies.");
         AddDetail("hedge,hawthorn,hedgerow", "A thick hawthorn hedge, laid by someone who knew the craft. Sparrows go in and out of it like gossip.");

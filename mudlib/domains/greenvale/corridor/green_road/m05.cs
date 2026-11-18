@@ -9,6 +9,7 @@ public class GrCorduroyCauseway : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/m04";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m06";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("causeway,logs,log,corduroy,road,planks", "Split logs, laid side by side across the road like the ribs of a ladder, and pegged to long stringers underneath. Many have been replaced with newer, paler timber, and some are rotting where they lie.");
         AddDetail("bog,water,mire,marsh,swamp,pool,pools", "Black water with a skin of weed. Where a log has slipped, you can see the bog take hold of it and draw it down, which is a decent warning.");

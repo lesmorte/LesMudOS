@@ -8,6 +8,7 @@ public class HwM06 : Room
         LongDesc = "Here the giants are dead, and have been for a very long time. Their trunks still stand, stripped of bark and bleached to a smooth silver, each hollow or split along its length and taller than any tower you have seen. The road runs among them as it would among pillars, and between them stand young trees in the light of the gaps, pale and thin. A wind that does not reach the ground sets the bare tops sighing, high overhead. Beneath them the claw marks on the silver wood begin at the height of a man's reach and go higher.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m05";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m07";
+        DangerBand(7, 8);
 
         AddDetail("trunks,trunk,giants,dead trees,standing trunks,pillars,snags", "The dead trunks have lost every limb and most of the bark and stand like columns, grey-silver and cracked from root to crown. Some are hollow enough that you could walk into them upright. A smell of old damp wood and of fox comes from the openings.");
         AddDetail("claw marks,claws,scratches,marks,gouges", "Four parallel grooves, each as long as your hand, are torn in the silver wood at the height of your head. Above them are more, and above those more still. Whatever made them stood on its hind legs and was not afraid of being seen.");

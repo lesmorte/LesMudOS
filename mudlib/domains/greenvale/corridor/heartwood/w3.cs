@@ -9,6 +9,7 @@ public class HwW3 : Room
         Exits["south"] = "/domains/greenvale/corridor/heartwood/w2";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/w4";
         Exits["east"] = "/domains/greenvale/corridor/heartwood/d1";
+        DangerBand(8, 9);
 
         AddDetail("spring,water,pool,basin,well", "The water rises from the sand in a slow, steady welling, and the surface is never still but never ripples. The cold of it reaches your hand before it touches. It tastes of stone and of nothing else.");
         AddDetail("roots,root,four roots,hollow", "The four roots that frame the spring grow from trees you cannot see the tops of, and they curve together like the fingers of a cupped hand. Their inner faces are worn smooth where animals have rubbed against them.");

@@ -9,6 +9,7 @@ public class EeGreenGate : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m10";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m01";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("oaks,gate,arch,limbs,branches,trees", "The two oaks are so alike in size they might have been planted together. Their limbs have been trained, over generations, to meet and grow into one another, so the arch is no longer two trees but one thing.");
         AddDetail("canopy,shade,north,beyond,road ahead", "Beyond the arch the canopy closes. The road runs into a green gloom, and the nearest trunks beyond the gate are hung with moss on every side.");

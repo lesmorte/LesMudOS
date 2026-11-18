@@ -7,6 +7,7 @@ public class FbLowNiche : Room
         ShortDesc = "The Low Niche";
         LongDesc = "You must stoop, almost kneel, to come through the gap beneath the slab, and the cell inside is hardly bigger than a cupboard. It is walled with a single course of small blocks and floored with the pale dust, and the cold here is the same as on the stair, but nearer. A shelf at the back is cut in the shape of a shallow hand, and it was made for something other than a body. On the shelf lies a curl of black ash, delicate as a feather, kept in the shape of a folded sheet.";
         Exits["west"] = "/domains/greenvale/corridor/barrow/descending_way";
+        DangerBand(9, 10);
 
         AddDetail("ash,page,sheet,curl,burned page,black", "A single page was burned here, on the shelf, and left to burn out. The ash has kept the fold of the sheet, and in it the ghost of ruled lines and a column of small marks in a hand that is not the hand of the carvers. Not a word survives. A breath would take it, and so the draught from the stair has not been let in: the slab is as it was left.");
         AddDetail("shelf,hand,hollow,niche,cell", "The shelf is cut to the shape of an open hand, fingers spread, the size of a platter. The stone beneath the ash is not even blackened. The page burned on something that was afterward carried away.");

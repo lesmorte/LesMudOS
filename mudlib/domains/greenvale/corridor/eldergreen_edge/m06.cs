@@ -9,6 +9,7 @@ public class EeFernBanks : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m05";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m07";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("ferns,fern,banks,bracken", "The ferns are broad-fronded and wet to the touch, and in their lower shade grow clumps of wild garlic, its white stars thick on the banks.");
         AddDetail("stream,channel,water,trickle", "The stream runs clear over brown stones through a channel somebody lined with flat rock long ago. It tastes cold and faintly of iron.");

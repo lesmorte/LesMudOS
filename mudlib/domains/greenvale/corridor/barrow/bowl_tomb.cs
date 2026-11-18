@@ -7,6 +7,7 @@ public class FbBowlTomb : Room
         ShortDesc = "The Tomb of the Seven Bowls";
         LongDesc = "A long, narrow chamber with a bier cut from the living rock down its middle, and about it, set at equal intervals in a ring, seven shallow bowls of green-grey stone. The bowls hold a brown crust, the dust of what may once have been oil, or grain, or something else. The bier is longer than a man needs, and its surface is smooth as water. The doorway behind you is plain but for a few strokes on its jamb. The carving here is deeper and tighter than in the passage, as though more care had been taken with those who lay nearest the ground.";
         Exits["west"] = "/domains/greenvale/corridor/barrow/long_gallery";
+        DangerBand(9, 10);
 
         AddDetail("bier,slab,rock,stone bed", "The bier is the rock itself, left standing when the chamber was cut around it, and its top has been polished level. A shallow trough runs down each side. What lay on it lies there still, or has gone to dust, and it is not for you to say which.");
         AddDetail("bowls,bowl,crust,offerings,ring", "Each bowl is a hand deep and as wide as a helm, hollowed from a single block and set into the floor so that its rim is level. One stands at the head of the bier, and the others are set round it at the same distance, the seventh at the foot. The brown crust in each has cracked into plates like a dry riverbed.");

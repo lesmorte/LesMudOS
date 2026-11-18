@@ -8,6 +8,7 @@ public class HwM01 : Room
         LongDesc = "The road passes under the first of the great trees and the light changes at once, from green to a dimmer brown. The trunks stand far apart and each is wider than a cart is long, their bark in plates as thick as a hand. Nothing grows beneath them but fern and pale moss, and the road is soft with centuries of fallen needle and leaf. It is quieter than the Green Road was: the birds are few and high, and your boots make no echo.";
         Exits["south"] = "/domains/greenvale/corridor/green_road/m11";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m02";
+        DangerBand(7, 8);
 
         AddDetail("trunks,trunk,trees,tree,oaks,oak,giants", "The nearest trunk takes eleven of your paces to walk around. Its first branch is higher than any roof in the Hollow, and its roots rise out of the ground in ridges that you must step over. Nothing in the Green Road behind you is half its age.");
         AddDetail("bark,plates", "The bark has split into grey plates, each deep enough to hide your hand to the wrist. Lichen grows on them in rings, and some of the rings are wider than a shield.");

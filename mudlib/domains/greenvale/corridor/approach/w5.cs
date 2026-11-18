@@ -10,6 +10,7 @@ public class OaW5 : Room
         Exits["east"] = "/domains/greenvale/corridor/approach/m07";
         Exits["west"] = "/domains/greenvale/corridor/approach/d3";
         ResetSeconds = 120;
+        DangerBand(8, 9);
 
         AddDetail("fields,strips,beans,barley,kale,crops", "The strips are narrow and neat, each marked by a stake with a family's colour of rag. Whoever farms the western ones does so with one eye on the tree-line.");
         AddDetail("haystacks,hay,stacks,ricks", "Conical ricks, thatched against the rain with bundled straw. One has been burrowed into by a fox, or a boy.");

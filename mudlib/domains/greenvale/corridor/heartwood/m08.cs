@@ -8,6 +8,7 @@ public class HwM08 : Room
         LongDesc = "The canopy closes so completely here that noon looks like evening. The light that reaches the road is green and without shadow, and the trunks fade into it a few dozen paces off. Pale ferns shoulder the road on both sides, taller than a child, and the only colour is the faint blue glow of a fungus on a fallen bough. Everything is damp, still and very large, and the road seems narrower than it was.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m07";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m09";
+        DangerBand(7, 8);
 
         AddDetail("light,dusk,green light,gloom,shadow,shadows", "The light has no source. It falls through the canopy in so many layers that it arrives from everywhere and casts nothing. Your own hands look faintly green.");
         AddDetail("ferns,fern,fronds,bracken", "The ferns are pale and wide, the fronds as long as your arm, and they close over the road at the edges. They move without a wind, a little, when something small passes underneath.");

@@ -9,6 +9,7 @@ public class FbGuardianHall : Room
         Exits["south"] = "/domains/greenvale/corridor/barrow/long_gallery";
         Exits["north"] = "/domains/greenvale/corridor/barrow/borrowed_tomb";
         ResetSeconds = 600;
+        DangerBand(9, 10);
 
         AddDetail("pillars,pillar,rows,columns,column", "There are seven pillars to a row, square and plain, each carrying nothing on its faces but the interlaced line in bands of seven. They are set so exactly that from the door you look down two lanes of perfect shadow. Their feet are bare of dust, as though something had been walking among them.");
         AddDetail("frame,cradle,slab,plinth,stand,place", "The frame is of dark stone and metal, taller than a tall man, standing on a slab worn by the weight of something heavy that stood there a very long time. It is the place of a guardian, and it is empty. The slab is scored with fresh marks, as by a tool and as by a heavy tread.");

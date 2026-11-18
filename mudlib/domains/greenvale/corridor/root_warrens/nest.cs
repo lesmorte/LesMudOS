@@ -7,7 +7,8 @@ public class RwNest : Room
         ShortDesc = "The Broodmother's Nest";
         LongDesc = "The slope ends in a great round chamber, domed like a bell, and it is filled almost to the walls by a nest. The nest is a vast mound of shredded hide, fur, timbers and bone, packed and trampled into a bed, and it is warm. Smaller burrows open all round the walls at floor level, each as wide as a barrel. The reek is almost solid. At the back of the chamber, the far wall is a slope of fallen earth and broken stone, all that is left of the shaft the goblins dug and could not close.";
         Exits["up"] = "/domains/greenvale/corridor/root_warrens/brood_passage";
-        ResetSeconds = 300;
+        ResetSeconds = 1800;
+        DangerBand(9, 10);
 
         AddDetail("nest,mound,bed,bedding,hide,fur,timbers,heap", "The nest is a bed of everything the warren once held: hides, furs, timbers, splintered furniture, the scraps of goblin lives. It has been trampled flat in a hollow at its middle and packed so hard it could be walked on. It is warm to the touch, like a living thing.");
         AddDetail("bones,bone,skulls,skull,ribs", "Bones are bedded in the nest by the cartload, among them the great skulls of boars and the long ribs of deer, and also, in a layer near the bottom, many small bony hands and pointed skulls that are not rats'.");

@@ -8,6 +8,7 @@ public class HwM10 : Room
         LongDesc = "The great trunks stand wider apart here, and between them the sky comes down in patches of real light. Bracken and young oak fill the gaps, and the road is dry and pale, with dust on it. Birds are singing again somewhere ahead, small and ordinary, and the air smells of cut wood and, faintly, of smoke. You have walked out of a very old place, and you are aware of it as you would be of leaving a shrine.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m09";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m11";
+        DangerBand(7, 8);
 
         AddDetail("sky,light,patches,sunlight,sun", "The sunlight comes down in separate shafts and lies on the road in gold coins. After the green dusk, it feels warm enough to be a gift.");
         AddDetail("bracken,young oak,oak,undergrowth,saplings", "The bracken is waist-high, and among it stand young oaks no thicker than a wrist. They are the first things you have seen in a day that are not older than you can imagine.");

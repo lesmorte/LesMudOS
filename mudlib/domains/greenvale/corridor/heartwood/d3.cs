@@ -8,6 +8,7 @@ public class HwD3 : Room
         LongDesc = "A small stone shrine has fallen in on itself at the end of the trail, and the broken blocks lie piled where the roof came down. Two walls still stand to the height of a man, built of the dark green-grey stone, and between them lies a heavy lintel, cracked in two and tilted against the rubble. The trail ends here: it was never meant to go further. Behind the fallen lintel is a gap between two leaning slabs, black and narrow, from which a cold air comes steadily. Moss and fern grow over the rest, and the silence is thick.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/d2";
         Exits["west"] = "/domains/greenvale/corridor/heartwood/w5";
+        DangerBand(9, 10);
 
         AddDetail("shrine,ruin,ruins,building,walls,wall", "The shrine was square, and small, no bigger than a cottage room. Two walls stand, and the roof has come in between them. The stone of the walls is the same green-grey as the arch on the road, cut and fitted in the same way, and there is no mark on the outside at all.");
         AddDetail("lintel,beam,cracked,crack,stone", "The lintel is a single stone as long as a wagon, broken across its middle and tilted. Under the moss on its upper face are the last few groups of a carved line, in the interlaced pattern of the arch.");

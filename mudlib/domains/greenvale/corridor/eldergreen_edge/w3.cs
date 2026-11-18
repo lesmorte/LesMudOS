@@ -10,6 +10,7 @@ public class EeDeerLawn : Room
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/w4";
         Exits["east"] = "/domains/greenvale/corridor/eldergreen_edge/d1";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("lawn,grass,clover,thyme,meadow", "The grass is cropped as short as a bowling green, and thick with clover, daisies and creeping thyme that releases its scent underfoot.");
         AddDetail("oaks,oak,trees,edge", "The oaks stand well back from one another around the lawn, each with a wide skirt of bare earth where the deer have lain beneath them.");

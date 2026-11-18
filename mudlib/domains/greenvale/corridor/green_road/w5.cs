@@ -10,6 +10,7 @@ public class GrTheBearTrees : Room
         Exits["east"] = "/domains/greenvale/corridor/green_road/m07";
         Exits["west"] = "/domains/greenvale/corridor/green_road/d3";
         Safe = false;
+        DangerBand(7, 8);
 
         AddDetail("trees,beeches,beech,trunks,bear trees", "Old beeches, smooth as columns. Every trunk is scarred at the height of a standing bear's reach, and the scars are fresh enough to weep.");
         AddDetail("scars,gouges,claw marks,claws,scratches,marks", "Sets of four parallel grooves, each as long as a forearm and deep enough to put a finger in. They are laid one over another, higher on some trees than a man could reach.");

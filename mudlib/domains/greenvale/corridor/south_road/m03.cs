@@ -10,6 +10,7 @@ public class SrM03 : Room
         Exits["north"] = "/domains/greenvale/corridor/south_road/m04";
         Exits["west"] = "/domains/greenvale/corridor/south_road/w1";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("lane,cart lane,ruts", "The lane is a farmer's road, far more rutted than the highway. A strip of grass down the middle is cropped short by whatever the farm keeps.");
         AddDetail("gateposts,gatepost,posts,gate", "Two oak gateposts, grey and split, with iron hinges rusted to the shape of old hands. The gate itself leans against the hedge, unhung for a generation.");

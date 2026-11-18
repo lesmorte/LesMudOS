@@ -10,6 +10,7 @@ public class OaM08 : Room
         Exits["north"] = "/domains/greenvale/corridor/approach/m09";
         Safe = true;
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("green,grass,village green,common", "The grass is cropped short by geese and sheep in turn, and rubbed bare in a ring where the village children have been playing for generations. A stone in the middle marks the spot where the hamlet's moots are held.");
         AddDetail("pond,duck pond,ducks,water", "Six ducks and one very dignified drake cruise the pond, which is the colour of weak tea and edged with irises. A child's wooden boat lies stranded among the reeds.");

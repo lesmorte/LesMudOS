@@ -10,6 +10,7 @@ public class OaM03 : Room
         Exits["north"] = "/domains/greenvale/corridor/approach/m04";
         Exits["west"] = "/domains/greenvale/corridor/approach/w1";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("toll house,house,building,gable", "The toll house is built of the same grey stone as the city's wall, with a slate roof and a chimney that smokes in all weathers. Over the door a carved oak leaf shows that it is the Assembly's.");
         AddDetail("barrier,pole,pole barrier,gate", "A long pole, painted in bands of green and white, turns on a weighted pivot. A rope runs from its tail to the window, and the toll keeper lifts it with a tug when he is satisfied.");
@@ -18,6 +19,7 @@ public class OaM03 : Room
         AddDetail("wagons,line,queue,carts", "Six wagons wait, nose to tail, their drivers asleep on the boards or arguing about weights. The wheels have cut the paving here deeper than anywhere on the road.");
         AddDetail("track,west track,path,hedgerows,broken stonework", "A muddy track leaves the road beside the toll house, with a stake driven into the verge and a rag tied to it. Down the track, above the hedgerows, you can see the tops of tall stone shapes that are not any building you know.");
         AddReadable("toll board,board,tolls,rates,toll", "GREENVALE TOLL HOUSE, by order of the Assembly\nFor the upkeep of the road and the safety of its travelers.\n Handcart, barrow or pack-beast: 1 gold\n Wagon, empty: 3 gold\n Wagon, laden: 5 gold\n Herd, per ten head: 2 gold\n Riders and walkers: free\nHolders of the Greenvale Travel Pass pass without question.\nPROSPERITY THROUGH UNITY", "A painted board hangs on the wall by the window. You could {cmd}read{/} it.");
+        AddSpawn("/domains/greenvale/corridor/npc/patrol_approach");
 
         AddSpawn("/domains/greenvale/corridor/approach/npc/toll_keeper");
         AddSpawn("/domains/greenvale/corridor/approach/npc/toll_guard");

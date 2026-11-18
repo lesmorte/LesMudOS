@@ -9,6 +9,7 @@ public class SrM08 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m07";
         Exits["north"] = "/domains/greenvale/corridor/south_road/m09";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("meadows,meadow,hay,grass", "Long meadows, half-mown, the cut grass drying in swathes. The smell is a thing you could eat.");
         AddDetail("haycocks,haycock,stooks,ricks", "Haycocks stand in orderly ranks, each tied against the wind with a plait of straw. In the shadow of one a farmer's coat lies forgotten.");

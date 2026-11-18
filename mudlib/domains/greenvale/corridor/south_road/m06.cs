@@ -9,6 +9,7 @@ public class SrM06 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m05";
         Exits["north"] = "/domains/greenvale/corridor/south_road/m07";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("sheep,flock,lambs,ewes", "Grey-faced, black-nosed sheep with a stripe of red dye across the shoulder. They stare at you with total sheepish suspicion.");
         AddDetail("walls,wall,drystone,wire", "The drystone walls are built without mortar, lichen-bearded, and topped with a single course of upright stones. A little wool clings to every sharp edge.");

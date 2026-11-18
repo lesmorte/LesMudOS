@@ -9,6 +9,7 @@ public class GrTheSpiderRavine : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/d1";
         Exits["north"] = "/domains/greenvale/corridor/green_road/d3";
         Safe = false;
+        DangerBand(8, 9);
 
         AddDetail("ravine,cleft,gully,walls,wall,rock,rocks", "A sheer-sided cleft forty feet deep and twenty wide, full of cold air. The rock is black, wet and furred with lichen.");
         AddDetail("stream,water,brook,rill", "A black stream runs along the floor over smooth stones, silent and cold. Its edges are stringy with web.");

@@ -9,6 +9,7 @@ public class EeBoarWallow : Room
         Exits["west"] = "/domains/greenvale/corridor/eldergreen_edge/w3";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/d2";
         ResetSeconds = 120;
+        DangerBand(7, 8);
 
         AddDetail("wallow,mud,bog,hollow,pool", "The mud is black, glossy and ankle-deep, with a skin of green scum over it. Great hollows where the boars have lain are still wet, and the shape of a sow with piglets is pressed in one.");
         AddDetail("trees,trunks,scores,tusk marks,tusks,gouges", "The gouges in the bark run from knee to waist height, and the sap has bled and hardened amber in the deepest. A tusker rubbed here lately.");

@@ -9,6 +9,7 @@ public class SrM04 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m03";
         Exits["north"] = "/domains/greenvale/corridor/south_road/m05";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("barley,fields,field,crop,crops", "The barley is almost ripe, gold at the tips, and it rustles like a crowd whispering. The ears are heavy and bow toward the road.");
         AddDetail("fence,fences,rails,rail,lichen", "Split-rail fences, lashed with withies and shored up with stones. The lichen on them is the colour of old brass.");

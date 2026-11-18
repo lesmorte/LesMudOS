@@ -8,6 +8,7 @@ public class EeHuntersHide : Room
         LongDesc = "A cunningly woven platform of branches and lashed saplings nestles in the great beech's fork, forty feet above the forest floor and roofed over with living boughs so well that it cannot be seen from below. There is room for one to lie full length with a bow, a lantern and a day's food, and slits in the leaf-wall look out on the trail. Everything is dusty and silent, and everything has been left as it was. The air up here is warm, green and smells of dust, bark and old canvas.";
         Exits["west"] = "/domains/greenvale/corridor/eldergreen_edge/d2";
         ResetSeconds = 120;
+        DangerBand(7, 8);
 
         AddDetail("platform,hide,branches,saplings,lashings,floor", "The platform is sound, lashed with rawhide that has dried hard as iron. It has been mended, more than once, by someone who meant to stay.");
         AddDetail("slits,slit,leaf-wall,window,view,trail", "Through the slits you can see the whole of the trail below, and the cord-hung trees along it. Nothing on it could see you.");

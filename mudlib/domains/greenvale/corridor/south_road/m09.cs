@@ -9,6 +9,7 @@ public class SrM09 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/m08";
         Exits["north"] = "/domains/greenvale/corridor/south_road/m10";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("brook,stream,water,current", "The brook is cold, clear and busy, talking to itself over stones the colour of tea. It runs north, toward the river.");
         AddDetail("willows,willow,leaves,banks", "Old pollard willows with rough crowns of whips. Their roots have laid hold of the bank and hold it up.");

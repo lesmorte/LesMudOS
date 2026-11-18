@@ -9,6 +9,7 @@ public class RwSpoilHeap : Room
         Exits["east"] = "/domains/greenvale/corridor/root_warrens/junction";
         Exits["south"] = "/domains/greenvale/corridor/root_warrens/clay_cut";
         ResetSeconds = 300;
+        DangerBand(7, 8);
 
         AddDetail("heap,spoil,slope,stone,stones,clay,rubble", "The heap is a dull mix of yellow clay, grey stones and rotted roots, dumped barrow by barrow over a long time. The top is crowned with a smooth crust where the fungus has taken it, and the sides are cratered with burrows.");
         AddDetail("fungus,fungi,shelves,shelf,mould,drifts", "The fungus grows in pale shelves the colour of old candle-wax, soft and damp to the touch and faintly sweet-smelling. It is thickest where the clay is dampest. It would be worth carrying away, if one knew what it was good for.");

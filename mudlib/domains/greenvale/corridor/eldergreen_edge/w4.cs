@@ -9,6 +9,7 @@ public class EeSpiderThicket : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/w3";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/w5";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("webs,web,silk,sheets,strands", "The webs are huge, tight and strong, and the nearest sheet is as thick as a bedsheet. Small bones and beetle shells hang in it, bound in silk.");
         AddDetail("thicket,hazel,holly,blackthorn,brambles,bramble", "Hazel, holly and blackthorn have woven themselves into a barrier that only the path pierces. The thorns are long and black, and catch at cloaks.");

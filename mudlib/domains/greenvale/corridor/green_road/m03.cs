@@ -10,6 +10,7 @@ public class GrMerchantCamp : Room
         Exits["north"] = "/domains/greenvale/corridor/green_road/m04";
         Exits["west"] = "/domains/greenvale/corridor/green_road/w1";
         Safe = true;
+        DangerBand(6, 7);
 
         AddDetail("wagons,wagon,ring,hoops,canvas", "Heavy four-wheeled wagons chained wheel to wheel, with canvas tilts pegged tight against the damp. Each carries a painted scale on the tailboard, the mark of a Consortium house, but the paint is flaking from hard travel.");
         AddDetail("oxen,ox,beasts,animals,tethers", "Sixteen patient oxen stand in a huddle with their breath smoking, and one of them looks at you with the weary interest of an animal that has done this journey many times.");

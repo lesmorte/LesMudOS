@@ -10,6 +10,7 @@ public class FbDescendingWay : Room
         Exits["down"] = "/domains/greenvale/corridor/barrow/long_gallery";
         Exits["west"] = "/domains/greenvale/corridor/barrow/resealed_tomb";
         Exits["east"] = "/domains/greenvale/corridor/barrow/low_niche";
+        DangerBand(9, 10);
 
         AddDetail("steps,step,flights,flight,stair,landing,landings,stone", "Seven steps, a landing as long as a man, seven steps again. The treads are exactly the same height, so that you could go down them in the dark and never miss one. There is no wear in the middle of any of them.");
         AddDetail("vault,roof,ceiling,arch,darkness", "The vault is a tall, narrow point, like a cupped pair of hands held upright. Where the lamplight stops, the stone goes on.");

@@ -10,6 +10,7 @@ public class EeRiverwatchOutpost : Room
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m10";
         Safe = true;
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("palisade,stakes,wall,gate,yard", "The palisade is a hedge of sharpened oak stakes taller than a mounted man, lashed with iron bands and weathered grey. The gate is open by day, and a ranger stands near it, nodding to every traveler.");
         AddDetail("pennant,pole,flag,banner,eye,silver eye", "A green-and-grey pennant bearing a silver eye flies from a tall pole. It is the same device that hangs in the Rangers' office in Oakenfell, and beneath it, painted on the pole in white, are the words \"Ever Vigilant\".");

@@ -9,6 +9,7 @@ public class OaM05 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/m04";
         Exits["north"] = "/domains/greenvale/corridor/approach/m06";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("wagons,rows,canvas,hoods,carts", "The wagons stand in numbered rows, tilts laced down, shafts propped. Their sides are chalked with marks for owner, cargo and destination, and the rows nearest the road are already hitched.");
         AddDetail("oxen,ox,beasts,teams,lines", "Great patient oxen stand in their yokes, breath smoking, chewing nothing in particular. A drover's boy walks among them with a bucket, murmuring to each by name.");

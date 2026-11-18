@@ -9,6 +9,7 @@ public class SrW2 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/w1";
         Exits["north"] = "/domains/greenvale/corridor/south_road/w3";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("orchard,trees,apple trees,pear trees,boughs", "Old trees, planted in the miller's grandfather's day, propped with forked poles where the limbs hang low. The fruit is hard and green and smells of promise.");
         AddDetail("bees,hive,hives,skeps", "Straw skeps stand on a shelf under a thatched shed, and the bees come and go in a drowsy stream. They have no interest in you if you are polite.");

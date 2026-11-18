@@ -10,6 +10,7 @@ public class RwQuarters : Room
         Exits["south"] = "/domains/greenvale/corridor/root_warrens/gallery";
         Exits["east"] = "/domains/greenvale/corridor/root_warrens/larder";
         ResetSeconds = 300;
+        DangerBand(7, 8);
 
         AddDetail("partitions,partition,hide,hides,woven,screens", "The partitions are frames of split root woven with strips of hide, and the hides are old, stiff and cracked, in grey, brown and one patchy yellow. Where they have fallen they lie in curled sheets that have not rotted. A tanner or a leatherworker might yet have a use for them.");
         AddDetail("hollows,hollow,beds,bed,litter,straw,fur", "The sleeping hollows are worn smooth and each has its own shape, a wide one for a hulking digger and a narrow one beside it. The smallest, in a row at the back, are lined with soft grey fur and one has a wooden toy lying in it, a horse with one leg.");

@@ -8,6 +8,7 @@ public class GrTheWatchtowerCellar : Room
         LongDesc = "A low, vaulted cellar of dressed stone, dry and cold, with the smell of cold iron and old paper. Racks along the walls hold rusted lanterns, a few moldering sacks and the frames of cots. A table has been dragged into the middle, and on it a lantern, a heap of papers and a ledger bound in black cloth wait as if their owner stepped away. On the end wall, at the height of a man's eyes, something has been burned deep into the stone.";
         Exits["up"] = "/domains/greenvale/corridor/green_road/w3";
         Safe = false;
+        DangerBand(8, 9);
 
         AddDetail("cellar,vault,vaulted ceiling,ceiling,walls,room", "A cellar of tight-fitting stone, built to hold a garrison's stores. The air is dry and entirely still, and nothing seems to have grown here in years.");
         AddDetail("racks,rack,lanterns,lantern,sacks,sack,cots,cot,frames", "Rows of empty racks, rusted lanterns and rotted sacks. The cots are neatly made. Nobody slept in them in the end.");

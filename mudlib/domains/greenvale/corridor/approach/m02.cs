@@ -9,6 +9,7 @@ public class OaM02 : Room
         Exits["south"] = "/domains/greenvale/corridor/approach/m01";
         Exits["north"] = "/domains/greenvale/corridor/approach/m03";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("flagstones,paving,stones,flags,road", "Each flag is as long as a man is tall, quarried, squared and laid by people who expected the road to last. They are cracked and heaved in places, and mended in places with stone of a different grey.");
         AddDetail("ruts,troughs,wheel ruts,grooves", "The grooves are exactly one wagon wide. Following them with your eye you can see how every cart that ever came this way has chosen the same two lines.");

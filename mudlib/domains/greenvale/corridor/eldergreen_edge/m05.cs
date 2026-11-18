@@ -9,6 +9,7 @@ public class EeBrokenWaystone : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m04";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m06";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("stone,marker,crack,split", "The waystone is shoulder-high even broken, a single block of grey stone with its face smoothed for lettering. The crack runs jaggedly down it and has been widened by seeds and roots; a small fern grows in the gap.");
         AddDetail("lichen,moss,fern", "The lichen grows in rings, orange and grey, and some of the rings are wider than your hand. They cover more of the inscription than the weather has.");
@@ -17,6 +18,7 @@ public class EeBrokenWaystone : Room
         AddDetail("birds,birdsong,silence", "The birds fall quiet around the stone, and then take up their calls again a little further off, as though the stone itself were something to be passed in silence.");
         AddDetail("scratch,scratches,spiral,rough hand,rough letters", "Near the base, in letters rougher than the rest and scratched rather than cut, someone has added a line of their own. It is worn and very old.");
         AddReadable("waystone,inscription,letters,writing,inscription stone", "What can be read of the inscription, standing half and fallen half together:\n\n   . . . ED BY THE WARDENS OF . . . . . .\n   FROM THE HOL . . . . . TWELVE MILES\n   TO OAKENF . . . . . . . . DAYS\n   . . . . . . . . . . . . . . .\n   KEEP TO THE ROAD. THE WOOD . . . . .\n\nBelow, in rougher letters that were scratched in later:\n   . . . FOREST REMEMBERS.\n\nA line in the middle has been chiselled away entirely, on purpose, by someone who did not want it read.", "A cracked waystone with a half-legible inscription leans here. You could {cmd}read{/} it.");
+        AddSpawn("/domains/greenvale/corridor/npc/patrol_eldergreen_edge");
 
         AddEncounter("/domains/greenvale/corridor/mob/forest_wolf", 10);
         AddEncounter("/domains/greenvale/corridor/mob/forest_spider", 5);

@@ -9,6 +9,7 @@ public class EePatrolMile : Room
         Exits["south"] = "/domains/greenvale/corridor/eldergreen_edge/m09";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/m11";
         ResetSeconds = 120;
+        DangerBand(5, 7);
 
         AddDetail("brush,verge,limbs,piles,cut", "The brush has been cut with billhooks and stacked on the verge to rot into mulch. Beyond the cut line the wood looks different: closer, darker, watching.");
         AddDetail("blazes,blaze,eye,paint,square", "On the trunk at your elbow is a small green square with a stylised eye painted on it in silver-grey. They appear every hundred paces, and each is freshly touched up.");

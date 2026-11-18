@@ -8,6 +8,7 @@ public class HwD2 : Room
         LongDesc = "Thorn has taken this part of the wood: brambles as thick as a man's wrist, hawthorn grown to the height of a tree, and sloe and briar knotted among them into a wall on every side. The trail forces its way through in a tunnel barely wide enough for one, hooked and scratched on both flanks. The thorns are long and black and wet, and they catch at cloaks and pull. Strange things are tangled in them: tufts of fur, a scrap of cloth, the white curve of a rib. On the east side of the trail a stretch of the thicket has died back, grey and brittle among the green.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/d1";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/d3";
+        DangerBand(9, 10);
 
         AddDetail("thorn,thorns,brambles,bramble,briar,hawthorn,sloe,thicket,wall", "The thorns are black and as long as a finger, and they grow in pairs. The thicket is so dense that the light comes through only as a dim brown glow, and the leaves rustle without any wind.");
         AddDetail("tunnel,trail,path,way,passage", "The trail is a low tunnel through the thorn, worn by animals and the odd hunter. Bent stems and snapped twigs show where others have come this way, and gone back, and not stopped.");

@@ -11,6 +11,7 @@ public class RwRootHall : Room
         Exits["south"] = "/domains/greenvale/corridor/root_warrens/corner";
         Exits["down"] = "/domains/greenvale/corridor/root_warrens/brood_passage";
         ResetSeconds = 300;
+        DangerBand(7, 8);
 
         AddDetail("roots,root,columns,column,cords,cord,thicket", "The roots are the colour of tallow and as smooth as skin, with a faint sheen of wet. When you look away from them you catch a movement at the edge of your sight, a slow shifting of the cords, and when you look back the cords lie as they did. They do not rot like dead wood, and they are cold to the touch.");
         AddDetail("pale roots,rootlets,root hairs,hairs,threads,white", "Among the great cords hang bundles of fine white rootlets, soft as wool and as long as a forearm. They break off clean, and they smell sharply green. An herbalist might know what to make of them.");

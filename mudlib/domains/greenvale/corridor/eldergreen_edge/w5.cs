@@ -10,6 +10,7 @@ public class EeBirchStand : Room
         Exits["west"] = "/domains/greenvale/corridor/eldergreen_edge/m07";
         Exits["east"] = "/domains/greenvale/corridor/eldergreen_edge/d3";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("birches,birch,trunks,bark,silver birches", "The birch bark peels in papery curls, creamy white and marked with black. It is the best tinder in the wood.");
         AddDetail("leaves,light,glow,sun,sunlight", "The leaves are small and tremble in every breath of wind, throwing a green shimmering light on the white trunks.");

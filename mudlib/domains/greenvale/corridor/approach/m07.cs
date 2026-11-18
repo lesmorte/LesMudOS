@@ -10,6 +10,7 @@ public class OaM07 : Room
         Exits["north"] = "/domains/greenvale/corridor/approach/m08";
         Exits["west"] = "/domains/greenvale/corridor/approach/w5";
         ResetSeconds = 120;
+        DangerBand(6, 8);
 
         AddDetail("river,mere,river mere,water", "The River Mere runs wide and unhurried here, with a clean gravel bed showing through the shallows. Far out a flat barge is poled slowly downstream, its load hidden under tarpaulins, on its way to the city's docks.");
         AddDetail("reeds,bank,riverbank", "Tall reeds, brown at the tips, whisper in the wind. Between them the mud is stitched with the prints of herons and, closer to the road, hobnailed boots.");

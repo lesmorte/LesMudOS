@@ -9,6 +9,7 @@ public class GrBelowTheWatchtower : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/m08";
         Exits["north"] = "/domains/greenvale/corridor/green_road/m10";
         Safe = false;
+        DangerBand(6, 7);
 
         AddDetail("tower,watchtower,knoll,stump,hill,ruin", "A square stone tower, perhaps three storeys, with its top broken off and the rest furred with ivy. It was built to see the road and now cannot see anything. A path to it leaves the road farther on, in the woodland, and is not marked.");
         AddDetail("milestone,stone,marker,leaning", "A rough stone leaning with its top rubbed round by hands. Cut figures on its face show the distance to Eldergreen and to the Crossroads, and below them are words in a different, more recent chisel.");
@@ -17,6 +18,7 @@ public class GrBelowTheWatchtower : Room
         AddDetail("road,verge,ditch,shadow", "A ditch runs along the roadside, half choked with leaf. Rangers cleared it once and no one has since.");
         AddDetail("smoke,fire,light,lights", "No smoke rises from the tower, and nobody has seen a light there in years, although drovers swear they have heard something from it at night.");
         AddReadable("milestone words,words,chiseled words,inscription,figures", "On the stone, in figures and then in a harder, later hand:\n\nEDGE POST 8 MI.\nCROSSROADS 2 MI.\n\nRIVERWATCH POST. EVER VIGILANT.\n(Beneath, scratched in with a knife:) NOBODY HOME.", "Figures and a few words are cut into the milestone. You could {cmd}read{/} them.");
+        AddSpawn("/domains/greenvale/corridor/npc/patrol_green_road");
 
         AddEncounter("/domains/greenvale/corridor/mob/goblin_raider", 10);
     }

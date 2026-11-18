@@ -8,6 +8,7 @@ public class HwM04 : Room
         LongDesc = "For a mile the moss has had its way. It covers the banks of the road, the fallen trunks along it and every boulder, and it has crept in from the edges until the wheel-ruts are the only bare earth. Water drips somewhere out of sight, slow and regular, and the sound is the only one there is. The trees are the same great pillars as before, but the green light is thicker here, and the air feels damp against the skin.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m03";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m05";
+        DangerBand(7, 8);
 
         AddDetail("moss,green,carpet,fur", "The moss is of several kinds: a deep dark green on the roots, a yellow-green on the stones, and a grey mat on the dead wood. It is so thick that a hand pressed into it vanishes to the knuckle, and the print fills slowly again.");
         AddDetail("trunks,trunk,deadfall,fallen trunks,logs,log", "The fallen trunks have lain so long that they are only long humps of moss with a hollow in the middle. One has a young beech growing from its back, taller than you are.");

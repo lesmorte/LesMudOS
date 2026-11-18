@@ -10,6 +10,7 @@ public class SrW5 : Room
         Exits["east"] = "/domains/greenvale/corridor/south_road/m07";
         Exits["west"] = "/domains/greenvale/corridor/south_road/d3";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("hay,meadow,grass,stalks", "Meadow hay, seeding and heavy, bowed over with its own weight. It smells of summer and sweetness.");
         AddDetail("wildflowers,flowers,poppies,cornflowers,daisies", "Poppies, cornflowers, yellow rattle and ox-eye daisies, all tangled together. A few honey bees crawl heavily among them.");

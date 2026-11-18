@@ -9,6 +9,7 @@ public class GrTheWebbedGlade : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/w3";
         Exits["north"] = "/domains/greenvale/corridor/green_road/w5";
         Safe = false;
+        DangerBand(7, 8);
 
         AddDetail("webs,web,sheets,silk,threads,strands", "Sheets of grey silk, each as large as a bedsheet, strung between the trees. They tremble when you breathe.");
         AddDetail("husks,husk,bundles,cocoons,cocoon,remains", "Wrapped bundles hang in the webs, shrivelled and light. Some are birds, some are rabbits, and one is bigger and wears the remains of a boot.");

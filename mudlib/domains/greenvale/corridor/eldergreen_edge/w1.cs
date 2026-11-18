@@ -9,6 +9,7 @@ public class EeWoodcuttersRide : Room
         Exits["west"] = "/domains/greenvale/corridor/eldergreen_edge/m03";
         Exits["north"] = "/domains/greenvale/corridor/eldergreen_edge/w2";
         ResetSeconds = 120;
+        DangerBand(6, 7);
 
         AddDetail("ride,track,sled,drag marks,sawdust,chips,bark", "The ride is a trough of bark and chips, scored down the middle by runners. At every bend a post has been set to stop the sleds from sliding into the trees.");
         AddDetail("logs,oaks,felled oaks,timber,stack,stacks", "The felled oaks have been limbed and cut to length, each log chalked with a mark and a number. They are enormous, and each takes a team to move.");

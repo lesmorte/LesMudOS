@@ -8,6 +8,7 @@ public class FbResealedTomb : Room
         LongDesc = "A square chamber, no larger than a farm kitchen, holds a single great chest of green-grey stone on a low plinth, its lid a slab as thick as a man is deep. The lid has been moved: the old tight joint is broken all round, and someone has run a bead of new pale lead along the seam to close it again, as neatly as a mason would, and a drop of pale wax has hardened on the plinth beside it. The floor is clean and cold, and the dust lies even except along a narrow track from the door to the plinth. Panels of the interlaced carving cover the walls from floor to vault.";
         Exits["east"] = "/domains/greenvale/corridor/barrow/descending_way";
         ResetSeconds = 600;
+        DangerBand(9, 10);
 
         AddDetail("chest,sarcophagus,coffin,tomb,stone chest,plinth", "The chest stands on a plinth the height of a bench. It is cut from one block, and its sides carry the same band of figures, but small, and with their arms lowered to their sides. It is longer than a man would need.");
         AddDetail("lid,seam,joint,lead,bead,new lead,reseal", "The old joint was no wider than a hair and sealed with nothing but the weight of the lid. The new seam is a bead of lead, still bright where it was smoothed with a thumb or a tool, and the pitted edge of the stone shows beside it where the lid was levered up and set back down. A mason of Oakenfell would be glad to do as well.");

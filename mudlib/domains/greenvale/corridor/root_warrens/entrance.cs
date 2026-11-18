@@ -8,6 +8,7 @@ public class RwEntrance : Room
         LongDesc = "You are in the hollow the great tree tore out of the ground, where the roots hang down overhead like the ribs of a wrecked ship and the daylight comes in green and thin from above. The floor is trodden to hard bare clay by small feet, and at the back it slopes into a narrow mouth cut square into the earth, far too even to be a burrow. A slow draught breathes out of it, cool and rank, smelling of wet stone and old nests. Someone shored the mouth with split timbers a long time ago, and the timbers have been chewed. Behind you the roots make a rough stair back up to the trail.";
         Exits["up"] = "/domains/greenvale/corridor/heartwood/w2";
         Exits["down"] = "/domains/greenvale/corridor/root_warrens/root_stair";
+        DangerBand(7, 8);
 
         AddDetail("roots,root,ribs,stair,curtain", "The roots hang in cords as thick as a man's leg, and they curve back up into the underside of the plate. Where you came down, the biggest of them have been trodden and cut into a rough stair, and the cuts are old and square. Someone made this way to be used.");
         AddDetail("mouth,opening,tunnel,entry,dark", "The mouth is the width of two men and the height of one and a half, with sides and a lintel that are plainly cut with picks. It was not dug by a fox or a badger. Beyond the first few paces it turns downward into black.");

@@ -7,7 +7,8 @@ public class FbBorrowedTomb : Room
         ShortDesc = "The Borrowed Tomb";
         LongDesc = "The great door has been drawn back just far enough to pass, and beyond it lies a tomb larger than any other, its bier dragged crosswise into a corner to clear the floor. Where it stood is a camp for one: a flat stone for a seat, a litter of rust and rag, and a ring of old soot on the paving, and against the wall a split shield. The carving on these walls is the finest in the barrow, and has been scraped at in places with something that had an edge. The cold is deeper here, and still; it has the smell of old iron.";
         Exits["south"] = "/domains/greenvale/corridor/barrow/guardian_hall";
-        ResetSeconds = 600;
+        ResetSeconds = 1800;
+        DangerBand(9, 10);
 
         AddDetail("bier,corner,rock,slab", "The bier is a block of the same green-grey stone, cut to be fixed, and torn from its footing and levered across the floor with an iron bar, the marks of which score the paving. What it was made to hold is nowhere to be seen. The room was cleared for a living man.");
         AddDetail("camp,seat,flat stone,stone,soot,ring,fire,hearth", "The seat is a block from the broken bier, placed to face the door. The soot ring is the size of a platter and long cold, with a handful of pale splinters in it that were once a stool or a chest. A man sat here a long while, and watched the door.");

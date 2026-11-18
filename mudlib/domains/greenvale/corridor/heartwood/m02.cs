@@ -8,6 +8,7 @@ public class HwM02 : Room
         LongDesc = "Two tall piers of dark stone stand on either side of the road, and between them lies what was once their arch, broken into heavy wedge-shaped blocks sunk in moss. The stone is a green-grey that no wall in the region shares, and the blocks are fitted so closely that you cannot slide a knife blade into the joints that remain. The road runs through the gap as though the arch had never been there. Cold comes off the stone even at noon.";
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m01";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m03";
+        DangerBand(7, 8);
 
         AddDetail("piers,pier,pillars,pillar,uprights", "Each pier stands about three times the height of a man and is much too narrow for its height: a cart could pass between them, but the stone suggests a door for something taller and thinner than any cart driver. Their faces are smooth, without mortar, and the top of each is cut to a slope where the arch began.");
         AddDetail("arch,blocks,block,wedges,wedge,stones,rubble,fallen arch,voussoirs", "Eleven blocks lie where they fell, and a twelfth stands cracked on the east pier. They are cut to a pointed curve, narrow at the crown and sharp at the peak, unlike the round arches of Oakenfell. The undersides are smooth. Moss has grown over everything else, and has grown thick enough to bury a man's arm.");

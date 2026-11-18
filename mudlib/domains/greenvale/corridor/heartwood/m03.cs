@@ -9,6 +9,7 @@ public class HwM03 : Room
         Exits["south"] = "/domains/greenvale/corridor/heartwood/m02";
         Exits["north"] = "/domains/greenvale/corridor/heartwood/m04";
         Exits["east"] = "/domains/greenvale/corridor/heartwood/w1";
+        DangerBand(7, 8);
 
         AddDetail("roots,root,steps,stair,stairs,root stair", "Roots as thick as a barrel lie across the slope in shallow curves, and the road has been cut and trodden across them. The tops are polished by boots and hooves. Between them leaf mould has packed into steps of its own.");
         AddDetail("slope,hill,rise,climb", "The slope is gentle but long. At the top the trees stand a little farther apart, and you can see that the road bends round the shoulder of the hill and does not go over it.");

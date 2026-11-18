@@ -9,6 +9,7 @@ public class GrTheBanditsLookout : Room
         Exits["south"] = "/domains/greenvale/corridor/green_road/d2";
         Exits["east"] = "/domains/greenvale/corridor/green_road/w5";
         Safe = false;
+        DangerBand(8, 9);
 
         AddDetail("outcrop,rock,rocks,ledge,rocky outcrop", "A shelf of grey rock raised a few feet above the surrounding forest floor. It gives a clear sight line in every direction through a gap in the trees.");
         AddDetail("platform,logs,oaks,oak,lashings,ropes,rope,ladder", "A crude platform of lashed logs in the crotch of two oaks, reached by a rope ladder. It would hold three men, but the ladder is hauled up when the platform is manned.");

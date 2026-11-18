@@ -7,6 +7,7 @@ public class FbInscribedTomb : Room
         ShortDesc = "The Inscribed Tomb";
         LongDesc = "The west wall of this narrow tomb is given over to one great panel of dark stone, set flush in the wall and cut in rows of interlaced strokes from the height of the knee to the height of a raised hand. In the middle of the panel is a rectangle where the stone is cleaner and paler than the rest, as if a sheet had lain across it for a while. Before it the dust on the floor is stained with a fine black drift, such as a stick of charcoal leaves. A bier stands against the east wall, bare and level and cold.";
         Exits["east"] = "/domains/greenvale/corridor/barrow/long_gallery";
+        DangerBand(9, 10);
 
         AddDetail("rectangle,clean,clean stone,pale,sheet", "The rectangle is about as large as a table-top and as sharply edged as if it had been ruled. The dust and the faint bloom that cover the rest of the panel are gone from it, wiped by something laid flat and pressed, over and over. It was not scrubbed. In the deepest grooves a few threads of white paper fibre have caught, and been left. It was copied.");
         AddDetail("dust,drift,black,charcoal,floor,stain,smudge", "The black is charcoal, fine and dry and fresh, and where it has been trodden it has left the print of a boot sole. A few threads of pale paper fibre lie among it, caught on the grain of the dust.");

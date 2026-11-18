@@ -9,6 +9,7 @@ public class SrW4 : Room
         Exits["south"] = "/domains/greenvale/corridor/south_road/w3";
         Exits["north"] = "/domains/greenvale/corridor/south_road/w5";
         ResetSeconds = 120;
+        DangerBand(5, 6);
 
         AddDetail("pasture,grass,clover,buttercups", "Lush pasture, wet underfoot, golden with buttercups. Wild strawberries glint red in the sunniest bank.");
         AddDetail("cattle,cows,cow", "Red cattle with white faces, chewing in the shade of a willow. They study you with one soft eye.");
