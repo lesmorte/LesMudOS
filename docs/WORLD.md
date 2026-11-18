@@ -9,7 +9,8 @@ Facts about the game world that the owner has fixed. Area briefs and system desi
 | Engine | LesMudOS (this repository: the driver and the standard mudlib) |
 | Starting region | Green Vale |
 | Starting village | The Village of Vincent's Hollow |
-| First major city of Green Vale | Not yet named or built. The All Hall is there. |
+| First major city of Green Vale | Oakenfell. Not yet built. The Hall of Legends is there. |
+| Where advanced classes are chosen | The Hall of Legends, in Oakenfell (called the "All Hall" in the class brief and in earlier notes) |
 
 ## Structure
 
@@ -20,11 +21,30 @@ Facts about the game world that the owner has fixed. Area briefs and system desi
 ## Leaving the village
 
 - A new character cannot leave the main area of Vincent's Hollow. The road north is closed to them.
-- Completing the first quest, "Clear the Cellar", grants a travel pass. With it, the road north out of Vincent's Hollow is open, and leads toward the first major city of Green Vale.
-- The pass replaces the earlier idea of a key to an All Hall inside the village. The All Hall is in the city.
-- Until the city is built, the road beyond the village is a short stretch that ends with the way ahead not yet open.
+- Completing the first quest, "Clear the Cellar", grants a travel pass. With it, the road north out of Vincent's Hollow is open, and leads toward Oakenfell, the first major city of Green Vale.
+- The pass replaces the earlier idea of a key to a hall inside the village. The Hall of Legends is in Oakenfell.
+- Until Oakenfell is built, the road beyond the village is a short stretch that ends with the way ahead not yet open.
 
 ## Names in the game
 
 - The game introduces itself as Legends of Hollowmere (the login banner, `who`, help).
 - The village is "The Village of Vincent's Hollow" where a full name is called for (area name, the pass, arrival messages). Text quoted from the area brief, such as the sign on the North Road, keeps the brief's wording.
+
+## Systems from the design bible
+
+The owner's design bible ([specs/design-bible.md](specs/design-bible.md)) adds five connected systems. None is designed or built yet.
+
+| System | What it is |
+|---|---|
+| Faction Reputation | A standing with each major faction, from Hostile to Legendary, earned and lost through quests, deeds, discoveries and donations; rival factions pull against each other; tiers unlock quests, vendors, equipment, titles |
+| Factions of Greenvale | The Greenvale Assembly, the Hall of Legends, the Merchant Consortium, the Riverwatch Rangers, the Thorn Pact, the Free Companies, the Circle of Ash |
+| Renown | One global measure of how widely a character is known, from Unknown to Mythic, earned by memorable deeds; NPCs react to it; Infamy is tracked separately |
+| The Chronicle | The permanent history of the world, kept by the Hall of Legends: narrative entries for discoveries, deeds, victories, server firsts, with a Hall of Heroes, a Hall of Legends and a Hall of Infamy |
+| Event Significance Score | A score for every event that decides whether it is forgotten, becomes gossip, earns Renown, or enters the Chronicle |
+
+At launch, Vincent's Hollow has strong Assembly influence, moderate Merchant Consortium influence, a minor Riverwatch presence, hidden Circle of Ash activity and occasional Thorn Pact interaction.
+
+## Open questions on names
+
+- The owner's messages and the bible's title say "Oakenfell"; the bible's text says "Oakenfall". The game uses Oakenfell until told otherwise.
+- The owner's message gave the region as "Green Vale"; the bible writes "Greenvale" throughout, including in faction names (the Greenvale Assembly). The game uses Green Vale for the region and keeps faction names as the bible gives them, until told otherwise.
