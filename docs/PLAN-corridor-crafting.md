@@ -19,7 +19,7 @@ Everything waits on class stage A being merged, because stage A rewrites the pla
 | Each item has its own quality | Crafting | Items are identical copies of a file; a character's inventory is saved as a list of file paths | F1 |
 | Stacks of materials | Crafting | Every item is a separate object | F1 |
 | Value depends on quality | Crafting | Fixed `Value` per file | F1 |
-| A carry limit ("+1 carry capacity") | Crafting | No limit exists | F1 |
+| A carry limit ("+1 carry capacity") | Crafting | No limit exists | Not built (owner's decision 5) |
 | Gathering skills that improve with use | Crafting | Stage A skills are abilities you use, not numbers that grow | C1 |
 | Harvesting corpses | Crafting | Corpses hold loot only, locked 30 minutes to killer and deceased | C1 |
 | Resource nodes that regrow | Both | None | F2 |
@@ -35,7 +35,7 @@ Everything waits on class stage A being merged, because stage A rewrites the pla
 
 ## 3. Design decisions already taken in this plan
 
-These follow from the briefs and the existing game. The owner's open questions are in section 8.
+These follow from the briefs and the existing game. The owner's answers to the open questions are in section 8.
 
 ### Items (F1)
 
@@ -43,7 +43,7 @@ These follow from the briefs and the existing game. The owner's open questions a
 - **Stacks.** A material is one object with a quantity. Two stacks merge only if file and quality both match. `get 3 skins`, `drop 2 fine wolf skin`, `give`, `sell` and shops all understand quantities.
 - **Names.** Quality is shown as a prefix and can be typed: `fine wolf skin`. Common has no prefix in ordinary lists, so the inventory stays readable.
 - **Value.** Base value × quality multiplier: Poor 0.5, Common 1, Fine 1.5, Excellent 2.5, Masterwork 4, Legendary 8. Shops buy at their usual fraction of that.
-- **Carry limit.** 20 slots plus bonuses; a stack is one slot; worn and wielded items do not count. The Traveler's Leather Wrap adds one. Weight and encumbrance stay a later combat-timing pass.
+- **Carry limit.** Not built in this pass (owner's decision 5). Weight and encumbrance stay a later combat-timing pass.
 - **`give`.** Player to player, with quantity. This is the whole of player trade in pass 1.
 
 ### World features (F2)
@@ -68,7 +68,7 @@ These follow from the briefs and the existing game. The owner's open questions a
 
 ### The corridor
 
-- **Geography.** The game already has the Hollow's gate on its north side and Oakenfell's Southgate facing it. The corridor runs north from the Hollow's gate to Southgate, and "The South Road" is the name of the road as the city calls it. The brief's "Northgate at the southern edge" and "West Gate of Oakenfell" are treated as slips; see section 8.
+- **Geography.** The game already has the Hollow's gate on its north side and Oakenfell's Southgate facing it. The corridor runs north from the Hollow's gate to Southgate, and "The South Road" is the name of the road as the city calls it. The owner has confirmed this (section 8).
 - **The existing Vale Road.** The five rooms built so far are absorbed: the Long Meadows into segment 1, the River Bend, the Rise and the Southgate Approach into segment 5. The "two miles" waystone goes.
 - **Shape.** Each of the five segments is about 11 main-road rooms, 5 woodland rooms and 3 deep-forest rooms, with one secret location each. The main road runs straight enough to follow without a map; side trails leave it at named landmarks and rejoin it.
 - **Dungeons.** In addition to the hundred rooms: the Root Warrens at 12 rooms and the Forgotten Barrow at 10.
@@ -109,7 +109,7 @@ Model choice follows the standing rule: the cheapest that will do the job well. 
 
 | Id | Agent | Model | Builds | Touches | Done when |
 |---|---|---|---|---|---|
-| F1 | Item instances | Opus | Instance state, quality, stacks, quantities in commands, quality value, carry limit, `give`, save format for inventory, corpses and lost property, migration of old saves | `/std/thing`, `item`, `adventurer`, `corpse`, `shopkeeper`, `/secure/lost_property`, SaveStore if needed | New `tests/item_test.py`; every existing test script still passes; an old save file loads |
+| F1 | Item instances | Opus | Instance state, quality, stacks, quantities in commands, quality value, `give`, save format for inventory, corpses and lost property, migration of old saves | `/std/thing`, `item`, `adventurer`, `corpse`, `shopkeeper`, `/secure/lost_property`, SaveStore if needed | New `tests/item_test.py`; every existing test script still passes; an old save file loads |
 | F2 | World features | Sonnet | Hidden exits and `search`, patrols, resource nodes, danger bands | `/std/room`, `npc`, new `/std/patrol`, `/std/node` | New `tests/world_test.py`; Elder Lane in Oakenfell opens into the grove as the first use |
 
 ### Crafting
@@ -162,12 +162,21 @@ Lessons from the Oakenfell build that go into these briefs:
 - **Scale.** A hundred rooms from five builders will be uneven. The lead reads every room; a second pass by one builder for consistency is budgeted if needed.
 - **Restarts.** Sessions restart and stop agents. Every brief requires a commit after each step and a notes file, as now.
 
-## 8. Decisions needed from the owner
+## 8. The owner's decisions (18 November 2026)
 
-1. **Direction and gates.** Keep the world as built: north out of the Hollow's gate, arriving at Oakenfell's Southgate past Southfarm Hamlet? The brief says the Northgate is at the Hollow's southern edge and ends at Oakenfell's West Gate.
-2. **Eldergreen Wood and the Elderwood.** The corridor runs through the Eldergreen Wood; the city's Westgate road leads to the Elderwood. One forest or two?
-3. **Dungeons.** Are the Root Warrens and the Forgotten Barrow in addition to the hundred rooms (12 and 10 rooms here), or inside the count?
-4. **New buildings in the Hollow.** The stations need a healer, a tanner and a craftsman, which the Hollow does not have. Add three small rooms off the square, or put all four stations in existing buildings?
-5. **Carry limit.** Introduce 20 slots, stacks counting as one, so that "+1 carry capacity" means something?
-6. **Player market.** Pass 1 is `give` between players and vendors that pay by quality; the Oakenfell auction house opens in a later pass. Enough for launch?
-7. **Pace from level 5 to 10.** How many hours should the corridor take a first character: closer to 4, 8 or 15?
+1. **Direction and gates.** As built: north out of the Hollow's gate, arriving at Oakenfell's Southgate past Southfarm Hamlet.
+2. **Forests.** Two forests. The corridor runs through the Eldergreen Wood; the Elderwood lies west of Oakenfell, beyond Westgate.
+3. **Dungeons.** In addition to the hundred rooms: the Root Warrens at 12 rooms, the Forgotten Barrow at 10.
+4. **The Hollow.** Three small new rooms off the square: the healer (Herbalist Table), the tanner (Tanning Rack) and the craftsman (Workbench). The Cooking Fire goes in the tavern.
+5. **Carry limit.** None for now. The Traveler's Leather Wrap is built as a wearable item whose "+1 carry capacity" is recorded on it and has no effect until a limit exists. F1 does not build a carry limit.
+6. **Player market.** `give` between players and vendors that pay by quality. The auction house stays closed.
+7. **Pace from level 5 to 10.** 15 hours for a player with perfect knowledge; about 40 hours for an ordinary player who explores and reads.
+
+### What the pace decision means
+
+Levels 5 to 10 need 3,500 experience under the current formula. The bot reaches level 5 (1,000 experience) in 16 to 30 minutes. Fifteen hours for the next 3,500 is therefore a far slower rate than the Hollow, about a fifteenth of it. Two ways to get there, to be settled when K1 runs the numbers:
+
+- **Steepen the table** for levels 6 to 10 so that more experience is needed, and let corridor creatures pay well. Kills feel rewarding; the number to reach grows.
+- **Keep the table** and have corridor creatures and quests pay little. Simple, but a level 8 bear worth less than a cellar goblin reads badly.
+
+The plan assumes the first: the experience formula is data in one place, so K1 proposes a new table for levels 6 to 10 (and a curve onward to 100 on the same footing), sets creature and quest experience against it, and T1's bot measures the perfect-knowledge time against the 15-hour target. Fifteen hours of bot play cannot be run on every change, so T1 measures experience per hour over one-hour samples in each band and the total is projected. Section 3's carry-limit bullet under Items no longer applies.
