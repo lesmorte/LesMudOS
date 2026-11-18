@@ -48,4 +48,5 @@ At launch, Vincent's Hollow has strong Assembly influence, moderate Merchant Con
 
 - The city is Oakenfell. (The design bible and the ESS specification write "Oakenfall"; those documents are kept as supplied, and the game uses Oakenfell.)
 - The region is Greenvale, one word, as in the Greenvale Assembly.
-- The owner will supply a city design document for Oakenfell. Nothing in the city is designed until it arrives.
+- The owner's city design document for Oakenfell is [specs/oakenfell-city-design.md](specs/oakenfell-city-design.md). The room-by-room plan drawn from it, awaiting the owner's review, is [areas/oakenfell.md](areas/oakenfell.md).
+- The river through Oakenfell is the River Mere. The city's motto is "From Strong Roots Grow Great Things".
