@@ -208,6 +208,17 @@ class Hero:
     def pump(self, seconds):
         return self.feed(a.quiet(self.c, seconds))
 
+    def use_item(self, command, expected, timeout=30.0):
+        """Eat or drink something. If the hero is still recovering from an
+        earlier action the item is queued; wait for the queued action to
+        happen instead of guessing how long the Recovery is (it depends on
+        the weapon and shield in hand)."""
+        text = self.cmd(command)
+        deadline = time.time() + timeout
+        while "not ready yet" in text and expected not in text and time.time() < deadline:
+            text += self.pump(1.0)
+        return text
+
     def settle(self, seconds=1.0):
         """Read until nothing arrives for a while."""
         text = ""
@@ -1078,12 +1089,10 @@ class Run:
         # food and drink at full health, if not tried before
         hero.score()
         check("buy a bowl of stew", hero.cmd("buy stew"), "You buy a bowl of stew for 4 gold.")
-        hero.settle(9.0)  # a fight or a potion just before leaves the hero on a Recovery
-        check("eat it", hero.cmd("eat stew"), "You spoon up the hot stew until the bowl is empty.")
+        check("eat it", hero.use_item("eat stew", "You spoon up the hot stew"), "You spoon up the hot stew until the bowl is empty.")
         hero.go(START)
         check("buy a trail ration", hero.cmd("buy ration"), "You buy a trail ration for 5 gold.")
-        hero.settle(9.0)  # the stew above put the hero on its Recovery
-        check("eat it", hero.cmd("eat ration"), "You chew through the dry biscuit and salted meat.")
+        check("eat it", hero.use_item("eat ration", "You chew through the dry biscuit"), "You chew through the dry biscuit and salted meat.")
 
     # ================================================================ 6. checks with the warden
 
