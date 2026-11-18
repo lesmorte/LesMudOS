@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Quick check for area builders: does every file under mudlib/domains/hollow
+"""Quick check for area builders: does every file under mudlib/domains
 compile, pass the sandbox, and load in the driver?
 
 Boots the driver on a temporary copy of the mudlib, makes a level-10 wizard,
-then `goto`s every room (village/, cellars/) and `clone`s everything else
-(npc/, mob/, obj/). Takes well under a minute.
+then `goto`s every room and `clone`s everything in an npc/, mob/ or obj/
+directory. Takes well under a minute.
 
 Usage (from the repository root, after `dotnet build`):
     LESMUDOS_TEST_PORT=4821 python3 tests/load_check.py [name-filter]
@@ -24,6 +24,20 @@ import area_test as a  # noqa: E402
 import smoke_test as h  # noqa: E402
 
 
+def domain_files(mudlib):
+    """Every .cs file under mudlib/domains except the /domains/town demo, as mudlib paths without the extension."""
+    found = []
+    root = os.path.join(mudlib, "domains")
+    for folder, _, names in os.walk(root):
+        for name in sorted(names):
+            if not name.endswith(".cs") or name == "area.cs":
+                continue
+            path = "/" + os.path.relpath(os.path.join(folder, name), mudlib).replace(os.sep, "/")[:-3]
+            if not path.startswith("/domains/town/"):
+                found.append(path)
+    return sorted(found)
+
+
 def main():
     wanted = sys.argv[1] if len(sys.argv) > 1 else ""
     work = tempfile.mkdtemp(prefix="lesmudos-load-")
@@ -36,10 +50,11 @@ def main():
         wiz.read_until("> ")
         wiz.command("promote " + h.SECRET)
         a.drain(wiz, 0.5)
-        for path in a.hollow_files(mudlib):
+        for path in domain_files(mudlib):
             if wanted not in path:
                 continue
-            is_room = "/village/" in path or "/cellars/" in path
+            # Rooms are walked into; everything in an npc/, mob/ or obj/ directory is cloned.
+            is_room = not any(part in path for part in ("/npc/", "/mob/", "/obj/"))
             text = wiz.command(("goto " if is_room else "clone ") + path)
             a.drain(wiz, 0.3)
             bad = any(w in text for w in ("Failed", "sandbox", "***", "No such file")) or (not is_room and "Cloned" not in text)

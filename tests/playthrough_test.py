@@ -1149,7 +1149,7 @@ class Run:
         text = hero.cmd("north")
         check("with the pass the road north is open: the hero walks out onto the Vale Road", text, "The Vale Road")
         check("score names the new area and the region", hero.score(), "Area The Vale Road   Region Greenvale")
-        check("the road beyond is not open yet", hero.cmd("north"), "not open yet")
+        check("the road runs on north", hero.cmd("look"), "north")
         hero.cmd("south")
         hero.go(GUILD)
         check("score at the end", hero.score(), "Completed quests: Clear the Cellar, Recover the Overseer's Orders", "weapon:", "head: a Guild Initiate's helm")

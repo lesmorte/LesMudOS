@@ -89,11 +89,32 @@ This works only while no level-10 wizard exists, and stops working after five wr
 
 | Level | Commands |
 |---|---|
-| 1 | `promote`, `wizards`, `mudstat`, `pwd`, `cd`, `list` (browse the mudlib directories) |
-| 3 | `clone` |
-| 1 | `cat` (view a file) |
-| 5 | `update`, `mkdir`, `edit` (line editor), `copy`, `move`, `rename`, `delete`, `rmdir` (level 10 for files under `/secure` and `/std`) |
+| 1 | `promote`, `wizards`, `mudstat`, `goto`, `stat`, `pwd`, `cd`, `list`, `cat` (browse and read the whole mudlib), and in your own home `/wiz/<you>`: `mkdir`, `edit` (line editor), `copy`, `move`, `rename`, `delete`, `rmdir`, `update`, `clone` |
+| 3 | `clone` outside your home |
+| 5 | `update`, `mkdir`, `edit`, `copy`, `move`, `rename`, `delete`, `rmdir` outside your home and inside other wizards' homes (level 10 for files under `/secure` and `/std`, and for `/wiz` itself and the home directories) |
 | 10 | `shutdown` |
+
+Every wizard has a home directory `/wiz/<name>` (your name in lower case). The game creates it when you become a wizard and tells you where it is. `~` stands for it in any path (`cd ~`, `list ~/rooms`, `edit ~/rooms/hall`), and `cd` with no argument goes there. Other wizards can read your home but, below level 5, not change it. Wizards write code that runs on the server, so promote only people you trust (see [Design](docs/DESIGN.md) section 8).
+
+### Build your own area
+
+As any wizard, in the game:
+
+```
+> cd
+/wiz/yourname
+> mkdir rooms
+> edit rooms/hall
+```
+
+Type `a`, paste a room (for example the one in [docs/BUILDING.md](docs/BUILDING.md)), end with a line containing only `.`, then `x`. Then:
+
+```
+> update ~/rooms/hall
+> goto ~/rooms/hall
+```
+
+Make an item the same way in `~/items/`, `clone ~/items/gem` to try it, and point an exit at `/wiz/yourname/rooms/hall` from your room to link them. `delete`, `copy`, `move`, `rename` and `rmdir` work as well, inside your home, at any wizard level.
 
 ### Create a file from inside the game
 

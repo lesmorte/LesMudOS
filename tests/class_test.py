@@ -924,7 +924,7 @@ def run(work, mudlib):
     check("with the pass the road north is open: the Vale Road", out, "The Vale Road", "Oakenfell")
     s = a.score_of(wiz)["text"]
     check("score shows the area and the region of the Vale Road", s, "Area The Vale Road   Region Greenvale")
-    check("the road beyond is not open yet", wiz.command("north"), "not open yet")
+    check("the road runs on north", wiz.command("look"), "north")
     wiz.command("south")
     wiz.command("drop pass")
     check("the pass can be lost; the road closes again", wiz.command("north"), "need a travel pass")
