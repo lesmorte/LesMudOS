@@ -64,6 +64,7 @@ class Act:
     fx: str = ""           # on-hit effect of an attack ("slow:1.3:12", "stagger:2", "weaken:armor=-2:15") or the special's argument
     factor: float = 1.0    # damage factor (CombatAction.DamageFactor)
     hit: int = 0           # extra to-hit (CombatAction.ToHitBonus)
+    name: str = ""         # what stat calls it
 
 
 @dataclass(frozen=True)
@@ -672,7 +673,7 @@ def full_run(arch_name, runs=500):
 
 
 def A(id, name, prep=0.0, rec=0.5, mult=1, mod=0.0, kind="attack", fx="", factor=1.0, hit=0):
-    return Act(id, prep, rec, mult, mod, kind, fx, factor, hit)
+    return Act(id, prep, rec, mult, mod, kind, fx, factor, hit, name)
 
 
 @dataclass(frozen=True)
