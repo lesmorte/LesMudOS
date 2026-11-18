@@ -45,6 +45,8 @@ AREAS = {"south_road": "The South Road", "eldergreen_edge": "Eldergreen Edge", "
          "approach": "The Oakenfell Approach", "root_warrens": "The Root Warrens", "barrow": "The Forgotten Barrow"}
 CITY_AREAS = {"southgate": "Oakenfell", "market": "Oakenfell", "founders": "Oakenfell", "grove": "The Hidden Grove", "river": "Oakenfell",
               "guild": "Oakenfell", "beyond": "The Roads beyond Oakenfell"}
+WORDS = {w_: n for n, w_ in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split())}
+WORDS.update({"twenty-four": 24, "twenty-five": 25, "thirty": 30})
 ROOM_KEY = re.compile(r"[mwds]\d+$")
 
 # The brief (task B): from, direction, to, detail keys that find it, search chance, chronicle event, subject, name.
@@ -484,8 +486,10 @@ class Walker(ct.Walker):
             for item_path, item, price in stock:
                 words = {w_.lower() for w_ in re.findall(r"[A-Za-z]+", item.name)} | {i.lower() for i in item.ids}
                 if words & {k.strip() for k in keywords.lower().split(",")}:
-                    for number in re.findall(r"(\d+) gold", ci.render(line)):
-                        R.ok(int(number) == price, f"shops: {person.name}'s topic [{keywords}] names the price of {item.name} ({number}); the stock says {price}", line[:200])
+                    for number in re.findall(r"(\d+|[a-z]+(?:-[a-z]+)?) gold", ci.render(line).lower()):
+                        value = int(number) if number.isdigit() else WORDS.get(number)
+                        if value is not None:
+                            R.ok(value == price, f"shops: {person.name}'s topic [{keywords}] names the price of {item.name} ({number}); the stock says {price}", line[:200])
         self.ensure_gold(sum(p for _, _, p in stock) + 10)
         for item_path, item, price in sorted(stock, key=lambda s: s[2]):
             if not item.exists:

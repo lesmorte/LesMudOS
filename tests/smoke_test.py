@@ -63,6 +63,9 @@ ANSI = re.compile("\x1b\\[[0-9;]*m")
 ANSI_TAIL = re.compile("\x1b(\\[[0-9;]*)?$")
 
 
+PROMPT = re.compile(r"(?<!-)> ")
+
+
 class Client:
     def __init__(self, name, password=PASSWORD, login=True, archetype=None):
         """Connect and give the name. With login, also answer the password
@@ -165,11 +168,17 @@ class Client:
     def send(self, line):
         self.sock.sendall((line + "\r\n").encode())
 
+    @staticmethod
+    def seen(marker, data):
+        """Has `marker` appeared in `data`? The prompt "> " is not found inside "-> ": `stat` prints "Exit north -> /domains/..." and
+        a reply cut off there leaves the real prompt behind, so that every later reply is read one command late."""
+        return PROMPT.search(data) is not None if marker == "> " else marker in data
+
     def read_until(self, marker, timeout=30.0):
         """Read until `marker` appears. Returns everything read."""
         deadline = time.time() + timeout
         data, self.pending = self.pending, ""
-        if marker in data:
+        if self.seen(marker, data):
             return data
         while time.time() < deadline:
             try:
@@ -177,7 +186,7 @@ class Client:
                 if not chunk:
                     break
                 data += self.rx(chunk)
-                if marker in data:
+                if self.seen(marker, data):
                     return data
             except socket.timeout:
                 pass

@@ -22,7 +22,7 @@ public class OaFarmWife : Shopkeeper
         AddChat("Bread and cheese, still warm! Baked apples with honey! Come and {cmd}browse{/}, dear, there's plenty.");
         AddChat("You look as if you've walked a long way. Sit on the wall and have something hot.");
         AddChat("Mind you leave the plate. I've only so many.");
-        AddTopic("bread,cheese,bread and cheese,loaf,loaves", "Bread from my own oven and cheese from my brother's dairy, wrapped in a cloth. Four gold, and you'll not go hungry. {cmd}buy bread{/}.");
+        AddTopic("bread,cheese,bread and cheese,loaf,loaves", "Bread from my own oven and cheese from my brother's dairy, wrapped in a cloth. Three gold, and you'll not go hungry. {cmd}buy bread{/}.");
         AddTopic("apple,apples,baked apple,honey", "Baked in the oven with honey and a clove, and a little butter. Two gold a piece. {cmd}buy apple{/}.");
         AddTopic("southfarm,hamlet,green,village", "Eleven cottages, one mill, one well and the best apples in the county. We feed the city, and the city does not notice.");
         AddTopic("children,child,kids,boys,girls", "Mine are the ones making the most noise. Adelina and Emmeline, if you hear a name shouted, it will be one of those two.");
