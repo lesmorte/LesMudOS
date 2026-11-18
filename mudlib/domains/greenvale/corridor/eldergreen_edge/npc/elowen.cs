@@ -18,7 +18,7 @@ public class EeElowen : Npc
         AddChat("Everything in the wood is hunting something. The trick is to hunt the hunter.");
         AddChat("Morwenna would have laughed at that. She laughed at everything.");
         AddTopic("hunting,hunter,game,deer", "I go for deer mostly. The roe on the lawn are quick, and hard to stalk. You have to wait until they stop watching.");
-        AddTopic("deer,lawn,deer lawn,roe", "Roe deer, in the clearing south of the thicket. Skittish. They'll flee unless you strike first. We don't hunt there more than we must; they're the wood's, not ours.");
+        AddTopic("lawn,deer lawn,roe", "Roe deer, in the clearing south of the thicket. Skittish. They'll flee unless you strike first. We don't hunt there more than we must; they're the wood's, not ours.");
         AddTopic("spiders,spider,thicket,bite", "The thicket is a trap. I walked in once for a hare. I came out with a leg that wouldn't hold me for a week. Take a torch, and a friend.");
         AddTopic("goblin,goblins,scouts,cords", "Small. Quick. Grey. They don't fight if they can leave. They move at night, and they stop at the big oak. I've watched them. They walk round it, left hand to the tree.");
         AddTopic("morwenna,friend,missing", "My friend. We came up here together. She wanted to track the goblins to where they went, and she found something, and she went on alone. I should have gone with her.");

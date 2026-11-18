@@ -23,7 +23,7 @@ public class SrInnkeeperAldith : Shopkeeper
         AddTopic("food,drink,meal,stew,pasty,bread,cheese", "Bread and cheese for the hurried, a mutton pasty for the hungry. {cmd}browse{/} and {cmd}buy{/} whatever takes your fancy.");
         AddTopic("road,north,wood,forest,eldergreen", "The road is fine to the bridge. Beyond, you're in the Eldergreen. Take bread for the road, and a candle, and a friend if you can find one.");
         AddTopic("rumor,rumors,news,gossip,travelers", "Ask the three in the yard. Ives drives cattle, Jocosa sells ribbons, and Kenrick has seen more of the world than is good for him. They all talk for a drink.");
-        AddTopic("inn,rest,traveler's rest,history", "The Rest has stood here three hundred years, they say. The road was cut around it, not the other way. There's always been someone here, with a lamp lit.");
+        AddTopic("inn,traveler's rest,history", "The Rest has stood here three hundred years, they say. The road was cut around it, not the other way. There's always been someone here, with a lamp lit.");
         AddTopic("riverwatch,rangers,ranger,notice", "The Rangers' notice is by the door. I put it up myself. Heed it. They know what they're writing.");
         AddTopic("safe,log out,logout,leave", "You're safe in this yard. Sleep, stay, or log out. Nobody will trouble you, and your things will be where you left them.");
         AddEmote("Aldith wipes down the bench under the ash and straightens a stool.", 8);

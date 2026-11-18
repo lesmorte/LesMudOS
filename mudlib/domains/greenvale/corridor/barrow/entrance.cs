@@ -18,7 +18,8 @@ public class FbEntrance : Room
         AddDetail("soot,smear,lintel,smudge,slab", "Just inside the gap, over your head, a slab of the old wall juts out like a lintel. On its underside is a smear of soot the width of a hand, black and soft to the finger: a lamp carried too high by someone who did not stoop. The rain has not been in to touch it.");
     }
 
-    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report. The dungeon is
+    // reported as lying beneath Heartwood, the forest above it.
     public override void Init()
     {
         base.Init();
@@ -27,7 +28,7 @@ public class FbEntrance : Room
         try
         {
             LoadObject("/secure/events").Call<string>("Report", "discover.secret_dungeon", who, new List<ObjectRef> { who }, Self, "forgotten-barrow",
-                new Dictionary<string, string> { ["name"] = "The Forgotten Barrow" });
+                new Dictionary<string, string> { ["name"] = "The Forgotten Barrow", ["area"] = "Heartwood" });
         }
         catch (MudRuntimeException) { }
     }

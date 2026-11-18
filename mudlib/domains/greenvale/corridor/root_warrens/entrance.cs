@@ -18,7 +18,8 @@ public class RwEntrance : Room
         AddDetail("daylight,light,sky,green,above", "The light that falls through the roots is the green of the forest canopy, and it ends a few paces in, as if a door had been shut on it.");
     }
 
-    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report.
+    // Tells the Chronicle that a player has come here. A character is credited once, so every visit may report. The dungeon is
+    // reported as lying beneath Heartwood, the forest above it.
     public override void Init()
     {
         base.Init();
@@ -27,7 +28,7 @@ public class RwEntrance : Room
         try
         {
             LoadObject("/secure/events").Call<string>("Report", "discover.secret_dungeon", who, new List<ObjectRef> { who }, Self, "root-warrens",
-                new Dictionary<string, string> { ["name"] = "The Root Warrens" });
+                new Dictionary<string, string> { ["name"] = "The Root Warrens", ["area"] = "Heartwood" });
         }
         catch (MudRuntimeException) { }
     }

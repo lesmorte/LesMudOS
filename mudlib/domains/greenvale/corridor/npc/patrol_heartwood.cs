@@ -31,7 +31,7 @@ public class CpHeartwood : Patrol
         AddChat("The trees here were old before the road was. We try to remember that we are the guests.");
         AddChat("Memorial to the Last Great Oak and back. When the trees thin, you are nearly through.");
         AddTopic("road,roads,way,paved,memorial,oak,last great oak,hunters memorial,hunter's memorial", "The old paved stretch is older than the Rangers and older than the road. North of the Memorial the forest begins to thin, and the Last Great Oak marks where Heartwood ends and the Approach begins. Keep to the stone and you will find it.");
-        AddTopic("rangers,riverwatch,ranger,badge,eye,silver eye,ever vigilant,hunter,hunters,memorial", "We are Riverwatch, with the silver eye on green and grey, Ever Vigilant. There is a hunter's station in this wood, one of ours, and the Memorial is for those who did not come back from it. It is a long list for so short a road.");
+        AddTopic("rangers,riverwatch,ranger,badge,eye,silver eye,ever vigilant,hunter,hunters", "We are Riverwatch, with the silver eye on green and grey, Ever Vigilant. There is a hunter's station in this wood, one of ours, and the Memorial is for those who did not come back from it. It is a long list for so short a road.");
         AddTopic("watch,danger,dangers,beware,bears,bear,goblins,goblin,stalkers,stalker,woodlings,wolves,wolf,thorn", "Bears, goblin warriors out of the ruins, stalkers that you hear only after they have chosen you, and a thing or two in the thorn that walks when it should not. The big wolf keeps to its dell. Do not leave the road to see the ruins, and leave any grove you find alone.");
     }
 }
