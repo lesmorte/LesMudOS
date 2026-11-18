@@ -182,6 +182,8 @@ public class RenownLedger : MudObject
     /// <summary>The first words an NPC says to this character; empty below Recognized.</summary>
     public string RecognitionLine(string name) => Recognition[TierIndex(QueryRenown(name))];
 
+    private static readonly string[] TrustedTrees = { "/std/", "/secure/", "/domains/", "/classes/", "/skills/", "/events/" };
+
     /// <summary>
     /// The `title` command for the calling player: no argument lists the titles
     /// earned, `none` shows no title, a title name chooses it. The player is
@@ -192,7 +194,24 @@ public class RenownLedger : MudObject
         var caller = PreviousObject();
         if (Self.IsClone || caller == null || !caller.IsClone || caller.ProgramPath != "/std/player" || caller != ThisPlayer())
             return "Only a player can choose a title.\n";
-        var name = caller.Call<string>("QueryName") ?? "";
+        return Choose(caller.Call<string>("QueryName") ?? "", args);
+    }
+
+    /// <summary>
+    /// The same as TitleCommand for a named character, for trusted code that
+    /// acts for a player (a class trainer, a guild NPC). Objects outside the
+    /// trusted trees are refused. It can only choose among titles already earned.
+    /// </summary>
+    public string ChooseTitle(string name, string args)
+    {
+        var caller = PreviousObject();
+        if (Self.IsClone || caller == null || caller.ProgramPath.Contains("..") || !TrustedTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)))
+            return "Only trusted code can choose a title for someone.\n";
+        return Choose(name, args);
+    }
+
+    private string Choose(string name, string args)
+    {
         var key = Key(name);
         var earned = QueryTitles(key);
         args = (args ?? "").Trim();
