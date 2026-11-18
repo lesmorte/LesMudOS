@@ -23,7 +23,7 @@ public class FdStewardOrlan : Npc
         AddTopic("rivals,enemies,thorn pact,thorn,free companies,companies", "We have disputes with the Thorn Pact and with the Free Companies. A dispute is not a feud. I would not put it more strongly than that.");
         AddTopic("motto,unity,prosperity", "Prosperity Through Unity. It was chosen by those who founded the Assembly, when they could agree on nothing else. I find it modest.");
         AddTopic("business,politics,petition,quest,quests,join,help", "Political business is not open to newcomers, I am afraid. The Assembly knows those it knows. Come again when your name has gone ahead of you. You may sit in the gallery in the meantime and watch us be tedious.");
-        AddEmote("From beyond the inner doors a delegate's voice rises: \"Three coppers a wheel at the bridge, and not a penny more!\" There is a chorus of groans.", 6);
+        AddEmote("From beyond the inner doors a delegate's voice rises: \"Three a wheel at the bridge, and not a coin more!\" There is a chorus of groans.", 6);
         AddEmote("Behind the carved screen a gavel raps, and a voice calls for order, and gets something else.", 6);
         AddEmote("Orlan Hesk turns a page of his ledger, makes a mark, and lifts his eyes to the inner doors for exactly one second.", 5);
         AddEmote("Through the lattice a delegate pounds the bench: \"Then let the Consortium pay for the road!\" Someone laughs, and someone else does not.", 5);
