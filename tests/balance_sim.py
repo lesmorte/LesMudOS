@@ -60,6 +60,10 @@ class Act:
     rec: float
     mult: int = 1
     mod: float = 0.0
+    kind: str = "attack"   # "attack", or a special: "buff" (on itself), "summon", "mend" (heals itself)
+    fx: str = ""           # on-hit effect of an attack ("slow:1.3:12", "stagger:2", "weaken:armor=-2:15") or the special's argument
+    factor: float = 1.0    # damage factor (CombatAction.DamageFactor)
+    hit: int = 0           # extra to-hit (CombatAction.ToHitBonus)
 
 
 @dataclass(frozen=True)
@@ -184,30 +188,51 @@ class Fighter:
         self.stamina = self.mana = 0.0
         self.last_t = 0
         self.extra_hp = 0
+        self.effects = {}      # timed effects by id: (until ms, {mod: value}, speed factor)
+        self.paid = (0, 0)     # stamina and mana the current action cost (half comes back if it is interrupted)
+        self.step = 0          # position in a creature's pattern
+        self.fired = 0         # bit mask of the once-only triggers already used
+        self.armor_extra = 0
 
     def alive(self):
         return self.hp > 0
 
+    def add_effect(self, eid, t, seconds, mods=None, speed=1.0):
+        """A timed effect; one with the same id is replaced (Living.AddEffect)."""
+        self.effects[eid] = (t + seconds * 1000, dict(mods or {}), speed)
+
+    def mod(self, key, t=0):
+        return sum(e[1].get(key, 0) for e in self.effects.values() if e[0] > t)
+
+    def speed(self, t=0):
+        f = 1.0
+        for e in self.effects.values():
+            if e[0] > t:
+                f *= e[2]
+        return f
+
     def attack(self, t=0):
-        return rnd(self.rate * self.level) + self.to_hit + (1 if t < self.bless_until else 0)
+        return rnd(self.rate * self.level) + self.to_hit + (1 if t < self.bless_until else 0) + int(self.mod("tohit", t))
 
     def defense(self):
         return max(0, self.level - 1)
 
     def total_armor(self, t=0):
-        return self.armor + (1 if t < self.bless_until else 0)
+        return self.armor + (1 if t < self.bless_until else 0) + int(self.mod("armor", t))
 
     def dodge(self):
-        return self.arch.dodge if self.arch else 0
+        if self.arch:
+            return self.arch.dodge
+        return self.kind.dodge if self.kind is not None and hasattr(self.kind, "dodge") else 0
 
     def block(self):
         return 15 if self.is_player and self.shield else 0
 
-    def delay_ms(self, act):
-        return round((self.reaction + act.mod + act.rec) * UNIT_MS)
+    def delay_ms(self, act, t=0):
+        return round((self.reaction * self.speed(t) + act.mod + act.rec) * UNIT_MS)
 
-    def prep_ms(self, act):
-        return min(self.delay_ms(act), round(act.prep * UNIT_MS))
+    def prep_ms(self, act, t=0):
+        return min(self.delay_ms(act, t), round(act.prep * UNIT_MS))
 
     def regen(self, t):
         if self.arch:
@@ -230,18 +255,19 @@ def player_max_hp(arch, level, extra=0):
 
 
 def make_monster(name):
-    k = KINDS[name]
+    k = CKINDS[name] if name in CKINDS else KINDS[name]
     return Fighter(k.level, k.hp, k.dmg, k.to_hit, k.armor, k.reaction, k.acts, k)
 
 
-def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True):
-    """arch: an Arch or its name. weapon: a key of WEAPONS. shield: None means the archetype's own habit."""
+def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True, armor_extra=0):
+    """arch: an Arch or its name. weapon: a key of WEAPONS. shield: None means the archetype's own habit.
+    armor_extra: armor from worn pieces other than the shield (vest, helm)."""
     if isinstance(arch, str):
         arch = ARCHS[arch]
     has_shield = arch.shield if shield is None else shield
     dmg, to_hit, mod, rec = WEAPONS[weapon]
     mod = max(0.0, mod - REACTION_CUT.get(arch.name, 0.0)) if mod > 0 else mod
-    armor = arch.armor_bonus + (SHIELD[0] if has_shield else 0)
+    armor = arch.armor_bonus + (SHIELD[0] if has_shield else 0) + armor_extra
     reaction = arch.reaction + mod + (SHIELD[1] if has_shield else 0)
     to_hit += arch.hit_armed
     p = Fighter(level, player_max_hp(arch, level, extra_hp), dmg, to_hit, armor, reaction, (Act("attack", 0, rec),),
@@ -269,6 +295,8 @@ def choose(e):
     a = {x.id: x for x in e.acts}
     if e.kind is None or len(e.acts) == 1:
         return e.acts[0]
+    if e.kind.name in CKINDS or hasattr(e.kind, "pattern"):
+        return choose_corridor(e, a)
     n = e.kind.name
     if n == "Giant Cave Toad":
         return a["leap"] if e.taken % 3 == 2 else a["lash"]
@@ -339,14 +367,17 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
         push(e.ready_at, "ready", e)
     t = 0
 
-    def stagger(e, now):
+    def stagger(e, now, seconds=2.0):
         e.gen += 1
         if e.resolve_at is not None and e.resolve_at > now:
             half = (e.ready_at - e.resolve_at) / 2
             e.resolve_at = None
             e.ready_at = round(now + half)
+            if e.is_player:  # half the cost comes back
+                e.stamina = min(e.arch.stamina, e.stamina + e.paid[0] / 2)
+                e.mana = min(e.arch.mana, e.mana + e.paid[1] / 2)
         else:
-            e.ready_at = max(e.ready_at, now) + 2000
+            e.ready_at = max(e.ready_at, now) + round(seconds * 1000)
         push(e.ready_at, "ready", e)
 
     out["stagger"] = stagger
@@ -363,27 +394,34 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
                 act = acts[choice]
                 target = living[0]
                 out["actions"] += 1
+                ent.paid = (0, 0)
                 if choice == "potion":
                     potions -= 1
+                    out["potions_used"] = out.get("potions_used", 0) + 1
                     ent.hp = min(ent.max_hp, ent.hp + POTION_HEAL)
-                    push(t + ent.delay_ms(act), "ready", ent)
-                    ent.ready_at = t + ent.delay_ms(act)
+                    push(t + ent.delay_ms(act, t), "ready", ent)
+                    ent.ready_at = t + ent.delay_ms(act, t)
                     continue
                 if choice == "bash":
                     ent.stamina -= BASH_COST
+                    ent.paid = (BASH_COST, 0)
                 elif choice == "strike":
                     ent.stamina -= STRIKE_COST
+                    ent.paid = (STRIKE_COST, 0)
                 elif choice == "bolt":
                     ent.mana -= spell_cost(ent, BOLT_COST)
+                    ent.paid = (0, spell_cost(ent, BOLT_COST))
                 elif choice == "heal":
                     ent.mana -= HEAL_COST
+                    ent.paid = (0, HEAL_COST)
                 elif choice == "bless":
                     ent.mana -= BLESS_COST
+                    ent.paid = (0, BLESS_COST)
             else:
                 act = choose(ent)
                 ent.taken += 1
                 target = player
-            delay, prep = ent.delay_ms(act), ent.prep_ms(act)
+            delay, prep = ent.delay_ms(act, t), ent.prep_ms(act, t)
             ent.ready_at = t + delay
             push(ent.ready_at, "ready", ent)
             if prep > 0:
@@ -424,6 +462,8 @@ def do_hit(att, defn, t, to_hit_bonus=0, crit=5, factor=1.0, mult=1, bonus=0):
 def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
     if target.hp <= 0 and act.id not in ("heal", "bless"):
         return
+    if not ent.is_player and getattr(ent.kind, "corridor", False):
+        return resolve_corridor(ent, act, target, t, enemies, out, push)
     if act.id == "cry":
         ent.cry_until = t + CRY_MS
         return
@@ -440,6 +480,8 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
         ent.bless_until = t + BLESS_MS
         return
     if act.id == "bolt":
+        if target.dodge() and random.randint(1, 100) <= target.dodge():
+            return
         dmg = random.randint(*BOLT_DMG)
         target.hp -= dmg
         if target.hp <= 0 and on_kill is not None:
@@ -621,6 +663,314 @@ def full_run(arch_name, runs=500):
             shop()
         fight_ms_total += fight_ms
     return done / runs, first_try / runs, farm_total / runs, deaths_total / runs, levels, fight_ms_total / runs / 1000.0
+
+
+# ---------------------------------------------------------------- the Greenvale Transit Corridor (levels 5 to 10)
+#
+# 31 creatures (mudlib/domains/greenvale/corridor/mob/<id>.cs), levels 5 to 10 for all five callings with village gear,
+# the pace model and the experience proposal. Run: python3 tests/balance_sim.py corridor | pace | xp  (docs/CORRIDOR_BALANCE.md)
+
+
+def A(id, name, prep=0.0, rec=0.5, mult=1, mod=0.0, kind="attack", fx="", factor=1.0, hit=0):
+    return Act(id, prep, rec, mult, mod, kind, fx, factor, hit)
+
+
+@dataclass(frozen=True)
+class CKind:
+    """A corridor creature. pattern = (first actions, repeating cycle, ((HP percent, action id), ...) once each)."""
+    id: str
+    name: str
+    level: int
+    hp: int
+    dmg: tuple
+    to_hit: int
+    armor: int
+    xp: int
+    reaction: float
+    acts: tuple
+    pattern: tuple
+    gold: tuple = (0, 0)
+    loot: tuple = ()          # ((item, percent), ...)
+    band: tuple = (5, 6)      # player levels meant to fight it
+    boss: bool = False
+    dodge: int = 0
+    aggressive: bool = False
+    corridor: bool = True
+
+    @property
+    def tag(self):
+        return self.id
+
+
+def P(first=(), cycle=("hit",), at=()):
+    return (tuple(first), tuple(cycle), tuple(at))
+
+
+# Items a corpse may hold (existing items only) and what a perfect-knowledge player gets for them: a potion is
+# drunk (worth its price), anything else is sold for half its Value.
+ITEM_GOLD = {"healing_potion": 15.0, "trail_ration": 2.0, "iron_dagger": 3.0, "rusty_sword": 5.0, "training_spear": 4.0,
+             "small_shield": 6.0, "woodcutter_axe": 9.0, "hunting_bow": 10.0, "novice_mace": 6.0, "bag_of_coins": 80.0,
+             "enchanted_dagger": 40.0}
+
+#   id, name, level, hp, dmg, to_hit, armor, xp, reaction, acts, pattern, gold, loot, band, boss, dodge, aggressive
+CORRIDOR = [
+    CKind("field_rabbit", "Field Rabbit", 1, 8, (1, 2), 0, 0, 3, 1.5, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
+          band=(5, 6)),
+    CKind("roe_deer", "Roe Deer", 3, 22, (1, 3), 0, 0, 8, 2.5, (A("kick", "Kick", 0, 1.0),), P(cycle=("kick",)),
+          band=(5, 7)),
+    CKind("grey_fox", "Grey Fox", 4, 26, (2, 4), 1, 1, 14, 1.5, (A("nip", "Nip", 0, 0.5),), P(cycle=("nip",)),
+          band=(5, 6), dodge=10),
+    CKind("stray_wolf", "Stray Wolf", 5, 43, (7, 12), 1, 1, 100, 2.0, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
+          band=(5, 7)),
+    CKind("forest_spider", "Forest Spider", 5, 41, (6, 12), 2, 0, 100, 1.5,
+          (A("bite", "Bite", 0, 0.5), A("venom", "Slowing Bite", 0, 0.5, fx="slow:1.3:14")),
+          P(cycle=("bite", "bite", "venom")), band=(5, 7), aggressive=True),
+    CKind("bandit_lookout", "Bandit Lookout", 6, 48, (10, 15), 2, 2, 120, 3.0, (A("slash", "Slash", 0, 1.0),),
+          P(cycle=("slash",)), gold=(4, 12), loot=(("iron_dagger", 20), ("trail_ration", 25)), band=(6, 7), aggressive=True),
+    CKind("forest_wolf", "Forest Wolf", 6, 52, (5, 10), 2, 1, 120, 2.0,
+          (A("bite", "Bite", 0, 0.5), A("savage", "Savage Bite", 0, 0.5, mult=2)),
+          P(cycle=("bite", "bite", "bite", "savage")), band=(5, 7)),
+    CKind("wild_boar", "Wild Boar", 6, 47, (11, 19), 1, 2, 120, 3.5,
+          (A("gore", "Gore", 0, 1.0), A("charge", "Charge", 1.0, 1.5, mult=2)),
+          P(first=("charge",), cycle=("gore",)), band=(6, 8)),
+    CKind("goblin_scout", "Goblin Scout", 7, 57, (8, 12), 3, 2, 140, 2.0, (A("stab", "Quick Stab", 0, 0.5),),
+          P(cycle=("stab",)), gold=(5, 14), loot=(("iron_dagger", 20), ("healing_potion", 8)), band=(7, 8), aggressive=True),
+    CKind("goblin_raider", "Goblin Raider", 7, 53, (8, 13), 2, 3, 140, 3.0,
+          (A("hack", "Cleaver Hack", 0, 1.0), A("whoop", "War Whoop", 0.5, 0.5, kind="buff", fx="damage=3,speed=0.85:25")),
+          P(cycle=("hack",), at=((50, "whoop"),)), gold=(6, 16), loot=(("rusty_sword", 15), ("training_spear", 15), ("healing_potion", 8)),
+          band=(6, 9), aggressive=True),
+    CKind("boar_brute", "Boar Brute", 7, 53, (7, 12), 2, 3, 140, 4.5,
+          (A("gore", "Gore", 0, 1.5), A("trample", "Trample", 1.0, 2.0, mult=2)),
+          P(cycle=("gore", "gore", "trample")), band=(6, 8)),
+    CKind("tunnel_rat", "Tunnel Rat", 7, 63, (5, 10), 3, 1, 140, 2.0, (A("bite", "Bite", 0, 0.5),), P(cycle=("bite",)),
+          band=(7, 8), aggressive=True),
+    CKind("woodland_spider", "Woodland Spider", 8, 65, (3, 5), 3, 1, 160, 1.5,
+          (A("bite", "Bite", 0, 0.5), A("venom", "Slowing Bite", 0, 0.5, fx="slow:1.35:14")),
+          P(cycle=("bite", "bite", "venom")), band=(7, 9), aggressive=True),
+    CKind("rogue_bandit", "Rogue Bandit", 8, 60, (10, 16), 3, 3, 160, 3.0,
+          (A("slash", "Slash", 0, 1.0), A("pommel", "Pommel Strike", 0, 1.5, fx="stagger:2", factor=0.5)),
+          P(cycle=("slash", "slash", "pommel")), gold=(8, 20), loot=(("rusty_sword", 15), ("healing_potion", 10), ("trail_ration", 20)),
+          band=(8, 9), aggressive=True),
+    CKind("young_black_bear", "Young Black Bear", 8, 67, (7, 13), 2, 2, 160, 4.0,
+          (A("swipe", "Swipe", 0, 1.5), A("maul", "Maul", 1.0, 2.0, mult=2)),
+          P(cycle=("swipe", "swipe", "maul")), band=(7, 8)),
+    CKind("black_bear", "Black Bear", 8, 64, (8, 13), 3, 3, 160, 4.5,
+          (A("swipe", "Swipe", 0, 1.5), A("maul", "Maul", 1.0, 2.0, mult=2), A("roar", "Bellowing Roar", 0.5, 0.5, kind="buff", fx="damage=3,speed=0.85:30")),
+          P(cycle=("swipe", "swipe", "maul"), at=((50, "roar"),)), band=(7, 9)),
+    CKind("heartwood_goblin", "Goblin Warrior", 8, 56, (7, 11), 3, 4, 160, 3.0,
+          (A("slash", "Slash", 0, 1.0), A("heavy", "Heavy Swing", 0.5, 1.5, mult=2)),
+          P(cycle=("slash", "slash", "slash", "heavy")), gold=(8, 20), loot=(("training_spear", 15), ("iron_dagger", 15), ("healing_potion", 8)),
+          band=(7, 9), aggressive=True),
+    CKind("highway_bandit", "Highway Bandit", 8, 59, (7, 11), 3, 3, 160, 3.0,
+          (A("slash", "Slash", 0, 1.0), A("pommel", "Pommel Strike", 0, 1.5, fx="stagger:2", factor=0.5)),
+          P(cycle=("slash", "slash", "pommel")), gold=(8, 22), loot=(("rusty_sword", 15), ("healing_potion", 12), ("trail_ration", 20)),
+          band=(6, 9), aggressive=True),
+    CKind("thorn_woodling", "Thorn Woodling", 9, 62, (11, 18), 2, 4, 200, 4.0,
+          (A("lash", "Branch Lash", 0, 1.5), A("thorns", "Thorn Barrage", 0.5, 1.5, fx="weaken:armor=-2:20")),
+          P(cycle=("lash", "lash", "thorns")), band=(8, 10)),
+    CKind("forest_stalker", "Forest Stalker", 9, 62, (4, 7), 4, 2, 200, 2.0,
+          (A("claw", "Claw", 0, 1.0), A("ambush", "Ambush Strike", 0.5, 1.0, mult=2, hit=4)),
+          P(first=("ambush",), cycle=("claw",)), band=(8, 10), dodge=15, aggressive=True),
+    CKind("ancient_wolf", "Ancient Wolf", 9, 69, (11, 18), 3, 3, 200, 3.0,
+          (A("bite", "Rending Bite", 0, 1.0), A("howl", "Howl", 0.5, 0.5, kind="buff", fx="damage=2,speed=0.75:25")),
+          P(cycle=("bite",), at=((60, "howl"),)), band=(9, 10), aggressive=True),
+    CKind("rogue_goblin_veteran", "Rogue Goblin Veteran", 9, 53, (6, 9), 4, 5, 200, 3.5,
+          (A("slash", "Slash", 0, 1.0), A("daze", "Dazing Blow", 0, 1.5, fx="weaken:tohit=-2,damage=-2:20", factor=0.75)),
+          P(cycle=("slash", "slash", "daze")), gold=(10, 26), loot=(("healing_potion", 15), ("woodcutter_axe", 10), ("trail_ration", 20)),
+          band=(8, 10), aggressive=True),
+    CKind("restless_spirit", "Restless Spirit", 9, 64, (10, 16), 3, 0, 200, 2.5,
+          (A("touch", "Grave Touch", 0, 1.0), A("chill", "Chill of the Grave", 0, 1.0, fx="slow:1.25:12")),
+          P(cycle=("touch", "touch", "chill")), band=(9, 10), dodge=20, aggressive=True),
+    CKind("ancient_skeleton", "Ancient Skeleton", 9, 63, (8, 13), 3, 4, 200, 3.5,
+          (A("blade", "Rusted Blade", 0, 1.0), A("crush", "Bone Crusher", 1.0, 1.5, mult=2)),
+          P(cycle=("blade", "blade", "blade", "crush")), gold=(3, 12), band=(9, 10), aggressive=True),
+    CKind("goblin_tunneler", "Goblin Tunneler", 8, 60, (5, 8), 3, 3, 160, 3.0,
+          (A("pick", "Pick Strike", 0, 1.0), A("overhead", "Overhead Swing", 1.0, 1.5, mult=2)),
+          P(cycle=("pick", "pick", "overhead")), gold=(8, 20), loot=(("iron_dagger", 15), ("healing_potion", 8), ("trail_ration", 20)),
+          band=(7, 9), aggressive=True),
+    CKind("root_creeper", "Root Creeper", 8, 58, (8, 13), 2, 3, 160, 3.5,
+          (A("lash", "Root Lash", 0, 1.0), A("grasp", "Clinging Grasp", 0, 1.5, fx="slow:1.3:14")),
+          P(cycle=("lash", "lash", "grasp")), band=(7, 9), aggressive=True),
+    # bosses and near-bosses: two special actions each
+    CKind("bandit_leader", "Bandit Leader", 10, 42, (7, 11), 4, 5, 1000, 3.5,
+          (A("slash", "Sabre Slash", 0, 1.0), A("smash", "Shield Smash", 0.5, 1.5, fx="stagger:3", factor=0.75),
+           A("rally", "Call the Pack", 0.5, 1.0, kind="summon", fx="highway_bandit")),
+          P(cycle=("slash", "slash", "smash"), at=((60, "rally"), (30, "rally"))), gold=(30, 60),
+          loot=(("bag_of_coins", 100), ("healing_potion", 60), ("enchanted_dagger", 15)), band=(8, 10), boss=True, aggressive=True),
+    CKind("forest_panther", "Forest Panther", 10, 83, (7, 12), 5, 3, 1000, 2.0,
+          (A("claw", "Claw", 0, 1.0), A("pounce", "Pouncing Leap", 0.5, 1.0, mult=2, hit=4), A("rake", "Raking Frenzy", 0, 1.0, fx="weaken:armor=-2:20")),
+          P(first=("pounce",), cycle=("claw", "claw", "rake", "claw")), band=(9, 10), boss=True, dodge=20, aggressive=True),
+    CKind("warren_broodmother", "Warren Broodmother", 10, 35, (7, 11), 3, 4, 1000, 4.0,
+          (A("bite", "Venom Fang", 0, 1.0, fx="slow:1.3:14"), A("spit", "Webbed Spit", 0.5, 1.5, fx="weaken:tohit=-2,damage=-2:20", factor=0.75),
+           A("brood", "Call the Brood", 0.5, 1.0, kind="summon", fx="tunnel_rat")),
+          P(cycle=("bite", "bite", "spit"), at=((66, "brood"), (33, "brood"))), band=(8, 10), boss=True, aggressive=True),
+    CKind("barrow_guardian", "Barrow Guardian", 10, 194, (7, 11), 3, 5, 600, 4.5,
+          (A("slam", "Stone Fist", 0, 1.5), A("quake", "Earthshaker", 1.0, 2.0, mult=2, fx="stagger:2"),
+           A("stone", "Stone Skin", 0.5, 0.5, kind="buff", fx="armor=3:20")),
+          P(cycle=("slam", "slam", "quake"), at=((50, "stone"),)), band=(9, 10), boss=True, aggressive=True),
+    CKind("fallen_knight", "Fallen Knight", 10, 95, (8, 12), 5, 6, 1000, 3.5,
+          (A("cleave", "Rusted Cleave", 0, 1.0), A("crush", "Crushing Blow", 1.0, 1.5, mult=2),
+           A("ward", "Shield of the Fallen", 0.5, 0.5, kind="buff", fx="armor=4,speed=0.9:20")),
+          P(first=("ward",), cycle=("cleave", "cleave", "crush")), gold=(20, 40), loot=(("healing_potion", 50),), band=(9, 10), boss=True, aggressive=True),
+]
+CKINDS = {k.id: k for k in CORRIDOR}
+
+
+def parse_fx(spec):
+    """'damage=3,speed=0.85' -> ({'damage': 3.0}, 0.85)"""
+    mods, speed = {}, 1.0
+    for part in spec.split(","):
+        if not part:
+            continue
+        key, value = part.split("=")
+        if key == "speed":
+            speed = float(value)
+        else:
+            mods[key] = float(value)
+    return mods, speed
+
+
+def choose_corridor(e, a):
+    """ChooseAction of the corridor creature files: the once-only triggers by HP, then the opening actions, then the cycle."""
+    first, cycle, triggers = e.kind.pattern
+    for i, (percent, aid) in enumerate(triggers):
+        if not e.fired & (1 << i) and e.hp * 100 <= percent * e.max_hp:
+            e.fired |= 1 << i
+            return a[aid]
+    n = e.step
+    e.step += 1
+    return a[first[n] if n < len(first) else cycle[(n - len(first)) % len(cycle)]]
+
+
+def resolve_corridor(ent, act, target, t, enemies, out, push):
+    if act.kind == "buff":
+        spec, secs = act.fx.split(":")
+        mods, speed = parse_fx(spec)
+        ent.add_effect(act.id, t, int(secs), mods, speed)
+        return
+    if act.kind == "summon":
+        m = make_monster(act.fx)
+        enemies.append(m)
+        m.ready_at = t + round(m.reaction * UNIT_MS)
+        push(m.ready_at, "ready", m)
+        return
+    if act.kind == "mend":
+        ent.hp = min(ent.max_hp, ent.hp + int(act.fx))
+        return
+    dmg, _ = do_hit(ent, target, t, to_hit_bonus=act.hit, factor=act.factor, mult=act.mult, bonus=int(ent.mod("damage", t)))
+    if dmg <= 0:
+        return
+    target.hp -= dmg
+    if act.fx and target.hp > 0:
+        kind, rest = act.fx.split(":", 1)
+        if kind == "slow":
+            factor, secs = rest.split(":")
+            target.add_effect("slow-" + ent.kind.id, t, int(secs), {}, float(factor))
+        elif kind == "stagger":
+            out["stagger"](target, t, float(rest))
+        elif kind == "weaken":
+            spec, secs = rest.split(":")
+            mods, speed = parse_fx(spec)
+            target.add_effect("weaken-" + ent.kind.id, t, int(secs), mods, speed)
+
+
+# ---- gear: what a character of each calling can have from the village (nothing beyond it exists yet)
+
+# weapon, shield. Everybody who has killed the Overseer has the Leather Commander's Vest (armor 3) and, from the first
+# quest, the Guild Initiate's Helm (1); the Hidden Cache gives the +5 HP trinket. The Overseer's axe (17-25) is for the
+# callings that may wield an axe; the others buy the Fine Iron Longsword (60 gold, a rare stock) or keep to what they have.
+GEAR = {"warrior": ("overseer's axe", True), "scout": ("fine longsword", False), "priest": ("novice mace", True),
+        "mage": ("iron dagger", False), "adventurer": ("overseer's axe", True)}
+GEAR_ARMOR = 4     # vest 3 + helm 1
+GEAR_HP = TRINKET_HP
+CORRIDOR_POTIONS = 4
+
+
+def cplayer(arch, level):
+    weapon, shield = GEAR[arch]
+    return make_player(arch, level, weapon, shield, GEAR_HP, armor_extra=GEAR_ARMOR)
+
+
+def cfight(arch, level, key, potions=0, runs=600, start=None, seed=None):
+    """Fight creature `key` one-on-one `runs` times from full HP. start = (stamina, mana) at the start, or full.
+    Returns means: win rate, seconds, net HP lost in won fights, potions drunk, total damage taken, end resources."""
+    wins = 0
+    sec_w = sec_l = 0.0
+    lost = used = dtot = 0.0
+    end_s = end_m = 0.0
+    boss = CKINDS[key].boss
+    for _ in range(runs):
+        p = cplayer(arch, level)
+        if start:
+            p.stamina, p.mana = start
+        e = make_monster(key)
+        r = fight(p, [e], potions, boss=boss)
+        u = r.get("potions_used", 0)
+        if r["alive"]:
+            p.regen(r["ms"])
+            wins += 1
+            sec_w += r["ms"] / 1000.0
+            lost += p.max_hp - p.hp
+            used += u
+            dtot += p.max_hp - p.hp + POTION_HEAL * u
+            end_s += p.stamina
+            end_m += p.mana
+        else:
+            sec_l += r["ms"] / 1000.0
+    n = wins or 1
+    return dict(win=wins / runs, sec=sec_w / n, sec_loss=sec_l / max(1, runs - wins), lost=lost / n, used=used / n,
+                dtot=dtot / n, end_s=end_s / n, end_m=end_m / n)
+
+
+# ---- the pace model (docs/CORRIDOR_BALANCE.md section 1)
+ROOM_SECONDS = 4.0          # one move: the command, the room text, the next decision
+ROOMS_BETWEEN_KILLS = 3     # between one spawn and the next on a woodland or deep loop
+LOOT_SECONDS = 3.0          # `loot` the corpse
+POTION_SECONDS = 2.0        # `drink potion` out of a fight
+RESUPPLY = 0.05             # share of the time spent buying potions in bulk
+HP_REGEN_PER_SECOND = 0.1   # Adventurer.Tick: 1 HP per 10 s out of combat (3 per 10 s in a safe room)
+ROOMS_TO_PREY = {5: 14, 6: 26, 7: 40, 8: 54, 9: 68, 10: 76}   # rooms from the Hollow's guest rooms to where level n prey lives
+CORPSE_SECONDS = 10.0       # find and loot the corpse after a death
+
+
+def kind_gold(k):
+    """Average gold a kill is worth to a player: coins, plus the loot sold (or a potion drunk)."""
+    coins = (k.gold[0] + k.gold[1]) / 2.0
+    return coins + sum(ITEM_GOLD[i] * pct / 100.0 for i, pct in k.loot)
+
+
+def regen_hp(arch):
+    return HP_REGEN_PER_SECOND * (1.5 if arch == "adventurer" else 1.0)
+
+
+def pace_cell(arch, level, key, funded=True, runs=500, gold=None):
+    """One calling at one level hunting one creature, in the steady state: the seconds of a whole cycle per kill and the
+    experience per hour. funded: gold from the kills buys potions that are drunk after each fight (15 gold for 20 HP);
+    otherwise the character waits for natural regeneration. Two passes so that Stamina and Mana at the start of a fight
+    are what the recovery time of the first pass gave back."""
+    k = CKINDS[key]
+    a = ARCHS[arch]
+    g = kind_gold(k) if gold is None else gold
+    start = None
+    walk = ROOMS_BETWEEN_KILLS * ROOM_SECONDS + LOOT_SECONDS
+    for _ in range(3):
+        c = cfight(arch, level, key, 0, runs, start)
+        potions = min(g / 15.0, c["dtot"] / POTION_HEAL) if funded else 0.0
+        t_hp = max(0.0, c["dtot"] - POTION_HEAL * potions) / regen_hp(arch) + potions * POTION_SECONDS
+        wait = t_hp + walk
+        start = (min(a.stamina, c["end_s"] + a.stamina_regen * wait / 10.0), min(a.mana, c["end_m"] + a.mana_regen * wait / 10.0))
+    w = c["win"]
+    win_cycle = (c["sec"] + walk + t_hp) * (1 + RESUPPLY)
+    loss_cycle = c["sec_loss"] + ROOMS_TO_PREY[min(10, max(5, level))] * ROOM_SECONDS + CORPSE_SECONDS
+    cycle = w * win_cycle + (1 - w) * loss_cycle
+    xph = 3600.0 * w * k.xp / cycle if cycle else 0.0
+    return dict(win=w, fight=c["sec"], dtot=c["dtot"], lost=c["lost"], t_hp=t_hp, walk=walk, cycle=cycle, xph=xph,
+                potions=potions, gold=g, win_cycle=win_cycle)
+
+
+def prey(level):
+    """The ordinary creatures a character of this level hunts: those of its own level and one above (bosses are visits)."""
+    return [k for k in CORRIDOR if k.level in (level, level + 1) and not k.boss and k.level >= 5]
 
 
 # ---------------------------------------------------------------- consistency with the mudlib
