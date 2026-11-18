@@ -1099,7 +1099,8 @@ class Run:
         hero.score()
         self.note(f"the Overseer is dead; level {hero.level}, xp {hero.xp}, gold {hero.gold}")
         hero.equip_all()
-        check("the axe is wielded and the vest worn", hero.cmd("i"), "the Goblin Overseer's axe (wielded)", "a leather commander's vest (worn)")
+        check("the axe is wielded (where the calling may) and the vest worn", hero.cmd("i"),
+              *(["the Goblin Overseer's axe (wielded)"] if CAN_AXE else ["the Goblin Overseer's axe"]), "a leather commander's vest (worn)")
         check("look at the Overseer's Orders", hero.cmd("look at orders"), "A bundle of poorly translated notes covered in strange symbols and instructions.")
         orders = hero.cmd("read orders")
         for fragment in ("The Hollow Below", "The Key of Vincent", "Continue excavation.", "The old founder was telling the truth.", "The entrance remains sealed.", "The Crow demands progress."):
