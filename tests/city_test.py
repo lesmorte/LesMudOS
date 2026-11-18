@@ -259,9 +259,9 @@ class Walker:
     def check_details(self, path, src):
         w = self.w
         details, readables, dupes = src.room_texts()
-        for key, first, second in dupes:
-            R.ok(False, f"details: {path}: the key '{key}' is defined twice and the later definition wins",
-                 f"first:  [{first}]\nlater:  [{second}]")
+        for keys, first, second in dupes:
+            R.ok(False, f"details: {path}: keys {keys} are defined twice; the later definition replaces the earlier",
+                 f"earlier: [{first}]\nlater:   [{second}]")
         for fn, args in src.calls:
             if fn not in ("AddDetail", "AddReadable"):
                 continue
@@ -402,8 +402,8 @@ class Walker:
         R.ok(before - self.gold() == 8, "bed: the bed costs 8 gold, as browse says")
         look = self.say(w, "look")
         R.ok("The Silver Stag Inn, Guest Rooms" in lines_of(look), "bed: the buyer is in the guest rooms")
-        kill = self.say(w, "kill orla")
-        R.ok("calm lies over this place" in kill or "no threat" in kill, "bed: fighting is refused in the guest rooms", f"got: {body(kill)[:200]!r}")
+        stat = w.cmd("stat here")
+        R.ok("Safe True" in stat and "logout room True" in stat, "bed: the guest rooms are Safe and a logout room", f"got: {body(stat)[:200]!r}")
         w.cmd("restore")
 
     # ---- exits ----
@@ -419,6 +419,10 @@ class Walker:
             if not R.ok(dsrc.short in lines_of(out), f"exits: {path} {direction} leads to '{dsrc.short}' ({dest})", f"first lines: {lines_of(out)[:2]}\n{body(out)[:200]!r}"):
                 continue
             backs = [d for d, p in dsrc.exits.items() if p == path]
+            if not dest.startswith("/domains/greenvale/"):
+                continue  # the Vincent's Hollow side of the road is shut to a wizard without a pass; the player walk covers it
+            if dest == OAK + "founders/elder_lane" and path == OAK + "grove/overgrown_way":
+                continue  # by design: the hidden way is left for integration, Elder Lane has no exit west
             if not R.ok(backs, f"exits: {dest} has a way back to {path}", f"exits of {dest}: {dsrc.exits}"):
                 continue
             back = backs[0]
@@ -492,12 +496,12 @@ def check_texts(wk):
     seen = set()
     for typed, out in wk.texts:
         text = body(out)
-        if "> " in text:
-            at = text.index("> ")
-            key = ("gt", text[max(0, at - 30):at + 10])
+        # A '> ' at the start of a line is the prompt, followed by an idle action that arrived just after the reply.
+        for m in re.finditer(r"(?<!\n)> ", text):
+            key = ("gt", text[max(0, m.start() - 30):m.end() + 10])
             if key not in seen:
                 seen.add(key)
-                R.ok(False, "text: the sequence '> ' appears inside game text", f"after '{typed}': ...{text[max(0, at - 80):at + 20]!r}")
+                R.ok(False, "text: the sequence '> ' appears inside game text", f"after '{typed}': ...{text[max(0, m.start() - 80):m.end() + 20]!r}")
         for m in RAW_TAG.finditer(text):
             key = ("tag", text[max(0, m.start() - 30):m.end()])
             if key not in seen:

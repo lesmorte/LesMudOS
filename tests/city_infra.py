@@ -121,26 +121,26 @@ class Source:
 
     def room_texts(self):
         """The room's details and readables as Room builds them: ({key: text for look}, {key: text for read}, duplicates).
-        A duplicate is a key defined twice: the later definition replaces the earlier one."""
-        details, readables, owner, dupes = {}, {}, {}, []
+        A duplicate is a group of keys that two AddDetail calls (or two AddReadable calls) both define: the later call replaces
+        the earlier one for those keys. Each is (keys, first call's key list, later call's key list)."""
+        details, readables, d_owner, r_owner, pairs = {}, {}, {}, {}, {}
         for fn, args in self.calls:
             if fn == "AddDetail":
                 for k in keys_of(args[0]):
-                    if k in owner:
-                        dupes.append((k, owner[k], args[0]))
+                    if k in d_owner:
+                        pairs.setdefault((d_owner[k], args[0]), []).append(k)
                     details[k] = args[1]
-                    owner[k] = args[0]
+                    d_owner[k] = args[0]
             elif fn == "AddReadable":
                 look = args[2] if len(args) > 2 else "There is writing on it. You could {cmd}read{/} it."
                 for k in keys_of(args[0]):
-                    if k in readables:
-                        dupes.append((k, owner.get(k, "?"), args[0]))
+                    if k in r_owner:
+                        pairs.setdefault((r_owner[k], args[0]), []).append(k)
                     readables[k] = args[1]
+                    r_owner[k] = args[0]
                     if k not in details:
                         details[k] = look
-                        owner[k] = args[0]
-                    elif owner.get(k) != args[0]:
-                        dupes.append((k, owner[k], args[0]))
+        dupes = [(keys, first, later) for (first, later), keys in pairs.items()]
         return details, readables, dupes
 
     def topics(self):
