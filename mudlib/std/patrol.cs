@@ -75,6 +75,9 @@ public class Patrol : Npc
 
     public int QuerySteps() => steps;
 
+    /// <summary>How many times a step found no real exit along the route (or was not allowed).</summary>
+    public int QueryBlocked() => blocked;
+
     public override string Stat() => base.Stat() +
         $"  Patrol: {QueryPatrolState()}, route {route.Count} rooms ({(Loop ? "loop" : "there and back")}), at {cursor}, pace {PaceSeconds}s, steps {steps}, blocked {blocked}, defends players {DefendPlayers}\n";
 
