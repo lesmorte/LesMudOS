@@ -19,7 +19,7 @@ public class MkSouthRows : Room
         AddDetail("lane,west lane,coin street", "A narrow lane leads west toward Coin Street, where the awnings give way to stone and shuttered windows. The noise there is lower, and more expensive.");
 
         AddSpawn("/domains/greenvale/oakenfell/market/npc/trader_wenna");
-        AddSpawn("/domains/greenvale/oakenfell/market/npc/trader_osric");
+        AddSpawn("/domains/greenvale/oakenfell/market/npc/trader_edric");
         AddSpawn("/domains/greenvale/oakenfell/market/npc/armorer_brann");
     }
 }

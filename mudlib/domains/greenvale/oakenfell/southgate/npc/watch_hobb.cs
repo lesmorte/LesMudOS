@@ -20,7 +20,7 @@ public class SgWatchHobb : Npc
         AddChat("Thirty years on this gate, and I've seen every sort come through. Heroes, mostly, and the rest were liars who wanted to be.");
         AddChat("Don't ask me about the weather. I've had enough of weather.");
         AddTopic("city,oakenfell,districts", "Five districts, friend. Southgate here's the newest, then the Market to the north, the Founder's District beyond it with the old stones and the Hall of Legends west of that. The River District's east, along the Mere. Ask the folk at the Silver Stag if you want the rest.");
-        AddTopic("motto,keystone,arch,oak", "From Strong Roots Grow Great Things. They say the Great Oak stood hereabouts, and the city grew round it. Old Wick at the Stag will tell you that story, if you buy him a drink.");
+        AddTopic("motto,keystone,arch,oak", "From Strong Roots Grow Great Things. They say the Great Oak stood hereabouts, and the city grew round it. Old Tam at the Stag will tell you that story, if you buy him a drink.");
         AddTopic("rules,board,law,laws", "Read the board. I've said it ten thousand times and it never gets shorter. Keep your steel in its sheath, pay your toll, and don't argue with the Consortium's clerks. They will win.");
         AddTopic("inn,stag,silver stag,rooms,bed", "Straight up Wayfarer's Row and left into Stag Lane. The Silver Stag. Best stew south of the river, and the beds are clean.");
         AddTopic("wolf,road,wolves", "Wolves on the Vale Road? There's one that wanders. The Riverwatch hasn't caught it, and I haven't had the nerve to ask.");

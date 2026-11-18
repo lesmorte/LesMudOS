@@ -4,14 +4,14 @@ public class SgRegularWick : Npc
 {
     public override void Create()
     {
-        Name = "Old Wick";
-        Ids.Add("wick");
-        Ids.Add("old wick");
+        Name = "Old Tam";
+        Ids.Add("tam");
+        Ids.Add("old tam");
         Ids.Add("regular");
         Ids.Add("old man");
         Ids.Add("oldest regular");
-        Ids.Add("wick tanner");
-        ShortDesc = "Old Wick, the oldest regular";
+        Ids.Add("tam tanner");
+        ShortDesc = "Old Tam, the oldest regular";
         LongDesc = "A very old man with a white beard, a bent back and a stick propped on the bench beside him. His eyes are bright and sharp, and his hands tremble only when they hold nothing.";
         Level = 2;
         MaxHp = 20;
@@ -23,7 +23,7 @@ public class SgRegularWick : Npc
         AddTopic("founders,founder's district,old walls,walls", "Oldest part of the city. Quiet streets, old stones and old families. Go up Old Stone Street, past the Square, and mind the lanes that end in walls.");
         AddTopic("history,city,oakenfell,old days", "Four hundred years, near enough. Settlers by the river, and a tree to meet under. Don't let the Assembly tell you it was all their doing.");
         AddTopic("rumor,rumors,gossip", "Dessa knows the roads and Fenn knows the offices. I know the old things, and old things don't change. Buy me a drink and I'll think of one.");
-        AddEmote("Old Wick stares into the fire, lips moving as if counting something.", 8);
-        AddEmote("Old Wick taps his stick on the floor and mutters, \"Not like that, never like that.\"", 6);
+        AddEmote("Old Tam stares into the fire, lips moving as if counting something.", 8);
+        AddEmote("Old Tam taps his stick on the floor and mutters, \"Not like that, never like that.\"", 6);
     }
 }

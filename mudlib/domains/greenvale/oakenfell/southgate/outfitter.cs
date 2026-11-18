@@ -17,6 +17,6 @@ public class SgOutfitter : Room
         AddDetail("bell,door,brass bell", "The brass bell hangs on a curl of iron above the door. It has a flat, cheerful note.");
         AddDetail("counter,ledger", "A worn oak counter, scarred where heavy sacks have been dropped on it for years. A ledger and a brass scale rest on it.");
 
-        AddSpawn("/domains/greenvale/oakenfell/southgate/npc/outfitter_perrin");
+        AddSpawn("/domains/greenvale/oakenfell/southgate/npc/outfitter_corwin");
     }
 }

@@ -22,7 +22,7 @@ public class SgRegularFenn : Npc
         AddTopic("assembly,government,council", "The Greenvale Assembly sits in Founder's Square, and its meetings are loud. Half of them say the Consortium owns half of the Assembly, and the other half say it's fine.");
         AddTopic("consortium,merchants,trade", "The Merchant Consortium controls the Market, the caravans and half the warehouses. They say 'Trade Builds Tomorrow', and nobody argues, because nobody dares.");
         AddTopic("hall,hall of legends,legends", "The Hall of Legends is neutral, they say. Neutral with a bell tower and a gold-bound chronicle. Don't believe in neutral halls.");
-        AddTopic("oak,great oak,tree", "The oak's a legend and a trade sign. Ask old Wick about it; he'll tell you where it stood, and how much of it he still believes.");
+        AddTopic("oak,great oak,tree", "The oak's a legend and a trade sign. Ask old Tam about it; he'll tell you where it stood, and how much of it he still believes.");
         AddEmote("Fenn Alder scribbles on a scrap of paper, then crosses it out.", 8);
         AddEmote("Fenn Alder glances over his shoulder before whispering something to Dessa.", 6);
     }

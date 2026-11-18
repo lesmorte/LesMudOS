@@ -4,13 +4,13 @@ public class MkTraderOsric : Npc
 {
     public override void Create()
     {
-        Name = "Osric Bale";
-        Ids.Add("osric");
-        Ids.Add("osric bale");
+        Name = "Edric Bale";
+        Ids.Add("edric");
+        Ids.Add("edric bale");
         Ids.Add("trader");
         Ids.Add("ironmonger");
         Ids.Add("stallholder");
-        ShortDesc = "Osric Bale, an ironmonger";
+        ShortDesc = "Edric Bale, an ironmonger";
         LongDesc = "A lean, sharp-faced man with a tape over one shoulder and a nail between his teeth. His stall is a clutter of pots, nails, hinges and hooks, each hung in perfect order.";
         Level = 1;
         MaxHp = 15;
@@ -21,6 +21,6 @@ public class MkTraderOsric : Npc
         AddTopic("pots,pans,nails,hooks,iron", "I supply the inns and kitchens by the crate, mostly. A traveler wants a pan for one night, I'd say sleep at the Stag and let them cook for you.");
         AddTopic("smith,smiths,guild,guild quarter", "The smiths of the Crafters' Court make the best iron in Greenvale, and they know it. Their prices know it too.");
         AddTopic("weapons,armor,armorer", "Brann at the corner stall will have armor when his shipment is unloaded. For blades, ask Kessa up in the North Rows.");
-        AddEmote("Osric Bale counts a handful of nails and hangs them in a perfect row.", 8);
+        AddEmote("Edric Bale counts a handful of nails and hangs them in a perfect row.", 8);
     }
 }

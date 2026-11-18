@@ -4,12 +4,12 @@ public class SgSellswordJory : Npc
 {
     public override void Create()
     {
-        Name = "Jory Ketch";
-        Ids.Add("jory");
+        Name = "Brandt Ketch";
+        Ids.Add("brandt");
         Ids.Add("sellsword");
-        Ids.Add("jory ketch");
+        Ids.Add("brandt ketch");
         Ids.Add("mercenary");
-        ShortDesc = "Jory Ketch, an off-duty sellsword";
+        ShortDesc = "Brandt Ketch, an off-duty sellsword";
         LongDesc = "A stocky, sandy-haired man with a crooked grin and a shirt open at the neck. His sword lies across the table beside a tankard, and his knuckles are scarred.";
         Level = 4;
         MaxHp = 40;
@@ -21,7 +21,7 @@ public class SgSellswordJory : Npc
         AddTopic("work,pay,contract", "Pay's decent, work's dirty. That's the Free Companies. Talk to Sera about the ledger.");
         AddTopic("west,western road,elderwood", "Heard the western road is bad. Wagons burned, loggers vanished. Nobody pays enough for that, but somebody always does.");
         AddTopic("lodge,companies", "The Free Lodge is home, church and bank. They keep your coin, your name and your secrets, in that order.");
-        AddEmote("Jory Ketch flips a coin across his knuckles and catches it behind his back.", 8);
-        AddEmote("Jory Ketch stretches and cracks his neck.", 6);
+        AddEmote("Brandt Ketch flips a coin across his knuckles and catches it behind his back.", 8);
+        AddEmote("Brandt Ketch stretches and cracks his neck.", 6);
     }
 }

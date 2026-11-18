@@ -18,7 +18,7 @@ public class SgFreeLodge : Room
         AddReadable("notice,notices,contract board,jobs", "THE FREE LODGE\nContracts posted daily. Pay on delivery, bonus on survival.\nNO feuds inside. NO unpaid tabs. NO questions about our clients.\nOpen to any sword, any road, any coin.\nCOIN BEFORE CROWN", "A notice nailed to the door lists the lodge's terms. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/greenvale/oakenfell/southgate/npc/recruiter_sera");
-        AddSpawn("/domains/greenvale/oakenfell/southgate/npc/sellsword_jory");
+        AddSpawn("/domains/greenvale/oakenfell/southgate/npc/sellsword_brandt");
         AddSpawn("/domains/greenvale/oakenfell/southgate/npc/sellsword_maddok");
     }
 }

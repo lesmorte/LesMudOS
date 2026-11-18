@@ -21,7 +21,7 @@ public class SgInnkeeperOrla : Shopkeeper
         AddChat("If you hear a rumor, share it. If you've a tale, tell it. That's the house rule.");
         AddTopic("bed,room,rest,sleep", "Eight gold a night, and you'll wake whole as a new loaf. Say the word: {cmd}buy bed{/}, and I'll show you upstairs.");
         AddTopic("food,drink,ale,stew,meal", "Venison stew from the spit and Stag Amber, our own brew. Try {cmd}browse{/}, then {cmd}buy stew{/}.");
-        AddTopic("rumor,rumors,news,gossip", "Ask the three by the fire. Old Wick, Dessa and Fenn know more than the Assembly's spies, and they'll tell you for a drink.");
+        AddTopic("rumor,rumors,news,gossip", "Ask the three by the fire. Old Tam, Dessa and Fenn know more than the Assembly's spies, and they'll tell you for a drink.");
         AddTopic("stag,inn,history", "The Silver Stag's been on this corner longer than the Southgate has had a name. The stag's head over the mantel, now, the regulars say the first owner took it with a single arrow, and the arrow gets longer every year.");
         AddTopic("quest,work,job,jobs,adventure", "Read the board by the stairs. Posters come and go. If you're quick, and capable, you'll find coin in it.");
         AddEmote("Orla Penhallow wipes down a table and shoos a cat from the bar.", 8);

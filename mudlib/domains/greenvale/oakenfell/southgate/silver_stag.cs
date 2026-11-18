@@ -19,7 +19,7 @@ public class SgSilverStag : Room
         AddReadable("board,cork board,notices,notice", "The cork board is crowded with notices:\n \"WANTED: guards for a wagon to Watchfort Crossing, good pay, no questions about the Elderwood.\"\n \"LOST: one grey cat, answers to Biscuit. Reward.\"\n \"FOUND: a signet ring, engraved with a stag. Ask at the bar.\"\n \"The Free Lodge is hiring steady blades. Coin Before Crown.\"", "A cork board by the stairs is crowded with notices. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/greenvale/oakenfell/southgate/npc/innkeeper_orla");
-        AddSpawn("/domains/greenvale/oakenfell/southgate/npc/regular_wick");
+        AddSpawn("/domains/greenvale/oakenfell/southgate/npc/regular_tam");
         AddSpawn("/domains/greenvale/oakenfell/southgate/npc/regular_dessa");
         AddSpawn("/domains/greenvale/oakenfell/southgate/npc/regular_fenn");
     }
