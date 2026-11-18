@@ -12,6 +12,7 @@ public class RustySword : Weapon
         DamageMax = 14;
         ReactionMod = 0.5;
         Recovery = 1.0;
+        Category = "sword";
         Value = 10;
     }
 }

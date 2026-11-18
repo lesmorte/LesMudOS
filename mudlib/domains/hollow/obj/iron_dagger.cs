@@ -13,6 +13,7 @@ public class IronDagger : Weapon
         ReactionMod = 0.0;
         Recovery = 0.5;
         ToHit = 1;
+        Category = "dagger";
         Value = 6;
     }
 }

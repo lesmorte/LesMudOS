@@ -15,6 +15,7 @@ public class GuildHelm : Armor
         ArmorValue = 1;
         Slot = "head";
         ReactionMod = 0.0;
+        Category = "light";
         Value = 15;
     }
 }

@@ -36,11 +36,15 @@ ANSI_TAIL = re.compile("\x1b(\\[[0-9;]*)?$")
 
 
 class Client:
-    def __init__(self, name, password=PASSWORD, login=True):
+    def __init__(self, name, password=PASSWORD, login=True, archetype="adventurer"):
         """Connect and give the name. With login, also answer the password
         prompts: once for an existing account, twice for a new one or one
-        that has no password yet. Text read past the name that is not a
-        password prompt (a refusal) is kept for the next read_until."""
+        that has no password yet, and then the choice of a calling if the
+        game asks for one (a new character, or one saved before classes; the
+        default is the adventurer, whose kit and unarmed damage are closest
+        to the character the older tests were written for). Text read past
+        the name that is not a password prompt (a refusal) is kept for the
+        next read_until."""
         self.pending = ""
         self.raw = ""  # everything received since the last raw_reset(), with escape sequences
         self._carry = ""  # an escape sequence cut by the end of a chunk
@@ -55,10 +59,20 @@ class Client:
             self.send(password)
             self.read_until("again: ")
             self.send(password)
+            self.choose_calling(archetype)
         elif "Password: " in text:
             self.send(password)
+            self.choose_calling(archetype)
         else:
             self.pending = text
+
+    def choose_calling(self, archetype):
+        """After the password: if the game asks for a calling, choose `archetype` (None leaves the prompt unanswered).
+        Everything read on the way is kept for the next read_until."""
+        text = self.read_any(("Your calling: ", "> ", "Wrong password", "Goodbye", "Another name?", "Someone else"), timeout=15.0)
+        if archetype is not None and "Your calling: " in text and not text.rstrip().endswith("There is no such calling. Your calling:"):
+            self.send(archetype)
+        self.pending = text
 
     def rx(self, chunk):
         """Decode a received chunk, keep it in self.raw, and return it without ANSI sequences."""
@@ -629,7 +643,10 @@ public class Spinner : Item
         g.send(pw_g)
         g.read_until("again: ")
         g.send(pw_g)
-        check("matching passwords create the account", g.read_until("> "), "Account created.", "Welcome, Gwendolyn.")
+        # Changed with the class system: after the password a new character is asked for a calling before entering the game.
+        check("matching passwords create the account", g.read_until("Your calling: "), "Account created.", "choose your calling")
+        g.send("adventurer")
+        check("the chosen calling lets the new account into the game", g.read_until("> "), "You take up the calling of the Adventurer.", "Welcome, Gwendolyn.")
         saved = save_file("gwendolyn")
         check("new account is saved at once, with a hash", saved, '"passwordHash": "pbkdf2-sha256$210000$', absent=(pw_g,))
         g.send("quit")
@@ -682,7 +699,10 @@ public class Spinner : Item
         c.send("old-timer-pass")
         c.read_until("again: ")
         c.send("old-timer-pass")
-        check("password set, then into the game", c.read_until("> "), "Password set.", "Welcome back, Oldtimer. This is visit number 5.")
+        # Changed with the class system: a character saved before classes is asked for a calling at the next login.
+        check("password set, then asked for a calling", c.read_until("Your calling: "), "Password set.", "choose your calling")
+        c.send("adventurer")
+        check("calling chosen, then into the game", c.read_until("> "), "Welcome back, Oldtimer. This is visit number 5.")
         check("old save file kept its fields", c.command("who"), "Oldtimer the old-timer")
         check("old account now has a hash", save_file("oldtimer"), '"passwordHash": "pbkdf2-sha256$', '"title": "the old-timer"', absent=("old-timer-pass",))
         c.send("quit")

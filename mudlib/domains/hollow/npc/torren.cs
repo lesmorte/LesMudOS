@@ -17,6 +17,7 @@ public class Torren : Shopkeeper
         AddChat("Buy, {cmd}sell{/} or just {cmd}browse{/}. I pay half what a blade is worth, no more, no less.");
         AddTopic("sword,swords,steel,blade,blades", "A sword's only as good as the arm behind it. The rusty ones are cheap, but they'll hold an edge if you respect them. Try {cmd}browse{/}, then {cmd}buy sword{/}.");
         AddTopic("longsword,fine,rare", "Now and then I make something fine, when the iron is right. If I have one, it'll be on the rack. Sixty gold, and worth every coin.");
+        AddTopic("mace,staff,bow,bows,maces,staves", "A mace for the temple folk, a staff for the scholars, a bow for the ones who like their enemies at arm's length. Cheap, all three. Not everyone is trained for every weapon, mind: swords for those who know them, and so on.");
         AddTopic("goblins,goblin,cellar", "Goblin steel? Scrap. They bring me broken blades sometimes, and I pay by the pound.");
         AddEmote("Torren hammers a glowing blade on the anvil; sparks fly across the smithy.", 8);
         AddEmote("Torren plunges a blade into the quench barrel with a hiss of steam.", 5);
@@ -26,6 +27,9 @@ public class Torren : Shopkeeper
         AddStock("/domains/hollow/obj/iron_dagger", 6);
         AddStock("/domains/hollow/obj/woodcutter_axe", 18);
         AddStock("/domains/hollow/obj/small_shield", 12);
+        AddStock("/domains/hollow/obj/novice_mace", 12);
+        AddStock("/domains/hollow/obj/apprentice_staff", 10);
+        AddStock("/domains/hollow/obj/hunting_bow", 20);
         AddRareStock("/domains/hollow/obj/fine_iron_longsword", 60, 30);
     }
 }

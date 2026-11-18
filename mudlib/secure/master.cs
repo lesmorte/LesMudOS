@@ -22,6 +22,10 @@ public class Master : MudObject, IMaster
         return path.StartsWith("/players/") && IsPlayerBody(caller);
     }
 
+    // The class registry blueprint may list the two directories where classes and skills live, and nothing else.
+    private static bool IsClassRegistry(ObjectRef ob, string? path)
+        => !ob.IsClone && ob.ProgramPath == "/secure/classes" && (path == "/classes" || path == "/skills");
+
     private static bool IsPlayerBody(ObjectRef ob) => ob.IsClone && ob.ProgramPath == "/std/player";
 
     // Only the registry blueprint counts. A clone of it has no authority.
@@ -37,6 +41,7 @@ public class Master : MudObject, IMaster
             case "admin-secret": return IsWizList(caller);
             case "exec": return caller.ProgramPath == "/secure/login";
             case "get-dir":
+                return IsPlayerBody(caller) || IsClassRegistry(caller, arg);
             case "read-file":
             case "write-file":
             case "make-dir":

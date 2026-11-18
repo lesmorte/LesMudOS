@@ -13,6 +13,7 @@ public class MagicalTrinket : Armor
         ReactionMod = 0.0;
         ArmorValue = 0;
         MaxHpBonus = 5;
+        Magic = "raises your maximum HP by 5";
         Value = 40;
     }
 }

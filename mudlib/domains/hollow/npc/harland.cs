@@ -32,6 +32,7 @@ public class Harland : Shopkeeper
     {
         if (path != "/domains/hollow/obj/tavern_bed") return base.OnBuy(buyer, path);
         buyer.Call("Heal", 9999);
+        buyer.Call("FillResources");
         TellObject(buyer, "Harland shows you upstairs. You sleep soundly and wake fully rested.\n");
         var tavern = Environment();
         if (tavern != null) tavern.Call("MoveThrough", buyer, "up");

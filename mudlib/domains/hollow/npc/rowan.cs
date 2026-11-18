@@ -12,6 +12,7 @@ public class Rowan : Npc
     private const string OverseerPath = "/domains/hollow/mob/goblin_overseer";
     private const string OrdersPath = "/domains/hollow/obj/overseers_orders";
     private const string HelmPath = "/domains/hollow/obj/guild_helm";
+    private const string PassPath = "/domains/hollow/obj/travel_pass";
 
     public override void Create()
     {
@@ -34,8 +35,22 @@ public class Rowan : Npc
         AddEmote("Rowan studies a map pinned to the wall and frowns.", 5);
     }
 
+    /// <summary>
+    /// A player who has completed "Clear the Cellar" and carries no travel pass (an existing character, or one who lost it
+    /// with a corpse) is given another. True if one was given.
+    /// </summary>
+    private bool ReissuePass(ObjectRef who)
+    {
+        if (who.Call<int>("QueryQuest", Cellar) != 2 || Present("travel pass", who) != null) return false;
+        MoveObject(CloneObject(PassPath), who);
+        Speak("You have no travel pass on you? Then take another, and keep it safe. The guild vouches for you.");
+        Write("Rowan gives you a travel pass.\n");
+        return true;
+    }
+
     protected override string? TalkOverride(ObjectRef who)
     {
+        ReissuePass(who);
         if (who.Call<int>("QueryQuest", Orders) == 2)
             return "The Crow, the Hollow Below, the sealed entrance... We have learned a great deal, and I like none of it. The guild will have more work for you when you are ready.";
         if (who.Call<int>("QueryQuest", Cellar) == 2)
@@ -94,7 +109,7 @@ public class Rowan : Npc
     {
         var player = ThisPlayer();
         if (player == null) return false;
-        var reported = false;
+        var reported = ReissuePass(player);
 
         if (player.Call<int>("QueryQuest", Cellar) < 2 && player.Call<bool>("QueryKilled", OverseerPath))
         {
@@ -136,6 +151,9 @@ public class Rowan : Npc
         var helm = CloneObject(HelmPath);
         MoveObject(helm, player);
         Reward(player, Cellar, 150, 50, " and gives you a Guild Initiate's Helm");
+        MoveObject(CloneObject(PassPath), player);
+        Speak("And this is for the road: a travel pass, a pass of safe conduct from the guild. With it the way north out of the Hollow is open to you, and the road leads to Oakenfell.");
+        Write("Rowan gives you a travel pass.\n");
 
         if (player.Call<int>("QueryQuest", Orders) == 0)
         {

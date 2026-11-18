@@ -14,6 +14,7 @@ public class FineIronLongsword : Weapon
         DamageMax = 18;
         ReactionMod = 1.0;
         Recovery = 1.0;
+        Category = "sword";
         Value = 60;
     }
 }

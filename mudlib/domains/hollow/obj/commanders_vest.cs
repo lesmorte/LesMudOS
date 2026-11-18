@@ -14,6 +14,7 @@ public class CommandersVest : Armor
         ArmorValue = 3;
         Slot = "body";
         ReactionMod = 0.0;
+        Category = "light";
         Value = 60;
     }
 }
