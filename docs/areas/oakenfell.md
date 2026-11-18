@@ -91,7 +91,7 @@ Finding it:
 - There is no exit shown in Elder Lane. `look at wall` and `look at ivy` describe a gap; `search wall` (or `push ivy`) reveals it for that character, who can from then on go `through` it.
 - Local knowledge also opens it: the retired adventurer on Old Stone Street and the oldest regular at the Silver Stag each give a hint if asked about the oak, and a hint is enough.
 - A second entrance exists and is not usable yet: a rusted garden door seen from inside the grove, said to open onto the Guild Quarter. The document allows several entrances; one more is left to find later.
-- The grove is a hidden location for the discovery system: finding it is worth Renown, and the first character ever to find it is recorded.
+- Finding the Great Stump, Oakenfell's namesake, is recorded in the Chronicle as a first: the first character ever to stand before it gets a featured Chronicle entry and is named among the recorded firsts (decided by the owner; CHRONICLE.md section 4). Every later finder earns the Renown of a hidden discovery. So the grove is findable from the first build.
 - The legends in the design document (the roots still live, spirits gather, Druids hear the tree whisper, passages lie beneath) are told by the caretaker and by townsfolk, and nothing in the first build confirms or denies them. Nothing can be dug, opened or entered at the stump yet.
 - A scholar in the Athenaeum who asks too many questions about the oldest parts of the city is the Circle of Ash's interest in the grove. He is never named as such.
 
@@ -157,6 +157,6 @@ Mounts, auctions, crafting, housing, political quests, the grove's secrets, the 
 
 1. Is about 45 rooms the right first size, or should the first build be smaller (the route from Southgate to the Hall of Legends, with the other districts as one street each)?
 2. Is the whole city safe ground, as planned here?
-3. Should the Hidden Grove be findable in the first build, or present but sealed until there is content for it?
+3. (Settled: the Hidden Grove is findable in the first build, and finding the Great Stump is a recorded first.)
 4. The bank and the second respawn point are additions of mine. Keep them?
 5. The gates name four destinations: the Elderwood (west), the mountains (north), Watchfort Crossing (east, from the bible) and downriver. Are these the directions the world should grow in?

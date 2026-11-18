@@ -42,7 +42,7 @@ An event type is data: an id, the five score components, the multiplier flags, t
 | Rarity | Common 0, Uncommon 25, Rare 100, Very Rare 250, Legendary 500, Unique 1000, Server First 2000. One value. |
 | Persistence | Temporary 0, Reoccurring 25, Long-Term 100, Permanent 500, World-Altering 1000 |
 | Flags | Storyline ×1.5, Regional ×1.25, World ×2.0, Seasonal ×1.25, Developer Flagged ×2.0 |
-| First-occurrence rule | Whether the first time ever earns ×2.0, and whether that first time is a recorded server first |
+| First-occurrence rule | Whether the first time ever earns ×2.0, and whether that first time is listed among the recorded firsts with its holder's name. Being a recorded first is separate from the Server First rarity score. |
 | Renown | Renown to each participant, and extra for the first time ever |
 
 ### Reporting
@@ -116,6 +116,7 @@ Final ESS is rounded to the nearest whole number, halves up. Values are for a so
 | Area discovered | 5 | 0 | 0 | 0 | | 10 | 5 |
 | Hidden location discovered (Hidden Cache) | 25 | 0 | Uncommon 25 | 0 | | 100 | 25 |
 | Secret dungeon discovered (Forgotten Cellars) | 100 | Settlement 100 | Rare 100 | 0 | | 600 | 100 |
+| The Great Stump found (Oakenfell's namesake, in the Hidden Grove) | 25 | Settlement 100 | Very Rare 250 | 0 | | 750, and a recorded first | 25 |
 | Left the village with a travel pass | 10 | 0 | 0 | 0 | | 20 | 10 |
 | Reached a milestone level (10, 25, 50, 75, 100) | 100 | 0 | Server First 2000, then Rare 100 | 0 | | 4,200 | 200 |
 | Chose an advanced class | 10 | 0 | Server First 2000, then Common 0 | 0 | | 4,020 | 10 |
@@ -127,6 +128,7 @@ What Vincent's Hollow produces:
 - **The first character ever** to kill the Overseer (450) and to find the Forgotten Cellars (600) gets a Chronicle entry for each. The first to bring Rowan the orders (1,069) gets a Legendary entry, and the first to find the Hidden Cache (100) and to finish "Clear the Cellar" (220) start rumors.
 - **Every later character** doing the same things earns Renown for them but makes no history, except that finding the Forgotten Cellars for oneself (100) is still talked about in the tavern.
 - **Everyone together** makes history through the aggregates: the thousandth goblin killed in Greenvale is a featured entry no matter who strikes the blow.
+- **The first character to find the Great Stump** in Oakenfell's Hidden Grove gets a featured entry (750) and is recorded among the firsts, by the owner's decision: finding the city's namesake is history. It is a recorded first without the Server First rarity, which stays reserved for milestones. Later finders earn the hidden-location Renown and no entry.
 - **Milestones** such as the first character to reach level 10 or to choose an advanced class are Realm-Shaping events with a server first. They are meant to be the entries a new player reads years later.
 
 The numbers are a starting point. The implementer tabulates what a full play-through produces for the first character and for a later one, and the table is adjusted until that reads sensibly.
