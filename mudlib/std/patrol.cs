@@ -104,7 +104,7 @@ public class Patrol : Npc
         if (route.Count > 1 && PlayerOnRoute())
         {
             walking = true;
-            Step();
+            Schedule(Step, PaceSeconds); // it does not leave the moment a player arrives: its first step is a pace away
             return;
         }
         walking = false;

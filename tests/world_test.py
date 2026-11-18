@@ -83,8 +83,9 @@ public class WtBrute : Monster
 PROBE = '''// @inherit /std/thing
 public class WtProbe : Thing
 {
+    private const string W = "/domains/wtest/";
     public override void Create() { Name = "Probe"; Ids.Add("probe"); }
-    public override string? Short() => null;
+    public override string? Short() => "a probe";
     public override void Init()
     {
         AddAction("tele", Tele);
@@ -104,7 +105,7 @@ public class WtProbe : Thing
     {
         for (var i = 1; i < 800; i++)
         {
-            var ob = FindObject(W + args.Trim() + "#" + i);
+            var ob = FindObject((args.Trim().StartsWith("/") ? "" : W) + args.Trim() + "#" + i);
             if (ob == null || !ob.IsAlive) continue;
             Write("PINFO state=" + ob.Call<string>("QueryPatrolState") + " room=" + (Environment(ob)?.Name ?? "none") + " steps=" + ob.Call<int>("QuerySteps") + " blocked=" + ob.Call<int>("QueryBlocked") + " hp=" + ob.Call<int>("QueryHp") + "\\n");
             return true;
@@ -114,7 +115,7 @@ public class WtProbe : Thing
     }
     private bool Gather(string args)
     {
-        var node = Present(args.Trim(), Environment()!);
+        var node = Present(args.Trim(), Environment(ThisPlayer()!)!);
         if (node == null) { Write("GATHER nonode\\n"); return true; }
         var got = node.Call<bool>("TryGather", ThisPlayer()!);
         Write("GATHER " + got + " charges=" + node.Call<int>("QueryCharges") + "/" + node.Call<int>("QueryMaxCharges") + " kind=" + node.Call<string>("QueryKind") + " difficulty=" + node.Call<int>("QueryDifficulty") + "\\n");
@@ -122,7 +123,7 @@ public class WtProbe : Thing
     }
     private bool GatherFar(string args)
     {
-        var node = Present("bush", Environment()!);
+        var node = Present("bush", Environment(ThisPlayer()!)!);
         var other = Users().FirstOrDefault(u => u.Call<string>("QueryName") == args.Trim());
         Write("GATHERFAR " + (node != null && other != null && node.Call<bool>("TryGather", other)) + "\\n");
         return true;
@@ -133,7 +134,7 @@ public class WtProbe : Thing
         return true;
     }
 }
-'''.replace("W + ", f'"{W}" + ')
+'''
 
 
 def files():
@@ -142,7 +143,8 @@ def files():
     f["brute"] = BRUTE
     f["hub"] = rm("WtHub", "Test Hub", {"up": "/domains/hollow/village/square", "east": W + "cave", "north": W + "dull", "south": W + "shrine",
                                          "west": W + "lowland", "down": W + "arena", "northeast": W + "p1"},
-                  '        AddSpawn("%sprobe");\n        foreach (var r in new[] { "p1", "l1", "w1", "k1", "h1", "d0", "s0", "b0", "x0", "q0" }) LoadObject("%s" + r);\n' % (W, W))
+                  '        foreach (var r in new[] { "p1", "l1", "w1", "k1", "h1", "d0", "s0", "b0", "x0", "q0" }) LoadObject("%s" + r);\n' % W,
+                  '    public override void Init()\n    {\n        base.Init();\n        var who = ThisPlayer();\n        if (who != null && Interactive(who) && Present("probe", who) == null) MoveObject(CloneObject("%sprobe"), who);\n    }\n' % W)
     # --- hidden exits
     f["cave"] = rm("WtCave", "Test Cave", {"east": W + "hub"},
                    '        AddDetail("crack,fissure", "A crack in the rock, black and narrow.");\n'
@@ -164,7 +166,6 @@ def files():
     f["ok"] = rm("WtOkGround", "Test Calm Ground", {"east": W + "lowland"}, '        DangerBand(1, 3);\n')
     f["wild"] = rm("WtWild", "Test Wild Ground", {"south": W + "lowland", "north": W + "wild2"}, '        DangerBand(5, 7);\n')
     f["wild2"] = rm("WtWild2", "Test Wilder Ground", {"south": W + "wild"}, '        DangerBand(6, 8);\n')
-    os.makedirs  # (directories are made by the caller)
     f["hills/area"] = '''// @inherit /std/area
 public class WtHillsArea : Area
 {
@@ -202,9 +203,8 @@ public class WtHillsArea : Area
     f["b0"] = rm("WtB0", "Test Bystander Zero", {"east": W + "b1"}, '        AddSpawn("%sbystander");\n        AddSpawn("%sbrute");\n' % (W, W))
     f["b1"] = rm("WtB1", "Test Bystander One", {"west": W + "b0"})
     f["bystander"] = patrol("WtBystander", "Test Bystander", "bystander", ["b0", "b1"], pace=60, defend=False)
-    # --- the edge: a patrol on a route whose exits are fine, in the sandbox, is tested with files written later
     # --- nodes
-    f["x0"] = rm("WtX0", "Test Garden", {"south": W + "hub"}, '        AddNode("%sbush");\n        AddSpawn("%sprobe");\n' % (W, W))
+    f["x0"] = rm("WtX0", "Test Garden", {"south": W + "hub"}, '        AddNode("%sbush");\n' % W)
     f["bush"] = '''// @inherit /std/node
 public class WtBush : Node
 {
@@ -221,7 +221,7 @@ public class WtBush : Node
     }
 }
 '''
-    f["q0"] = rm("WtQ0", "Test Quiet Room", {"north": W + "hub"}, '        AddSpawn("%sprobe");\n' % W)
+    f["q0"] = rm("WtQ0", "Test Quiet Room", {"north": W + "hub"})
     return f
 
 
@@ -251,8 +251,10 @@ def exits_of(text):
 
 
 def fresh(name):
+    """A new character, taken down to the test hub, where the hub hands out the probe (tele, pinfo, gather)."""
     c = h.Client(name)
     c.read_until("> ")
+    c.command("down")
     return c
 
 
@@ -267,13 +269,12 @@ def run(work, mudlib, box):
     check("secret makes the first wizard", wiz.command("promote " + h.SECRET), "level 10 wizard")
     wiz.command("goto " + W + "hub")
     a.drain(wiz, 0.5)
-    ok_patrol_startup = True
 
     # ===== dormant patrols: nobody on any route, nothing moves =====
     time.sleep(7)
     for who in ("guard", "loopguard"):
         info = pinfo(wiz, who)
-        check(f"a patrol with no player on its route stands still ({who})", str(info), "'dormant'", "steps=0" if False else "0, 0")
+        check(f"a patrol with no player on its route stands still and is dormant ({who})", "ok" if info and info[0] == "dormant" and info[2] == 0 else str(info), "ok")
     # ===== hidden exits =====
     alice = fresh("alice")
     bob = fresh("bob")
@@ -283,7 +284,7 @@ def run(work, mudlib, box):
     a.drain(bob, 0.3)
     text = alice.command("look")
     check("an unfound hidden exit is not listed", exits_of(text), "east")
-    check("an unfound hidden exit is not listed (no west)", "west" not in exits_of(text) and "(hidden)" not in text, "True")
+    check("an unfound hidden exit is not listed (no west)", str("west" not in exits_of(text) and "(hidden)" not in text), "True")
     check("typing an unfound hidden direction is as if it did not exist", alice.command("west"), "What?")
     check("the one-letter form does not work either", alice.command("w"), "What?")
     text = alice.command("look at carving")
@@ -337,13 +338,11 @@ def run(work, mudlib, box):
     dave.command("tele " + W + "dull")
     text = dave.command("search")
     check("search in a room with nothing hidden says so in a plain line", text, "You search carefully but find nothing of note.")
-    check("the room hears the searcher", "x", "x")
     dave.command("tele " + W + "cave")
     a.drain(dave, 3.5)
-    text, took = timed(dave, "[hook west]", 8)
     dave.send("search")
     text, took = timed(dave, "[hook west]", 8)
-    check("search finds a 100% hidden exit", text, "You find a hidden way".replace("You find a hidden way", "You squeeze") if False else "[hook west]", "passage west")
+    check("search finds a 100% hidden exit and tells the character", text, "You squeeze into the crack and find a passage west.", "[hook west]")
     check("search never finds a 0% exit", exits_of(dave.command("look")), "east, west", absent=("up",))
     # timing: two searches in a row
     dave.command("tele " + W + "dull")
@@ -357,7 +356,7 @@ def run(work, mudlib, box):
     check("a second search too soon is queued", q, "You are not ready yet. You will search as soon as you can")
     t2txt, _ = timed(dave, "nothing of note", 8)
     gap = time.time() - first
-    check("search takes about 3 seconds of action time (Reaction Time 2.5 less 1, times 2)", "%.1f" % gap if 2.4 <= gap <= 3.9 else "gap %.1f" % gap, "." )
+    check("search takes about 3 seconds of action time (Reaction Time 2.5 less 1, times 2)", "ok" if 2.4 <= gap <= 3.9 else "gap %.1f" % gap, "ok")
     check("the queued search happened", t2txt, "nothing of note")
     dave.send("search")
     a.quiet(dave, 0.3)
@@ -381,14 +380,7 @@ def run(work, mudlib, box):
     check("search is refused while fighting", erin.command("search"), "You cannot search while you are fighting.")
     erin.command("flee")
     # chance: twelve characters search a 50% room once each
-    crowd = []
-    for i in range(12):
-        c = fresh("crowd%s" % "abcdefghijkl"[i])
-        c.command("tele " + W + "chancy") if False else None
-        crowd.append(c)
-    wiz.command("goto " + W + "hub")
-    for c in crowd:
-        c.command("north")  # hub north is the dull room; chancy is reached by the tele below
+    crowd = [fresh("crowd%s" % "abcdefghijkl"[i]) for i in range(12)]
     for c in crowd:
         c.command("tele " + W + "chancy")
         a.drain(c, 0.2)
@@ -400,7 +392,7 @@ def run(work, mudlib, box):
         a.drain(c, 0.3)
         if "west" in exits_of(c.command("look")):
             found += 1
-    check("a 50% exit is found by some of twelve searchers and not by all (%d found)" % found, "ok" if 1 <= found <= 11 else "found %d" % found, "ok")
+    check("a 50%% exit is found by some of twelve searchers and not by all (%d found)" % found, "ok" if 1 <= found <= 11 else "found %d" % found, "ok")
     for c in crowd:
         c.send("quit")
     # a locked hidden exit
@@ -458,7 +450,7 @@ def run_bands(wiz):
     gina.command("tele " + W + "lowland")
     a.drain(gina, 0.3)
     text = gina.command("north")
-    check("entering ground two or more levels above you warns once, in one line", text, "Test Wild Ground", "This ground is more dangerous than you are ready for.".lower().replace("this", "this"))
+    check("entering ground two or more levels above you warns once, in one line", text, "Test Wild Ground", "this ground is more dangerous than you are ready for.")
     check("the warning is a single line", str(len(re.findall("more dangerous than you are ready for", text))), "1")
     text = gina.command("north")
     check("moving on within dangerous ground gives no second warning", text, "Test Wilder Ground", absent=("dangerous than you",))
@@ -530,8 +522,6 @@ def run_elder(wiz, work, mudlib, box):
     check("the Elder Lane exit is remembered after logging in again", exits_of(hank.command("look")), "east, west")
     ivy.send("quit")
     hank.send("quit")
-    # "Change nothing else in the city": the neighbouring rooms are as they were
-    check("the Overgrown Way still returns east", "x", "x")
 
 
 def run_patrols(wiz):
@@ -548,6 +538,7 @@ def run_patrols(wiz):
     check("a patrol with a player on its route is walking", str(info), "'walking'")
     check("steps are counted", "ok" if info and info[2] >= 4 else str(info), "ok")
     # talking pauses it
+    a.drain(watcher, 0.3)
     text = ""
     start = time.time()
     while "arrives" not in text and time.time() - start < 12:
@@ -564,11 +555,12 @@ def run_patrols(wiz):
     s3 = pinfo(wiz, "guard")
     check("and walks again after the pause", "moved" if s3 and s3[2] > s2[2] else "still %s %s" % (s2, s3), "moved")
     # ask also pauses
+    a.drain(watcher, 0.3)
     text = ""
     start = time.time()
     while "arrives" not in text and time.time() - start < 12:
         text += a.quiet(watcher, 0.2)
-    watcher.command("ask ranger about roads")
+    check("ask: a patrol answers", watcher.command("ask ranger about roads"), "Test Ranger shrugs.")
     s1 = pinfo(wiz, "guard")
     time.sleep(4.0)
     s2 = pinfo(wiz, "guard")
@@ -617,8 +609,7 @@ def run_patrols(wiz):
     # fighting: JoinFight path (patrol already in the room)
     watcher.command("tele " + W + "s0")
     a.drain(watcher, 0.2)
-    watcher.command("kill brute")
-    text = a.quiet(watcher, 2.0)
+    text = watcher.command("kill brute") + a.quiet(watcher, 2.0)
     check("a defending patrol already in the room joins at once", text, "A test stander attacks a brute!")
     watcher.command("flee")
     watcher.command("tele " + W + "hub")
@@ -647,7 +638,7 @@ def run_patrols(wiz):
     text = a.quiet(wiz, 7.0)
     info = pinfo(wiz, "guard")
     check("and comes back at the start of its route", text, "A test ranger arrives, back on duty.")
-    check("with its health restored", str(info), "hp=60")
+    check("with its health restored", "ok" if info and info[4] == 60 else str(info), "ok")
     check("and walks again", "ok" if info and info[0] in ("walking", "dormant") else str(info), "ok")
     wiz.command("goto " + W + "hub")
     watcher.send("quit")
@@ -675,7 +666,6 @@ def run_nodes(wiz):
     jill = fresh("jill")
     jill.command("tele " + W + "x0")
     check("a node picked clean is bare for the next character", jill.command("gather bush"), "GATHER False charges=0/2")
-    check("a gatherer who is not in the room gets nothing", ivan.command("gatherfar jill") + "", "GATHER" + "FAR".replace("FAR", "FAR") + " False" if False else "GATHERFAR")
     time.sleep(4.5)
     check("the node regrows after its regrow time", jill.command("look at bush"), "A bush heavy with red berries.")
     check("a regrown node can be gathered again", jill.command("gather bush"), "GATHER True charges=1/2")
@@ -693,25 +683,28 @@ def run_sandbox(wiz, mudlib):
     os.makedirs(home, exist_ok=True)
     wizw = "/wiz/wiz/"
     h.write(mudlib, wizw + "hall", rm("WizHall", "Wiz Hall", {"east": wizw + "den", "north": "/domains/hollow/village/square"},
-                                       '        HiddenExit("west", "/domains/hollow/village/square", "", 100);\n        AddSpawn("/wiz/wiz/walker");\n'))
+                                       '        HiddenExit("west", "/domains/hollow/village/square", "", 100);\n        AddSpawn("/wiz/wiz/walker");\n        AddSpawn("/wiz/wiz/walkertwo");\n'))
+    h.write(mudlib, wizw + "walkertwo", patrol("WizWalkerTwo", "Wiz Walker Two", "walkertwo", [], pace=2, ret=4).replace(
+        'SetRoute(new[] {  }', 'SetRoute(new[] { "/wiz/wiz/hall", "/wiz/wiz/den" }'))
     h.write(mudlib, wizw + "den", rm("WizDen", "Wiz Den", {"west": wizw + "hall"}))
     h.write(mudlib, wizw + "walker", patrol("WizWalker", "Wiz Walker", "walker", [], pace=2, ret=4).replace(
         'SetRoute(new[] {  }', 'SetRoute(new[] { "/wiz/wiz/hall", "/domains/hollow/village/square", "/wiz/wiz/den" }'))
     # trusted route into /wiz
     h.write(mudlib, W + "intruder", patrol("WtIntruder", "Test Intruder", "intruder", [], pace=2).replace(
-        'SetRoute(new[] {  }', 'SetRoute(new[] { "/domains/hollow/village/square", "/wiz/wiz/hall" }'))
+        'SetRoute(new[] {  }', 'SetRoute(new[] { "/domains/hollow/village/trusted_edge", "/wiz/wiz/hall" }'))
     h.write(mudlib, "/domains/hollow/village/trusted_edge", rm("TrustedEdge", "Trusted Edge", {"north": "/wiz/wiz/hall"}, '        AddSpawn("%sintruder");\n' % W))
     kay = fresh("kay")
     kay.command("tele /wiz/wiz/hall")
     time.sleep(6)
     a.drain(kay, 0.2)
-    wiz.command("goto /wiz/wiz/hall")
     info = pinfo_path(wiz, "/wiz/wiz/walker")
-    check("a patrol made under /wiz is never walked into a trusted room", "ok" if info and not info.startswith("room=/domains") and "state=walking" in info else str(info), "ok")
+    check("a patrol made under /wiz is never walked into a trusted room", "ok" if info and "room=/wiz/wiz/hall" in info and "blocked=0" not in info else str(info), "ok")
+    info2 = pinfo_path(wiz, "/wiz/wiz/walkertwo")
+    check("a patrol made under /wiz does walk in its own wizard's home (control)", "ok" if info2 and "steps=0" not in info2 and "room=/wiz/wiz/" in info2 else str(info2), "ok")
     kay.command("tele /domains/hollow/village/trusted_edge")
     time.sleep(6)
     info = pinfo(wiz, "intruder")
-    check("a trusted patrol never walks into /wiz", "ok" if info and not info[1].startswith("/wiz") else str(info), "ok")
+    check("a trusted patrol never walks into /wiz", "ok" if info and info[1] == "/domains/hollow/village/trusted_edge" and info[3] >= 1 else str(info), "ok")
     # a /wiz room's hidden exit records only against itself
     kay.command("tele /wiz/wiz/hall")
     kay.send("search")
@@ -720,8 +713,6 @@ def run_sandbox(wiz, mudlib):
     check("a /wiz room's hidden exit can be found (and leads where it says)", exits_of(kay.command("look")), "west")
     kay.command("tele " + ELDER)
     check("a found /wiz exit grants nothing in a trusted area", exits_of(kay.command("look")), "east", absent=("west",))
-    check("a trusted exit cannot be marked found by calling the character from an object that is not that room", kay.command("evil"), "EVIL False" if False else "")
-    # hand-called from the probe in the hub
     kay.command("tele " + W + "hub")
     check("an object that is not a room cannot record a found exit", kay.command("evil"), "EVIL False")
     kay.command("tele " + ELDER)
@@ -740,12 +731,9 @@ def run_sandbox(wiz, mudlib):
 
 
 def pinfo_path(wiz, path):
-    wiz.command("goto /domains/wtest/hub")
-    for i in range(1, 500):
-        pass
-    text = wiz.command("pinfo ../../wiz/wiz/walker")
+    text = wiz.command("pinfo " + path)
     m = re.search(r"PINFO (.*)", text)
-    return m.group(1) if m else None
+    return m.group(1).strip() if m else None
 
 
 def run_examples(wiz):
@@ -779,7 +767,6 @@ def main():
     os.makedirs(os.path.join(mudlib, "domains", "example"), exist_ok=True)
     for path, source in a.building_templates().items():
         h.write(mudlib, path, source)
-    h.write(mudlib, "/domains/hollow/village/dummy_marker", "// marker\n") if False else None
     box = [None, None]
     box[0], box[1] = a.start_driver(work, mudlib)
     try:
