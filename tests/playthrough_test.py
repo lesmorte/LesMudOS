@@ -1115,7 +1115,10 @@ class Run:
         hero.score()
         xp0, gold0 = hero.xp, hero.gold
         check("Rowan sells nothing and hears nothing yet: the orders are not a quest item to sell", hero.cmd("sell orders"), "What?") if False else None
-        hero.cmd("drop orders")  # first the cellar quest alone; the orders are handed in afterwards
+        hero.settle(1.5)  # a caster's queued spell output must not shift the replies
+        for _ in range(3):
+            if "You drop" in hero.cmd("drop orders") or "orders" not in " ".join(hero.inventory()).lower():
+                break  # first the cellar quest alone; the orders are handed in afterwards
         text = hero.cmd("report")
         check("report: Clear the Cellar is completed", text, "Quest complete: Clear the Cellar!", "Rowan pays you 50 gold and gives you a Guild Initiate's Helm.", "You gain 150 experience.",
               "Rowan gives you a travel pass.", "New quest: Recover the Overseer's Orders.")
