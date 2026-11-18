@@ -134,8 +134,6 @@ def main():
     work = tempfile.mkdtemp(prefix="lesmudos-chron-")
     mudlib = os.path.join(work, "mudlib")
     h.copy_mudlib(mudlib)
-    h.edit(mudlib, "/secure/master", MASTER_OLD1, MASTER_NEW1)
-    h.edit(mudlib, "/secure/master", MASTER_OLD2, MASTER_NEW2)
     shutil.copy(os.path.join(ROOT, "tests", "fixtures", "chron_harness.cs"), os.path.join(mudlib, "secure", "chron_harness.cs"))
     h.write(mudlib, "/events/test", test_group())
     os.makedirs(os.path.join(mudlib, "wiz", "alice"), exist_ok=True)

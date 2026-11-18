@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Mudlib")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+289b52801761b23aa16cacceba083971a7758515")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d283de7b9b060eb4daf143e234f3126a00890061")]
 [assembly: System.Reflection.AssemblyProductAttribute("Mudlib")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Mudlib")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
