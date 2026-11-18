@@ -8,7 +8,7 @@ public class NorthRoad : Room
         LongDesc = "A dusty road stretches north into the wilderness and south toward Vincent's Hollow. Wagon ruts and horse tracks mark the path used by traders and adventurers. Towering pines sway gently in the breeze while distant mountains dominate the northern skyline. A carved wooden sign welcomes travelers to the settlement.";
         Exits["south"] = "/domains/hollow/village/gate";
         Safe = false;
-        Exits["north"] = "/domains/green_vale/vale_road/road";
+        Exits["north"] = "/domains/greenvale/vale_road/road";
         LockExit("north", "travel pass", "The road north leads toward Oakenfell through the wilds beyond Vincent's Hollow, and the Adventurers Guild does not let the untested go there. You need a travel pass from the guild.");
 
         AddDetail("road,dusty road,path", "A packed earth road, dusty in the dry weather and churned to mud where the wagons have passed. It runs straight north into the trees.");

@@ -7,7 +7,7 @@ public abstract class Area : MudObject
 {
     /// <summary>"The Village of Vincent's Hollow".</summary>
     protected string AreaName = "";
-    /// <summary>"Green Vale".</summary>
+    /// <summary>"Greenvale".</summary>
     protected string RegionName = "";
 
     public string QueryAreaName() => AreaName;

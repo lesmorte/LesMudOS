@@ -1,7 +1,7 @@
 // @inherit /std/room
 
 /// <summary>
-/// The first room beyond Vincent's Hollow: a one-room area in Green Vale. The road runs on toward the first major city of
+/// The first room beyond Vincent's Hollow: a one-room area in Greenvale. The road runs on toward the first major city of
 /// the vale, which is not built yet, so the way ahead is closed. The room is not safe.
 /// </summary>
 public class ValeRoad : Room
@@ -9,7 +9,7 @@ public class ValeRoad : Room
     public override void Create()
     {
         ShortDesc = "The Vale Road";
-        LongDesc = "Past the last milestone of Vincent's Hollow the North Road widens into the Vale Road, a rutted cart track between hedgerows and rolling green fields. The air is cooler here, and the smoke of the village is already a smudge behind you. The road runs on north toward Oakenfell, the first city of Green Vale, but a tangle of fallen timber and loose stone has been dragged across it a little way ahead.";
+        LongDesc = "Past the last milestone of Vincent's Hollow the North Road widens into the Vale Road, a rutted cart track between hedgerows and rolling green fields. The air is cooler here, and the smoke of the village is already a smudge behind you. The road runs on north toward Oakenfell, the first city of Greenvale, but a tangle of fallen timber and loose stone has been dragged across it a little way ahead.";
         Exits["south"] = "/domains/hollow/village/north_road";
         Safe = false;
         BlockExit("north", "The road runs on toward Oakenfell, but fallen timber and rubble block the way ahead. It is not open yet.");
