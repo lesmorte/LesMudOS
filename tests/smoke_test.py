@@ -817,7 +817,7 @@ public class Beacon : Item
             "    private bool Attempt(string args)",
             "    {",
             '        var wiz = LoadObject("/secure/wizlist");',
-            '        var vault = LoadObject("/secure/vault");',
+            '        var vault = LoadObject("/secure/lost_property");',
             '        Run("copyfile", () => CopyFile("/domains/town/square.cs", "/wiz/bob/stolen.cs"));',
             '        Run("writefile", () => WriteFile("/wiz/bob/own.cs", "x"));',
             '        Run("readfile", () => ReadFile("/wiz/bob/items/gem.cs"));',
@@ -830,7 +830,7 @@ public class Beacon : Item
             '        Run("restore-alice", () => RestoreObject("/players/alice"));',
             '        Run("save-wizlist", () => SaveObject("/secure/wizlist"));',
             '        Run("restore-wizlist", () => RestoreObject("/secure/wizlist"));',
-            '        Run("save-vault", () => SaveObject("/secure/vault"));',
+            '        Run("save-vault", () => SaveObject("/secure/lost_property"));',
             '        Run("secret", () => CheckAdminSecret(args));',
             '        Run("update", () => UpdateProgram("/std/room"));',
             '        Run("shutdown", () => Shutdown());',
@@ -852,7 +852,7 @@ public class Beacon : Item
                               ("removefile", "may not remove-file /wiz/bob/items/gem.cs"), ("removedir", "may not remove-dir /wiz/bob/rooms"),
                               ("save-alice", "may not write /players/alice"), ("restore-alice", "may not read /players/alice"),
                               ("save-wizlist", "may not write /secure/wizlist"), ("restore-wizlist", "may not read /secure/wizlist"),
-                              ("save-vault", "may not write /secure/vault"), ("secret", "may not check the admin secret"),
+                              ("save-vault", "may not write /secure/lost_property"), ("secret", "may not check the admin secret"),
                               ("update", "may not update /std/room"), ("shutdown", "may not shut the driver down"), ("destruct-player", "may not destruct")]:
             check("wizard homes: code in a home cannot " + label, text, label + "=BLOCKED ", reason)
         check("wizard homes: code in a home cannot promote", text, "promote=Only a player can do that.")

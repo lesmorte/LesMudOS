@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/home/claude/LesMudOS/mudlib/Mudlib.csproj": {}
+    "/home/claude/wt-classes/mudlib/Mudlib.csproj": {}
   },
   "projects": {
-    "/home/claude/LesMudOS/mudlib/Mudlib.csproj": {
+    "/home/claude/wt-classes/mudlib/Mudlib.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/claude/LesMudOS/mudlib/Mudlib.csproj",
+        "projectUniqueName": "/home/claude/wt-classes/mudlib/Mudlib.csproj",
         "projectName": "Mudlib",
-        "projectPath": "/home/claude/LesMudOS/mudlib/Mudlib.csproj",
+        "projectPath": "/home/claude/wt-classes/mudlib/Mudlib.csproj",
         "packagesPath": "/root/.nuget/packages/",
-        "outputPath": "/home/claude/LesMudOS/mudlib/obj/",
+        "outputPath": "/home/claude/wt-classes/mudlib/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/root/.nuget/NuGet/NuGet.Config"
@@ -27,8 +27,8 @@
             "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "/home/claude/LesMudOS/src/LesMudOS.Api/LesMudOS.Api.csproj": {
-                "projectPath": "/home/claude/LesMudOS/src/LesMudOS.Api/LesMudOS.Api.csproj"
+              "/home/claude/wt-classes/src/LesMudOS.Api/LesMudOS.Api.csproj": {
+                "projectPath": "/home/claude/wt-classes/src/LesMudOS.Api/LesMudOS.Api.csproj"
               }
             }
           }
@@ -343,14 +343,14 @@
         }
       }
     },
-    "/home/claude/LesMudOS/src/LesMudOS.Api/LesMudOS.Api.csproj": {
+    "/home/claude/wt-classes/src/LesMudOS.Api/LesMudOS.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/claude/LesMudOS/src/LesMudOS.Api/LesMudOS.Api.csproj",
+        "projectUniqueName": "/home/claude/wt-classes/src/LesMudOS.Api/LesMudOS.Api.csproj",
         "projectName": "LesMudOS.Api",
-        "projectPath": "/home/claude/LesMudOS/src/LesMudOS.Api/LesMudOS.Api.csproj",
+        "projectPath": "/home/claude/wt-classes/src/LesMudOS.Api/LesMudOS.Api.csproj",
         "packagesPath": "/root/.nuget/packages/",
-        "outputPath": "/home/claude/LesMudOS/src/LesMudOS.Api/obj/",
+        "outputPath": "/home/claude/wt-classes/src/LesMudOS.Api/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/root/.nuget/NuGet/NuGet.Config"
