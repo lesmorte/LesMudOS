@@ -30,7 +30,9 @@ mudlib/std/
   adventurer.cs  : abstract Living with the player's gameplay commands and saved character
   corpse.cs       what a dead creature or player leaves: a locked container with decay
   player.cs       now inherits adventurer; keeps login, wizard and file commands
-  room.cs         details, readable text, spawns, encounters, locked exits, safe flag, reset
+  room.cs         details, readable text, spawns, encounters, locked exits, hidden exits, danger band, safe flag, reset
+  patrol.cs      : Npc that walks a route of rooms (section 3a)
+  node.cs        : Thing that holds gatherable charges and regrows (section 3a)
 mudlib/secure/
   lost_property.cs  the lost-property store (section 9, Corpses)
 mudlib/domains/hollow/
@@ -63,6 +65,20 @@ Public functions for other objects: `QueryDetail(name)`, `QueryReadable(name)`, 
 `Long()` for a room lists, after the description and exits, the visible objects. Creatures and items are shown as today (`A ginger tavern cat is here.`); several identical shorts are merged (`Two giant rats are here.`; corpses merge as `Two corpses of a large rat are here.`).
 
 Exit names may be any single word (`north`, `up`, `down`). The one-letter abbreviation rule stays, with `u` and `d` for up and down.
+
+## 3a. World features: hidden exits, search, patrols, nodes, danger bands
+
+Built for the wilderness road (docs/PLAN-corridor-crafting.md, F2). Builder examples are in BUILDING.md; this is how they work.
+
+**Hidden exits.** `Room.HiddenExit(direction, destination, hintDetail, findChance, foundLine)` keeps the exit apart from `Exits`: `QueryExits()` and `flee` never see it, the room binds the direction for every player but `GoExit` answers only a character who has found it (to anyone else the word is not a command at all). What a character has found is the saved list `foundExits` on the adventurer, entries of the form `room path|direction`. Only a room can write to it: `RecordFoundExit(direction)` takes the room from `PreviousObject()`, refuses a clone, refuses unless the character is standing in that room and the room declares that exit, and so a record can only ever name the room that made it. Records under `/wiz` are capped at 50 per character (1000 in all), so a sandbox cannot grow a save file or reach a trusted room's record. The record is written to disk as soon as it is made. Finding happens in two places: the player's `look at` calls `Room.Examined`, and the `search` action calls `Room.Search`; both require the character to be the caller. A newly found exit tells the character the exit's `foundLine`, then calls the room's `protected virtual ExitFound(who, direction)` once. Someone watching a hidden departure reads the direction only if they have found that exit themselves; otherwise "leaves somewhere". Wizards (`QueryWizLevel() >= 1`) see all hidden exits in the list, marked, and are told "that way is hidden" if they try one they have not found; `stat here` lists them.
+
+**`search`** is a command for every player. It cannot be used while fighting. Otherwise it is an action on the combat clock (COMBAT_TIMING.md): Preparation 0, Recovery 0, reaction modifier -1.0, so it takes the character's Reaction Time less 1 (not below 0), doubled into seconds: 3 seconds at 2.5. If the character is still recovering from something else it is queued like a potion (`stop` cancels), and it is checked again when it happens, so a search queued before a fight does nothing once the fight has begun. It uses `Living.ActAsAction(action, waiting)`, a general version of `UseAsAction`, and the adventurer's `Special` override. A room with nothing to find, and a room where every roll failed, give the same line ("You search carefully but find nothing of note."), and a search always costs the same time, so the delay and the text give nothing away. The room hears "Name searches the area carefully."
+
+**Danger bands.** `Room.DangerBand(low, high)` or `BandLow`/`BandHigh` in the directory's `area.cs`; `QueryBandLow()` and `QueryBandHigh()` answer for the room, falling back to the area. `Room.MoveThrough` warns an interactive character once, after the new room's description, when the new room's low end is at least 2 above their level and the room they left was not (a room with no band counts as not dangerous). Entering by login, `goto`, or the respawn does not warn. `consider`, `score` and `look` are unchanged.
+
+**Patrols** (`/std/patrol`, an `Npc`). A route, a pace, loop or there-and-back; walks only through real, ordinary, unlocked exits; stops while fighting and for `TalkPauseSeconds` after `talk` or `ask` (the `Npc.Spoken` hook); with `DefendPlayers` joins (`BeginFight(creature, true)`, so it waits its own Reaction Time before its first action) against any creature fighting a player in its room, both when the fight starts (the room's `JoinFight` call) and when the patrol arrives; dies by leaving for `/std/void` and returning to the start of its route after `ReturnSeconds`. Cost: nothing is scheduled to walk while no player is in a room of the route; a poll every `PollSeconds` (default 15) compares the rooms of the users to a set of route names, loads nothing and moves nothing. When a player is on the route it steps every `PaceSeconds` and checks the players at each step. Safety: a patrol whose file is under `/wiz/<name>/` walks only in `/wiz/<name>/`; any other patrol never walks into `/wiz`.
+
+**Resource nodes** (`/std/node`, a `Thing`). `Kind`, `Charges`, `RegrowSeconds`, `Difficulty`, `FullDesc`, `PickedDesc`, `PickedShort`. Regrowing is lazy: each `TryGather` records the time its charge returns, and every query clears the ones that have passed, so a node has no timer and costs nothing while untouched. `TryGather(who)` needs `who` alive, a creature and in the node's room.
 
 ## 4. Living things
 
@@ -159,7 +175,7 @@ These are the final numbers after the event-clock balance simulation (section 12
 
 ## 7. Items
 
-`Item` gains `Value` (gold), `QuestItem` (cannot be sold), `ReadText` and `protected virtual void OnGet(ObjectRef taker)`, called after the item has been moved to a taker by `get`, `get ... from` or `loot`. `Vanish()` lets an item destruct itself when it is sold, eaten or handed in (only player bodies may destruct other objects).
+`Item` gains `Value` (gold), `QuestItem` (cannot be sold or given), `ReadText` and `protected virtual void OnGet(ObjectRef taker)`, called after the item has been moved to a taker by `get`, `get ... from` or `loot`. `Vanish()` lets an item destruct itself when it is sold, eaten or handed in (only player bodies may destruct other objects).
 
 | Class | Fields | Commands |
 |---|---|---|
@@ -167,6 +183,17 @@ These are the final numbers after the event-clock balance simulation (section 12
 | `Armor` | `ArmorValue`, `Slot`, `ReactionMod`, optional `MaxHpBonus` | `wear <item>`, `remove <item>` |
 | `Consumable` | `HealAmount`, `UseVerb` (`eat`, `drink`), `UseMessage`, `Recovery` | `eat <item>`, `drink <item>` (also `quaff`); a queued action |
 | `Coins` | `Amount` (or `AmountMin`/`AmountMax`, rolled when first seen), `SetAmount(n)` | Picking it up (or looting it) adds the gold and destructs the item |
+
+### Quality, stacks and the save record (F1)
+
+Every item carries instance state: a **quality** (0 Poor, 1 Common, 2 Fine, 3 Excellent, 4 Masterwork, 5 Legendary; default Common), a **quantity** (default 1) and up to 16 named text **properties** for later systems. The state lives in `/std/item` as private fields; the helpers in `/std/thing` work through its public functions.
+
+- **Value.** `QueryValue()` is the value of one item: base `Value` times the quality multiplier, rounded half away from zero and at least 1 (a base of 0 stays 0). The multipliers are data in one place, `Item.QualityMultipliers`: Poor 0.5, Common 1, Fine 1.5, Excellent 2.5, Masterwork 4, Legendary 8. `Item.ValueFor(base, quality)` computes it.
+- **Names.** Quality is shown as a prefix word ("a fine wolf skin", "an excellent wolf skin"); Common shows none. A quantity above one shows as a count with the plural ("3 fine wolf skins"); the plural is `Plural`, or the short description without its article plus "s" ("es" after s, x, z, ch, sh). An item answers to its names, to their plurals, and to either after its own quality word; every name it answered to before still works. `look at` a stack, or at any item whose quality is not Common, adds a line with its quality and count; `appraise` adds the quality. No colour tags are added to `Name`, `Ids` or `ShortDesc`.
+- **Stacks.** An item type is stackable with `Stackable = true`. A stack is one object. `Settle()` merges a stack into another in the same container if both are of the same file, quality and properties (and neither is equipped); the survivor is the stack that was already there, and the arriving object is destructed. Every standard move (get, drop, give, buy, loot, a corpse spilling, login, lost property, `CreateIn`) settles; the bare `MoveObject` efun does not, so room spawns and monster loot never merge by themselves. `Split(n)` makes a new object of the same file and state beside the stack, holding n. The two halves of a merge or split talk to each other through `ReceiveStack` and `TakeSplit`, which accept only an object of the same program file in the same place, so the quantity is never written by anyone else.
+- **Who may change state.** `SetQuality`, `SetQuantity`, `SetProperty`, `RestoreState` and `Split` check `PreviousObject()`: code from `/std`, `/secure`, `/domains`, `/classes`, `/skills` and `/events` may change any item; code from anywhere else (a wizard's `/wiz` home) may change only items that are themselves outside those trees. A direct typed call (`As<Item>()`) is caught too, because the driver reports the calling object as the previous object. Cloning is unchanged: sandbox code can still clone a real item in its default state, as before, but cannot raise its quality or quantity or split someone's stack.
+- **The save record.** Wherever items are persisted, each item is one string: its program path, then `?` and its state if that is not the default. State is `q=<quality>`, `n=<quantity>` and `p.<name>=<value>` joined by `&`, with `%`, `&`, `=` and `?` in names and values written as `%XX`. A Common single item is still a bare path, which is also what saves made before F1 hold, so old saves load unchanged as items in the default state. Examples: `/domains/hollow/obj/rusty_sword`, `/domains/test/wolf_skin?n=3`, `/domains/test/wolf_skin?q=2&n=5&p.maker=Ann`. The path always comes from the object's `ProgramPath`, never from what the item says about itself. A malformed state part is ignored; a file that is gone loses that item, as before. If a file has stopped being stackable, a record with `n=` comes back as that many separate objects (at most a thousand).
+- **Commands.** `get`, `drop`, `give`, `sell` and `get ... from <corpse>` take `N THING`, `all THING` or `THING` (one); `get all`, `drop all` and `give all` take everything (equipped things are left alone by "all", but can be named). Asking for more than there is refuses and moves nothing. `buy N THING` works for stackable stock and makes one stack.
 
 ### Equipment for the Hollow
 
@@ -194,7 +221,8 @@ These are the final numbers after the event-clock balance simulation (section 12
 `Shopkeeper` (inherits `Npc`):
 
 - `AddStock(string path, int price)` and `AddRareStock(string path, int price, int percent)`. Rare stock is rolled when the shopkeeper is created, so it changes at reset of its room.
-- Commands offered to players in the room: `browse` (what is for sale, with prices), `buy <item>`, `sell <item>` (pays half the item's `Value`; refuses value 0 and quest items), `value <item>`.
+- Commands offered to players in the room: `browse` (what is for sale, with prices), `buy [N] <item>` (several only of stackable stock, as one stack, at most 1000), `sell [N|all] <item>` (pays half the value of one item, quality included, times the number sold; refuses value 0 and quest items), `value <item>` (per item and for the whole stack).
+- `AddStock(path, price, quality)` sells a quality; the price is the listed price times the quality's multiplier. A purchase of one calls `OnBuy(buyer, path)`, a purchase of several `OnBuyStack(buyer, path, count)`; both make the items with `CreateIn`.
 - Stock is unlimited; each purchase clones a new item into the buyer's inventory.
 - The command is `browse`, not `list`, because `list` is the wizard directory command.
 
@@ -213,7 +241,7 @@ The five callings, their skills and traits, equipment categories and access, the
 
 `Adventurer` (abstract, inherits `Living`) carries everything about playing the game; `Player` inherits it and keeps accounts, wizard tools and files.
 
-Saved with the player: level, experience, HP, gold, quest states, the program paths of carried items and which are equipped, and the logout room.
+Saved with the player: level, experience, HP, gold, quest states, a save record (path and state, section 7) for each carried item and which are equipped, and the logout room.
 
 - **New character:** chooses one of five callings after the password (Warrior, Scout, Priest, Mage, Adventurer); level 1, the calling's HP, gold, resources and starting kit (CLASS_SYSTEM.md section 7); unarmed 1-3.
 - **Experience to reach level n:** 50 x n x (n - 1) times the experience modifier of the character's classes (2: 100, 3: 300, 4: 600, 5: 1000). The level cap is 100.
@@ -221,7 +249,7 @@ Saved with the player: level, experience, HP, gold, quest states, the program pa
 - **Regeneration:** 1 HP every 10 seconds out of combat; 3 in a safe room.
 - **Death:** the player is told so, and a **corpse** in the room where they died takes everything they carry (equipment included) and a gold fee of 10% of their purse. They wake in the Guest Rooms at full HP, with experience and level intact, and must walk back to the corpse and `loot` it. Their killer forgets them. The loss is saved at once.
 - **Logout room:** quitting in a room whose `QueryLogoutRoom()` is true (the Guest Rooms) makes that the next login room. Otherwise players enter at the Village Square.
-- **Inventory persistence:** on save, the paths of carried items and which are equipped are stored and the items are destructed with the player on quit; on login they are cloned again and re-equipped. Other per-item state is not kept. Items do not drop to the floor on quit.
+- **Inventory persistence:** on save, the record of each carried item (path, quality, quantity, properties) and which are equipped are stored and the items are destructed with the player on quit; on login they are cloned again with their state, merged into stacks and re-equipped. Other per-item state (a lantern being lit) is not kept. Items do not drop to the floor on quit.
 
 Commands, available to every player:
 
@@ -230,10 +258,13 @@ Commands, available to every player:
 | `kill <target>` (also `attack`) | Start a fight |
 | `flee` | Leave by a random exit; fails 25% of the time |
 | `consider <target>` | Rough comparison of levels |
+| `search` | Look for a hidden exit; a short timed action; not while fighting (section 3a) |
 | `wield`, `unwield`, `wear`, `remove` | Equipment |
 | `eat`, `drink`, `quaff` | Consumables |
 | `talk <npc>`, `ask <npc> about <topic>` | Dialogue |
 | `read <thing>` | Readable details and readable items |
+| `get`, `drop` `[N\|all] <thing>` | Pick up or put down; amounts split stacks (section 7) |
+| `give [N\|all] <thing> to <player>` | Hand things to another player in the room. Quest items (the travel pass, the Overseer's Orders) cannot be given. The giver, the receiver and the room are told. Both characters are saved at once, the giver first, so a crash cannot leave a gift in both save files. Not to NPCs. |
 | `loot [<corpse>]`, `get <thing> from <corpse>`, `get all from <corpse>`, `look in <corpse>` | Corpses, see below |
 | `browse`, `buy`, `sell`, `value` | In a shop |
 | `accept`, `report` | In the Adventurers Guild |
@@ -266,7 +297,7 @@ These follow the existing rule: below the level, the command answers "What?". `s
 - **The lock.** For `LockSeconds` (1800) only a player whose name equals the killer's or the dead player's may take things. Both are recorded by lower-case player name, because a player's object changes at logout. A non-player killer or victim records nothing. After the lock anyone may loot. The check uses the clock at every attempt; there is no timer. Refusal: "The corpse of X is not yours to loot yet."
 - **Taking things.** Only `Take(itemId)` and `TakeAll()` on the corpse hand things over; they identify the taker with `PreviousObject()` and `ThisPlayer()` and return null or the refusal text. The plain `get` command sees only what lies directly in the room. `loot` goes through the room's corpses, skipping those the player may not loot.
 - **Decay.** An empty corpse disappears two minutes after it became empty ("crumbles to dust"). A monster's corpse that still holds loot rots away after 60 minutes and its contents with it. A player's corpse that still holds things rots after 60 minutes and spills them on the floor. Reset does not touch corpses. A wizard of level 10 can shorten the times of a corpse (`SetTimers`) for tests.
-- **The lost-property store.** `/secure/lost_property` is a blueprint-only daemon (loaded at boot, saved as `/secure/lost_property`; a save left by the old name `/secure/vault` is read once and carried over). A player corpse reports its contents to it when created and after every change; an empty or gone corpse removes its record. A player may have several corpses; records are keyed by name plus a corpse id. After a restart every record on disk refers to a corpse that no longer exists, so it is unclaimed; records made during the current run are live and cannot be claimed. At login, after the inventory is restored, the player is handed anything recorded under their name (Harland, the innkeeper, kept it safe), the records are deleted, and the player is saved. Only a corpse clone may record or clear, and only a player body may claim, for its own name taken from the calling object. Monster corpses are not recorded. Equipment state is not kept in the vault.
+- **The lost-property store.** `/secure/lost_property` is a blueprint-only daemon (loaded at boot, saved as `/secure/lost_property`; a save left by the old name `/secure/vault` is read once and carried over). A player corpse reports its contents to it when created and after every change; an empty or gone corpse removes its record. A player may have several corpses; records are keyed by name plus a corpse id. After a restart every record on disk refers to a corpse that no longer exists, so it is unclaimed; records made during the current run are live and cannot be claimed. At login, after the inventory is restored, the player is handed anything recorded under their name (Harland, the innkeeper, kept it safe), the records are deleted, and the player is saved. Only a corpse clone may record or clear, and only a player body may claim, for its own name taken from the calling object. Monster corpses are not recorded. Equipment state is not kept in the vault. Items are recorded as save records (section 7), so stacks come back with their quality and quantity; records written before F1 are bare paths and come back as items in the default state. `get N <thing> from <corpse>` takes part of a stack, under the same lock.
 - **Player versus player.** The code does not allow players to attack each other, so no player can currently kill another; the lock rule would let a player killer loot a victim's corpse if that ever changes.
 
 ## 10. Quests
@@ -318,6 +349,7 @@ Kills count only if they happened while the quest was active or before it was ac
 - A simulation script, `tests/balance_sim.py`, plays the combat rules on an event clock outside the driver (the same delay formula as the mudlib; `python3 tests/balance_sim.py check` parses the mudlib files and fails if the numbers differ) with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
 - `tests/playthrough_test.py` (port 4813, `LESMUDOS_TEST_PORT`) is the first-player test. It copies the mudlib unmodified (no stub rooms), makes a brand-new non-wizard level 1 character and plays the whole area: every exit of all 18 rooms in both directions, the sign, plaque and quest board, the brief's objects, every NPC's quoted lines word for word, the shop and the tavern (including the bed and logging out in the Guest Rooms), a deliberate death with corpse recovery and the locked-corpse message for a second player, then both quests with a fight loop (flee, rest, bed, potions, looting, the Hidden Cache, levelling) up to the Goblin Overseer, `report`, the rewards and the ending speech. A warden wizard account is used only to peek at state; if the solo character cannot finish, the test records a finding and falls back to `heal`, clearly labelled. It takes 15 to 20 minutes.
 - `tests/timing_test.py` (port 4815) measures real intervals between combat actions against the formula (design section 6): unarmed, sword, shield, haste, slow, fast and slow creatures, the first-action delay of creatures drawn in, the Overseer's pattern and its Power Strike warning, the potion queue and `stop`, and lifetime cases (spamming `kill`, dying with a potion queued, a target quitting during a wind-up).
+- `tests/world_test.py` (port 4823) tests the world features of section 3a: hidden exits (both ways of finding them, who sees what, saved across logout, a clean restart and a kill), `search` and its timing, danger bands, patrols (route, there and back, loop, real exits only, talk pause, defending, dying and returning, dormancy), nodes, the wizard sandbox, the docs' examples and Elder Lane in Oakenfell.
 - `tests/load_check.py` (port 4821) compiles and loads every mudlib file.
 - `tests/ansi_test.py` (port 4814) tests colour: rendering, `ansi off`, persistence, raw `cat` and editor output, escaping of player input, unclosed tags, shop columns and what a non-player object is told (section 14). `Client` in `smoke_test.py` strips ANSI sequences by default so that all other tests read plain text; `Client.raw` and `raw_command()` give the bytes.
 

@@ -19,7 +19,7 @@ public class MkAuctioneerCorbin : Npc
         AddTopic("auction,auctions,sale,sales,bid,bidding", "The auction house is between sales, and not yet open to the public. When the books are opened, everything from rings to racehorses will go under my gavel.");
         AddTopic("lots,goods,sell,consign", "Consignments will be taken when sales open. Until then I rehearse.");
         AddTopic("gavel,hammer", "My gavel is eighty years old and has sold half of Greenvale. Do not touch it.");
-        AddTopic("best,sale,famous", "The best sale? A signet ring, ten years ago. Eight bidders, three fistfights, and a duel. I sold it twice.");
+        AddTopic("best,finest,famous", "The best sale? A signet ring, ten years ago. Eight bidders, three fistfights, and a duel. I sold it twice.");
         AddEmote("Corbin Pyke raps his gavel on the stand and calls to the empty benches.", 8);
         AddEmote("Corbin Pyke clears his throat and tries a new chant.", 6);
     }

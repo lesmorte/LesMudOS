@@ -17,14 +17,14 @@ public class Consumable : Item
 
     public double QueryRecovery() => Recovery;
 
-    /// <summary>Called by the eat and drink commands. Heals the user and uses the item up.</summary>
+    /// <summary>Called by the eat and drink commands. Heals the user and uses up one item (of a stack, if it is stackable).</summary>
     public void Consume(ObjectRef user)
     {
         if (Environment() != user) return;
         var healed = HealAmount > 0 ? user.Call<int>("Heal", HealAmount) : 0;
-        TellObject(user, (UseMessage ?? $"You {UseVerb} {Short()}.") + (healed > 0 ? $" You recover {healed} hit points." : "") + "\n");
+        TellObject(user, (UseMessage ?? $"You {UseVerb} {DescribeCount(1)}.") + (healed > 0 ? $" You recover {healed} hit points." : "") + "\n");
         OnUse(user);
-        Destruct();
+        UseOne(); // one of a stack; the last one is gone
     }
 
     /// <summary>Extra effects for special consumables.</summary>

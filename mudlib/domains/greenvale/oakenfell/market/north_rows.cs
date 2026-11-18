@@ -16,7 +16,7 @@ public class MkNorthRows : Room
         AddDetail("spices,spice,herbs,drying herbs", "Strings of dried herbs and little cloth bags of spice hang from every awning, and the lane smells like a kitchen and a church at once.");
         AddDetail("weaponsmith's stall,weaponsmith,anvil,hammer", "A weaponsmith's stall with a half-finished blade clamped to a vice, a portable anvil and a rack with nothing on it yet. A notice says new stock is on its way.");
         AddDetail("bridge,mere,river", "To the east the lane drops toward the Mere Bridge, a stone span over the river. You can see barges poling beneath it.");
-        AddDetail("herbalist,herbalist's stall,baskets", "A herbalist's stall at the lane's edge is crowded with baskets, bundles and small clay jars. A green cloth hangs over the awning, with an oak leaf worked into the weave.");
+        AddDetail("herbalist's stall,herb stall,baskets", "A herbalist's stall at the lane's edge is crowded with baskets, bundles and small clay jars. A green cloth hangs over the awning, with an oak leaf worked into the weave.");
         AddReadable("plaque,market cross plaque,inscription", "MARKET CROSS\nRaised from a beam of the Great Oak,\nthe year after the fire.\nHere let honest weights be kept.\nFrom Strong Roots Grow Great Things.", "A bronze plaque is bolted to the Market Cross. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/greenvale/oakenfell/market/npc/trader_ysolde");

@@ -65,15 +65,15 @@ public class Corpse : Thing
         try
         {
             var store = LoadObject("/secure/lost_property");
-            var paths = new List<string>();
+            var records = new List<string>(); // one save record per item: path, and its quality and quantity (see /std/thing RecordOf)
             var coins = 0;
             foreach (var item in Contents())
             {
                 var amount = item.Call<int>("QueryAmount");
-                if (amount > 0) coins += amount; else paths.Add(item.ProgramPath);
+                if (amount > 0) coins += amount; else records.Add(RecordOf(item));
             }
-            if (gone || (paths.Count == 0 && coins == 0)) store.Call("Clear", deceasedName, corpseId);
-            else store.Call("Record", deceasedName, corpseId, paths, coins);
+            if (gone || (records.Count == 0 && coins == 0)) store.Call("Clear", deceasedName, corpseId);
+            else store.Call("Record", deceasedName, corpseId, records, coins);
         }
         catch (MudRuntimeException)
         {
@@ -132,15 +132,30 @@ public class Corpse : Thing
         return text.ToString();
     }
 
-    /// <summary>Take one thing out. Returns null on success, otherwise the refusal text.</summary>
+    /// <summary>
+    /// Take one thing out, or an amount: "skin", "3 skins", "all skins". Returns null on success, otherwise the refusal
+    /// text. Nothing is taken if the corpse holds fewer than asked.
+    /// </summary>
     public string? Take(string itemId)
     {
         var taker = ThisPlayer();
         if (taker == null || PreviousObject() != taker) return "You cannot do that.";
         if (LockedFor(taker)) return Refusal();
-        var item = Present(itemId, Self);
-        if (item == null) return $"There is no '{Esc(itemId)}' in {Short()}.";
-        Hand(item, taker);
+        if (!ParseAmount(itemId, out var count, out var all, out var noun)) return $"There is no '{Esc(itemId)}' in {Short()}.";
+        var found = !all && count == 1
+            ? (Present(noun.ToLowerInvariant(), Self) is { } one ? new List<ObjectRef> { one } : new List<ObjectRef>())
+            : Matching(Self, noun);
+        if (found.Count == 0) return $"There is no '{Esc(noun)}' in {Short()}.";
+        var held = found.Sum(QuantityOf);
+        if (!all && held < count) return $"There {(held == 1 ? "is" : "are")} only {held} in {Short()}.";
+        var left = all ? int.MaxValue : count;
+        foreach (var item in found)
+        {
+            if (left <= 0) break;
+            var n = Math.Min(left, QuantityOf(item));
+            Hand(item, n, taker);
+            left -= n;
+        }
         AfterTaking();
         return null;
     }
@@ -153,19 +168,20 @@ public class Corpse : Thing
         if (LockedFor(taker)) return Refusal();
         var items = Contents();
         if (items.Count == 0) return $"There is nothing in {Short()}.";
-        foreach (var item in items) Hand(item, taker);
+        foreach (var item in items) Hand(item, QuantityOf(item), taker);
         AfterTaking();
         return null;
     }
 
-    private void Hand(ObjectRef item, ObjectRef taker)
+    private void Hand(ObjectRef item, int n, ObjectRef taker)
     {
-        var description = item.Call<string>("Short") ?? "something";
-        MoveObject(item, taker);
+        var description = Describe(item, n);
+        var held = MovePortion(item, n, taker);
+        if (held == null) return;
         TellObject(taker, $"You take {description} from {Short()}.\n");
         var room = Environment();
         if (room != null) TellRoom(room, $"{taker.Call<string>("QueryName")} takes {description} from {Short()}.\n", taker);
-        item.Call("Taken", taker);
+        held.Call("Taken", taker);
     }
 
     private void AfterTaking()
@@ -203,7 +219,7 @@ public class Corpse : Thing
         }
         else
         {
-            foreach (var item in items) if (room != null) MoveObject(item, room);
+            foreach (var item in items) if (room != null) MovePortion(item, QuantityOf(item), room);
             if (room != null) TellRoom(room, $"The corpse of {Strip(label)} rots away, leaving its belongings on the ground.\n");
         }
         Destruct();

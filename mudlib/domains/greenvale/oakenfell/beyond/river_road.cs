@@ -10,7 +10,7 @@ public class BgRiverRoad : Room
         BlockExit("north", "The River Road runs on downriver along the Mere, but it is not yet open to travelers.");
 
         AddDetail("road,river road,towpath,path,hoof prints,ropes,marks", "A narrow towpath beaten hard by hooves, grooved at its edge where tow-ropes have sawn the bank. It follows every bend of the river.");
-        AddDetail("river,mere,river mere,water,current,downriver", "The River Mere is wide and brown and slow here, curving away between green banks. A barge, tiny with distance, slides on it.");
+        AddDetail("river,mere,river mere,water,current", "The River Mere is wide and brown and slow here, curving away between green banks. A barge, tiny with distance, slides on it.");
         AddDetail("willows,willow,reeds,bank,banks,screen", "Willows trail their pale leaves in the water, and thick reeds crowd the margins, rustling. Something plops into the water and is gone.");
         AddDetail("haze,distance,horizon,downriver,north", "Far downriver the water and the sky blur together in a pale haze. You cannot see where the river goes.");
         AddReadable("milestone,stone,marker,mile stone", "A mossy stone beside the towpath reads:\n\"OAKENFELL, 1.\nDOWNRIVER.\"", "A mossy stone stands by the towpath. You could {cmd}read{/} it.");

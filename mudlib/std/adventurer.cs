@@ -31,6 +31,8 @@ public abstract class Adventurer : Living
     [Saved] private Dictionary<string, int> quests = new();
     [Saved] private Dictionary<string, string> questTitles = new();
     [Saved] private List<string> killed = new();
+    // One save record per carried object: its program path, then "?" and its state (quality, quantity, properties) unless
+    // that is the default. Saves made before item state existed hold bare paths, which load as items in the default state.
     [Saved] private List<string> carried = new();
     [Saved] private List<int> carriedEquipped = new();
     [Saved] private string logoutRoom = "";
@@ -472,7 +474,7 @@ public abstract class Adventurer : Living
         carriedEquipped.Clear();
         foreach (var item in AllInventory())
         {
-            carried.Add(item.ProgramPath);
+            carried.Add(RecordOf(item));
             if (IsEquipped(item)) carriedEquipped.Add(carried.Count - 1);
         }
         var room = Environment();
@@ -494,6 +496,7 @@ public abstract class Adventurer : Living
         AddAction("take", CmdGet);
         AddAction("loot", CmdLoot);
         AddAction("drop", CmdDrop);
+        AddAction("give", CmdGive);
         AddAction("inventory", CmdInventory);
         AddAction("i", CmdInventory);
         AddAction("kill", CmdKill);
@@ -517,6 +520,7 @@ public abstract class Adventurer : Living
         AddAction("hp", CmdHp);
         AddAction("skills", CmdSkills);
         AddAction("quests", CmdQuests);
+        AddAction("search", CmdSearch);
         // Builder tools. Each handler checks the wizard level on every use and
         // declines below it, so to everyone else these verbs do not exist.
         AddAction("goto", CmdGoto);
@@ -534,8 +538,8 @@ public abstract class Adventurer : Living
         {
             try
             {
-                var item = CloneObject(carried[i]);
-                MoveObject(item, Self);
+                var item = CloneRecord(carried[i], Self);
+                if (item == null) continue;
                 var slot = item.Call<string>("QuerySlot") ?? "";
                 var put = carriedEquipped.Contains(i) || (equipKit && (slot == "weapon" || slot == "shield") && QueryEquipped(slot) == null);
                 if (put && AccessRefusal(item) == null) Equip(item);
@@ -566,8 +570,7 @@ public abstract class Adventurer : Living
         {
             try
             {
-                MoveObject(CloneObject(claim[i]), Self);
-                returned++;
+                if (CloneRecord(claim[i], Self) != null) returned += RecordQuantity(claim[i]);
             }
             catch (MudRuntimeException)
             {
@@ -689,6 +692,7 @@ public abstract class Adventurer : Living
         var detail = room?.Call<string>("QueryDetail", args);
         if (detail == null) { NotifyFail($"You see no '{Esc(args)}' here."); return false; }
         Write(detail.EndsWith("\n") ? detail : detail + "\n");
+        room!.Call("Examined", Self, args); // a detail may be what reveals a hidden exit
         return true;
     }
 
@@ -697,15 +701,76 @@ public abstract class Adventurer : Living
         var room = Environment();
         var from = args.IndexOf(" from ", StringComparison.Ordinal);
         if (from > 0) return GetFromCorpse(args.Substring(0, from).Trim(), args.Substring(from + 6).Trim());
-        var item = room == null ? null : Present(args, room);
-        if (item == null || item == Self) { NotifyFail("Get what?"); return false; }
-        if (!item.Call<bool>("CanGet")) { Write("You can't take that.\n"); return true; }
-        var description = item.Call<string>("Short");
-        MoveObject(item, Self);
+        if (room == null || !ParseAmount(args, out var count, out var all, out var noun)) { NotifyFail("Get what?"); return false; }
+        if (!all && count == 1)
+        {
+            var item = Present(noun, room);
+            if (item == null || item == Self) { NotifyFail("Get what?"); return false; }
+            if (!item.Call<bool>("CanGet")) { Write("You can't take that.\n"); return true; }
+            Pick(item, 1);
+            return true;
+        }
+        var named = Matching(room, noun);
+        var found = named.Where(o => o.Call<bool>("CanGet")).ToList();
+        if (found.Count == 0)
+        {
+            if (all && noun == "") { Write("There is nothing here to take.\n"); return true; }
+            if (named.Count > 0) { Write("You can't take that.\n"); return true; }
+            NotifyFail("Get what?");
+            return false;
+        }
+        var here = found.Sum(QuantityOf);
+        if (!all && here < count) { Write($"There {(here == 1 ? "is" : "are")} only {here} here.\n"); return true; }
+        var left = all ? int.MaxValue : count;
+        foreach (var item in found)
+        {
+            if (left <= 0) break;
+            var n = Math.Min(left, QuantityOf(item));
+            Pick(item, n);
+            left -= n;
+        }
+        return true;
+    }
+
+    /// <summary>Pick up n of an item lying in the room, with the messages.</summary>
+    private void Pick(ObjectRef item, int n)
+    {
+        var description = Describe(item, n);
+        var held = MovePortion(item, n, Self);
+        if (held == null) { Write($"You cannot take {description}.\n"); return; }
         Write($"You take {description}.\n");
         Say($"{Name} takes {description}.\n");
-        item.Call("Taken", Self);
-        return true;
+        held.Call("Taken", Self);
+    }
+
+    /// <summary>
+    /// What a command that takes an amount acts on in the inventory, as (object, how many of it). Null if nothing carried
+    /// answers to the name. With refusal set, the player has fewer than asked and nothing should happen. "all" leaves
+    /// equipped things alone; naming one picks it as before.
+    /// </summary>
+    private List<(ObjectRef item, int n)>? FromInventory(int count, bool all, string noun, out string? refusal)
+    {
+        refusal = null;
+        List<ObjectRef> found;
+        if (!all && count == 1)
+        {
+            var one = Present(noun.ToLowerInvariant());
+            found = one == null ? new List<ObjectRef>() : new List<ObjectRef> { one };
+        }
+        else found = Matching(Self, noun).Where(o => !(all && IsEquipped(o))).ToList();
+        if (found.Count == 0) return null;
+        var have = found.Sum(QuantityOf);
+        if (!all && have < count) { refusal = $"You have only {have}."; return new List<(ObjectRef, int)>(); }
+        var plan = new List<(ObjectRef item, int n)>();
+        var left = all ? int.MaxValue : count;
+        foreach (var ob in found)
+        {
+            if (left <= 0) break;
+            var n = Math.Min(left, QuantityOf(ob));
+            plan.Add((ob, n));
+            left -= n;
+        }
+        return plan;
     }
 
     private ObjectRef? CorpseHere(string name)
@@ -749,12 +814,61 @@ public abstract class Adventurer : Living
     private bool CmdDrop(string args)
     {
         var room = Environment();
-        var item = Present(args);
-        if (item == null || room == null) { NotifyFail("Drop what?"); return false; }
-        var description = item.Call<string>("Short");
-        MoveObject(item, room);
-        Write($"You drop {description}.\n");
-        Say($"{Name} drops {description}.\n");
+        if (room == null || !ParseAmount(args, out var count, out var all, out var noun)) { NotifyFail("Drop what?"); return false; }
+        var plan = FromInventory(count, all, noun, out var refusal);
+        if (plan == null) { NotifyFail("Drop what?"); return false; }
+        if (refusal != null) { Write(refusal + "\n"); return true; }
+        foreach (var (item, n) in plan)
+        {
+            var description = Describe(item, n);
+            if (MovePortion(item, n, room) == null) { Write($"You cannot drop {description}.\n"); continue; }
+            Write($"You drop {description}.\n");
+            Say($"{Name} drops {description}.\n");
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// "give [NUMBER|all] THING to PLAYER": hand things to another player in the room. Quest items cannot be given (the
+    /// travel pass and the Overseer's Orders prove what their holder did). Both characters are saved at once, the giver
+    /// first, so that a crash straight after a gift cannot leave the item in both save files.
+    /// </summary>
+    private bool CmdGive(string args)
+    {
+        var room = Environment();
+        var to = args.LastIndexOf(" to ", StringComparison.Ordinal);
+        if (room == null || to <= 0) { NotifyFail("Usage: {cmd}give{/} [NUMBER] THING {cmd}to{/} PLAYER"); return false; }
+        var whom = args.Substring(to + 4).Trim().ToLowerInvariant();
+        var receiver = whom == "" ? null : Present(whom, room);
+        if (receiver == Self) { Write("You already have it.\n"); return true; }
+        if (receiver == null) { NotifyFail($"There is no one called '{Esc(whom)}' here."); return false; }
+        if (!receiver.Call<bool>("IsPlayerCharacter") || !Interactive(receiver))
+        {
+            Write($"{Cap(receiver.Call<string>("QueryLabel") ?? receiver.Call<string>("Short") ?? "It")} does not take things from you. You can give things only to other players.\n");
+            return true;
+        }
+        if (!ParseAmount(args.Substring(0, to), out var count, out var all, out var noun)) { NotifyFail("Give what?"); return false; }
+        var plan = FromInventory(count, all, noun, out var refusal);
+        if (plan == null) { NotifyFail(all && noun == "" ? "You have nothing to give." : $"You have no '{Esc(noun)}'."); return false; }
+        if (refusal != null) { Write(refusal + "\n"); return true; }
+        var important = plan.Where(p => p.item.Call<bool>("QueryQuestItem")).ToList();
+        if (important.Count > 0 && !all) { Write($"You cannot give away {Describe(important[0].item, important[0].n)}; it is too important.\n"); return true; }
+        foreach (var (item, _) in important) Write($"You keep {item.Call<string>("Short")}; it is too important to give away.\n");
+        var given = 0;
+        var other = receiver.Call<string>("QueryName") ?? "them";
+        foreach (var (item, n) in plan)
+        {
+            if (important.Any(p => p.item == item)) continue;
+            var description = Describe(item, n);
+            if (MovePortion(item, n, receiver) == null) { Write($"You cannot give {description}.\n"); continue; }
+            given++;
+            Write($"You give {description} to {other}.\n");
+            TellObject(receiver, $"{Name} gives you {description}.\n");
+            TellRoom(room, $"{Name} gives {description} to {other}.\n", Self, receiver);
+        }
+        if (given == 0) return true;
+        PersistNow();
+        receiver.Call("SaveAfterTrade");
         return true;
     }
 
@@ -822,6 +936,53 @@ public abstract class Adventurer : Living
         }
         Write("There is no way out!\n");
         return true;
+    }
+
+    // ---- World features: hidden exits and search (docs/GAME_SYSTEMS.md) ----
+
+    private const int MaxFoundExits = 1000;
+    private const int MaxFoundExitsInWiz = 50; // records for rooms under /wiz are capped, so a sandbox cannot fill the save file
+
+    /// <summary>The hidden exits this character has found, as "room path|direction". Kept on the character; a room asks for its own.</summary>
+    [Saved] private List<string> foundExits = new();
+
+    public bool QueryFoundExit(string roomPath, string direction) => foundExits.Contains(roomPath + "|" + direction);
+
+    /// <summary>
+    /// A room tells the character they have found one of its hidden exits. The room is the caller and can only record itself, for a
+    /// character who is in it, so no other object (a wizard's, say) can put a record against a room it is not. Returns true if the exit
+    /// was newly recorded; the record is saved at once.
+    /// </summary>
+    public bool RecordFoundExit(string direction)
+    {
+        var room = PreviousObject();
+        if (room == null || room.IsClone || Environment() != room || direction == "" || direction.Contains('|')) return false;
+        if (!room.Call<List<string>>("QueryHiddenExits")?.Contains(direction) ?? true) return false;
+        var key = room.Name + "|" + direction;
+        if (foundExits.Contains(key) || foundExits.Count >= MaxFoundExits) return false;
+        if (room.Name.StartsWith("/wiz/", StringComparison.OrdinalIgnoreCase) && foundExits.Count(k => k.StartsWith("/wiz/", StringComparison.OrdinalIgnoreCase)) >= MaxFoundExitsInWiz) return false;
+        foundExits.Add(key);
+        PersistNow();
+        return true;
+    }
+
+    private bool CmdSearch(string args)
+    {
+        if (Environment() == null) return false;
+        if (QueryInCombat()) { Write("You cannot search while you are fighting.\n"); return true; }
+        // A short action on the combat clock: its delay is your Reaction Time less 1 (not below 0), about 3 seconds.
+        ActAsAction(new CombatAction { Id = "search", Name = "Search", Kind = "search", Preparation = 0, Recovery = 0, ReactionMod = -1.0 }, "search");
+        return true;
+    }
+
+    protected override void Special(CombatAction action, ObjectRef? target)
+    {
+        if (action.Kind != "search") { base.Special(action, target); return; }
+        var room = Environment();
+        if (room == null) return;
+        if (QueryInCombat()) { Tell("You cannot search while you are fighting.\n"); return; }
+        TellRoom(room, $"{Name} searches the area carefully.\n", Self);
+        if (!room.Call<bool>("Search", Self)) Tell("You search carefully but find nothing of note.\n");
     }
 
     private bool CmdConsider(string args)

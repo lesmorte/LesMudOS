@@ -32,7 +32,7 @@ public class Weapon : Item
     public string QueryCategory() => Category;
 
     public override string Appraisal() =>
-        $"{Cap(Short() ?? Name)}: a {(Category == "" ? "weapon" : Category)}. Damage {DamageMin}-{DamageMax}, to hit +{ToHit}, reaction modifier {Num(ReactionMod)}, recovery {Num(Recovery)}. Worth {Value} gold." +
+        $"{Cap(Short() ?? Name)}: a {(Category == "" ? "weapon" : Category)}. Damage {DamageMin}-{DamageMax}, to hit +{ToHit}, reaction modifier {Num(ReactionMod)}, recovery {Num(Recovery)}. Worth {QueryValue()} gold." + AppraisalQuality() +
         (Magic != "" ? $" Magical property: {Magic}." : " It holds no magic.") + "\n";
 
     public override string Stat() => base.Stat() + $"  Weapon: damage {DamageMin}-{DamageMax}, to hit {ToHit}, reaction {Num(ReactionMod)}, recovery {Num(Recovery)}\n";

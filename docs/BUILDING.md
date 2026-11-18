@@ -27,7 +27,7 @@ The mudlib project excludes `wiz/**` from `dotnet build`, so the rule that class
 1. **File name.** Lower-case `snake_case`, ending in `.cs`: `goblin_guard.cs`. The mudlib path is the file name without `.cs`: `/domains/hollow/mob/goblin_guard`. Use the folders of the area: `village/` and `cellars/` for rooms, `npc/` for peaceful people and shopkeepers, `mob/` for monsters, `obj/` for items.
 2. **One class per file.** One public class that derives (directly or through its base) from `MudObject`. Other helper types in the file must not.
 3. **Class names are unique across the whole mudlib** (the mudlib is also compiled as one project to check it). Prefix them with your area if in doubt: `HollowGoblinGuard`.
-4. **The `// @inherit` line.** The first line of the file names the base file: `// @inherit /std/room`, `/std/npc`, `/std/shopkeeper`, `/std/monster`, `/std/weapon`, `/std/armor`, `/std/consumable`, `/std/coins`, `/std/item` (keys and plain things). The class then derives from the class in that file: `public class GoblinGuard : Monster`.
+4. **The `// @inherit` line.** The first line of the file names the base file: `// @inherit /std/room`, `/std/npc`, `/std/patrol`, `/std/node`, `/std/shopkeeper`, `/std/monster`, `/std/weapon`, `/std/armor`, `/std/consumable`, `/std/coins`, `/std/item` (keys and plain things). The class then derives from the class in that file: `public class GoblinGuard : Monster`.
 5. **Set everything in `Create()`.** No constructors with arguments. Names of rooms, fields and helpers are all in the templates.
 6. **Sandbox limits.** Mudlib code may use `System`, `System.Collections.Generic`, `System.Linq`, `System.Text` and the mudlib's own types. It cannot use files, threads, reflection, `typeof`, `GetType()`, `async`, `goto`, `lock`, `Console`, `Environment`. An error shows up when the file loads. A runaway loop is stopped by the evaluation-cost limit.
 7. **Exits name rooms by path**, without `.cs`: `Exits["north"] = "/domains/hollow/village/gate";`. Any single word works as a direction (`up`, `down`, `west`); one-letter abbreviations are added automatically. If the destination file does not exist yet, players are told the way is not open yet.
@@ -98,7 +98,7 @@ public class ExampleHall : Room
 }
 ```
 
-Room fields and methods: `Safe`, `LogoutRoom` (players who quit here log in here), `ResetSeconds`, `Exits`, `AddDetail`, `AddReadable`, `AddSpawn`, `AddEncounter`, `LockExit`, `BlockExit`. Override `Reset()` (and call `base.Reset()`) for anything special.
+Room fields and methods: `Safe`, `LogoutRoom` (players who quit here log in here), `ResetSeconds`, `Exits`, `AddDetail`, `AddReadable`, `AddSpawn`, `AddEncounter`, `LockExit`, `BlockExit`, `HiddenExit`, `DangerBand`, `AddNode`. Override `Reset()` (and call `base.Reset()`) for anything special.
 
 ### A room with a locked exit
 
@@ -157,6 +157,100 @@ public class ExampleTrail : Room
 }
 ```
 
+### A room with a hidden exit
+
+`HiddenExit(direction, destination, hintDetail, findChance, foundLine = "")` declares an exit that is **not listed** and cannot be walked (typing it answers "What?", as if it did not exist) until the character has found it. There are two ways to find it, and you choose them:
+
+- **`search`** in the room: each attempt finds the exit with `findChance` percent (0 to 100; 100 always finds it, 0 never does). Searching is an action on the combat clock and takes about 3 seconds; it cannot be used while fighting. A room with nothing to find gives the same plain line as a room where the attempt failed.
+- **Looking at a detail**: `hintDetail` is a comma-separated list of the names of a detail you added with `AddDetail`; `look at` any of them finds the exit for certain. Use `""` if only searching should find it, and `findChance` 0 if only looking should.
+
+When a character finds the exit they read `foundLine` (a standard line if you give none) and from then on it is listed among their exits and usable; the record is saved with the character at once, so it survives logout and restart. Other characters see nothing: until they find it themselves the exit is not listed for them, and when someone leaves by it they read "Name leaves somewhere." (a character who has found it reads the direction). Wizards (level 1 and up) see every hidden exit in the list marked `(hidden)`, and `stat here` lists them with their chance and detail; a wizard still has to find an exit before walking it. The room on the far side needs nothing special: give it an ordinary return exit. A hidden exit can be locked like any other (`LockExit`), and `flee` never uses one.
+
+To be told when a character first finds an exit, override `ExitFound(ObjectRef who, string direction)` in the room. It runs once for each character and exit, at the moment of discovery, and does nothing by default (the Chronicle's discovery events will use it). It is `protected`: only the room runs it.
+
+```csharp
+// File: /domains/example/secret_study.cs
+// @inherit /std/room
+public class ExampleSecretStudy : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Example Study";
+        LongDesc = "A quiet study lined with dusty shelves, one tall bookcase standing slightly out of true.";
+        Exits["east"] = "/domains/example/hall";
+        AddDetail("bookcase,shelves,shelf", "The bookcase is not quite flush with the wall, and the dust on the floor in front of it is scuffed in an arc.");
+        HiddenExit("west", "/domains/example/hidden_cellar", "bookcase,shelves,shelf", 25,
+            "You lean on the bookcase and it swings aside on a hidden hinge. A way leads {cmd}west{/}.");
+    }
+
+    protected override void ExitFound(ObjectRef who, string direction)
+    {
+        // Optional: report the discovery (a quest step, the Chronicle). Runs once per character.
+    }
+}
+```
+
+```csharp
+// File: /domains/example/hidden_cellar.cs
+// @inherit /std/room
+public class ExampleHiddenCellar : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Example Hidden Cellar";
+        LongDesc = "A cramped cellar behind the bookcase, smelling of old paper.";
+        Exits["east"] = "/domains/example/secret_study";
+    }
+}
+```
+
+### A room with a level band
+
+`DangerBand(low, high)` says the room is ground for characters of level `low` to `high`. A character who walks (or flees) from a room that is not dangerous to them into one whose `low` is two or more above their level reads one line, "this ground is more dangerous than you are ready for", once for that entry; walking on within dangerous ground does not repeat it. Nothing else changes: `look`, `consider` and `score` show no number, and wizards read the band in `stat here`. To give a whole directory a band, put it in the `area.cs` beside the rooms (`BandLow = 6; BandHigh = 8;`, next to `AreaName`); a room that calls `DangerBand` keeps its own.
+
+```csharp
+// File: /domains/example/watch_post.cs
+// @inherit /std/room
+public class ExampleWatchPost : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Example Watch Post";
+        LongDesc = "A ruined watch post, its roof gone, at the edge of the wild country.";
+        Exits["south"] = "/domains/example/trail";
+        DangerBand(6, 8);
+    }
+}
+```
+
+```
+// Path: /domains/example/area.cs   (every room in the directory takes this band unless it sets its own)
+// @inherit /std/area
+public class ExampleArea : Area
+{
+    public override void Create() { AreaName = "The Example"; RegionName = "Greenvale"; BandLow = 6; BandHigh = 8; }
+}
+```
+
+### A room with a resource node
+
+`AddNode(path)` (or `AddNode(path, count)`) places a resource node in the room, as `AddSpawn` places a creature: it is cloned in when the room loads and put back at reset if it is gone. A node does not need anything else from the room; it regrows by itself. See "Resource nodes" below for the node file.
+
+```csharp
+// File: /domains/example/berry_patch.cs
+// @inherit /std/room
+public class ExampleBerryPatch : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Example Berry Patch";
+        LongDesc = "A sunny bank above the trail where brambles have taken over.";
+        Exits["south"] = "/domains/example/trail";
+        AddNode("/domains/example/berry_bush");
+    }
+}
+```
+
 ## People
 
 ### A peaceful NPC: chat, topics, emotes
@@ -185,6 +279,45 @@ public class ExampleVillager : Npc
     }
 }
 ```
+
+### A patrol
+
+`/std/patrol` is an `Npc` that walks. `SetRoute(rooms, paceSeconds, loop)` gives it an ordered list of room paths and the seconds between steps; with `loop` false it walks the route there and back, with `loop` true the last room must lead on to the first. Put it in the first room of its route with `AddSpawn`. The people in the rooms read an arrival line and a departure line (`ArriveLine` with `{name}` and `{from}`, `LeaveLine` with `{name}` and `{dir}`; the defaults read "A ranger arrives from the south." and "A ranger leaves north."). The rules:
+
+- It walks only through **real exits**: an ordinary exit in the room it is in that leads to the next room of the route. A missing exit, a locked exit it has no key for, and a hidden exit all stop it (it stays where it is and tries again at the next step; `stat` counts the blocked steps).
+- It does not walk while it is **fighting**, and it stands still for `TalkPauseSeconds` (default 20) after a player uses `talk` or `ask` on it.
+- `DefendPlayers = true`: if a creature is fighting a player in the room the patrol is in (or the patrol arrives where one is), the patrol joins against the creature. A patrol is peaceful (it cannot be attacked) unless you set `Peaceful = false`; give it `Level`, `MaxHp`, damage and, if you like, combat actions as for any creature.
+- If it **dies** it leaves the world and comes back after `ReturnSeconds` (default 300) in the first room of its route, at full health. It leaves no corpse.
+- **Cost.** A patrol with no player in any room of its route has no walking call-out and no heartbeat. All it does is look every `PollSeconds` (default 15) whether any player stands in one of its route's rooms, which is a comparison of room names for each player on the game, and it loads no room. The moment a player is on the route it walks, and when the last one leaves it stops again where it is. Patrols are therefore free in the quiet parts of a long road.
+- A patrol defined under `/wiz` walks only in its own wizard's home, and no other patrol enters `/wiz`.
+
+```csharp
+// File: /domains/example/ranger.cs
+// @inherit /std/patrol
+public class ExampleRanger : Patrol
+{
+    public override void Create()
+    {
+        Name = "Ranger Hale";
+        Ids.Add("ranger");
+        Ids.Add("hale");
+        ShortDesc = "Ranger Hale of the Riverwatch";
+        LongDesc = "A weathered ranger in a green cloak, a longbow across her back, who walks the road as if she owned every stone of it.";
+        Level = 5;
+        MaxHp = 120;
+        DamageMin = 4;
+        DamageMax = 7;
+        DefendPlayers = true;
+        ReturnSeconds = 600;
+        SetRoute(new[] { "/domains/example/hall", "/domains/example/trail" }, 30);
+        ArriveLine = "{name} strides in from {from}, eyes on the treeline.";
+        AddChat("Keep to the road after dusk.");
+        AddTopic("road", "Quiet, today. That is when I worry.");
+    }
+}
+```
+
+To place it, give the first room `AddSpawn("/domains/example/ranger");`.
 
 ### A shopkeeper
 
@@ -284,9 +417,36 @@ public class ExampleDrake : Monster
 
 The drake claws every `(4.0 + 1.0) x 2 = 10` seconds, and every third action the room reads "An example drake rears back and swells its chest..." two seconds before the breath lands, which then costs it `(4.0 + 3.0) x 2 = 14` seconds in all. `stat drake` lists both actions with their delays.
 
+### Resource nodes
+
+`/std/node` is a thing in a room that cannot be picked up and holds **charges**. It knows its `Kind` (free text: "berry bush", "herb patch"), its `Difficulty` (an integer you choose; the crafting system decides what it means), its `Charges` (the most it holds), and its `RegrowSeconds`: each charge that is taken comes back that long afterwards, for everyone (a node picked clean by one character is bare for the next until it regrows). `FullDesc` is what `look` shows while it has charges, `PickedDesc` while it has none, and `PickedShort` replaces its line in the room's list while it is bare. The node answers to its `Name`, its `Ids` and the words of its `Kind`.
+
+Other code gathers with `TryGather(ObjectRef who)`, which takes one charge and returns true, or returns false if the node is bare or `who` is not alive and in the room with it, and reads `QueryKind()`, `QueryCharges()`, `QueryMaxCharges()`, `QueryDifficulty()` and `QueryRegrowSeconds()`. The node does not build the `harvest` command, tools, skills or what a charge yields; the crafting engine does that on top.
+
+```csharp
+// File: /domains/example/berry_bush.cs
+// @inherit /std/node
+public class ExampleBerryBush : Node
+{
+    public override void Create()
+    {
+        Name = "Berry Bush";
+        Ids.Add("bush");
+        ShortDesc = "a berry bush";
+        PickedShort = "a picked-over berry bush";
+        Kind = "berry bush";
+        Charges = 3;
+        RegrowSeconds = 600;
+        Difficulty = 2;
+        FullDesc = "A thorny bush heavy with dark red berries.";
+        PickedDesc = "A thorny bush, picked clean. A few shrivelled berries cling to the lowest twigs.";
+    }
+}
+```
+
 ## Items
 
-Every item has `Name`, `Ids` (words that name it), `ShortDesc` (with article, for lists), `LongDesc` (for `look at`) and optionally `Value` (gold; shopkeepers pay half; 0 means they will not buy it), `QuestItem = true` (cannot be sold) and `ReadText` (shown by `read`).
+Every item has `Name`, `Ids` (words that name it), `ShortDesc` (with article, for lists), `LongDesc` (for `look at`) and optionally `Value` (gold for one Common item; shopkeepers pay half; 0 means they will not buy it), `QuestItem = true` (cannot be sold or given away) and `ReadText` (shown by `read`). Quality and stacks are below, under "Quality and stacks".
 
 ### A weapon
 
@@ -403,6 +563,51 @@ public class ExampleKey : Item
 }
 ```
 
+### Quality and stacks
+
+Every item has a **quality** and a **quantity**, kept with it wherever it is saved (a character's inventory, the lost-property store). Quality is a number from 0 to 5, `Item.Poor`, `Common` (the default), `Fine`, `Excellent`, `Masterwork`, `Legendary`; players see it as a word in front of the name ("a fine wolf skin", nothing for Common) and can type it (`drop fine skin`). An item's worth is `Value` times the quality's multiplier, rounded and at least 1: Poor 0.5, Common 1, Fine 1.5, Excellent 2.5, Masterwork 4, Legendary 8. The table is `Item.QualityMultipliers` and `Item.ValueFor(value, quality)`; nothing else should hold those numbers. Shops pay half of that per item.
+
+A **material** is stackable: set `Stackable = true`. A stack is one object with a quantity: "3 wolf skins". Two stacks merge when they come to rest in the same place if they are of the same file and quality (and have the same properties, below), and never otherwise. Commands split them: `get 3 skins`, `get all skins`, `drop 2 fine wolf skin`, `give 2 skins to Ann`, `buy 5 skins`, `sell 3 skins`. The plural is the short description without its article plus "s" (or "es"); set `Plural` when that is wrong. Every name in `Ids` also answers in the plural with an "s" or "es". Eating or drinking a stackable consumable uses one. Items that are not stackable behave as they always have.
+
+```csharp
+// File: /domains/example/pelt.cs
+// @inherit /std/item
+public class ExamplePelt : Item
+{
+    public override void Create()
+    {
+        Name = "example pelt";
+        Ids.Add("pelt");
+        ShortDesc = "an example pelt";
+        LongDesc = "A soft grey pelt.";
+        Value = 4;
+        Stackable = true;
+        // Plural = "example pelts";  (only when the default is wrong)
+    }
+}
+```
+
+**Working with quality and quantity in code.** Every object that derives from `/std/thing` (items, NPCs, creatures, corpses, and later stations and resource nodes; not rooms, which derive from `MudObject` directly) has these helpers, as protected functions:
+
+| Helper | Does |
+|---|---|
+| `CreateIn(path, count, quality, container)` | Make count items at a quality in a container in one call: one stack for a stackable file (merged with a matching stack there), otherwise count objects (at most 100). Returns the object holding them, or null if refused. |
+| `TakeFrom(container, count, ob => test)` | Destroy count items that pass the test, splitting the last stack. All or nothing: false, and nothing taken, if there are fewer. Give a fourth argument to move them to another container instead. |
+| `CountIn(container, path)` | How many of a file a container holds, by quality: a `Dictionary<int, int>` from quality to count. |
+| `MovePortion(item, n, destination)` | Move n of a stack (all of it for n at or above its quantity) and merge them there. |
+| `QuantityOf(ob)`, `Describe(ob, n)` | A stack's quantity (1 for anything else); how n of it read ("2 fine wolf skins"). |
+
+On an item, from other code: `QueryQuality()`, `QueryQualityName()`, `QueryQuantity()`, `QueryStackable()`, `QueryValue()` (one item, quality included), `QueryBaseValue()`, `QueryTotalValue()`, `SetQuality(q)`, `SetQuantity(n)`, `Split(n)` (returns the part split off, put beside it), `Settle()` (merge with a matching stack nearby; call it after moving a stackable item with `MoveObject` yourself), and named text properties for later systems, `QueryProperty(key)` and `SetProperty(key, value)` (at most 16, 256 characters each; stacks with different properties do not merge). The setters return false if refused: code in a wizard's home (`/wiz/...`) may change only items that are themselves under `/wiz`.
+
+```csharp
+// In an NPC, an item or a station: hand a player three Fine wolf skins, then take two skins of any quality back.
+CreateIn("/domains/test/wolf_skin", 3, Item.Fine, player);
+var tookThem = TakeFrom(player, 2, ob => ob.ProgramPath == "/domains/test/wolf_skin");
+var fine = CountIn(player, "/domains/test/wolf_skin").GetValueOrDefault(Item.Fine);
+```
+
+A file that uses `Item.Fine` and the other names needs `// @use /std/item` (an item file already has it through `@inherit`). A shopkeeper can sell a quality with `AddStock(path, price, quality)`; the price shown is the listed price times the multiplier.
+
 ## Areas, regions, skills and classes
 
 **Area and region names.** Put an `area.cs` in the directory of your rooms. Every room in that directory then belongs to the area it names, and `score` shows "Area ...   Region ...". Nothing is repeated in the rooms.
@@ -434,7 +639,7 @@ Log in as a wizard (level 5 lets you do everything below except `slay`).
 update /domains/example/hall      compile (or recompile) a room and put you back in it
 goto /domains/example/hall        walk into a room by path (or goto <player>)
 clone /domains/example/sword      put a new object in your inventory
-stat here                         the room: safe flag, spawns and how many are alive, exits
+stat here                         the room: safe flag, spawns and how many are alive, exits, hidden exits, danger band
 stat rat                          a creature or item in the room: level, HP, damage, loot
 stat me                           your own numbers
 restore                           restore your HP, Stamina and Mana (level 5); restore <creature> too

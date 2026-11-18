@@ -17,7 +17,11 @@ public class LostProperty : MudObject
     /// <summary>The save file of the store when it was still called the vault. Read once, if the new file does not exist yet.</summary>
     private const string LegacySaveFile = "/secure/vault";
 
-    /// <summary>"name|corpse id" to the program paths of the items in that corpse.</summary>
+    /// <summary>
+    /// "name|corpse id" to the save records of the items in that corpse: a program path, then "?" and the item's state
+    /// (quality, quantity, properties) unless it is the default. Records written before item state existed are bare
+    /// paths and are handed back as items in the default state.
+    /// </summary>
     [Saved] private Dictionary<string, List<string>> items = new();
 
     /// <summary>"name|corpse id" to the gold in that corpse.</summary>
@@ -41,16 +45,16 @@ public class LostProperty : MudObject
     }
 
     /// <summary>A corpse reports its current contents. An empty report removes the record.</summary>
-    public void Record(string player, string corpseId, List<string> paths, int coins)
+    public void Record(string player, string corpseId, List<string> records, int coins)
     {
         if (!CalledByCorpse() || player == "") return;
         var key = Key(player, corpseId);
-        if (paths.Count == 0 && coins <= 0)
+        if (records.Count == 0 && coins <= 0)
         {
             Remove(key);
             return;
         }
-        items[key] = new List<string>(paths);
+        items[key] = new List<string>(records);
         gold[key] = coins;
         live.Add(key);
         SaveObject(SaveFile);
@@ -74,7 +78,7 @@ public class LostProperty : MudObject
     /// <summary>
     /// The calling player takes everything recorded under their name whose
     /// corpse no longer exists. Returns the gold as the first element, then
-    /// the item paths. The records are deleted.
+    /// the item records. The records are deleted.
     /// </summary>
     public List<string> Claim()
     {

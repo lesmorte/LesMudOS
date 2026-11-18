@@ -39,11 +39,25 @@ public abstract class Room : MudObject
         public string Refusal = "";
     }
 
+    private sealed class Hidden
+    {
+        public string Path = "";
+        public List<string> Hints = new();
+        public int Chance;
+        public string FoundLine = "";
+    }
+
     private readonly Dictionary<string, string> details = new();
     private readonly Dictionary<string, string> readables = new();
     private readonly Dictionary<string, Lock> locks = new();
     private readonly List<Spawn> spawns = new();
     private readonly List<Encounter> encounters = new();
+    private readonly Dictionary<string, Hidden> hidden = new();
+    private int bandLow;
+    private int bandHigh;
+    private bool bandSet;
+    private ObjectRef? areaRef;
+    private long areaLooked;
     private long lastEncounter;
     private bool resetArmed;
 
@@ -89,6 +103,39 @@ public abstract class Room : MudObject
         locks[direction] = new Lock { KeyId = keyId, Refusal = refusal };
     }
 
+    /// <summary>
+    /// An exit that is not listed and cannot be walked until a character has found it. It is found by `search` (findChance
+    /// percent per attempt, 0 to 100) or, for certain, by looking at the detail named by hintDetail (comma-separated names, as in
+    /// AddDetail; "" for none: only searching finds it). What a character has found is saved with the character. foundLine is
+    /// the line the character reads when they find it; "" for a standard one. Other characters see nothing until they find it.
+    /// </summary>
+    protected void HiddenExit(string direction, string destination, string hintDetail, int findChance, string foundLine = "")
+    {
+        hidden[direction] = new Hidden
+        {
+            Path = destination, Hints = Names(hintDetail), Chance = Math.Max(0, Math.Min(100, findChance)),
+            FoundLine = foundLine != "" ? foundLine : $"You find a hidden way {{cmd}}{direction}{{/}}!",
+        };
+    }
+
+    /// <summary>
+    /// Called once for each character and hidden exit, at the moment the character first finds the exit (by search or by looking at
+    /// its detail). Does nothing here; a room overrides it to report a discovery (to the Chronicle, a quest, a counter).
+    /// It is protected on purpose: only the room itself can run it.
+    /// </summary>
+    protected virtual void ExitFound(ObjectRef who, string direction) { }
+
+    /// <summary>This room's level band: ground meant for characters of level low to high. Entering a room whose low end is two or more above the character's level warns them once. A room that does not call this takes the band of its area.cs, if that has one.</summary>
+    protected void DangerBand(int low, int high)
+    {
+        bandLow = Math.Max(0, low);
+        bandHigh = Math.Max(bandLow, high);
+        bandSet = true;
+    }
+
+    /// <summary>Put a resource node (a /std/node file) here. The same as AddSpawn, under the name a reader looks for: the node is cloned in now and replaced at reset if it is gone. A node regrows by itself.</summary>
+    protected void AddNode(string path, int count = 1) => AddSpawn(path, count);
+
     /// <summary>A way nobody can use yet (a road into the wilderness). It is not listed among the exits, but the direction gives the message.</summary>
     protected void BlockExit(string direction, string message) => LockExit(direction, "", message);
 
@@ -98,7 +145,20 @@ public abstract class Room : MudObject
 
     public bool QueryLogoutRoom() => LogoutRoom;
 
+    /// <summary>The ordinary exits. Hidden exits are not among them, found or not.</summary>
     public List<string> QueryExits() => Exits.Keys.ToList();
+
+    /// <summary>The directions of the hidden exits of this room (for tools; a character sees only those they have found).</summary>
+    public List<string> QueryHiddenExits() => hidden.Keys.ToList();
+
+    /// <summary>Has this character found the hidden exit in this direction?</summary>
+    public bool QueryExitFoundBy(ObjectRef who, string direction) => hidden.ContainsKey(direction) && Found(who, direction);
+
+    private bool Found(ObjectRef who, string direction) => who.IsAlive && who.Call<bool>("QueryFoundExit", Self.Name, direction);
+
+    public int QueryBandLow() => bandSet ? bandLow : FindArea()?.Call<int>("QueryBandLow") ?? 0;
+
+    public int QueryBandHigh() => bandSet ? bandHigh : FindArea()?.Call<int>("QueryBandHigh") ?? 0;
 
     /// <summary>The path of the room an exit leads to, or null.</summary>
     public string? QueryExitPath(string direction) => Exits.GetValueOrDefault(direction);
@@ -109,9 +169,13 @@ public abstract class Room : MudObject
     /// </summary>
     private ObjectRef? FindArea()
     {
+        if (areaRef is { IsAlive: true }) return areaRef;
+        if (areaRef == null && areaLooked != 0 && Time() - areaLooked < 30) return null; // no area.cs: do not look again at every step
+        areaLooked = Time();
         var path = Self.ProgramPath;
-        try { return LoadObject(path.Substring(0, path.LastIndexOf('/')) + "/area"); }
-        catch (MudRuntimeException) { return null; }
+        try { areaRef = LoadObject(path.Substring(0, path.LastIndexOf('/')) + "/area"); }
+        catch (MudRuntimeException) { areaRef = null; }
+        return areaRef;
     }
 
     public string QueryAreaName() => FindArea()?.Call<string>("QueryAreaName") ?? "";
@@ -125,7 +189,7 @@ public abstract class Room : MudObject
     /// <summary>May this creature use the exit right now (is it not locked against them)?</summary>
     public bool CanUseExit(ObjectRef who, string direction)
     {
-        if (!Exits.ContainsKey(direction)) return false;
+        if (!Exits.ContainsKey(direction) && !(hidden.ContainsKey(direction) && Found(who, direction))) return false;
         return !locks.TryGetValue(direction, out var door) || (door.KeyId != "" && Present(door.KeyId, who) != null);
     }
 
@@ -135,6 +199,8 @@ public abstract class Room : MudObject
         foreach (var spawn in spawns) text.Append($"  Spawn {spawn.Path} x{spawn.Count}: {spawn.Handles.Count(h => h.IsAlive)} alive\n");
         foreach (var encounter in encounters) text.Append($"  Encounter {encounter.Path} {encounter.Percent}%\n");
         foreach (var exit in Exits) text.Append($"  Exit {exit.Key} -> {exit.Value}{(locks.ContainsKey(exit.Key) ? " (locked)" : "")}\n");
+        foreach (var exit in hidden) text.Append($"  Hidden exit {exit.Key} -> {exit.Value.Path} (find chance {exit.Value.Chance}%, detail '{string.Join(",", exit.Value.Hints)}'{(locks.ContainsKey(exit.Key) ? ", locked" : "")})\n");
+        text.Append(QueryBandHigh() > 0 ? $"  Danger band {QueryBandLow()}-{QueryBandHigh()}{(bandSet ? "" : " (from the area)")}\n" : "  Danger band none\n");
         return text.ToString();
     }
 
@@ -145,7 +211,7 @@ public abstract class Room : MudObject
         ArmReset();
         var who = ThisPlayer();
         if (who == null || !Interactive(who)) return;
-        foreach (var direction in Exits.Keys.Concat(locks.Keys).Distinct().ToList())
+        foreach (var direction in Exits.Keys.Concat(locks.Keys).Concat(hidden.Keys).Distinct().ToList())
         {
             AddAction(direction, GoExit);
             AddAction(direction.Substring(0, 1), GoExit); // "n" for "north", "u" for "up", "d" for "down"
@@ -157,10 +223,19 @@ public abstract class Room : MudObject
     {
         var player = ThisPlayer();
         var verb = QueryVerb();
-        var ways = Exits.Keys.Concat(locks.Keys).Distinct().ToList();
+        if (player == null) return false;
+        // Hidden exits are bound for everyone, but only a character who has found one has it among their ways.
+        var ways = Exits.Keys.Concat(locks.Keys).Concat(hidden.Keys.Where(d => Found(player, d))).Distinct().ToList();
         var direction = ways.Contains(verb) ? verb : verb.Length == 1 ? ways.FirstOrDefault(d => d.StartsWith(verb)) : null;
-        if (player == null || direction == null) return false;
-        if (!Exits.ContainsKey(direction)) TellObject(player, locks[direction].Refusal + "\n"); // blocked, and not listed
+        if (direction == null)
+        {
+            // A wizard sees hidden exits listed and is told why this one will not open; to everyone else the word means nothing.
+            var unfound = hidden.Keys.FirstOrDefault(d => d == verb || (verb.Length == 1 && d.StartsWith(verb)));
+            if (unfound == null || player.Call<int>("QueryWizLevel") < 1) return false;
+            TellObject(player, "That way is hidden, and you have not found it yet. (Wizard note: it is found by search or by looking at its detail; see stat here.)\n");
+            return true;
+        }
+        if (!Exits.ContainsKey(direction) && !hidden.ContainsKey(direction)) TellObject(player, locks[direction].Refusal + "\n"); // blocked, and not listed
         else MoveThrough(player, direction);
         return true;
     }
@@ -168,7 +243,10 @@ public abstract class Room : MudObject
     /// <summary>Move a creature of this room through an exit, with the usual messages. False if it could not go.</summary>
     public bool MoveThrough(ObjectRef who, string direction)
     {
-        if (!Exits.TryGetValue(direction, out var path) || !who.IsAlive || Environment(who) != Self) return false;
+        var secret = !Exits.ContainsKey(direction) && hidden.ContainsKey(direction);
+        string? path = Exits.GetValueOrDefault(direction);
+        if (secret && Found(who, direction)) path = hidden[direction].Path;
+        if (path == null || !who.IsAlive || Environment(who) != Self) return false;
         if (!CanUseExit(who, direction))
         {
             TellObject(who, locks[direction].Refusal + "\n");
@@ -187,10 +265,63 @@ public abstract class Room : MudObject
         }
 
         var name = who.Call<string>("QueryName") ?? "Someone";
-        TellRoom(Self, $"{name} leaves {direction}.\n", who);
+        if (secret)
+        {
+            // Only those who have found the way know which way it was.
+            foreach (var other in AllInventory())
+                if (other != who && Living(other)) TellObject(other, $"{name} leaves {(Found(other, direction) ? direction : "somewhere")}.\n");
+        }
+        else TellRoom(Self, $"{name} leaves {direction}.\n", who);
         MoveObject(who, destination);
         TellRoom(destination, $"{name} arrives.\n", who);
         who.Call("Look");
+        WarnIfDangerous(who, destination);
+        return true;
+    }
+
+    /// <summary>Entering ground whose band starts two or more levels above the character, from ground that did not, earns one line.</summary>
+    private void WarnIfDangerous(ObjectRef who, ObjectRef destination)
+    {
+        if (!Interactive(who)) return;
+        var level = who.Call<int>("QueryLevel");
+        if (destination.Call<int>("QueryBandLow") - level < 2 || QueryBandLow() - level >= 2) return;
+        TellObject(who, "{yellow}You feel a chill of warning: this ground is more dangerous than you are ready for.{/}\n");
+    }
+
+    // ---- Hidden exits: finding them ----
+
+    /// <summary>
+    /// Search the room once, for this character, who must be the caller (the search command). Each hidden exit they have not found
+    /// is found with its own chance. True if anything was found.
+    /// </summary>
+    public bool Search(ObjectRef who)
+    {
+        if (PreviousObject() != who || Environment(who) != Self) return false;
+        var any = false;
+        foreach (var exit in hidden.ToList())
+            if (!Found(who, exit.Key) && Random(100) < exit.Value.Chance && Reveal(who, exit.Key)) any = true;
+        return any;
+    }
+
+    /// <summary>The character (the caller) has just looked at a detail of this room. A hidden exit that names it is found, for certain.</summary>
+    public void Examined(ObjectRef who, string name)
+    {
+        if (PreviousObject() != who || hidden.Count == 0 || Environment(who) != Self) return;
+        var key = Names(name).FirstOrDefault();
+        if (key == null) return;
+        foreach (var exit in hidden.ToList())
+            if (exit.Value.Hints.Contains(key) && !Found(who, exit.Key)) Reveal(who, exit.Key);
+    }
+
+    private bool Reveal(ObjectRef who, string direction)
+    {
+        if (!who.Call<bool>("RecordFoundExit", direction)) return false; // the character keeps the record; false if already there or refused
+        TellObject(who, hidden[direction].FoundLine + "\n");
+        try { ExitFound(who, direction); }
+        catch (MudRuntimeException)
+        {
+            // A fault in a room's discovery hook must not undo the discovery.
+        }
         return true;
     }
 
@@ -205,7 +336,10 @@ public abstract class Room : MudObject
         // The room name is a title; every exit is a command the player can type.
         text.Append("{title}").Append(ShortDesc).Append("{/}\n").Append(LongDesc).Append('\n');
         var detailed = viewer != null && viewer.Call<double>("QueryMod", "exit_detail") > 0;
-        text.Append(Exits.Count == 0 ? "There are no obvious exits.\n" : "Obvious exits: " + string.Join(", ", Exits.Keys.Select(d => "{cmd}" + d + "{/}" + (detailed ? ExitNote(d, viewer!) : ""))) + "\n");
+        var wizard = viewer != null && viewer.Call<int>("QueryWizLevel") >= 1;
+        // Hidden exits are listed for a character who has found them; a wizard sees all of them, marked.
+        var ways = Exits.Keys.Concat(hidden.Keys.Where(d => !Exits.ContainsKey(d) && viewer != null && (wizard || Found(viewer, d)))).ToList();
+        text.Append(ways.Count == 0 ? "There are no obvious exits.\n" : "Obvious exits: " + string.Join(", ", ways.Select(d => "{cmd}" + d + "{/}" + (wizard && hidden.ContainsKey(d) && !Exits.ContainsKey(d) ? " (hidden)" : "") + (detailed ? ExitNote(d, viewer!) : ""))) + "\n");
 
         // Identical shorts are merged: "Two giant rats are here."
         var counts = new Dictionary<string, int>();
@@ -221,6 +355,12 @@ public abstract class Room : MudObject
         foreach (var desc in order)
         {
             var n = counts[desc];
+            // A stack names its own count ("3 wolf skins"): it reads as a plural and is never counted again.
+            if (desc.Length > 0 && char.IsDigit(desc[0]))
+            {
+                for (var i = 0; i < n; i++) text.Append(Cap(desc) + " are here.\n");
+                continue;
+            }
             text.Append(n == 1 ? Cap(desc) : $"{(n < CountWords.Length ? CountWords[n] : n.ToString())} {Plural(desc)}");
             text.Append(n == 1 ? " is here.\n" : " are here.\n");
         }
@@ -231,7 +371,7 @@ public abstract class Room : MudObject
     private string ExitNote(string direction, ObjectRef viewer)
     {
         var where = "unexplored";
-        try { where = LoadObject(Exits[direction]).Call<string>("Short") ?? where; }
+        try { where = LoadObject(Exits.GetValueOrDefault(direction) ?? hidden[direction].Path).Call<string>("Short") ?? where; }
         catch (MudRuntimeException) { }
         return $" (to {where}{(locks.ContainsKey(direction) && !CanUseExit(viewer, direction) ? ", locked" : "")})";
     }

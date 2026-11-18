@@ -55,6 +55,9 @@ public class Npc : Living
     /// <summary>Replaces the next chat line for this player (for example after a quest). Null for the normal line.</summary>
     protected virtual string? TalkOverride(ObjectRef who) => null;
 
+    /// <summary>Called when someone talks to this NPC or asks it something. A patrol stops walking for a moment here.</summary>
+    protected virtual void Spoken(ObjectRef who) { }
+
     /// <summary>Called when the room resets. Shopkeepers restock here.</summary>
     public virtual void OnReset() { }
 
@@ -66,6 +69,7 @@ public class Npc : Living
     /// <summary>Called by the "talk" command. Returns what is shown to the player.</summary>
     public string? Talk(ObjectRef who)
     {
+        Spoken(who);
         var line = TalkOverride(who);
         if (line == null && chat.Count > 0)
         {
@@ -81,16 +85,24 @@ public class Npc : Living
     /// <summary>Called by the "ask" command.</summary>
     public virtual string? Ask(ObjectRef who, string topic)
     {
-        topic = topic.ToLowerInvariant();
+        Spoken(who);
+        topic = topic.ToLowerInvariant().Trim();
+        // The best match wins, not the first: an exact key; else the longest key found in what was asked
+        // ("oakenfell" before "oak"); else the first key that contains what was asked (three letters or more).
+        var best = -1; var bestLength = 0; var loose = -1;
         for (var i = 0; i < topicKeys.Count; i++)
         {
             foreach (var raw in topicKeys[i].Split(','))
             {
                 var key = raw.Trim();
-                if (key != "" && (topic.Contains(key) || (topic.Length >= 3 && key.Contains(topic))))
-                    return Speech(topicLines[i]);
+                if (key == "") continue;
+                if (key == topic) return Speech(topicLines[i]);
+                if (topic.Contains(key) && key.Length > bestLength) { best = i; bestLength = key.Length; }
+                else if (loose < 0 && topic.Length >= 3 && key.Contains(topic)) loose = i;
             }
         }
+        if (best >= 0) return Speech(topicLines[best]);
+        if (loose >= 0) return Speech(topicLines[loose]);
         return $"{Name} shrugs. \"I can't tell you anything about that.\"";
     }
 
