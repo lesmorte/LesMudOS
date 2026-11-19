@@ -1,7 +1,7 @@
 // @inherit /std/craft_data
 
 /// <summary>The materials of Vincent's Hollow (the six skins and bloods come from /crafting/beasts.cs) and what its nodes yield.</summary>
-public class HcLaunchMaterials : CraftData
+public class CrLaunchMaterials : CraftData
 {
     public override void Create()
     {

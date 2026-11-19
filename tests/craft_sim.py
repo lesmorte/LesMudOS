@@ -35,6 +35,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(ROOT, "tests", "fixtures", "crafting")
+# The real launch data (the owner's ten recipes and their materials), which the sample fixtures stand in for in their own runs.
+LAUNCH_FILES = ("/crafting/launch_materials", "/recipes/launch")
 QUALITY = ["poor", "common", "fine", "excellent", "masterwork", "legendary"]
 PROF_LEVELS = [0, 25, 50, 75, 100]
 
@@ -44,10 +46,13 @@ PROF_LEVELS = [0, 25, 50, 75, 100]
 class Tree:
     """A mudlib with overlays: a path is looked up in the last overlay that has it, then in the mudlib."""
 
-    def __init__(self, mudlib, overlays=()):
+    def __init__(self, mudlib, overlays=(), hide=()):
         self.roots = [mudlib] + list(overlays)
+        self.hide = set(hide)  # mudlib paths left out (the real launch data, under a fixture that redefines the same ids)
 
     def read(self, path):
+        if path in self.hide:
+            return None
         for root in reversed(self.roots):
             f = os.path.join(root, path.lstrip("/") + ".cs")
             if os.path.isfile(f):
@@ -62,7 +67,8 @@ class Tree:
                 for n in names:
                     if n.endswith(".cs"):
                         rel = "/" + os.path.relpath(os.path.join(d, n), root)[:-3].replace(os.sep, "/")
-                        seen[rel] = True
+                        if rel not in self.hide:
+                            seen[rel] = True
         return sorted(seen)
 
 
@@ -431,8 +437,8 @@ def odds_report(N):
     return out
 
 
-def run_one(mudlib, overlays, label, verbose):
-    econ = Economy(Tree(mudlib, overlays), label)
+def run_one(mudlib, overlays, label, verbose, hide=()):
+    econ = Economy(Tree(mudlib, overlays, hide), label)
     lines, worst = econ.check(verbose)
     print(f"== {label}: {len(econ.recipes)} recipes, {len(econ.mats)} materials, {len(econ.shops)} shop lines")
     for line in lines:
@@ -459,10 +465,10 @@ def main(argv):
     failed = 0
     base = run_one(mudlib, [], "the mudlib", verbose)
     failed += len(base.errors)
-    for name in ("samples", "launch"):
-        d = os.path.join(FIXTURES, name)
-        if os.path.isdir(d):
-            failed += len(run_one(mudlib, [d], f"the mudlib with tests/fixtures/crafting/{name}", verbose).errors)
+    # The sample set defines its own recipes and materials with the launch ids: lay it over the mudlib without the real launch data.
+    d = os.path.join(FIXTURES, "samples")
+    if os.path.isdir(d):
+        failed += len(run_one(mudlib, [d], "the mudlib with tests/fixtures/crafting/samples (launch data left out)", verbose, LAUNCH_FILES).errors)
     print()
     for line in odds_report(base.N):
         print(line)

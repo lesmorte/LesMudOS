@@ -1,5 +1,5 @@
 // @inherit /std/material
-public class HcFlour : Material
+public class CrFlour : Material
 {
     public override void Create()
     {
@@ -8,7 +8,7 @@ public class HcFlour : Material
         Ids.Add("sack");
         ShortDesc = "a sack of flour";
         Plural = "sacks of flour";
-        LongDesc = "A small sack of milled flour.";
+        LongDesc = "A small sack of coarse flour, milled in the Hollow and dusting everything it touches.";
         Value = 1;
     }
 }

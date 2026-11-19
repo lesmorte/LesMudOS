@@ -286,7 +286,8 @@ class Mudlib:
         return os.path.join(self.root, mudpath.lstrip("/") + ".cs")
 
     def is_file(self, mudpath):
-        return os.path.isfile(self.abspath(mudpath))
+        # A save record names a file plus instance state ("/std/skin?p.kind=wolf"): the file is what must exist.
+        return os.path.isfile(self.abspath(mudpath.split("?")[0]))
 
     def is_path(self, mudpath):
         return self.is_file(mudpath) or os.path.isdir(os.path.join(self.root, mudpath.lstrip("/")))

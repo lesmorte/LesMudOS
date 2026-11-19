@@ -1,5 +1,5 @@
 // @inherit /std/material
-public class HcBloodInk : Material
+public class CrBloodInk : Material
 {
     public override void Create()
     {
@@ -8,7 +8,7 @@ public class HcBloodInk : Material
         Ids.Add("blood ink");
         ShortDesc = "a vial of blood ink";
         Plural = "vials of blood ink";
-        LongDesc = "Dark red ink, thick with goblin blood. Scribes, scholars and rune crafters will want it.";
+        LongDesc = "Dark red ink, thick with goblin blood, that dries nearly black. Scribes, scholars and rune crafters will want it.";
         Value = 6;
     }
 }

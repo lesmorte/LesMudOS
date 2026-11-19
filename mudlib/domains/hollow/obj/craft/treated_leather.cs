@@ -1,5 +1,5 @@
 // @inherit /std/material
-public class HcTreatedLeather : Material
+public class CrTreatedLeather : Material
 {
     public override void Create()
     {
@@ -8,7 +8,7 @@ public class HcTreatedLeather : Material
         Ids.Add("treated leather");
         ShortDesc = "a piece of treated leather";
         Plural = "pieces of treated leather";
-        LongDesc = "Supple leather, cured and oiled.";
+        LongDesc = "A piece of hide cured with blood and oil until it is supple and dark. It keeps a faint tannery smell, and a leatherworker would call it a good start.";
         Value = 4;
     }
 }

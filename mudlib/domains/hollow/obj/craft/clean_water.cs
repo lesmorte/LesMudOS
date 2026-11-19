@@ -1,5 +1,5 @@
 // @inherit /std/material
-public class HcCleanWater : Material
+public class CrCleanWater : Material
 {
     public override void Create()
     {
@@ -9,7 +9,7 @@ public class HcCleanWater : Material
         Ids.Add("flask");
         ShortDesc = "a flask of clean water";
         Plural = "flasks of clean water";
-        LongDesc = "Clear water from the well.";
+        LongDesc = "Cold, clear water drawn from the village well and stoppered in a flask. Plain stuff, but half the recipes in the Hollow cannot do without it.";
         Value = 1;
     }
 }
