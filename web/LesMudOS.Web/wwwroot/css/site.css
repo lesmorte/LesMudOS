@@ -169,7 +169,7 @@ h3 { font-size: 1.4rem; }
 /* one entry */
 .entry-page h1 { margin-bottom: .2em; }
 .entry-meta { margin: 0 0 1.5rem; color: var(--ink-2); }
-.dropcap p:first-of-type::first-letter { font: 4.6em/.8 var(--head); float: left; padding: .06em .1em 0 0; color: var(--copper); }
+.dropcap p:first-of-type::first-letter { font: 3.3em/.82 var(--head); float: left; padding: .04em .1em 0 0; color: var(--copper); }
 .entry-body { font-size: 1.2rem; line-height: 1.7; }
 .sig { font-style: italic; border-left: 3px solid var(--copper); padding-left: 1rem; margin: 1.25rem 0; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1rem; margin: 1.5rem 0; padding: 1rem; background: var(--card); border: 1px solid var(--line); }
@@ -202,10 +202,12 @@ h3 { font-size: 1.4rem; }
 .steps { margin: 0; padding-left: 1.4rem; }
 .steps li { margin-bottom: .6rem; }
 .connect { background: var(--card); border: 2px solid var(--oak); padding: 1rem 1.25rem; margin: 1rem 0 1.5rem; max-width: 40rem; }
-.connect dl { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1rem; margin: 0; }
+.connect dl { display: grid; grid-template-columns: 1fr; gap: 0 1rem; margin: 0; }
+.connect dd { margin-bottom: .6rem; }
+.connect .btn { margin-top: .4rem; padding: .35rem .9rem; font-size: .9rem; }
+@media (min-width: 36rem) { .connect dl { grid-template-columns: max-content 1fr; } }
 .connect dt { font-weight: 600; color: var(--ink-2); }
-.connect dd { margin: 0; }
-code, kbd { font: .95em ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace; background: var(--parch-2); padding: .05em .35em; border: 1px solid var(--line); border-radius: 2px; }
+code, kbd { overflow-wrap: anywhere; font: .95em ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace; background: var(--parch-2); padding: .05em .35em; border: 1px solid var(--line); border-radius: 2px; }
 .notice { border-left: 4px solid var(--copper); background: var(--card); padding: .75rem 1rem; max-width: 40rem; margin: 1rem 0; }
 .draft { border: 2px dashed var(--copper); background: var(--card); padding: .75rem 1rem; max-width: 40rem; margin: 0 0 1.5rem; font-weight: 600; }
 .platform { margin-top: 1.5rem; max-width: 40rem; }

@@ -131,6 +131,19 @@ public class SiteTests
     }
 
     [Fact]
+    public async Task The_sanitized_directory_written_by_the_deployment_sync_job_works_the_same()
+    {
+        // fixtures/synced is what deploy/setup-website.sh's lesmudos-web-sync wrote from fixtures/mixed: flat files and a roster without hashes
+        Assert.DoesNotContain("passwordHash", string.Concat(Directory.GetFiles(Paths.Fixture("synced")).Select(File.ReadAllText)));
+        using var site = new Site(Paths.Fixture("synced"));
+        var (_, html, _) = await site.Get("/heroes");
+        var names = Regex.Matches(html, "<span class=\"name\">([^<]+)</span>").Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(new[] { "Mira", "Dara", "Bryn", "Cade", "Eda", "Zed" }, names);
+        Assert.Contains("Knight", html);
+        Assert.Equal(VisibleMixedIds.Length + Fixed.Length + 1, (await site.PublicPaths()).Count);
+    }
+
+    [Fact]
     public async Task The_home_page_strip_shows_only_real_numbers()
     {
         using var site = Open("mixed");
