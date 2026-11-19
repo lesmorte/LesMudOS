@@ -398,7 +398,12 @@ def run(work, mudlib, box):
     erin.command("tele " + W + "arena")
     a.drain(erin, 0.3)
     erin.command("kill brute")
-    check("search is refused while fighting", erin.command("search"), "You cannot search while you are fighting.")
+    # a combat line with its own prompt may arrive first and be taken for the reply: read on a moment
+    refused = erin.command("search")
+    if "cannot search" not in refused:
+        try: refused += erin.read_until("> ", timeout=3)
+        except Exception: pass
+    check("search is refused while fighting", refused, "You cannot search while you are fighting.")
     erin.command("flee")
     # chance: twelve characters search a 50% room once each
     crowd = [fresh("crowd%s" % "abcdefghijkl"[i]) for i in range(12)]

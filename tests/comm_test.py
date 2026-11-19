@@ -156,7 +156,10 @@ def patch_player(mudlib):
                '        AddAction("idleme", a => { testIdle = !testIdle; Write(testIdle ? "idle\\n" : "active\\n"); return true; });\n')
     src = src.replace(anchor, actions + anchor, 1)
     add = TEST_PLAYER_ADDITIONS
-    if "QueryIdle" not in src:
+    real = "    public override bool QueryIdle() => "
+    if real in src:
+        src = src.replace(real, real + "testIdle || ", 1)   # the game's own idle timer, plus the test's switch
+    else:
         add += TEST_IDLE
     marker = "    private string lastTeller = \"\";\n"
     assert marker in src
@@ -200,6 +203,7 @@ def run(work, mudlib):
     check("say: the room hears it", heard(bob, "Alice says: hello all"), "Alice says: hello all")
     check("say: the whole room hears it", heard(dana, "Alice says: hello all"), "Alice says: hello all")
     check("say: the shortcut ' with a space", alice.command("' by the way"), "You say: by the way")
+    check("say: the shortcut ' without a space", alice.command("'by the way"), "You say: by the way")
     check("say: shortcut heard", heard(bob, "by the way"), "Alice says: by the way")
     check("say: empty gives the usage line", alice.command("say"), "Usage: say MESSAGE")
     check("say: blanks only give the usage line", alice.command("say     "), "Usage: say MESSAGE")

@@ -304,6 +304,8 @@ internal sealed class Kernel : IDriverServices
     {
         line = line.Trim();
         if (line.Length == 0) return;
+        // A leading single quote is a command word by itself, so 'hello means the same as ' hello (say).
+        if (line.Length > 1 && line[0] == '\'' && line[1] != ' ') line = "' " + line[1..];
         var space = line.IndexOf(' ');
         _verb = space < 0 ? line : line[..space];
         var args = space < 0 ? "" : line[(space + 1)..].Trim();
