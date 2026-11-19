@@ -383,6 +383,13 @@ def run(work, mudlib, box):
     text = ct.act(ann, "bleed corpse", *RESULT, settle=ct.GATHER_SETTLE)
     check("ann bleeds a goblin with the kit she bought", text, "of goblin blood")
     truth("she now has Goblin Blood", have(w, "ann", "/std/blood?p.kind=goblin") >= 1, inv(w, "ann"))
+    profs, _, _ = ct.pinfo(w, "ann")
+    truth("a won growth roll (high dice) gave Bleeding one whole point, saved as 10 tenths", profs.get("bleeding") == 10, profs)
+    truth("and the ladder is back at the first rung", ct.dq(w, "ladder ann bleeding") == "ladder=0", ct.dq(w, "ladder ann bleeding"))
+    N = ct.numbers_now()
+    truth("the shipped numbers hold the owner's ladder, repeat and easy factor",
+          [N("growth.ladder", i) for i in range(5)] == [20, 25, 50, 75, 100] and N("growth.repeat_every") == 20 and N("growth.easy_factor") == 0.5, N.n.get("growth.ladder"))
+    truth("and the fixed-gain numbers are gone from the file", not any(k in ct.sim.parse_numbers(ct.sim.Tree(ct.MUDLIB[0]))[0] for k in ("growth.near_gain", "growth.easy_gain", "growth.drag", "growth.min_factor")))
     check("rolls fixed to the middle for crafting", ct.dq(w, "rolls mid"), "rolls=True")
 
     # ===== 6. crafting the launch recipes at their stations, from bought materials =====
@@ -643,7 +650,7 @@ def main():
     # Test fixtures only: the creatures and nodes of the lab, and the lab itself. Not the sample recipes or materials.
     os.makedirs(os.path.join(mudlib, "domains", "crafttest", "mob"))
     os.makedirs(os.path.join(mudlib, "domains", "crafttest", "obj"))
-    for sub, names in (("mob", ("tc_goblin", "tc_wolf", "tc_rabbit")), ("obj", ("berry_bush", "herb_patch"))):
+    for sub, names in (("mob", ("tc_goblin", "tc_wolf", "tc_rabbit", "tc_boar")), ("obj", ("berry_bush", "herb_patch"))):
         for n in names:
             shutil.copy(os.path.join(SAMPLES, sub, n + ".cs"), os.path.join(mudlib, "domains", "crafttest", sub, n + ".cs"))
     for path, text in test_files().items():

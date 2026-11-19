@@ -161,7 +161,14 @@ public class CtProbe : Thing
                     case "codds": Write("DQ " + L(D.Call<List<double>>("CraftOdds", P(w[1]), P(w[2]), P(w[3]))!) + "\n"); return true;
                     case "hsample": Write("DQ " + string.Join(" ", D.Call<List<int>>("RollHarvestSample", P(w[1]), int.Parse(w[2]), P(w[3]), int.Parse(w[4]))!) + "\n"); return true;
                     case "csample": Write("DQ " + string.Join(" ", D.Call<List<int>>("RollCraftSample", P(w[1]), P(w[2]), P(w[3]), int.Parse(w[4]))!) + "\n"); return true;
-                    case "gain": Write("DQ gain=" + D.Call<int>("GainFor", int.Parse(w[1]), P(w[2])) + "\n"); return true;
+                    case "gstep": Write("DQ gstep=" + string.Join(",", D.Call<List<int>>("GrowthFor", int.Parse(w[1]), P(w[2]), int.Parse(w[3]), P(w[4]))!) + "\n"); return true;
+                    case "ladderlen": Write("DQ ladderlen=" + string.Join(",", D.Call<List<double>>("LadderFor", int.Parse(w[1]))!) + "\n"); return true;
+                    case "ladder":
+                    {
+                        var who = Users().FirstOrDefault(u => u.Call<string>("QueryName")!.ToLowerInvariant() == w[1]);
+                        Write("DQ ladder=" + (who == null ? -9 : D.Call<int>("WizardQueryLadder", who, w[2])) + "\n");
+                        return true;
+                    }
                     case "setprof":
                     {
                         var who = Users().FirstOrDefault(u => u.Call<string>("QueryName")!.ToLowerInvariant() == w[1]);
@@ -234,6 +241,9 @@ public class Evil : Thing
         r.Add("learn=" + target.Call<bool>("CraftLearn", "berry_juice", "taught"));
         r.Add("setprof=" + target.Call<bool>("CraftSetProficiency", "skinning", 1000));
         r.Add("wizset=" + d.Call<bool>("WizardSetProficiency", target, "skinning", 1000));
+        r.Add("setladder=" + target.Call<bool>("CraftSetLadder", "skinning", 3));
+        r.Add("readladder=" + target.Call<int>("QueryCraftLadder", "skinning"));
+        r.Add("wizladder=" + d.Call<int>("WizardQueryLadder", target, "skinning"));
         r.Add("rolls=" + d.Call<bool>("SetTestRolls", "high"));
         var cmd = d.Call<List<object>>("Command", target, "recipes", "");
         r.Add("command=" + (cmd == null || cmd.Count == 0 ? "null" : "[" + cmd[0] + "]"));
@@ -446,8 +456,17 @@ def run(work, mudlib, box):
         odds_close(dq(w, f"hodds {prof} {tool} {work_}"), sim.harvest_odds(N, prof, tool, work_), f"harvest odds match the simulator exactly (prof {prof}, tool {tool}, work {work_})")
     for avg, prof, work_ in [(2.5, 0, 10), (1, 0, 45), (1, 100, 10), (0.5, 33.3, 25), (4, 100, 0)]:
         odds_close(dq(w, f"codds {avg} {prof} {work_}"), sim.craft_odds(N, avg, prof, work_), f"crafting odds match the simulator exactly (avg {avg}, prof {prof}, work {work_})")
-    for tenths, work_ in [(0, 6), (300, 6), (900, 6), (500, 45), (995, 100)]:
-        check(f"growth matches the simulator (skill {tenths / 10}, work {work_})", dq(w, f"gain {tenths} {work_}"), f"gain={sim.gain(N, tenths, work_)}")
+    for tenths in (0, 190, 200, 399, 400, 599, 600, 850, 995, 1000):
+        got = dq(w, f"ladderlen {tenths}")
+        truth(f"the ladder follows the simulator (skill {tenths / 10})", got.startswith("ladderlen=") and [float(x) for x in got.split("=")[1].split(",")] == sim.ladder(N, tenths), got)
+    for tenths, work_, pos, roll in [(0, 6, 0, 19.9), (0, 6, 0, 20.0), (0, 6, 4, 99.9), (0, 6, 9, 0.0), (190, 6, 3, 74.9), (190, 6, 3, 75.0),
+                                     (200, 6, 0, 19.9), (200, 6, 1, 20.0), (200, 6, 9, 99.0), (300, 6, 0, 9.9), (300, 6, 0, 10.0), (300, 6, 4, 24.9), (300, 6, 4, 25.0),
+                                     (300, 6, 9, 49.9), (300, 6, 9, 50.0), (300, 6, 99, 10.0), (300, 22, 4, 49.9), (300, 22, 4, 50.0), (300, 22, 4, 99.0),
+                                     (300, 80, 0, 19.9), (300, 80, 0, 20.0), (500, 45, 3, 30.0), (500, 6, 3, 0.0), (500, 6, 3, 99.0),
+                                     (995, 100, 0, 19.9), (995, 100, 14, 99.9), (1000, 6, 0, 0.0), (1000, 100, 0, 0.0)]:
+        want = sim.growth_step(N, tenths, work_, pos, roll)
+        check(f"growth step matches the simulator (skill {tenths / 10}, work {work_}, position {pos}, roll {roll})",
+              dq(w, f"gstep {tenths} {work_} {pos} {roll}"), f"gstep={1 if want[0] else 0},{want[1]}")
 
     # ===== B. proficiencies, help =====
     ann = fresh("ann")
@@ -587,14 +606,32 @@ def run(work, mudlib, box):
     text = act(ann, "skin corpse of test rabbit", *RESULT, settle=GATHER_SETTLE)
     check("the best knife carried is used automatically, and quality follows skill + tool - difficulty", text, "take an excellent rabbit skin (with your fine skinning knife)")
     profs, _, _ = pinfo(w, "ann")
-    # far beneath: gap 50 - 6 = 44 > 30: no growth
+    # far beneath: gap 50 - 6 = 44 > 30: no growth, and the ladder does not move
     truth("work far beneath your skill teaches nothing (Skinning stays 50.0)", profs.get("skinning") == 500, profs)
-    dq(w, "setprof ann skinning 300")
-    ann.command("spawn tc_rabbit")
-    ann.command("slaynow rabbit")
-    act(ann, "skin corpse of test rabbit", *RESULT, settle=GATHER_SETTLE)
-    profs, _, _ = pinfo(w, "ann")
-    truth("easy work teaches slowly (30.0 + 0.2 = 30.2)", profs.get("skinning") == 300 + sim.gain(N, 300, 6) and sim.gain(N, 300, 6) == 2, profs)
+    # The growth dice: mid and high always gain a point (roll 0), low never does (roll 100), fail also fails the work itself.
+    # Skin one thing with ann; returns (text, skinning in tenths, ladder position of skinning).
+    def skin_one(kind):
+        ann.command(f"spawn {kind}")
+        ann.command("slaynow " + kind.replace("tc_", ""))
+        t = act(ann, f"skin corpse of test {kind.replace('tc_', '')}", *RESULT, settle=GATHER_SETTLE)
+        pr, _, _ = pinfo(w, "ann")
+        return t, pr.get("skinning"), int(dq(w, "ladder ann skinning").split("=")[1])
+    lad_pre = int(dq(w, "ladder ann skinning").split("=")[1])
+    t, sk, lad0 = skin_one("tc_rabbit")
+    truth("work far beneath your skill does not move the ladder", sk == 500 and lad0 == lad_pre, (sk, lad_pre, lad0))
+    check("the warden sets a skill of 30", dq(w, "setprof ann skinning 300"), "setprof=True")
+    dq(w, "rolls low")
+    t, sk, lad1 = skin_one("tc_wolf")
+    truth("work near your skill (wolf, work 22): a missed roll teaches nothing", sk == 300, sk)
+    truth("and moves the ladder up one rung", lad1 == lad0 + 1, (lad0, lad1))
+    t, sk, lad2 = skin_one("tc_rabbit")
+    truth("easy work (rabbit, work 6, 24 below) teaches nothing on a miss either", sk == 300 and "rises" not in t, (sk, t))
+    truth("but moves the ladder up one rung too", lad2 == lad1 + 1, (lad1, lad2))
+    check("the player is never told about the ladder or the chance", ann.command("proficiencies"), "Skinning", absent=("ladder", "chance", "rung", "%"))
+    check("the warden sets a skill of 50", dq(w, "setprof ann skinning 500"), "setprof=True")
+    t, sk, lad3 = skin_one("tc_rabbit")
+    truth("work more than 30 below your skill does not move the ladder", sk == 500 and lad3 == lad2, (sk, lad2, lad3))
+    check("the warden sets a skill of 30 again", dq(w, "setprof ann skinning 300"), "setprof=True")
     dq(w, "rolls fail")
     ann.command("spawn tc_rabbit")
     ann.command("slaynow rabbit")
@@ -602,7 +639,12 @@ def run(work, mudlib, box):
     check("a failed skinning ruins the hide", text, "Your knife slips and the hide of the corpse of a test rabbit is ruined.")
     check("and uses the corpse's one chance", ann.command("skin corpse of test rabbit"), "has already been skinned.")
     profs2, _, _ = pinfo(w, "ann")
-    truth("a failure teaches nothing", profs2.get("skinning") == profs.get("skinning"), (profs, profs2))
+    truth("a failure teaches nothing", profs2.get("skinning") == 300, profs2)
+    truth("and does not move the ladder", int(dq(w, "ladder ann skinning").split("=")[1]) == lad2, lad2)
+    dq(w, "rolls mid")
+    t, sk, lad4 = skin_one("tc_rabbit")
+    truth("a won roll on easy work gives one whole point (30.0 to 31.0)", sk == 310 and "rises to 31" in t, (sk, t))
+    truth("and sends the ladder back to the first rung", lad4 == 0, lad4)
     dq(w, "rolls high")
     ann.command("spawn tc_rabbit")
     ann.command("slaynow rabbit")
@@ -658,6 +700,29 @@ def run(work, mudlib, box):
     act(ann, "bleed corpse", *RESULT, settle=0)
     text = a.quiet(ann, 5)
     check("once its parts are taken it crumbles like any empty corpse", text, "The corpse of test wolf crumbles to dust.")
+
+    # ----- creature corpses rot at their lifetime, skin or no skin; a player's keeps its hour -----
+    ann.command("spawn tc_wolf")
+    ann.command("slaynow wolf")
+    check("a creature's corpse lives 600 seconds by default", w.command("stat corpse"), "lifetime 600s")
+    ann.command("spawn tc_boar")
+    ann.command("slaynow boar")
+    check("a creature file may set its own corpse lifetime (90 seconds)", w.command("stat corpse of test boar"), "lifetime 90s")
+    w.command("ctimers 1800 120 5")
+    check("a corpse with its hide still on it is there before its lifetime ends", ann.command("look"), "corpse of a test wolf", "corpse of a test boar")
+    time.sleep(2)
+    check("and still there partway", ann.command("look at corpse of test wolf"), "Its hide could still be taken")
+    text = a.quiet(ann, 5)
+    check("with the hide still on it, the corpse rots at its lifetime", text, "The corpse of test wolf crumbles to dust.", "The corpse of test boar crumbles to dust.")
+    check("and is gone", ann.command("look"), absent=("corpse of a test wolf",))
+    eve = fresh("eve")
+    eve.command("tele " + T + "decayroom")
+    eve.command(f"mk {O}healing_herb 1 1")
+    check("a player dies (the warden's probe)", w.command("slaynow eve"), "SLAIN")
+    check("the corpse holds the player's things and keeps its hour", w.command("stat corpse"), "lifetime 3600s")
+    w.command("ctimers 1800 3 3")
+    text = a.quiet(ann, 6)
+    check("a player's corpse does not rot at a creature's lifetime", text + ann.command("look"), "corpse of Eve", absent=("crumbles", "rots away"))
 
     # ===== H. stations, recipes by teaching, by book =====
     ann.command("tele " + T + "workshop")
@@ -868,6 +933,9 @@ def run(work, mudlib, box):
     # A crash right after a craft: the result message comes after the save.
     cloth = count_in(inv, O + "cloth_strip")
     band = count_in(inv, O + "simple_bandage")
+    dq(w, "setprof ann herbalism 200")
+    dq(w, "rolls low")  # the growth roll misses (the ladder moves) but the work succeeds
+    ladder_before = int(dq(w, "ladder ann herbalism").split("=")[1])
     ann.send("craft bandage")
     got = ann.read_until("You make", timeout=10)
     box[0].kill()
@@ -880,6 +948,7 @@ def run(work, mudlib, box):
     inv = inventory(w, "ann")
     truth("a driver killed right after a craft: the bandage is there and the cloth strip is gone, once",
           "You make" in got and count_in(inv, O + "simple_bandage") == band + 1 and count_in(inv, O + "cloth_strip") == cloth - 1, (cloth, band, inv))
+    truth("the ladder position survives a killed driver (one rung up from the miss)", int(dq(w, "ladder ann herbalism").split("=")[1]) == ladder_before + 1 >= 1, (ladder_before, dq(w, "ladder ann herbalism")))
     profs, known, _ = pinfo(w, "ann")
     truth("proficiencies survive a killed driver", profs.get("skinning", 0) >= 300 and profs.get("harvesting", 0) >= 20, profs)
     truth("known recipes survive a killed driver", known.get("berry_juice") == "taught" and known.get("minor_healing_salve") == "taught", known)
@@ -913,6 +982,9 @@ def run(work, mudlib, box):
     check("sandbox: cannot learn for a player", text, "learn=False")
     check("sandbox: cannot set a proficiency", text, "setprof=False")
     check("sandbox: cannot use the wizard's setter", text, "wizset=False")
+    check("sandbox: cannot set the ladder position", text, "setladder=False")
+    check("sandbox: cannot read the ladder position", text, "readladder=0")
+    check("sandbox: cannot use the wizard's ladder query", text, "wizladder=-1")
     check("sandbox: cannot fix the rolls", text, "rolls=False")
     check("sandbox: cannot run a crafting command for a player", text, "command=[]")
     check("sandbox: cannot take a corpse's part", text, "takeyield=False")

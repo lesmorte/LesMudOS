@@ -20,7 +20,7 @@ Poor to Masterwork, and FAILS if any recipe pays more than its vendor-bought ing
 
 It also checks that nothing but bleeding can make a scarce material: no recipe output, node yield or shop stock may be one.
 
-The formula functions here (harvest_odds, craft_odds, gain) are the exact twins of /secure/crafting; tests/craft_test.py
+The formula functions here (harvest_odds, craft_odds, ladder, growth_step) are the exact twins of /secure/crafting; tests/craft_test.py
 compares them with the daemon's own answers.
 
 Usage:
@@ -194,8 +194,8 @@ DEFAULTS = {
     "harvest.success_per_point": [0.2], "harvest.success_tool": [-10, 0, 5, 10, 15, 20], "harvest.success_difficulty": [0.4],
     "harvest.success_min": [30.0], "harvest.success_max": [98.0], "harvest.bonus_per_point": [0.15],
     "harvest.bonus_tool": [0, 0, 5, 10, 15, 20], "harvest.bonus_max": [40.0], "harvest.max_quality": [4.0],
-    "growth.near_band": [10.0], "growth.easy_band": [30.0], "growth.near_gain": [10.0], "growth.easy_gain": [3.0],
-    "growth.drag": [125.0], "growth.min_factor": [0.2],
+    "growth.near_band": [10.0], "growth.easy_band": [30.0],
+    "growth.ladder": [20.0, 25.0, 50.0, 75.0, 100.0], "growth.repeat_every": [20.0], "growth.easy_factor": [0.5],
     "craft.shift_per_point": [0.02], "craft.shift_min": [-1.5], "craft.shift_max": [1.0], "craft.noise": [0.75],
     "craft.noise_steps": [20.0], "craft.max_quality": [4.0], "craft.bonus_margin": [20.0], "craft.bonus_per_point": [0.5],
     "craft.bonus_max": [25.0], "craft.return_margin": [30.0], "craft.return_per_point": [0.4], "craft.return_max": [20.0],
@@ -258,15 +258,55 @@ def craft_odds(N, average, prof, work):
     return [100.0 * t / total for t in tiers] + [bonus, ret]
 
 
-def gain(N, tenths, work):
-    """Tenths of a point gained for one successful piece of work, exactly as the daemon's Gain."""
-    skill = tenths / 10.0
-    gap = skill - work
-    base = N("growth.near_gain") if gap <= N("growth.near_band") else N("growth.easy_gain") if gap <= N("growth.easy_band") else 0
-    if base <= 0 or tenths >= 1000:
-        return 0
-    factor = max(N("growth.min_factor"), 1 - skill / N("growth.drag"))
-    return max(1, int(math.floor(base * factor + 0.5)))
+def ladder(N, tenths):
+    """The chances (percent) a skill climbs, as the daemon's Ladder: each rung repeated 1 + skill / repeat_every times."""
+    every = max(1.0, N("growth.repeat_every"))
+    repeat = 1 + int(math.floor(max(0, tenths / 10.0) / every))
+    return [r for r in N.n["growth.ladder"] for _ in range(repeat)]
+
+
+def growth_step(N, tenths, work, position, roll, speed=1.0):
+    """(gained, next position) for one successful piece of work, exactly as the daemon's GrowthStep. roll is 0 up to 100."""
+    if tenths >= 1000:
+        return False, position
+    gap = tenths / 10.0 - work
+    if gap > N("growth.easy_band"):
+        return False, position
+    rungs = ladder(N, tenths)
+    at = max(0, min(position, len(rungs) - 1))
+    chance = rungs[at]
+    if gap > N("growth.near_band"):
+        chance *= N("growth.easy_factor")
+    chance = min(100.0, chance * speed)
+    return (True, 0) if roll < chance else (False, min(at + 1, len(rungs) - 1))
+
+
+def successes_per_point(N, tenths, easy=False):
+    """Expected number of successful pieces of work for one point at this skill, working near (or in the easy band)."""
+    total, reach = 0.0, 1.0
+    rungs = ladder(N, tenths)
+    for i, chance in enumerate(rungs):
+        p = min(1.0, chance * (N("growth.easy_factor") if easy else 1.0) / 100.0)
+        total += reach
+        if i == len(rungs) - 1:
+            # the last rung repeats until the point comes
+            total += reach * (1 - p) / p if p > 0 else 0
+            break
+        reach *= 1 - p
+    return total
+
+
+def growth_report(N):
+    out = ["Growth: expected successful pieces of work for one point (near band; easy band at half chance), by skill band:"]
+    grand = grand_easy = 0.0
+    for lo in range(0, 100, 20):
+        near = [successes_per_point(N, p * 10) for p in range(lo, lo + 20)]
+        easy = [successes_per_point(N, p * 10, True) for p in range(lo, lo + 20)]
+        out.append(f"  skill {lo:>3}-{lo + 19:<3}  {near[0]:5.2f} per point near ({sum(near):6.1f} for the band)   {easy[0]:5.2f} per point easy ({sum(easy):6.1f} for the band)")
+        grand += sum(near)
+        grand_easy += sum(easy)
+    out.append(f"  skill   0-100  {grand:6.1f} successes near your skill ({grand_easy:6.1f} if all of it were easy work)")
+    return out
 
 
 # ---------------------------------------------------------------- the economy
@@ -434,6 +474,7 @@ def odds_report(N):
     for avg, prof, work in [(1, 0, 0), (1, 0, 10), (2.5, 0, 10), (2.5, 50, 10), (1, 100, 10), (1, 0, 45), (0, 100, 0), (3, 100, 10)]:
         o = craft_odds(N, avg, prof, work)
         out.append(f"  {avg:>3} {prof:>5} {work:>4} | " + " ".join(f"{x:5.1f}%" for x in o[:5]) + f" | {o[6]:4.1f}% {o[7]:4.1f}%")
+    out.extend(growth_report(N))
     return out
 
 

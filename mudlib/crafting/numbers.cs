@@ -32,13 +32,12 @@ public class CraftNumbers : CraftData
         Number("difficulty.level_weight", 1);
         Number("difficulty.node_scale", 5);
         Number("bleed.fresh_seconds", 300);                        // bleeding needs a corpse younger than this
-        // ---- Growth: tenths of a point per successful piece of work ----
-        Number("growth.near_band", 10);     // work no more than this far below your skill (or above it) is "near": near_gain
-        Number("growth.easy_band", 30);     // up to this far below: easy_gain; further below: nothing
-        Number("growth.near_gain", 10);
-        Number("growth.easy_gain", 3);
-        Number("growth.drag", 125);         // the gain is multiplied by 1 - skill / drag ...
-        Number("growth.min_factor", 0.2);   // ... but never by less than this
+        // ---- Growth: a successful piece of work rolls a chance at one whole point, climbing a ladder of chances ----
+        Number("growth.near_band", 10);     // work no more than this far below your skill (or above it) is "near": the rung's chance
+        Number("growth.easy_band", 30);     // up to this far below: easy_factor of the rung's chance; further below: nothing
+        Numbers("growth.ladder", 20, 25, 50, 75, 100);   // percent; a miss moves up a rung, a gain starts again
+        Number("growth.repeat_every", 20);  // each rung is used 1 + skill / this times before the next
+        Number("growth.easy_factor", 0.5);
         // ---- Crafted quality = average ingredient quality + shift + noise, rounded ----
         Number("craft.shift_per_point", 0.02);   // tiers per point of (proficiency - recipe work level)
         Number("craft.shift_min", -1.5);
