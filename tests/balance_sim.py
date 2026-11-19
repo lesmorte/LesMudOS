@@ -19,9 +19,17 @@ Rules (identical to the code; `python3 tests/balance_sim.py check` compares the 
     Attack = round(AttackRate x Level) + to-hit bonuses and Defense = Level - 1. A natural 20 always hits, a natural 1
     always misses. Damage is uniform in the weapon's range, 5% critical (x1.5), a block (15% with a shield) halves it.
     Creatures have AttackRate 1.0 and no dodge or block.
-  * Stamina and Mana come back continuously (per 10 seconds, the class's figures); the player is rested to full
-    between fights. Level n needs 50 n (n-1) experience (100, 300, 600, 1000 for levels 2-5); a level adds 8 max HP and
-    heals fully, in the middle of a fight too.
+  * Attributes (docs/ATTRIBUTES.md): a player has the calling's starting attributes (no points placed: the simulated player
+    keeps them, so these tables show the callings as they start); a creature has 4 + level / 2 in each. Each effect counts
+    the points above 5: weapon damage +2% a point of Might (rounded half away from zero, after the roll); +1 to hit and +1
+    to the defender's side of the roll for every 4 points of Grace; critical chance +0.5% a point of Grace; spell damage
+    +2% a point of Insight and +1% of Spirit; spell healing +2% a point of Spirit and +1% of Insight (added to Divine
+    Knowledge's 25%); Physical Resistance 2% a point of Vigor and Resolve (at most 75%) against staggers and slows.
+  * Maximum HP (Vitality), Stamina (Endurance) and Mana (Focus) are class base + class per-level x level + attributes;
+    Stamina and Mana come back continuously at Maximum x (6% + (Resolve + Vigor) x 0.3%) and Maximum x (1% + (Insight +
+    Spirit) x 0.4%) per 10 seconds, HP out of combat at 0.3 + Vigor / 10; the player is rested to full between fights.
+    Level n needs 50 n (n-1) experience (100, 300, 600, 1000 for levels 2-5); a level-up heals fully, in the middle of a
+    fight too.
   * Player policies (what a sensible player does): potions at 35% HP; warrior Shield Bash on a creature that is
     preparing an action (the interrupt) or when Stamina is high; scout Precision Strike whenever it can pay; mage
     Arcane Bolt whenever it can pay; priest Minor Heal at 50% HP, Blessing at the start of a hard fight.
@@ -132,13 +140,12 @@ SHIELD, HELM, VEST = (1, 0.5), (1, 0.0), (3, 0.0)
 @dataclass(frozen=True)
 class Arch:
     name: str
-    hp: int
+    vitality: tuple       # (class base, per level) -- docs/ATTRIBUTES.md section 2
     reaction: float
     rate: float
-    stamina: int
-    mana: int
-    stamina_regen: float  # per 10 seconds
-    mana_regen: float
+    endurance: tuple
+    focus: tuple
+    attrs: tuple          # starting Might, Grace, Vigor, Insight, Spirit, Resolve (section 3)
     gold: int
     weapons: tuple        # progression, bought as gold allows
     shield: bool          # carries a shield (the warrior starts with one, others buy it)
@@ -151,14 +158,49 @@ class Arch:
 
 
 ARCHS = {a.name: a for a in [
-    Arch("warrior", 40, 3.0, 1.00, 100, 20, 10, 2, 10, ("rusty sword", "woodcutter axe", "fine longsword"), True, armor_bonus=2, hit_armed=2),
-    Arch("scout", 26, 2.0, 1.00, 100, 20, 8, 2, 10, ("hunting bow", "fine longsword"), False, dodge=8),
-    Arch("priest", 26, 2.5, 0.97, 40, 100, 4, 4, 15, ("novice mace",), True, healing_pct=25, potions=1),
-    Arch("mage", 24, 2.5, 0.96, 30, 100, 3, 8, 15, ("apprentice staff",), False, spell_cost_pct=-20, potions=1),
-    Arch("adventurer", 30, 2.5, 0.98, 70, 70, 6, 5, 20, ("training spear", "woodcutter axe", "fine longsword"), True),
+    Arch("warrior", (17, 9), 3.0, 1.00, (79, 2), (4, 1), (8, 5, 7, 5, 5, 6), 10, ("rusty sword", "woodcutter axe", "fine longsword"), True, armor_bonus=2, hit_armed=2),
+    Arch("scout", (8, 8), 2.0, 1.00, (81, 2), (2, 1), (5, 9, 5, 6, 5, 6), 10, ("hunting bow", "fine longsword"), False, dodge=8),
+    Arch("priest", (7, 7), 2.5, 0.97, (23, 1), (75, 4), (5, 5, 6, 6, 9, 5), 15, ("novice mace",), True, healing_pct=25, potions=1),
+    Arch("mage", (8, 6), 2.5, 0.96, (14, 1), (71, 4), (5, 5, 5, 9, 7, 5), 15, ("apprentice staff",), False, spell_cost_pct=-20, potions=1),
+    Arch("adventurer", (10, 8), 2.5, 0.98, (50, 2), (50, 2), (6, 6, 6, 6, 6, 6), 20, ("training spear", "woodcutter axe", "fine longsword"), True),
 ]}
 TRINKET_HP = 5
-HP_PER_LEVEL = 8
+ATTR = ("might", "grace", "vigor", "insight", "spirit", "resolve")
+
+
+def creature_attrs(level):
+    """A creature's attributes when its file names none: 4 + level / 2 (whole levels). No creature file names any yet."""
+    return (4 + level // 2,) * 6
+
+
+def above(attrs, name):
+    return max(0, attrs[ATTR.index(name)] - 5)
+
+
+def stat(attrs, key):
+    """Living.QueryStat for the statistics the combat rules use (no equipment bonus, no class modifier: the callings have none)."""
+    if key == "physical_power":
+        return 2 * above(attrs, "might")
+    if key in ("precision", "evasion"):
+        return above(attrs, "grace") // 4
+    if key == "crit":
+        return 0.5 * above(attrs, "grace")
+    if key == "spell_power":
+        return 2 * above(attrs, "insight") + above(attrs, "spirit")
+    if key == "healing_power":
+        return 2 * above(attrs, "spirit") + above(attrs, "insight")
+    if key == "physical_resistance":
+        return min(75, 2 * (above(attrs, "vigor") + above(attrs, "resolve")))
+    raise KeyError(key)
+
+
+def resources(arch, level):
+    """(max HP, max Stamina, max Mana, Stamina per 10 s, Mana per 10 s, HP per 10 s out of combat) by docs/ATTRIBUTES.md section 2."""
+    m, g, v, i, s, r = arch.attrs
+    hp = arch.vitality[0] + arch.vitality[1] * level + 2 * v
+    end = arch.endurance[0] + arch.endurance[1] * level + 2 * r + v
+    foc = arch.focus[0] + arch.focus[1] * level + 2 * i + s
+    return hp, end, foc, end * (0.06 + (r + v) * 0.003), foc * (0.01 + (i + s) * 0.004), 0.3 + v / 10
 SHIELD_PRICE = 12
 # Improvised Combat (adventurer) removes 0.5 of a weapon's reaction modifier.
 REACTION_CUT = {"adventurer": 0.5}
@@ -171,6 +213,9 @@ def rnd(x):
 class Fighter:
     def __init__(self, level, hp, dmg, to_hit, armor, reaction, acts, kind=None, arch=None, shield=False, rate=1.0):
         self.level, self.hp, self.max_hp = level, hp, hp
+        self.attrs = arch.attrs if arch is not None else creature_attrs(level)
+        self.max_stamina = self.max_mana = 0
+        self.stamina_regen = self.mana_regen = 0.0
         self.dmg, self.to_hit, self.armor = dmg, to_hit, armor
         self.reaction = reaction
         self.acts = acts
@@ -214,10 +259,15 @@ class Fighter:
         return f
 
     def attack(self, t=0):
-        return rnd(self.rate * self.level) + self.to_hit + (1 if t < self.bless_until else 0) + int(self.mod("tohit", t))
+        return rnd(self.rate * self.level) + self.to_hit + (1 if t < self.bless_until else 0) + int(self.mod("tohit", t)) + stat(self.attrs, "precision")
 
     def defense(self):
-        return max(0, self.level - 1)
+        return max(0, self.level - 1) + stat(self.attrs, "evasion")
+
+    def resists(self):
+        """Physical Resistance against a stagger or a slow, rolled to a tenth of a percent."""
+        chance = stat(self.attrs, "physical_resistance")
+        return chance > 0 and random.randrange(1000) < round(chance * 10)
 
     def total_armor(self, t=0):
         return self.armor + (1 if t < self.bless_until else 0) + int(self.mod("armor", t))
@@ -239,8 +289,8 @@ class Fighter:
     def regen(self, t):
         if self.arch:
             dt = (t - self.last_t) / 10000.0
-            self.stamina = min(self.arch.stamina, self.stamina + self.arch.stamina_regen * dt)
-            self.mana = min(self.arch.mana, self.mana + self.arch.mana_regen * dt)
+            self.stamina = min(self.max_stamina, self.stamina + self.stamina_regen * dt)
+            self.mana = min(self.max_mana, self.mana + self.mana_regen * dt)
         self.last_t = t
 
 
@@ -253,7 +303,12 @@ def hit_chance(attack, armor, defense):
 
 
 def player_max_hp(arch, level, extra=0):
-    return arch.hp + HP_PER_LEVEL * (level - 1) + extra
+    return resources(arch, level)[0] + extra
+
+
+def set_level_resources(p, level):
+    """A player's resource maxima and rates at a level (they grow with it)."""
+    _, p.max_stamina, p.max_mana, p.stamina_regen, p.mana_regen, _ = resources(p.arch, level)
 
 
 def make_monster(name):
@@ -275,7 +330,8 @@ def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True, armor_e
     p = Fighter(level, player_max_hp(arch, level, extra_hp), dmg, to_hit, armor, reaction, (Act("attack", 0, rec),),
                 arch=arch, shield=has_shield, rate=arch.rate)
     p.extra_hp = extra_hp
-    p.stamina, p.mana = float(arch.stamina), float(arch.mana)
+    set_level_resources(p, level)
+    p.stamina, p.mana = float(p.max_stamina), float(p.max_mana)
     p.weapon_rec = rec
     return p
 
@@ -370,14 +426,16 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
     t = 0
 
     def stagger(e, now, seconds=2.0):
+        if e.resists():
+            return
         e.gen += 1
         if e.resolve_at is not None and e.resolve_at > now:
             half = (e.ready_at - e.resolve_at) / 2
             e.resolve_at = None
             e.ready_at = round(now + half)
             if e.is_player:  # half the cost comes back
-                e.stamina = min(e.arch.stamina, e.stamina + e.paid[0] / 2)
-                e.mana = min(e.arch.mana, e.mana + e.paid[1] / 2)
+                e.stamina = min(e.max_stamina, e.stamina + e.paid[0] / 2)
+                e.mana = min(e.max_mana, e.mana + e.paid[1] / 2)
         else:
             e.ready_at = max(e.ready_at, now) + round(seconds * 1000)
         push(e.ready_at, "ready", e)
@@ -443,17 +501,18 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
 
 
 def do_hit(att, defn, t, to_hit_bonus=0, crit=5, factor=1.0, mult=1, bonus=0):
-    """One physical attack. Returns (damage, blocked) with damage 0 on a miss or dodge."""
+    """One physical attack. Returns (damage, blocked) with damage 0 on a miss or dodge. crit is the action's own chance (5 for
+    a basic attack); Critical Chance from Grace is added here, as Living.QueryCritFor does."""
     if random.randint(1, 100) <= defn.dodge():
         return 0, False
     roll = random.randint(1, 20)
     need = 10 + defn.total_armor(t) + defn.defense()
     if not (roll == 20 or (roll != 1 and roll + att.attack(t) + to_hit_bonus >= need)):
         return 0, False
-    dmg = max(1, random.randint(*att.dmg) + bonus) * mult
+    dmg = max(1, rnd(max(1, random.randint(*att.dmg) + bonus) * (1 + stat(att.attrs, "physical_power") / 100.0))) * mult
     if factor != 1.0:
         dmg = max(1, rnd(dmg * factor))
-    if random.randint(1, 100) <= crit:
+    if random.randrange(1000) < round(min(100, crit + stat(att.attrs, "crit")) * 10):
         dmg = max(1, rnd(dmg * 1.5))
     blocked = random.randint(1, 100) <= defn.block()
     if blocked:
@@ -476,7 +535,7 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
         push(m.ready_at, "ready", m)
         return
     if act.id == "heal":
-        ent.hp = min(ent.max_hp, ent.hp + rnd(HEAL_AMOUNT * (100 + ent.arch.healing_pct) / 100.0))
+        ent.hp = min(ent.max_hp, ent.hp + rnd(HEAL_AMOUNT * (100 + ent.arch.healing_pct + stat(ent.attrs, "healing_power")) / 100.0))
         return
     if act.id == "bless":
         ent.bless_until = t + BLESS_MS
@@ -484,7 +543,7 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
     if act.id == "bolt":
         if target.dodge() and random.randint(1, 100) <= target.dodge():
             return
-        dmg = random.randint(*BOLT_DMG)
+        dmg = max(1, rnd(random.randint(*BOLT_DMG) * (1 + stat(ent.attrs, "spell_power") / 100.0)))
         target.hp -= dmg
         if target.hp <= 0 and on_kill is not None:
             on_kill(player, target)
@@ -599,6 +658,7 @@ def full_run(arch_name, runs=500):
                 p.level = level
                 p.max_hp = player_max_hp(arch, level, trinket)
                 p.hp = p.max_hp
+                set_level_resources(p, level)
 
         def attempt(creatures, hard=False):
             nonlocal gold, potions, deaths, fight_ms
@@ -865,7 +925,7 @@ def resolve_corridor(ent, act, target, t, enemies, out, push):
     target.hp -= dmg
     if act.fx and target.hp > 0:
         kind, rest = act.fx.split(":", 1)
-        if kind == "slow":
+        if kind == "slow" and not target.resists():
             factor, secs = rest.split(":")
             target.add_effect("slow-" + ent.kind.id, t, int(secs), {}, float(factor))
         elif kind == "stagger":
@@ -930,7 +990,7 @@ ROOMS_BETWEEN_KILLS = 3     # between one spawn and the next on a woodland or de
 LOOT_SECONDS = 3.0          # `loot` the corpse
 POTION_SECONDS = 2.0        # `drink potion` out of a fight
 RESUPPLY = 0.05             # share of the time spent buying potions in bulk
-HP_REGEN_PER_SECOND = 0.1   # Adventurer.Tick: 1 HP per 10 s out of combat (3 per 10 s in a safe room)
+# Adventurer.Tick: 0.3 + Vigor / 10 HP per 10 s out of combat (three times that in a safe room); see resources().
 ROOMS_TO_PREY = {5: 14, 6: 26, 7: 40, 8: 54, 9: 68, 10: 76}   # rooms from the Hollow's guest rooms to where level n prey lives
 CORPSE_SECONDS = 10.0       # find and loot the corpse after a death
 # A perfect-knowledge player rests in a haven (a safe room: 3 HP per 10 s, Stamina and Mana twice as fast) whenever the hunting
@@ -947,7 +1007,8 @@ def kind_gold(k):
 
 
 def regen_hp(arch):
-    return HP_REGEN_PER_SECOND * (1.5 if arch == "adventurer" else 1.0)
+    """HP regained per second out of combat (Survival Training: x1.5 for the adventurer)."""
+    return resources(ARCHS[arch], 1)[5] / 10.0 * (1.5 if arch == "adventurer" else 1.0)
 
 
 def pace_cell(arch, level, key, f=0.0, runs=400, haven=True):
@@ -967,7 +1028,8 @@ def pace_cell(arch, level, key, f=0.0, runs=400, haven=True):
         h = HAVEN_SHARE[min(10, max(5, level))] if haven else 0.0
         t_hp = (1 - h) * t_place + h * min(t_place, t_haven)
         wait = t_hp + walk
-        start = (min(a.stamina, c["end_s"] + a.stamina_regen * wait * (1 + h) / 10.0), min(a.mana, c["end_m"] + a.mana_regen * wait * (1 + h) / 10.0))
+        _, mst, mma, rst, rma, _ = resources(a, level)
+        start = (min(mst, c["end_s"] + rst * wait * (1 + h) / 10.0), min(mma, c["end_m"] + rma * wait * (1 + h) / 10.0))
     w = c["win"]
     win_cycle = (c["sec"] + walk + t_hp) * (1 + RESUPPLY)
     loss_cycle = c["sec_loss"] + ROOMS_TO_PREY[min(10, max(5, level))] * ROOM_SECONDS + CORPSE_SECONDS
@@ -1218,8 +1280,13 @@ def check_classes(read_root, problems, num):
     for name, a in ARCHS.items():
         with open(os.path.join(root, name + ".cs"), encoding="utf-8") as f:
             text = f.read()
-        want = {"StartHp": a.hp, "StartReaction": a.reaction, "MaxStamina": a.stamina, "MaxMana": a.mana,
-                "StaminaRegen": a.stamina_regen, "ManaRegen": a.mana_regen, "AttackRate": a.rate, "StartGold": a.gold}
+        want = {"VitalityBase": a.vitality[0], "VitalityPerLevel": a.vitality[1], "EnduranceBase": a.endurance[0],
+                "EndurancePerLevel": a.endurance[1], "FocusBase": a.focus[0], "FocusPerLevel": a.focus[1],
+                "StartReaction": a.reaction, "AttackRate": a.rate, "StartGold": a.gold}
+        for attr, value in zip(ATTR, a.attrs):
+            m = re.search(rf'\["{attr}"\] = (\d+)', text)
+            if m is None or int(m.group(1)) != value:
+                problems.append(f"class {name}: start {attr} is {m.group(1) if m else None} in the mudlib, {value} in the simulation")
         for field, value in want.items():
             have = num(text, field)
             if have != value:
