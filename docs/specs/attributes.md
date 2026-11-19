@@ -2,6 +2,8 @@
 
 The owner's brief for replacing traditional RPG attributes, condensed from the source document without changing its content. Source: <https://claude.ai/artifact/HEy3U6Gg8p13RykAnn9b31>. How it is to be built is in [../ATTRIBUTES.md](../ATTRIBUTES.md).
 
+> **Superseded in part.** On 18 November 2026 the owner replaced the resource and regeneration formulas below with formulas fitted to the game as it plays, with Vitality per level set by class. The formulas in force are in [../ATTRIBUTES.md](../ATTRIBUTES.md), section 2. The rest of this brief stands.
+
 ## The task
 
 Refactor the character system to use a custom Hollowmere attribute model that reinforces the game's identity and worldbuilding. The attributes should feel like qualities spoken of in stories, songs, legends and historical records, not like traditional D&D-style statistics.

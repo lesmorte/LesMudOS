@@ -1,6 +1,6 @@
 # The Hollowmere attribute system: design and build plan
 
-How the owner's brief ([specs/attributes.md](specs/attributes.md)) becomes part of the game: what changes, what the formulas do to today's numbers, the choices the brief leaves open, and the order of work. Nothing here is built yet.
+How the owner's brief ([specs/attributes.md](specs/attributes.md)) becomes part of the game: what changes, the formulas (fitted to the game as it plays today, at the owner's direction), the choices the brief leaves open, and the order of work. Nothing here is built yet.
 
 ## 1. What changes
 
@@ -8,46 +8,61 @@ How the owner's brief ([specs/attributes.md](specs/attributes.md)) becomes part 
 |---|---|
 | A character has a level, a calling and its fixed numbers. There are no attributes. | Six attributes: Might, Grace, Vigor, Insight, Spirit, Resolve. Two points to place at every level. |
 | HP, Mana, Stamina | Vitality, Focus, Endurance, in every message, command, help text, document and in the code. |
-| Maximum HP is the calling's starting HP plus 8 a level. Mana and Stamina maximums are fixed by the calling (Warrior 100 Stamina and 20 Mana; Mage 30 and 100). | All three come from the owner's formulas: level first, then attributes. Every character has all three resources. |
+| Maximum HP is the calling's starting HP plus 8 a level. Mana and Stamina maximums are fixed by the calling (Warrior 100 Stamina and 20 Mana; Mage 30 and 100). | All three come from one formula each: a class base, a class amount per level, and attributes. |
 | To hit: d20 + level × the calling's attack rate against 10 + armor + (level − 1). Damage is the weapon's. Critical hits, dodge and block come only from traits. | Precision and Evasion enter the hit roll. Physical Power scales weapon damage. Grace gives a base critical chance. Spell Power and Healing Power scale spells. |
 | A calling's differences are fixed numbers. | A calling starts its members with different attributes and applies percentage modifiers after the formulas. |
 | Gathering and crafting use proficiency only. | Gathering Efficiency and Crafting Aptitude add to them. |
 | Creatures have hand-set HP, damage and armor. | Creatures also have attributes, generated from level and a template, so that resistances and powers work on them as on players. |
 
-## 2. What the formulas do to today's numbers
+## 2. Formulas fitted to the game as it plays today
 
-This is the part that needs the owner's eye before anything is built.
+The owner's brief gave formulas that roughly tripled Vitality and cut regeneration to a few points a minute. On seeing what that did to the present game, the owner asked instead for formulas that match the current system, which is working, with Vitality growing by a per-level amount that depends on the class (18 November 2026). These replace the formulas in the brief. Everything else in the brief stands: the six attributes, the three renamed resources, the derived statistics, two points a level, class modifiers applied after calculation.
 
-### Vitality is about three times today's HP
+The principle: **a new character has exactly today's numbers**, and attributes move them from there.
 
-| | Level 1 | Level 5 | Level 10 |
+### Resources
+
+| Resource | Formula |
+|---|---|
+| Maximum Vitality | class base + class per-level × Level + Vigor × 2 |
+| Maximum Endurance | class base + class per-level × Level + Resolve × 2 + Vigor |
+| Maximum Focus | class base + class per-level × Level + Insight × 2 + Spirit |
+
+| Class | Vitality base / per level | Endurance base / per level | Focus base / per level |
 |---|---|---|---|
-| Warrior today | 40 | 72 | 112 |
-| Mage today | 24 | 56 | 96 |
-| Formula, Vigor 5 | 92 | 140 | 200 |
-| Formula, Vigor 10 | 122 | 170 | 230 |
+| Warrior | 17 / 9 | 79 / 2 | 4 / 1 |
+| Scout | 8 / 8 | 81 / 2 | 2 / 1 |
+| Priest | 7 / 7 | 23 / 1 | 75 / 4 |
+| Mage | 8 / 6 | 14 / 1 | 71 / 4 |
+| Adventurer | 10 / 8 | 50 / 2 | 50 / 2 |
 
-Nothing is wrong with larger numbers, but every creature's damage, every healing item and spell, and both balance simulations were tuned to the old ones. They all have to be re-tuned, for the Hollow and for the corridor. That is expected work, and it is in the plan below.
+With the starting attributes of section 3, level 1 comes out exactly as today, for every class and every resource:
 
-### Regeneration as written is far slower than today's
+| Class | Vitality at 1 | at 5 (today) | at 10 (today) | Endurance at 1 | at 10 | Focus at 1 | at 10 |
+|---|---|---|---|---|---|---|---|
+| Warrior | 40 | 76 (72) | 121 (112) | 100 | 118 | 20 | 29 |
+| Scout | 26 | 58 (58) | 98 (98) | 100 | 118 | 20 | 29 |
+| Priest | 26 | 54 (58) | 89 (98) | 40 | 49 | 100 | 136 |
+| Mage | 24 | 48 (56) | 78 (96) | 30 | 39 | 100 | 136 |
+| Adventurer | 30 | 62 (62) | 102 (102) | 70 | 88 | 70 | 88 |
 
-| | Today | Formula (attributes 5 to 10) |
+- **Vitality per level by class** is the owner's request. Today every class gains 8; here the Warrior gains 9, the Scout and Adventurer 8, the Priest 7 and the Mage 6. By level 10 the Warrior is 9 ahead of today and the Mage 18 behind. The numbers are data in each class file, and an advanced class may set its own (a Knight more than a Warrior).
+- **Vigor is worth 2 Vitality a point.** A level 10 character who put all 18 points into Vigor has 36 more Vitality than one who put in none, against 60 to 90 from level: level stays the largest contributor, as the brief requires.
+- **Endurance and Focus now grow with level**, a little, where today they are fixed. Ability costs do not change, so a higher-level character can do somewhat more before tiring.
+
+### Regeneration
+
+The game regenerates every ten seconds, and that stays. The amount per tick:
+
+| Resource | Formula per tick | At the start, by class (today) |
 |---|---|---|
-| Vitality | 6 a minute, of 24 to 40 | 2 to 3 a minute, of about 100 |
-| Endurance (Stamina) | 24 to 60 a minute, of 30 to 100 | 2 to 3 a minute, of about 110 |
-| Focus (Mana) | 12 to 48 a minute, of 20 to 100 | 2 to 3 a minute, of about 100 |
+| Vitality | 0.3 + Vigor ÷ 10 | Warrior 1.0, Adventurer 0.9, Priest 0.9, Scout 0.8, Mage 0.8 (today 1.0 for all) |
+| Endurance | Maximum × (6% + (Resolve + Vigor) × 0.3%) | Warrior 9.9 (10), Scout 9.3 (8), Adventurer 6.7 (6), Priest 3.7 (4), Mage 2.7 (3) |
+| Focus | Maximum × (1% + (Insight + Spirit) × 0.4%) | Mage 7.4 (8), Priest 7.0 (4), Adventurer 4.1 (5), Scout 1.1 (2), Warrior 1.0 (2) |
 
-Taken literally:
+Every figure is within about a point of today's except one: **the Priest's Focus returns at 7.0 a tick against 4 today**, because the Priest's Spirit now counts. The Priest was the slowest class in the corridor's simulation by a wide margin, so this is left as a deliberate improvement to be checked in the rebalance; a class modifier of −40% Focus regeneration would restore today's figure exactly if the owner prefers.
 
-- A badly hurt character needs about 40 minutes to recover by resting, against about 7 today.
-- A Warrior's Shield Bash (15 Stamina) could be used about once every six minutes of regeneration, against several times a fight today.
-- A Mage's Arcane Bolt (20 Mana) is the Mage's whole attack. With about 100 Focus that is five bolts, then about one more every eight minutes. Today the Mage casts continuously.
-
-So the per-minute figures cannot be dropped in while ability costs stay as they are. Three ways to reconcile them, for the owner to choose (decision 2):
-
-- **A. As written, and re-cost everything.** Abilities become rare, decisive things; a caster needs a basic attack that costs nothing; food, potions, crafted tonics and havens become the main way to recover. This is a different and slower game, and the 15-hour pace for levels 5 to 10 would have to be rebuilt around it.
-- **B. As written out of combat only, with a separate in-combat rule.** Not what the brief says.
-- **C. Read the formulas as the rate per regeneration tick** (every ten seconds, as today) instead of per minute. Vitality then returns at 12 to 18 a minute of about 100 to 200, Endurance and Focus at 12 to 18 a minute: close to today's feel for Vitality, slower than today for Endurance and Focus but workable with modest cost changes. Attributes still decide the rate exactly as the owner wrote. **Recommended**, with the tick length kept in one data file so that it can be lengthened later.
+The Adventurer's Survival Training trait still multiplies Vitality regeneration by 1.5.
 
 ## 3. Choices the brief leaves open
 
@@ -69,37 +84,29 @@ Then 2 points a level, placed with a command (`improve might`), with unspent poi
 
 ### How the derived statistics enter the rules
 
-The brief names the statistics and their formulas but not how they act. Proposed, all as data in one file:
+So that a new character plays as today, each statistic acts through how far the attributes behind it stand above 5, the value everyone starts from. The brief's formulas for the statistics themselves are kept for display (`score` shows Physical Power, Precision and the rest as the brief defines them); the effects below are what the rules use. All of it is data in one file.
 
-| Statistic | Effect |
-|---|---|
-| Physical Power | Weapon and unarmed damage × (1 + Physical Power ÷ 100). Might 8 at level 1 gives +16%. |
-| Precision | Adds Precision ÷ 4 to the attacker's hit roll. |
-| Evasion | Adds Evasion ÷ 4 to the defender's side of the hit roll. (Level stays in the roll through the calling's attack rate, as now.) |
-| Critical Chance | Grace × 0.25% base, added to what traits and skills give. |
-| Spell Power | Spell damage × (1 + Spell Power ÷ 100). |
-| Healing Power | Healing from spells × (1 + Healing Power ÷ 100). Potions and food are not scaled. |
-| Mental Resistance | Percentage chance to shake off fear, charm, confusion and other mind effects (capped at 75%). No such effects exist yet; the statistic is computed and ready. |
-| Physical Resistance | Percentage chance to resist stagger, slow and knockdown (capped at 75%). Stagger and slow exist today. |
-| Carry Capacity | Computed and shown. Not enforced: items have no weights and there is no encumbrance system, by the owner's earlier decision. It takes effect when encumbrance is built. |
-| Gathering Efficiency | Adds Gathering Efficiency ÷ 4 to the harvest quality score and ÷ 8 to the success chance. |
-| Crafting Aptitude | Adds Crafting Aptitude ÷ 50 to the crafted quality shift, and raises the chance of a bonus output. |
+| Statistic | Effect | A new character |
+|---|---|---|
+| Physical Power | Weapon and unarmed damage +2% for each point of Might above 5 | Warrior +6%, Adventurer +2%, others none |
+| Precision | +1 to hit for every 4 points of Grace above 5 | Scout +1 |
+| Evasion | +1 to the defender's side of the hit roll for every 4 points of Grace above 5 | Scout +1 |
+| Critical Chance | +0.5% for each point of Grace above 5, added to what traits and skills give | Scout +2% |
+| Spell Power | Spell damage +2% for each point of Insight above 5 and +1% for each point of Spirit above 5 | Mage +10% |
+| Healing Power | Healing from spells +2% for each point of Spirit above 5 and +1% for each point of Insight above 5. Potions and food are not scaled. | Priest +9% |
+| Mental Resistance | 2% chance for each point of Spirit and Resolve above 5 to shake off fear, charm, confusion and other mind effects (at most 75%). No such effects exist yet; the statistic is computed and ready. | |
+| Physical Resistance | 2% chance for each point of Vigor and Resolve above 5 to resist stagger, slow and knockdown (at most 75%) | Warrior 6% |
+| Carry Capacity | 50 + Might × 5 pounds, computed and shown. Not enforced: items have no weights and there is no encumbrance system, by the owner's earlier decision. | |
+| Gathering Efficiency | +1 to the harvest quality score for each point of Grace and Insight above 5 | Scout +5 |
+| Crafting Aptitude | +0.02 to the crafted quality shift for each point of Insight and Resolve above 5 | |
 
-The divisors are starting values. The balance simulation sets them so that two level-matched characters with ordinary attributes hit each other about as often as today.
+A new character therefore differs from today's by a few percent at most, in the direction of their class. A level 10 character who has specialized differs by more: 18 points of Might is +36% weapon damage, 18 of Grace is +4 to hit, +4 to be missed and +9% critical chance. Whether those slopes are right is for the rebalance to confirm; they are easy to change.
 
 ### Class modifiers
 
-Percentage modifiers on a class file, applied after the formulas, as the brief says. The brief's examples are advanced classes, which are not built yet; they are recorded for stage B. Proposed for the five callings, small on purpose:
+Percentage modifiers on a class file, applied after the formulas, as the brief says. With the fitted formulas the five callings need none: their differences are already in their bases, per-level amounts and starting attributes. The hook exists for the advanced classes of stage B, where the brief's examples belong (Knight +15% Vitality; Mage +15% Focus; Berserker +15% Endurance; Rogue +10% Critical Chance; Druid +10% Focus and +10% Endurance).
 
-| Calling | Modifier |
-|---|---|
-| Warrior | +10% Vitality |
-| Scout | +5% Critical Chance |
-| Priest | +10% Healing Power |
-| Mage | +10% Focus |
-| Adventurer | +5% Vitality, +5% Endurance |
-
-The callings' other differences today (Reaction Time, attack rate, equipment, skills, traits) stay. Their fixed HP, Mana and Stamina numbers go.
+The callings' other differences today (Reaction Time, attack rate, equipment, skills, traits) stay.
 
 ### Creatures and NPCs
 
@@ -136,7 +143,7 @@ The attribute work touches the same files as three branches now open (the corrid
 | 1 | Lead | Merge the corridor, the crafting engine and the crafting content. |
 | 2 | Opus agent | The engine: attributes on every living thing, the formulas as data, derived statistics, point allocation, class modifiers, creature templates, equipment hooks, save conversion, regeneration; the statistics wired into the hit roll, damage, spells, healing, stagger and slow, gathering and crafting. Tests. |
 | 3 | Sonnet agent, straight after 2 | The rename, in code, content, tests and documents. |
-| 4 | Sonnet agent | Rebalance: both simulations rebuilt on the new rules; every creature's damage and Vitality, every healing item and spell, ability costs, and the experience table re-checked against the 15-hour target; the five-calling play-throughs. |
+| 4 | Sonnet agent | Re-check: both simulations updated to the new rules and run; the slopes of the derived statistics confirmed or adjusted; the experience table checked against the 15-hour target; the five-calling play-throughs. |
 | 5 | Sonnet agent | The storytelling pass: attributes in NPC speech, books, Chronicle wording and reputation lines, as the brief's design goals ask. |
 | 6 | Lead | Review, run everything, merge. |
 
@@ -144,15 +151,16 @@ Steps 2 and 3 are one after the other on purpose. Step 5 can run beside step 4.
 
 ## 6. What this does to work already done
 
-- **Class stage A's balance** and **the corridor's balance** are both re-done in step 4. The corridor's experience table was derived from experience per hour under the old rules; it is re-derived, and may change.
-- **The Priest's slowness**, accepted earlier, is worth another look in step 4: Healing Power and Spirit give the Priest something the old rules did not.
-- **Crafted consumables** restore fixed amounts tuned to the old HP. They are re-tuned in step 4.
+Because a new character has today's numbers, little needs redoing.
+
+- **Class stage A's balance** and **the corridor's balance** are re-checked in step 4, not rebuilt. The expected differences are small: the Warrior hits about 6% harder, the Mage's bolt about 10% harder, the Mage has less Vitality from level 2 on, the Priest's Focus returns faster.
+- **The corridor's experience table** stands unless the re-check shows the 15 hours has moved by more than about an hour.
+- **Crafted consumables** and other healing keep their numbers.
 - **Advanced classes** (stage B) should be built on the new system, so stage B comes after this.
 
 ## 7. Decisions needed from the owner
 
-1. **Starting attributes.** The table in section 3 (5 each, plus 6 points by calling), or something else, for example points the player places at creation?
-2. **Regeneration.** A (as written, re-cost everything, a slower game), B (as written out of combat only), or C (the formulas per ten-second tick; recommended)?
-3. **The statistics' effects.** The table in section 3 as the starting point, to be calibrated by simulation?
+1. **Starting attributes.** The table in section 3 (5 each, plus 6 points by calling)? The formulas' bases were fitted to it; a different table means refitting, which is quick.
+2. **Vitality per level.** Warrior 9, Scout 8, Adventurer 8, Priest 7, Mage 6?
+3. **The Priest's faster Focus.** Keep it (recommended, since the Priest was the slowest class), or pin it back to today's rate?
 4. **Carry Capacity.** Computed and shown but not enforced until encumbrance is built?
-5. **Rebalance.** Agreed that the Hollow's and the corridor's numbers, and the experience table, are re-derived under the new rules?
