@@ -1202,9 +1202,9 @@ def run(work, mudlib):
     wiz2 = h.Client("wiz")
     wiz2.read_until("> ")
     wiz2.command("goto " + TEST + "scratch")
-    # The wizard's own state came back: level 5 wizard, quests done, equipment.
+    # The wizard's own state came back: level 5 (about 1600 experience; level 6 needs 5400), quests done, equipment.
     s = score_of(wiz2)
-    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 6", "Damage 17-25", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
+    check("a quitting wizard keeps character, equipment and quests", s["text"], "Level 5", "more for level 6", "Damage 17-25", "Armor 4", "Completed quests: Clear the Cellar, Recover the Overseer's Orders")
     wiz2.send("quit")
     wiz2.read_until("Goodbye")
 

@@ -36,7 +36,7 @@ FILES = {
 }
 for _n in sorted(f[:-3] for f in os.listdir(os.path.join(ROOT, "mudlib", "domains", "greenvale", "corridor", "mob"))):
     FILES["s_" + _n] = a.room("Stat" + _n.title().replace("_", ""), "A stat room", {"east": ARENA}, safe=True)   # one safe room each
-for _i, _xp in enumerate((100, 200, 300, 400, 3500)):
+for _i, _xp in enumerate((100, 200, 300, 400, 48300)):
     FILES[f"dummy_{_i}"] = a.monster(f"Dummy{_i}", "Dummy", ["training dummy"], "a training dummy", 1, 1, 1, tohit=-30, xp=_xp)
 
 
@@ -89,7 +89,7 @@ def run(work, mudlib):
             if mult > 1:
                 check(f"{name}: {act_name} damage x{mult}", text, f"damage x{mult}")
 
-    # ===== level the wizard to 10 with dummies (4,500 experience) =====
+    # ===== level the wizard to 10 with dummies (49,300 experience, the table of CORRIDOR_BALANCE 4.3) =====
     wiz.command("goto " + HUB)
     for i in range(5):
         wiz.command("clone " + TEST + f"dummy_{i}")
