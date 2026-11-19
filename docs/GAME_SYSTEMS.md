@@ -37,6 +37,9 @@ mudlib/std/
 mudlib/secure/
   lost_property.cs  the lost-property store (section 9, Corpses)
   finds.cs          the register of finds: who has taken each hidden stash (section 9, Finds)
+  comm.cs           say, tell, reply, whisper, shout and the cleaning of player text (section 15)
+  channels.cs       the channel service: membership, switches, delivery (section 15)
+mudlib/channels/    one data file per channel (wizard.cs, sysop.cs), read by /secure/channels (section 15)
 mudlib/domains/hollow/
   village/        the eight village rooms (north_road, gate, square, guild, ironoak, tavern, guest_rooms, cellar)
   cellars/        the ten dungeon rooms (collapsed_passage to overseer_chamber)
@@ -391,6 +394,7 @@ Kills count only if they happened while the quest was active or before it was ac
 - `tests/corridor_test.py` (port 4828) walks the Greenvale Transit Corridor: the 100 road rooms against `docs/areas/transit-corridor-build.md`, a wizard through every exit of all 122 rooms both ways, the seven hidden ways (not listed and not walkable, found by looking at their detail, then walkable both ways), the Chronicle's reports for the five secret rooms and two dungeons (for a character, not for a wizard), the 29 resource nodes, the five Riverwatch patrols (at the start of the route; walking when a player stands on it), danger bands in `stat here` and the warning for a level 5 character, the creatures each zone may hold, every detail, readable, person, topic and shop, and a new character who walks the whole road from the Village Square to Oakenfell's Southgate. The aggression of the corridor's creatures is switched off in the test's own copy of the mudlib. `python3 tests/corridor_test.py static` runs the checks that need no game.
 - `tests/craft_test.py` (port 4829) tests crafting and gathering end to end (section 9a, CRAFTING.md section 8); `tests/craft_sim.py` checks the economy and the odds without a driver.
 - `tests/load_check.py` (port 4821) compiles and loads every mudlib file.
+- `tests/comm_test.py` (port 4832, about 5 minutes) tests the communication commands (section 15): every command and block, the flood limits, cleaning, channel membership for players and for wizards of level 1 and 10, `reply`, invisible wizards, saving of the settings, and a probe object written like a low-level wizard's that tries to post to `sysop`.
 - `tests/ansi_test.py` (port 4814) tests colour: rendering, `ansi off`, persistence, raw `cat` and editor output, escaping of player input, unclosed tags, shop columns and what a non-player object is told (section 14). `Client` in `smoke_test.py` strips ANSI sequences by default so that all other tests read plain text; `Client.raw` and `raw_command()` give the bytes.
 
 ## 13. What was verified by play
@@ -433,3 +437,32 @@ The point of the feature: wherever the game says what the player can type, that 
 **Driver change.** `Kernel.Command` used to write the `NotifyFail` message straight to the connection. It now calls `TellObject` on the player, so it reaches `CatchTell` like all other text. The prompt and the driver's `***` error lines still go straight to the connection and are never rendered, so they show tags as typed.
 
 **Clients.** Colour is on by default and is plain ANSI SGR (no 256-colour or truecolour codes). A client that does not understand ANSI shows `ESC[1;96m` as junk; such a player types `ansi off`. Nothing is negotiated with the client (no TTYPE or MTTS detection).
+
+## 15. Communication
+
+Design: [specs/communication.md](specs/communication.md). The commands are run by two daemons, `/secure/comm` (say, tell, reply, whisper, shout, and the cleaning of text) and `/secure/channels` (channels). The player body binds the verbs and keeps what the character chose; all the player-body code is in one region at the end of `/std/player`.
+
+| Command | What it does |
+|---|---|
+| `say TEXT`, `' TEXT` | `You say: ...`; everything living in the room gets `{name} says: ...` (NPC hooks as before). The `'` form needs a space after the quote: the driver takes the first word as the verb. |
+| `tell PLAYER TEXT` | `You tell {name}: ...` / `{name} tells you: ...`, from anywhere. The same answer, "No one by that name is in the world.", for a name that does not exist, a player who is not logged in and a wizard the sender cannot see. |
+| `reply TEXT` | A tell to the last player who told you something (kept only in memory). |
+| `whisper TEXT to NAME`, `whisper NAME TEXT` | The target, who must be in the room, gets the words; the others in the room see `{name} whispers something to {target}.` |
+| `shout TEXT` | Everyone in the world hears `{name} shouts: ...`. `shout off` / `shout on` stop and restart hearing (saved). |
+| `shout CHANNEL TEXT`, `CHANNEL TEXT` | A message on a channel, `[wizard] {name}: ...`, when the first word is a channel the speaker belongs to; otherwise `shout` is an ordinary shout. |
+| `channels`, `channel NAME on/off/join/leave` | The channels you belong to; switch one for yourself (saved); join or leave a channel whose file allows it. |
+| `ignore [PLAYER]`, `unignore PLAYER` | Saved list. Tells and whispers from an ignored player are not delivered (the sender is told "{name} is not listening to you."); their shouts and channel messages are not shown. |
+
+**Cleaning.** `Comm.Clean`, for every command: line breaks and tabs become spaces; control characters and the invisible format characters (zero width, bidi overrides) are dropped; colour tags such as `{red}`, `{cmd}` and `{/}` are removed (repeatedly, so that `{r{red}ed}` leaves nothing); runs of blanks shrink to one; the text is cut to 300 characters. An empty result gets the usage line. Remaining braces are escaped with `Esc` when shown, so nothing a player types can start a tag. This changed `say`, which used to show tags as typed.
+
+**Limits, in one place** (the constants at the top of `/secure/comm`): message length 300; one shout per 10 seconds; characters below level 2 cannot shout (they are told); one channel message per 2 seconds; at most 50 names ignored. Wizards (any level) are exempt from the shout and channel limits. Shouting also needs the character level only for players, not wizards.
+
+**Blocks.** A room may set `NoTell` and `NoShout` (protected fields of `/std/room`; no room sets them). A room with `NoTell` lets no tell in or out; one with `NoShout` lets no shout leave and none be heard in it. A wizard at either end of a tell, or in the room for a shout, is not bound. `say` and `whisper` are not affected. A target who is idle (`QueryIdle()` on the body, when the game has an idle timer) gets the tell and the sender is told so.
+
+**Channels.** A channel is a file `/channels/<id>.cs` whose class has `public string Definition()` returning lines `id=`, `title=`, `member_level=` (wizard level needed to belong), `speak_level=`, `can_mute=yes|no`, `can_join=yes|no`. Adding a channel is adding the file (the verbs for it are bound at the next login of each player). `wizard`: level 1 and above; `sysop`: level 10 only, and it cannot be switched off. Membership is read from `/secure/wizlist` for the character's name at every send and for every recipient of every message; it is never read from the player body, and nobody asks to join `wizard` or `sysop`. For a channel with `can_join`, a character also has to have joined (saved).
+
+**Security.** Every method of `/secure/comm` and `/secure/channels` that acts for a player checks that `PreviousObject()` is the interactive body of the player whose command is running (and a `/std/player` clone), so another object, including one a wizard wrote, cannot post, tell or shout for anyone through them; it gets nothing back. What a body keeps (ignores, switches, the last teller) can only be read or changed by those two daemons. A character who does not belong to a channel gets the answer "There is no channel called 'x'." for it, word for word what they get for a channel that does not exist, and the channel's name is not a command for them (`What?`). The files in `/channels` need wizard level 10 to change (`ChangeRefusal` in `/std/player`), as they decide who may listen to what. `/secure/channels` may list `/channels` and nothing else (`ValidOperation("get-dir")`). Limits of the design: any object can still `TellObject` any text to any player, and a wizard of level 5 or more can still write code that does so; the services cannot stop that, only make sure that what they deliver is genuine.
+
+**Names.** Players see the capitalised character name. A body that answers `QueryInvisible()` with true is shown as "Someone" to everyone who is not a wizard of at least its level, and cannot be targeted by `tell` or `whisper` by them. (No body is invisible yet.) Nothing here writes to the Chronicle or Renown, and tells and whispers are not logged.
+
+**Not done.** A linkdead target ("{name} has lost their link."): a dropped connection destroys the body at once (`NetDead`), so there is none to find. When linkdead characters exist, `FindPlayer` in `/secure/comm` is the one place to teach about them.

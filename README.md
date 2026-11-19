@@ -91,7 +91,7 @@ This works only while no level-10 wizard exists, and stops working after five wr
 |---|---|
 | 1 | `promote`, `wizards`, `mudstat`, `goto`, `stat`, `pwd`, `cd`, `list`, `cat` (browse and read the whole mudlib), and in your own home `/wiz/<you>`: `mkdir`, `edit` (line editor), `copy`, `move`, `rename`, `delete`, `rmdir`, `update`, `clone` |
 | 3 | `clone` outside your home |
-| 5 | `update`, `mkdir`, `edit`, `copy`, `move`, `rename`, `delete`, `rmdir` outside your home and inside other wizards' homes (level 10 for files under `/secure` and `/std`, and for `/wiz` itself and the home directories) |
+| 5 | `update`, `mkdir`, `edit`, `copy`, `move`, `rename`, `delete`, `rmdir` outside your home and inside other wizards' homes (level 10 for files under `/secure`, `/std` and `/channels`, and for `/wiz` itself and the home directories) |
 | 10 | `shutdown` |
 
 Every wizard has a home directory `/wiz/<name>` (your name in lower case). The game creates it when you become a wizard and tells you where it is. `~` stands for it in any path (`cd ~`, `list ~/rooms`, `edit ~/rooms/hall`), and `cd` with no argument goes there. Other wizards can read your home but, below level 5, not change it. Wizards write code that runs on the server, so promote only people you trust (see [Design](docs/DESIGN.md) section 8).
@@ -146,11 +146,24 @@ Introduce a syntax error and update again: the error comes back with file and li
 
 New characters now start in the Village Square of Vincent's Hollow (the start room is the `StartRoom` constant in `mudlib/std/player.cs`; `/domains/town` stays as the small technical demo). The gameplay systems are described in [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md), and builders should read [docs/BUILDING.md](docs/BUILDING.md).
 
-Player commands: `ansi`, `verbose`, `prompt`, `kill`/`attack`, `flee [DIRECTION]`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `skills`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
+Player commands: `say`, `tell`, `reply`, `whisper`, `shout`, `ignore`, `channels` (see [Talking to others](#talking-to-others)), `ansi`, `verbose`, `prompt`, `kill`/`attack`, `flee [DIRECTION]`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `skills`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
 
 Combat has no rounds. Each fighter acts when its own Reaction Time and the Recovery of its last action have passed (an unarmed player strikes every 6 seconds, one with a sword every 8), and `score`, `consider` and `stat` show the numbers. Drinking a potion mid-fight is queued for your next ready moment; `stop` cancels it. See docs/COMBAT_TIMING.md.
 
 Builder commands: `goto ROOM-OR-PLAYER` and `stat THING` (wizard level 1), `restore [TARGET]` and `speed TARGET PERCENT [SECONDS]` (5), `slay TARGET` (10), plus `update` and `clone` as before.
+
+### Talking to others
+
+| Command | |
+|---|---|
+| `say TEXT` (or `' TEXT`) | Everyone in the room hears it. |
+| `tell PLAYER TEXT`, `reply TEXT` | A private message to a player anywhere in the world; `reply` answers the last player who told you something. |
+| `whisper TEXT to NAME` (or `whisper NAME TEXT`) | Only the player you name, in the same room, hears the words; the others see that you whispered. |
+| `shout TEXT` | Everyone in the world hears it (from character level 2, once every 10 seconds). `shout off` and `shout on` stop and restart hearing shouts. |
+| `ignore [PLAYER]`, `unignore PLAYER` | Stop (or start again) hearing tells, whispers, shouts and channel messages from a player. Saved. |
+| `channels`, `channel NAME on/off`, `NAME TEXT` | The channels you belong to. Wizards belong to `wizard`, level 10 wizards also to `sysop`; `shout wizard TEXT` and `wizard TEXT` both speak on it. |
+
+Text is cleaned before anyone sees it (colour tags and control characters removed, 300 characters at most). Rooms can block tells (`NoTell`) and shouts (`NoShout`). Details and the security rules: [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md#15-communication).
 
 ### Colour
 
@@ -197,6 +210,7 @@ public class Lantern : Item
 | `tests/smoke_test.py` | End-to-end test of the driver over TCP (port 4811 in the examples below) |
 | `tests/area_test.py` | End-to-end test of the game systems and of the Hollow's content, with test rooms and wizard help (port 4812, about 8 minutes) |
 | `tests/playthrough_test.py` | A brand-new level 1 character plays the finished area from the start to the end of both quests, against an unmodified mudlib (port 4813, 10 to 25 minutes) |
+| `tests/comm_test.py` | Communication: say, tell, reply, whisper, shout, ignore, the room blocks, flood limits, text cleaning, channels and who may post to or hear `wizard` and `sysop`, invisible wizards, and a probe object that tries to post to `sysop` (port 4832, about 5 minutes) |
 | `tests/ansi_test.py` | Colour: tag rendering, `ansi on/off`, raw `cat`, escaping of player input (port 4814, about 30 seconds) |
 | `tests/find_test.py` | Finds: treasure in hidden places that each character takes once, for less each time; the register, wizards, the sandbox, restarts, and the five converted places (port 4827, about 1 minute) |
 | `tests/city_test.py` | Walk-through of Oakenfell (the city and the two Vale Road rooms that remain): the map against its build document, every detail, person and shop, a new character walking from the Southgate Approach to the Hall of Callings (about 7 minutes) |
@@ -218,6 +232,7 @@ LESMUDOS_TEST_PORT=4813 python3 tests/playthrough_test.py
 LESMUDOS_TEST_PORT=4821 python3 tests/load_check.py
 LESMUDOS_TEST_PORT=4831 python3 tests/playfeel_test.py
 LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
+LESMUDOS_TEST_PORT=4832 python3 tests/comm_test.py
 LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
 python3 tests/balance_sim.py
 ```
