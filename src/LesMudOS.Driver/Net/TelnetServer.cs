@@ -27,7 +27,9 @@ internal sealed class Connection
     {
         _client = client;
         _kernel = kernel;
-        RemoteAddress = client.Client.RemoteEndPoint?.ToString() ?? "unknown";
+        RemoteAddress = client.Client.RemoteEndPoint is IPEndPoint ep
+            ? (ep.Address.IsIPv4MappedToIPv6 ? $"{ep.Address.MapToIPv4()}:{ep.Port}" : ep.ToString())
+            : "unknown";
     }
 
     /// <summary>
@@ -129,7 +131,17 @@ internal sealed class TelnetServer
     public TelnetServer(Kernel kernel, int port)
     {
         _kernel = kernel;
-        _listener = new TcpListener(IPAddress.Any, port);
+        // Listen on IPv6 and IPv4 together: a domain with an AAAA record sends many clients to IPv6 first.
+        // Fall back to IPv4 alone on a host with IPv6 switched off.
+        try
+        {
+            _listener = new TcpListener(IPAddress.IPv6Any, port);
+            _listener.Server.DualMode = true;
+        }
+        catch (SocketException)
+        {
+            _listener = new TcpListener(IPAddress.Any, port);
+        }
     }
 
     public void Start()
