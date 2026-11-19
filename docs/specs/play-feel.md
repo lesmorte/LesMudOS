@@ -49,3 +49,11 @@ Owner's report: "a character can bypass rooms with aggro creatures by just hitti
 - Everything that stops an ambush today still stops it (the creature is dead, the player has left, a safe room, whatever `CanFight` refuses).
 - `flee <direction>` onward remains possible at the usual 3-in-4 chance: running a gauntlet is a risk, not a free walk.
 - Tests that walk through aggressive rooms (area_test, playthrough_test, corridor_mob_test, the simulator's assumptions) are updated to fight or flee; corridor_test keeps switching aggression off in its copy.
+
+## 10. A room does not refill while the creature's corpse is still there
+Owner's decision: "the refill should count the corpse of the creature too." Today a room's reset replaces a killed spawn whether or not its corpse still lies in the room, so a hunting ground piles up bodies beside fresh creatures.
+- At a reset, a spawn that was killed is not replaced while a corpse of that same spawn is still in the room it was spawned in. The corpse counts as the creature until it is gone (looted to dust, rotted, or carried away). The next reset after that replaces it.
+- The link is to the spawn itself (the corpse remembers which room's spawn it came from), not to the creature's name, so the corpse of another rat dragged in from elsewhere blocks nothing, and a corpse carried out of the room frees the slot.
+- Encounters (`AddEncounter`) follow the same rule: no new encounter of a creature whose corpse from this room still lies here.
+- A player's corpse never blocks anything.
+- With creature corpses lasting ten minutes at most (less once emptied), a spawn returns no later than the first reset after that.
