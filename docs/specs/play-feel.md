@@ -41,3 +41,11 @@ Owner's rule: experience goes "based on percent of damage dealt to players still
 - The corpse's loot lock belongs to all eligible players, not only the killer.
 - A killing blow from a non-player (another creature, a damage-over-time effect with no owner) gives no bonus; the full amount is split by damage.
 - Parties will change this later (Future mechanic): healers and other non-damaging help earn nothing under this rule.
+
+## 9. Aggressive creatures engage at once
+Owner's report: "a character can bypass rooms with aggro creatures by just hitting a direction again; once in a room with aggro it should count as being in a fight even if they haven't hit yet." Today an aggressive creature starts its fight only after its Reaction Time, and until then the player is not fighting and may walk on.
+- When a player arrives in a room (or logs in there) with an aggressive creature that would attack them, the fight starts as soon as the arrival is complete: the player sees the room, then "{creature} attacks you!", and is in combat, so walking is refused and `flee` is the way out. With several aggressive creatures, each one engages.
+- The creature's first action still waits its own Reaction Time, exactly as now, so nobody is hit sooner than before. Only the moment the fight begins changes.
+- Everything that stops an ambush today still stops it (the creature is dead, the player has left, a safe room, whatever `CanFight` refuses).
+- `flee <direction>` onward remains possible at the usual 3-in-4 chance: running a gauntlet is a risk, not a free walk.
+- Tests that walk through aggressive rooms (area_test, playthrough_test, corridor_mob_test, the simulator's assumptions) are updated to fight or flee; corridor_test keeps switching aggression off in its copy.
