@@ -162,6 +162,51 @@ internal sealed class Kernel : IDriverServices
         // Reported here, not inside the catch block: a catch handler still runs
         // on top of the faulting stack, which after runaway recursion is nearly full.
         if (failure is not null) ReportError(player, failure);
+        FlushPrompts();
+    }
+
+    // ---- Prompts ----
+    // After every line a player types the driver sends the owner's Prompt(). Output that arrives without a command (a combat round,
+    // someone arriving) leaves the player looking at old text, so every connection that received output during an execution gets a
+    // fresh prompt when it ends, if its owner is a player body that asks for it and is not in the middle of a question.
+
+    private readonly HashSet<Connection> _owing = new();
+    private Connection? _promptSkip; // the connection whose line is being handled: its prompt is sent when the line is done
+
+    private void FlushPrompts()
+    {
+        if (_owing.Count == 0) return;
+        foreach (var connection in _owing.ToArray())
+        {
+            if (connection == _promptSkip) continue;
+            _owing.Remove(connection);
+            if (connection.Owner is { IsAlive: true, InputTo: null } owner) SendPrompt(connection, owner, true);
+        }
+    }
+
+    private void SendPrompt(Connection connection, ObjectRef owner, bool afterOutput)
+    {
+        string text;
+        Runtime.Ticks = 0;
+        _thisPlayer = owner;
+        _callStack.Clear();
+        try
+        {
+            if (afterOutput && !In(owner, () => owner.Target?.PromptsAfterOutput() ?? false)) return;
+            text = In(owner, () => owner.Target?.Prompt() ?? "> ") ?? "> ";
+        }
+        catch (Exception error)
+        {
+            Log.Info($"ERROR (prompt of {owner.Name}): {error.Message}");
+            text = "> ";
+        }
+        finally
+        {
+            _thisPlayer = null;
+            _callStack.Clear();
+        }
+        connection.Send(text);
+        connection.AtPrompt = true;
     }
 
     private void ReportError(ObjectRef? player, Exception error)
@@ -194,6 +239,7 @@ internal sealed class Kernel : IDriverServices
     public void OnConnect(Connection connection)
     {
         _connections.Add(connection);
+        connection.LastInputMs = TimeMs();
         Execute(null, () =>
         {
             var login = AskMaster(m => m.Connect());
@@ -217,6 +263,9 @@ internal sealed class Kernel : IDriverServices
             connection.SendRaw(TelnetWontEcho);
             connection.Send("\n");
         }
+        if (line.Trim().Length > 0) connection.LastInputMs = TimeMs(); // an empty line is a client keep-alive, not activity
+        connection.AtPrompt = false; // the player pressed Enter: the cursor is on a fresh line
+        _promptSkip = connection;
         Execute(owner, () =>
         {
             if (owner.InputTo is { } handler)
@@ -232,12 +281,16 @@ internal sealed class Kernel : IDriverServices
             }
         });
         // The owner may have changed (Exec) or gone away (quit) during the command.
-        if (connection.Owner is { IsAlive: true, InputTo: null }) connection.Send("> ");
+        _promptSkip = null;
+        _owing.Remove(connection);
+        if (connection.Owner is { IsAlive: true, InputTo: null } now) SendPrompt(connection, now, false);
+        FlushPrompts(); // the other connections that received output while this line was handled
     }
 
     public void OnDisconnect(Connection connection)
     {
         _connections.Remove(connection);
+        _owing.Remove(connection);
         if (connection.Owner is not { IsAlive: true } owner) return;
         connection.Owner = null;
         owner.Connection = null;
@@ -586,7 +639,17 @@ internal sealed class Kernel : IDriverServices
     // IDriverServices: communication
     // =====================================================================
 
-    public void Receive(ObjectRef ob, string message) => (ob.Connection as Connection)?.Send(message);
+    public void Receive(ObjectRef ob, string message)
+    {
+        if (ob.Connection is not Connection connection) return;
+        if (connection.AtPrompt && message.Length > 0)
+        {
+            message = "\n" + message; // the player is looking at a prompt: start the news on a new line
+            connection.AtPrompt = false;
+        }
+        connection.Send(message);
+        _owing.Add(connection);
+    }
 
     public void Write(string message)
     {

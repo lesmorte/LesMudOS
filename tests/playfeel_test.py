@@ -198,7 +198,7 @@ def files():
         "dummy": DUMMY,
         "bite": a.room("PfBite", "Biting Room", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}biter");\n', reset=3000),
         "biter": BITER,
-        "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 20);\n', reset=3000),
+        "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 40);\n', reset=3000),
         "zapper": ZAPPER,
         "pinata": pinata("Pinata", "pinata", 100), "pinata90": pinata("Pinata90", "pinata", 90),
         "ratling": RATLING, "mouse": MOUSE, "skinner": SKINNER, "bare": BARE, "twin": TWIN,
@@ -273,6 +273,7 @@ def run(work, mudlib, box):
     run_fleeing(wiz)
     run_shared_xp(wiz)
     run_verbose(wiz)
+    run_prompt(wiz)
 
 
 # ===== 5. telling identical things apart =====
@@ -690,6 +691,140 @@ def run_verbose(wiz):
     again.command("verbose off")
     check("verbose: off again", again.command("verbose"), "Verbose is off.")
     wiz.command("goto " + TEST + "hub")
+
+
+# ===== 2. the prompt =====
+
+def last_line(text):
+    return text.replace("\r", "").split("\n")[-1]
+
+
+def stat3(prompt):
+    """((hp, max), (stamina, max), (mana, max)) from a default prompt, or None."""
+    m = re.match(r"^\w+ \((\d+)/(\d+)\) \((\d+)/(\d+)\) \((\d+)/(\d+)\) > $", prompt)
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def poll_prompt(c, wanted, timeout=25):
+    """Ask `hp` until the numbers in the prompt satisfy `wanted`; returns them (the last ones if it never does)."""
+    end = time.time() + timeout
+    got = None
+    while time.time() < end:
+        got = stat3(last_line(c.command("hp")))
+        if got and wanted(got):
+            break
+        time.sleep(0.5)
+    return got
+
+
+def run_prompt(wiz):
+    pat = h.Client("prue")
+    pat.read_until("> ")
+    text = pat.command("look")
+    check("prompt: the default shows name, Vitality, Stamina and Mana after a command", "ok" if stat3(last_line(text)) == (30, 30, 70, 70, 70, 70) else last_line(text), "ok")
+    check("prompt: it begins with the character's name", last_line(text), "Prue (30/30) (70/70) (70/70) > ")
+    text = pat.command("prompt")
+    check("prompt: alone it shows the prompt and the tokens", text, "Your prompt is:", "{name}", "{hp}", "{maxhp}", "{stamina}", "{maxstamina}", "{mana}", "{maxmana}", "prompt default", "prompt off")
+    # Live values.
+    pat.command("down")
+    pat.command("lab")
+    check("prompt: a zapper is taken", pat.command("get zapper"), "You take a zapper.")
+    text = pat.command("zap me 5")
+    check("prompt: Vitality is live", "ok" if stat3(last_line(text)) and stat3(last_line(text))[0] == 25 else repr(text), "ok")
+    wiz.command("goto " + TEST + "hub")
+    # Stamina and Mana are spent by a warrior's bash and a mage's bolt.
+    wiz.command("goto " + TEST + "lab")
+    wiz.command("clone " + TEST + "dummy")
+    wizard_dummy_room = True
+    war = h.Client("walt", archetype="warrior")
+    war.read_until("> ")
+    war.command("down")
+    war.command("lab")
+    war.command("kill dummy")
+    a.drain(war, 0.3)
+    war.command("bash dummy")
+    war_prompt = poll_prompt(war, lambda p: p[2] < p[3])
+    check("prompt: Stamina is live (a bash costs some)", "ok" if war_prompt and war_prompt[2] < war_prompt[3] else str(war_prompt), "ok")
+    mag = h.Client("mags", archetype="mage")
+    mag.read_until("> ")
+    mag.command("down")
+    mag.command("lab")
+    mag.command("kill dummy")
+    a.drain(mag, 0.3)
+    mag.command("bolt dummy")
+    mag_prompt = poll_prompt(mag, lambda p: p[4] < p[5])
+    check("prompt: Mana is live (a bolt costs some)", "ok" if mag_prompt and mag_prompt[4] < mag_prompt[5] else str(mag_prompt), "ok")
+    for _ in range(40):
+        if "You flee" in war.command("flee"):
+            break
+    for _ in range(40):
+        if "You flee" in mag.command("flee"):
+            break
+    wiz.command("slay dummy")
+    wiz.command("goto " + TEST + "hub")
+
+    # Setting it.
+    check("prompt: set to your own text with tokens", pat.command("prompt [{hp}/{maxhp}] {name}> "), "Your prompt is now:")
+    text = pat.command("look")
+    check("prompt: the tokens are expanded live (Vitality 25 and regenerating)", "ok" if re.match(r"^\[(2[5-9]|30)/30\] Prue> $", last_line(text)) else last_line(text), "ok")
+    pat.command("prompt {mana} mana,{stamina} sta")
+    check("prompt: a space is added when the text does not end in one", last_line(pat.command("look")), "70 mana,70 sta ")
+    pat.command("prompt {red}[{maxhp}]{/}\t{{name}}{bogus} {name")
+    text = pat.raw_command("look")
+    check("prompt: colour tags, control characters, unknown and unclosed tokens are removed from the player's text", last_line(ansi_free(text)), "[30] name ")
+    check("prompt: and no escape sequence, tab or tag reaches the screen from it", last_line(text), absent=("\x1b", "\t", "{red}"))
+    text = pat.command("prompt " + "x" * 81)
+    check("prompt: a prompt that is too long is refused", text, "at most 80 characters")
+    check("prompt: and nothing changed", last_line(pat.command("look")), "[30] name ")
+    check("prompt: 80 characters are fine", pat.command("prompt " + "y" * 80), "Your prompt is now:")
+    check("prompt: a prompt of only tags says there is nothing left", pat.command("prompt {red}{/}"), "leaves nothing")
+    check("prompt: prompt off gives the plain '> '", last_line(pat.command("prompt off")), "> ")
+    check("prompt: and stays that way", str(pat.command("look").endswith("\r\n> ")), "True")
+    # After unprompted output.
+    pat.command("prompt default")
+    text = pat.command("look")
+    check("prompt: prompt default restores it", "ok" if re.match(r"^Prue \(\d+/30\) \(70/70\) \(70/70\) > $", last_line(text)) else last_line(text), "ok")
+    wiz.command("goto " + TEST + "lab")
+    a.drain(pat, 0.3)
+    wiz.command("say hello there")
+    text = pat.read_until("> ", timeout=5)
+    check("prompt: after unprompted output (someone speaks) the player ends on a current prompt", text, "Wiz says: hello there")
+    check("prompt: the prompt is a fresh line after the news", "ok" if stat3(last_line(text)) else last_line(text), "ok")
+    check("prompt: and the news did not start on the prompt's line", "ok" if text.startswith("\r\nWiz says") or text.startswith("\nWiz says") else repr(text[:30]), "ok")
+    # A combat round is unprompted output too.
+    wiz.command("clone " + TEST + "biter")
+    pat.command("kill biter")
+    text = fight_text(pat, until=lambda t: "biter" in t and bool(stat3(last_line(t))), timeout=40)
+    check("prompt: a combat round ends on a prompt with live numbers", "ok" if stat3(last_line(text)) else last_line(text), "ok")
+    for _ in range(40):
+        if "You flee" in pat.command("flee"):
+            break
+    wiz.command("slay biter")
+    # Not in the middle of a question: the wizard is in the editor when Prue speaks.
+    pat.command("lab") if "Zap Lab" not in pat.command("look") else None
+    wiz.command("goto " + TEST + "lab")
+    wiz.send("edit /wiz/wiz/pfnote")
+    a.drain(wiz, 0.5)
+    pat.send("say anyone there")
+    text = a.quiet(wiz, 1.0)
+    check("prompt: while a player is in the editor the news arrives with no prompt", text, "Prue says: anyone there", absent=("Wiz (", "> "))
+    wiz.send("q")
+    a.drain(wiz, 0.5)
+    wiz.command("goto " + TEST + "hub")
+    # Saved with the character.
+    pat.command("prompt <{hp}> ")
+    pat.command("quit")
+    pat.closed(3)
+    again = login("prue")
+    check("prompt: saved with the character", again.command("prompt"), "Your prompt is: <{hp}>")
+    check("prompt: and used after login", "ok" if re.match(r"^<(2\d|30)> $", last_line(again.command("look"))) else "no", "ok")
+
+
+ANSI_RE = h.ANSI
+
+
+def ansi_free(text):
+    return ANSI_RE.sub("", text)
 
 
 if __name__ == "__main__":

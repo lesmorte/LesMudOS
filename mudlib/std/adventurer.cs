@@ -97,6 +97,97 @@ public abstract class Adventurer : Living
 
     public bool QueryVerbose() => verbose;
 
+    // ---- The prompt ----
+    // Shown by the driver after every command and after unprompted output. The player's text is untrusted input: it is cleaned of
+    // control characters and of every {tag} but the listed tokens, limited in length, and only the listed tokens are expanded.
+
+    private const string DefaultPrompt = "{name} ({hp}/{maxhp}) ({stamina}/{maxstamina}) ({mana}/{maxmana}) > ";
+    private const int MaxPromptLength = 80;
+
+    /// <summary>The prompt as the player wrote it (tokens unexpanded). Saved with the character; the plain "> " is "prompt off".</summary>
+    [Saved] private string promptFormat = DefaultPrompt;
+
+    /// <summary>The prompt tokens and what each stands for: the one table. (The attribute build renames Vitality, Endurance and Focus here.)</summary>
+    private static readonly (string token, string meaning)[] PromptTokens =
+    {
+        ("name", "your name"),
+        ("hp", "your current Vitality"), ("maxhp", "your maximum Vitality"),
+        ("stamina", "your current Stamina"), ("maxstamina", "your maximum Stamina"),
+        ("mana", "your current Mana"), ("maxmana", "your maximum Mana"),
+    };
+
+    private string PromptValue(string token) => token switch
+    {
+        "name" => Name,
+        "hp" => Hp.ToString(),
+        "maxhp" => QueryMaxHp().ToString(),
+        "stamina" => QueryStamina().ToString(),
+        "maxstamina" => QueryMaxStamina().ToString(),
+        "mana" => QueryMana().ToString(),
+        "maxmana" => QueryMaxMana().ToString(),
+        _ => "",
+    };
+
+    /// <summary>Text typed for a prompt, made safe: no control characters, no {tag} that is not a listed token, no stray braces.</summary>
+    private static string CleanPrompt(string raw)
+    {
+        var text = new StringBuilder();
+        for (var i = 0; i < raw.Length; i++)
+        {
+            var c = raw[i];
+            if (char.IsControl(c) || c == '}') continue;
+            if (c != '{') { text.Append(c); continue; }
+            var end = raw.IndexOf('}', i + 1);
+            if (end < 0) continue;
+            var inner = raw.Substring(i + 1, end - i - 1);
+            if (PromptTokens.Any(t => t.token == inner)) text.Append('{').Append(inner).Append('}');
+            i = end; // a tag that is not a token (a colour tag, say) is dropped whole
+        }
+        return text.ToString();
+    }
+
+    /// <summary>The prompt with its tokens replaced by the live values. Always cleaned first, whatever is stored.</summary>
+    private string ExpandPrompt()
+    {
+        var clean = CleanPrompt(promptFormat);
+        if (clean.Trim().Length == 0) return "> ";
+        var text = new StringBuilder();
+        for (var i = 0; i < clean.Length; i++)
+        {
+            if (clean[i] != '{') { text.Append(clean[i]); continue; }
+            var end = clean.IndexOf('}', i);
+            text.Append(PromptValue(clean.Substring(i + 1, end - i - 1)));
+            i = end;
+        }
+        return text.ToString();
+    }
+
+    public override string Prompt() => adventureBegun ? ExpandPrompt() : "> ";
+
+    public override bool PromptsAfterOutput() => adventureBegun;
+
+    /// <summary>"prompt" shows it; "prompt TEXT" sets it; "prompt default" restores the default; "prompt off" is the plain "> ".</summary>
+    private bool CmdPrompt(string args)
+    {
+        var word = args.Trim();
+        if (word == "")
+        {
+            var tokens = string.Join("\n", PromptTokens.Select(t => $"  {{{{{t.token}}}}}  {t.meaning}"));
+            Write($"Your prompt is: {Esc(CleanPrompt(promptFormat))}\n  which now reads: {Esc(ExpandPrompt())}\nIt can use these tokens:\n{tokens}\n" +
+                  "{cmd}prompt{/} TEXT sets it (up to " + MaxPromptLength + " characters), {cmd}prompt default{/} restores the default, {cmd}prompt off{/} gives the plain '> '.\n");
+            return true;
+        }
+        if (word.ToLowerInvariant() == "default") { promptFormat = DefaultPrompt; Write("Your prompt is back to the default.\n"); return true; }
+        if (word.ToLowerInvariant() == "off") { promptFormat = "> "; Write("Your prompt is now the plain '> '.\n"); return true; }
+        var clean = CleanPrompt(word).TrimStart();
+        if (clean.Trim().Length == 0) { Write("That leaves nothing to show. Type {cmd}prompt{/} to see what you can use.\n"); return true; }
+        if (clean.Length > MaxPromptLength) { Write($"Your prompt can be at most {MaxPromptLength} characters.\n"); return true; }
+        if (!clean.EndsWith(" ")) clean += " ";
+        promptFormat = clean;
+        Write($"Your prompt is now: {Esc(clean)}\n");
+        return true;
+    }
+
     public override string DamageNote(int applied, bool dealt) =>
         !verbose ? "" : dealt ? $" {{green}}(+{applied} damage){{/}}" : $" {{red}}(-{applied} damage){{/}}";
 
@@ -551,6 +642,7 @@ public abstract class Adventurer : Living
         AddAction("sc", CmdScore);
         AddAction("hp", CmdHp);
         AddAction("verbose", CmdVerbose);
+        AddAction("prompt", CmdPrompt);
         AddAction("skills", CmdSkills);
         AddAction("quests", CmdQuests);
         AddAction("search", CmdSearch);

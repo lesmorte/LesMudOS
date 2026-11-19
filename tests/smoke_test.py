@@ -64,6 +64,8 @@ ANSI_TAIL = re.compile("\x1b(\\[[0-9;]*)?$")
 
 
 PROMPT = re.compile(r"(?<!-)> ")
+# A prompt on a line of its own: the plain "> " or the default "Name (hp/max) (stamina/max) (mana/max) > ".
+PROMPT_LINE = re.compile(r"(?m)^(?:[A-Za-z]+ \(\d+/\d+\) \(\d+/\d+\) \(\d+/\d+\) )?> ?(?=\r?\n|$)")
 
 
 class Client:
@@ -204,7 +206,35 @@ class Client:
                 pass
         return data
 
+    def absorb(self):
+        """Take in what has already arrived and keep it for the next read, without the prompts the server sent after output nobody
+        asked for (a combat round, someone arriving): the prompt now follows unprompted output too, and a prompt left unread would be
+        taken for the end of the next command's reply. Only the prompt lines go; the text stays."""
+        data = ""
+        quiet_since = time.time()
+        while True:
+            self.sock.settimeout(0.0)
+            try:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    break
+                data += self.rx(chunk)
+                quiet_since = time.time()
+                continue
+            except (BlockingIOError, socket.timeout):
+                pass
+            finally:
+                self.sock.settimeout(0.2)
+            # Something arrived unasked: let it finish (its prompt may follow a moment later) before the next command goes out.
+            if not data or time.time() - quiet_since > 0.06:
+                break
+            time.sleep(0.01)
+        if data:
+            self.pending += PROMPT_LINE.sub("", data)
+
     def command(self, line, marker="> ", timeout=30.0):
+        if marker == "> ":
+            self.absorb()
         self.send(line)
         return self.read_until(marker, timeout)
 

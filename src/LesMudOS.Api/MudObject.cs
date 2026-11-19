@@ -57,6 +57,19 @@ public abstract class MudObject
     /// </summary>
     public virtual void CatchTell(string message) => DriverHost.Services.Receive(Self, message);
 
+    /// <summary>
+    /// The prompt the driver sends after every line this object's player types, and (if PromptsAfterOutput says so) after output
+    /// that arrives without being asked for. It is sent as it is, with no rendering. Default "> ".
+    /// </summary>
+    public virtual string Prompt() => "> ";
+
+    /// <summary>
+    /// Should the driver send Prompt() after output this object receives outside of a command (a combat round, someone arriving), so
+    /// that the player always ends on a current prompt? Default no: only a fully logged-in player body says yes. Never asked
+    /// while the player is answering a question (InputTo).
+    /// </summary>
+    public virtual bool PromptsAfterOutput() => false;
+
     /// <summary>Called on an interactive object when its connection drops.</summary>
     public virtual void NetDead() { }
 
