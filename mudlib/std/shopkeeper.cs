@@ -95,6 +95,7 @@ public class Shopkeeper : Npc
         AddAction("buy", CmdBuy);
         AddAction("sell", CmdSell);
         AddAction("value", CmdValue);
+        AddAction("price", CmdValue);   // the same question in the word players reach for first
     }
 
     private Stock? Find(string name)

@@ -273,7 +273,7 @@ Commands, available to every player:
 | `get`, `drop` `[N\|all] <thing>` | Pick up or put down; amounts split stacks (section 7) |
 | `give [N\|all] <thing> to <player>` | Hand things to another player in the room. Quest items (the travel pass, the Overseer's Orders) cannot be given. The giver, the receiver and the room are told. Both characters are saved at once, the giver first, so a crash cannot leave a gift in both save files. Not to NPCs. |
 | `loot [<corpse>]`, `get <thing> from <corpse>`, `get all from <corpse>`, `look in <corpse>` | Corpses, see below |
-| `browse`, `buy`, `sell`, `value` | In a shop |
+| `browse`, `buy`, `sell`, `value` (or `price`) | In a shop |
 | `accept`, `report` | In the Adventurers Guild |
 | `ansi [on\|off]` (also `color`, `colour`) | Show or change ANSI colour (section 14) |
 | `score` (also `sc`) | Level, experience and what the next level needs, HP, gold, equipment, quests |

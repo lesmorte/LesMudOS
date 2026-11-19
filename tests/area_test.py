@@ -607,6 +607,7 @@ def run(work, mudlib):
     check("sell pays half", hero.command("sell sword"), "You sell a rusty sword to Torren for 5 gold.")
     check("the sold item is gone", hero.command("i"), "a woodcutter axe (wielded)", absent=("rusty sword",))
     check("value of an item you carry", hero.command("value axe"), "Torren would pay 9 gold for a woodcutter axe.")
+    check("price is the same question", hero.command("price axe"), "Torren would pay 9 gold for a woodcutter axe.")
     wiz.command("clone " + TEST + "fakeorders")
     wiz.command("drop forged orders")
     hero.command("get forged orders")

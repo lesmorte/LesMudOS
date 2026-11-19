@@ -167,3 +167,20 @@ Because a new character has today's numbers, little needs redoing.
 5. **Carry Capacity** is computed and shown, and not enforced until encumbrance is built.
 
 Nothing is open. The build starts when the corridor, the crafting engine and the crafting content have merged (section 5).
+
+## 8. Balance revision (owner-approved 19 November 2026; overrides the tables above where they differ)
+
+The simulator showed the formulas above make most callings much stronger once a character spends its points: a level 4 character with two potions and 6 points placed beat the Goblin Overseer 80 / 97 / 92 / 97 / 72 percent of the time (Warrior, Scout, Priest, Mage, Adventurer) against 60 / 75 / 53 / 55 / 59 today. The owner's target is about 71% for every calling. These changes give 74 / 75 / 68 / 73 / 70 (3,000 fights each, points placed in the calling's obvious attributes):
+
+| What | Was | Now |
+|---|---|---|
+| Precision | +1 to hit per 4 points of Grace above 5 | +1 per **8** points |
+| Evasion | +1 to the defender's side per 4 points of Grace above 5 | **Nothing from Grace.** The statistic stays (equipment and effects may add to it) |
+| Critical Chance | +0.5% per point of Grace above 5 | **+0.25%** |
+| Focus regeneration | Maximum x (1% + (Insight + Spirit) x 0.4%) | Maximum x (1% + (Insight + Spirit) x **0.15%**) |
+| Warrior Vitality | 17 base, 9 a level | **13** base, **8** a level |
+| Scout Vitality | 8 base, 8 a level | **3** base, **7** a level |
+| Scout Evasion trait | 8% dodge | **5%** dodge |
+| Mage Vitality | 8 base, 6 a level | **4** base, 6 a level |
+
+Priest and Adventurer tables are unchanged. Known consequences: a character who places no points is weak (61 / 63 / 60 / 35 / 59), the Mage most of all; level 5 remains easy for everyone (93-98%). `tests/balance_sim.py` must model placed points (2 a level, in the calling's obvious attributes) as its main table and keep the unspent case as a second table. Skill ranks and the larger heal will need a second pass.
