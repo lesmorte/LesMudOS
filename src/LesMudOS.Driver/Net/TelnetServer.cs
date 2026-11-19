@@ -38,6 +38,15 @@ internal sealed class Connection
     /// </summary>
     public bool EchoSuppressed;
 
+    /// <summary>True when the last thing sent was a prompt and the player has typed nothing since: unprompted output then starts on a new line. Game thread only.</summary>
+    public bool AtPrompt;
+
+    /// <summary>
+    /// When this connection last sent a real line (not an empty one: a client keep-alive is not activity), in the kernel's clock.
+    /// Telnet negotiation never makes a line, so it does not count either. Game thread only.
+    /// </summary>
+    public long LastInputMs;
+
     /// <summary>Queue text for the client. Never blocks the game thread.</summary>
     public void Send(string text) => _outbox.Writer.TryWrite(Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n").Replace("\n", "\r\n")));
 

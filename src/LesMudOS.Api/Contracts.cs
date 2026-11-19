@@ -95,6 +95,9 @@ internal interface IDriverServices
     void Say(ObjectRef caller, string message);
 
     long TimeMs();
+    int IdleSeconds(ObjectRef ob);
+    int IdleLimitSeconds();
+    int TimeoutSeconds();
     int CallOut(ObjectRef owner, Action function, double delaySeconds);
     bool RemoveCallOut(ObjectRef owner, int id);
     void SetHeartBeat(ObjectRef ob, bool on);

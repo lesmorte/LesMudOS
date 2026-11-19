@@ -52,7 +52,7 @@ public class Crafted : Consumable
         if (e[0] > 0)
         {
             var healed = user.Call<int>("Heal", e[0]);
-            if (healed > 0) lines.Add($"You recover {healed} hit points.");
+            if (healed > 0) lines.Add($"You recover {healed} hit points." + (user.Call<string>("HealNote", healed) ?? ""));
         }
         if (e[1] > 0)
         {

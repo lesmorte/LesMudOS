@@ -64,6 +64,8 @@ ANSI_TAIL = re.compile("\x1b(\\[[0-9;]*)?$")
 
 
 PROMPT = re.compile(r"(?<!-)> ")
+# A prompt on a line of its own: the plain "> " or the default "Name (hp/max) (stamina/max) (mana/max) > ".
+PROMPT_LINE = re.compile(r"(?m)^(?:[A-Za-z]+ \(\d+/\d+\) \(\d+/\d+\) \(\d+/\d+\) )?> ?(?=\r?\n|$)")
 
 
 class Client:
@@ -179,7 +181,7 @@ class Client:
         deadline = time.time() + timeout
         data, self.pending = self.pending, ""
         if self.seen(marker, data):
-            return data
+            return data + self.linger(marker)
         while time.time() < deadline:
             try:
                 chunk = self.sock.recv(65536)
@@ -187,10 +189,29 @@ class Client:
                     break
                 data += self.rx(chunk)
                 if self.seen(marker, data):
-                    return data
+                    return data + self.linger(marker)
             except socket.timeout:
                 pass
         return data
+
+    def linger(self, marker):
+        """Reading up to some text that is not the prompt: the prompt the server sends after that output may still be on its way.
+        Take it in now (without the prompt line), or it would be taken for the end of the next command's reply."""
+        if marker == "> ":
+            return ""
+        got = ""
+        end = time.time() + 0.12
+        while time.time() < end:
+            try:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    break
+                got += self.rx(chunk)
+                if PROMPT_LINE.search(got):
+                    break
+            except socket.timeout:
+                pass
+        return PROMPT_LINE.sub("", got)
 
     def ed(self, line, timeout=30.0):
         """Send a line to the in-game editor and read until its ':' prompt."""
@@ -204,7 +225,35 @@ class Client:
                 pass
         return data
 
+    def absorb(self):
+        """Take in what has already arrived and keep it for the next read, without the prompts the server sent after output nobody
+        asked for (a combat round, someone arriving): the prompt now follows unprompted output too, and a prompt left unread would be
+        taken for the end of the next command's reply. Only the prompt lines go; the text stays."""
+        data = ""
+        quiet_since = time.time()
+        while True:
+            self.sock.settimeout(0.0)
+            try:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    break
+                data += self.rx(chunk)
+                quiet_since = time.time()
+                continue
+            except (BlockingIOError, socket.timeout):
+                pass
+            finally:
+                self.sock.settimeout(0.2)
+            # Something arrived unasked: let it finish (its prompt may follow a moment later) before the next command goes out.
+            if not data or time.time() - quiet_since > 0.06:
+                break
+            time.sleep(0.01)
+        if data:
+            self.pending += PROMPT_LINE.sub("", data)
+
     def command(self, line, marker="> ", timeout=30.0):
+        if marker == "> ":
+            self.absorb()
         self.send(line)
         return self.read_until(marker, timeout)
 

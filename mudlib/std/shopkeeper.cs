@@ -97,7 +97,17 @@ public class Shopkeeper : Npc
         AddAction("value", CmdValue);
     }
 
-    private Stock? Find(string name) => stock.FirstOrDefault(s => s.Sample is { IsAlive: true } sample && sample.Call<bool>("Id", name.ToLowerInvariant()));
+    private Stock? Find(string name)
+    {
+        var id = name.ToLowerInvariant();
+        var first = stock.FirstOrDefault(s => s.Sample is { IsAlive: true } sample && sample.Call<bool>("Id", id));
+        if (first != null) return first;
+        // "buy sword 2": the second thing for sale that answers to "sword", in the order browse lists them.
+        var position = SplitOrdinal(id, out var bare);
+        if (position == 0) return null;
+        var same = stock.Where(s => s.Sample is { IsAlive: true } sample && sample.Call<bool>("Id", bare)).ToList();
+        return position <= same.Count ? same[position - 1] : null;
+    }
 
     private bool CmdBrowse(string args)
     {
@@ -160,20 +170,27 @@ public class Shopkeeper : Npc
         var have = found.Sum(QuantityOf);
         if (!all && have < count) { Write($"You have only {have} that {Name} would buy.\n"); return true; }
         var left = all ? int.MaxValue : count;
+        // One line per kind of thing sold: "a rusty sword (x3)" for three, not three lines.
+        var order = new List<string>();
+        var sold = new Dictionary<string, (string single, int n, long price)>();
         foreach (var item in found)
         {
             if (left <= 0) break;
             var n = Math.Min(left, QuantityOf(item));
             left -= n;
-            var what = Describe(item, n);
+            var key = SameKey(item);
+            var single = Single(item);
             var price = (long)OfferFor(item) * n;
             var part = n >= QuantityOf(item) ? item : item.Call<ObjectRef>("Split", n);
             if (part == null) continue;
             part.Call("Vanish");
             if (part.IsAlive) continue; // not gone, so not paid for
             seller.Call("AddGold", (int)Math.Min(price, int.MaxValue));
-            Write($"You sell {what} to {Name} for {price} gold.\n");
+            if (!sold.TryGetValue(key, out var g)) { g = (single, 0, 0); order.Add(key); }
+            sold[key] = (g.single, g.n + n, g.price + price);
         }
+        foreach (var key in order)
+            Write($"You sell {ListName(sold[key].single, sold[key].n)} to {Name} for {sold[key].price} gold.\n");
         return true;
     }
 

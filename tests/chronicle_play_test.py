@@ -52,7 +52,7 @@ def main():
         check("score shows the renown tier", do(hero, "score"), "Renown: Unknown")
         do(hero, "west")
         check("the ledger stands in the guild", do(hero, "look"), "chronicle ledger")
-        check("the ledger reads, and is empty of deeds", do(hero, "read chronicle"), "Chronicle", absent=("Bryn",))
+        check("the ledger reads, and is empty of deeds", do(hero, "read chronicle").rsplit("\n", 1)[0], "Chronicle", absent=("Bryn",))
 
         # A wizard walking into a discovery makes no history.
         do(wiz, "goto " + HOLLOW + "cellars/hidden_cache")

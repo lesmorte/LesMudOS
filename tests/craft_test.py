@@ -496,7 +496,8 @@ def run(work, mudlib, box):
     check("a corpse can be skinned only once", ann.command("skin corpse"), "has already been skinned.")
     text = act(ann, "bleed corpse", *RESULT, settle=GATHER_SETTLE)
     check("bleeding a fresh wolf gives wolf blood", text, "You bleed the corpse of a test wolf and take a poor vial of wolf blood")
-    check("a corpse can be bled only once", ann.command("bleed corpse"), "has already been bled.")
+    # With nothing left in it (skin and blood both taken) the corpse crumbles at once, so it cannot be bled twice for want of a corpse.
+    check("a corpse can be bled only once (it crumbles when the last yield is taken)", ann.command("bleed corpse"), "There is no corpse")
     check("the corpse no longer offers either", ann.command("look at corpse"), absent=("could still be taken", "fresh enough"))
     profs, _, _ = pinfo(w, "ann")
     truth("Skinning and Bleeding are saved in tenths (1.0 each)", profs.get("skinning") == 10 and profs.get("bleeding") == 10, profs)
@@ -797,7 +798,7 @@ def run(work, mudlib, box):
     wiz.command("tele " + T + "workshop")
     text = act(wiz, "combine herb and goblin blood and cloth", "Wizards make no history", *RESULT)
     check("a wizard who discovers a Rare recipe is told that wizards make no history", text + a.quiet(wiz, 1), "Wizards make no history.")
-    check("and the Chronicle still names only Cat", wiz.command("chron craft.discover_rare|hunters_poultice"), "holders=cat ", absent=("wizzy", "Wizzy"))
+    check("and the Chronicle still names only Cat", re.sub(r"(?m)^Wizzy \(\d+/\d+\).*$", "", wiz.command("chron craft.discover_rare|hunters_poultice")), "holders=cat ", absent=("wizzy", "Wizzy"))  # the prompt carries the name
 
     # ===== K. the effects of crafted things =====
     ann.command("tele " + T + "hall")

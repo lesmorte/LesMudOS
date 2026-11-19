@@ -70,8 +70,7 @@ R = Report()
 def body(out):
     """A reply without the carriage returns and without the prompt that ends it."""
     text = out.replace("\r", "")
-    if text.endswith("> "):
-        text = text[:-2]
+    text = re.sub(r"(?:[A-Za-z]+ \(\d+/\d+\) \(\d+/\d+\) \(\d+/\d+\) )?> $", "", text)
     return text.strip()
 
 
@@ -494,7 +493,7 @@ def check_texts(wk):
     R.section("7c. Text rules on everything the characters were shown")
     seen = set()
     for typed, out in wk.texts:
-        text = body(out)
+        text = re.sub(r"(?m)^(?:[A-Za-z]+ \(\d+/\d+\) \(\d+/\d+\) \(\d+/\d+\) )?> ?", "", body(out))  # the prompts (the default one names the character)
         # A '> ' at the start of a line is the prompt, followed by an idle action that arrived just after the reply.
         for m in re.finditer(r"(?<!\n)> ", text):
             key = ("gt", text[max(0, m.start() - 30):m.end() + 10])

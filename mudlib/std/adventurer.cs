@@ -35,6 +35,8 @@ public abstract class Adventurer : Living
     [Saved] private List<string> carried = new();
     [Saved] private List<int> carriedEquipped = new();
     [Saved] private string logoutRoom = "";
+    // "verbose on": combat lines and healing lines show the numbers. Off by default; saved with the character.
+    [Saved] private bool verbose;
 
     private int regenBeats;
     private bool dying;
@@ -93,6 +95,120 @@ public abstract class Adventurer : Living
 
     public override bool IsPlayerCharacter() => true;
 
+    public bool QueryVerbose() => verbose;
+
+    // ---- The prompt ----
+    // Shown by the driver after every command and after unprompted output. The player's text is untrusted input: it is cleaned of
+    // control characters and of every {tag} but the listed tokens, limited in length, and only the listed tokens are expanded.
+
+    private const string DefaultPrompt = "{name} ({hp}/{maxhp}) ({stamina}/{maxstamina}) ({mana}/{maxmana}) > ";
+    private const int MaxPromptLength = 80;
+
+    /// <summary>The prompt as the player wrote it (tokens unexpanded). Saved with the character; the plain "> " is "prompt off".</summary>
+    [Saved] private string promptFormat = DefaultPrompt;
+
+    /// <summary>The prompt tokens and what each stands for: the one table. (The attribute build renames Vitality, Endurance and Focus here.)</summary>
+    private static readonly (string token, string meaning)[] PromptTokens =
+    {
+        ("name", "your name"),
+        ("hp", "your current Vitality"), ("maxhp", "your maximum Vitality"),
+        ("stamina", "your current Stamina"), ("maxstamina", "your maximum Stamina"),
+        ("mana", "your current Mana"), ("maxmana", "your maximum Mana"),
+    };
+
+    private string PromptValue(string token) => token switch
+    {
+        "name" => Name,
+        "hp" => Hp.ToString(),
+        "maxhp" => QueryMaxHp().ToString(),
+        "stamina" => QueryStamina().ToString(),
+        "maxstamina" => QueryMaxStamina().ToString(),
+        "mana" => QueryMana().ToString(),
+        "maxmana" => QueryMaxMana().ToString(),
+        _ => "",
+    };
+
+    /// <summary>Text typed for a prompt, made safe: no control characters, no {tag} that is not a listed token, no stray braces.</summary>
+    private static string CleanPrompt(string raw)
+    {
+        var text = new StringBuilder();
+        for (var i = 0; i < raw.Length; i++)
+        {
+            var c = raw[i];
+            if (char.IsControl(c) || c == '}') continue;
+            if (c != '{') { text.Append(c); continue; }
+            var end = raw.IndexOf('}', i + 1);
+            if (end < 0) continue;
+            var inner = raw.Substring(i + 1, end - i - 1);
+            if (PromptTokens.Any(t => t.token == inner)) text.Append('{').Append(inner).Append('}');
+            i = end; // a tag that is not a token (a colour tag, say) is dropped whole
+        }
+        return text.ToString();
+    }
+
+    /// <summary>The prompt with its tokens replaced by the live values. Always cleaned first, whatever is stored.</summary>
+    private string ExpandPrompt()
+    {
+        var clean = CleanPrompt(promptFormat);
+        if (clean.Trim().Length == 0) return "> ";
+        var text = new StringBuilder();
+        for (var i = 0; i < clean.Length; i++)
+        {
+            if (clean[i] != '{') { text.Append(clean[i]); continue; }
+            var end = clean.IndexOf('}', i);
+            text.Append(PromptValue(clean.Substring(i + 1, end - i - 1)));
+            i = end;
+        }
+        return text.ToString();
+    }
+
+    public override string Prompt() => adventureBegun ? ExpandPrompt() : "> ";
+
+    public override bool PromptsAfterOutput() => adventureBegun;
+
+    /// <summary>"prompt" shows it; "prompt TEXT" sets it; "prompt default" restores the default; "prompt off" is the plain "> ".</summary>
+    private bool CmdPrompt(string args)
+    {
+        var word = args.Trim();
+        if (word == "")
+        {
+            var tokens = string.Join("\n", PromptTokens.Select(t => $"  {{{{{t.token}}}}}  {t.meaning}"));
+            Write($"Your prompt is: {Esc(CleanPrompt(promptFormat))}\n  which now reads: {Esc(ExpandPrompt())}\nIt can use these tokens:\n{tokens}\n" +
+                  "{cmd}prompt{/} TEXT sets it (up to " + MaxPromptLength + " characters), {cmd}prompt default{/} restores the default, {cmd}prompt off{/} gives the plain '> '.\n");
+            return true;
+        }
+        if (word.ToLowerInvariant() == "default") { promptFormat = DefaultPrompt; Write("Your prompt is back to the default.\n"); return true; }
+        if (word.ToLowerInvariant() == "off") { promptFormat = "> "; Write("Your prompt is now the plain '> '.\n"); return true; }
+        var clean = CleanPrompt(word).TrimStart();
+        if (clean.Trim().Length == 0) { Write("That leaves nothing to show. Type {cmd}prompt{/} to see what you can use.\n"); return true; }
+        if (clean.Length > MaxPromptLength) { Write($"Your prompt can be at most {MaxPromptLength} characters.\n"); return true; }
+        if (!clean.EndsWith(" ")) clean += " ";
+        promptFormat = clean;
+        Write($"Your prompt is now: {Esc(clean)}\n");
+        return true;
+    }
+
+    public override string DamageNote(int applied, bool dealt) =>
+        !verbose ? "" : dealt ? $" {{green}}(+{applied} damage){{/}}" : $" {{red}}(-{applied} damage){{/}}";
+
+    public override string HealNote(int healed) => !verbose || healed <= 0 ? "" : $" {{green}}(+{healed} Vitality){{/}}";
+
+    /// <summary>"verbose" shows the setting; "verbose on" and "verbose off" change it.</summary>
+    private bool CmdVerbose(string args)
+    {
+        var word = args.Trim().ToLowerInvariant();
+        if (word == "")
+        {
+            Write(verbose ? "Verbose is on: combat shows the damage you deal {green}(+2 damage){/} and take {red}(-5 damage){/}, and healing shows {green}(+4 Vitality){/}. Type {cmd}verbose off{/} to turn it off.\n"
+                : "Verbose is off. Type {cmd}verbose on{/} to see the numbers in combat: the damage you deal and take, and healing.\n");
+            return true;
+        }
+        if (word != "on" && word != "off") { NotifyFail("Usage: {cmd}verbose{/} [{cmd}on{/}|{cmd}off{/}]"); return false; }
+        verbose = word == "on";
+        Write(verbose ? "Verbose is now on. Combat lines will show the damage done.\n" : "Verbose is now off.\n");
+        return true;
+    }
+
     public override string QueryLabel() => Name;
 
     /// <summary>Wizard level; /std/player overrides this with the registry's answer.</summary>
@@ -137,7 +253,7 @@ public abstract class Adventurer : Living
 
     public void AddXp(int amount)
     {
-        if (amount <= 0) return;
+        if (amount <= 0 || QueryIdle()) return; // nobody earns experience while away from the keyboard
         xp += amount;
         Tell($"You gain {amount} experience.\n");
         CheckLevelUp();
@@ -525,6 +641,8 @@ public abstract class Adventurer : Living
         AddAction("score", CmdScore);
         AddAction("sc", CmdScore);
         AddAction("hp", CmdHp);
+        AddAction("verbose", CmdVerbose);
+        AddAction("prompt", CmdPrompt);
         AddAction("skills", CmdSkills);
         AddAction("quests", CmdQuests);
         AddAction("search", CmdSearch);
@@ -616,8 +734,13 @@ public abstract class Adventurer : Living
 
     protected override bool NeedsHeartBeat() => true;
 
+    /// <summary>Called on every heart beat. A player overrides it to watch for idleness; other characters have none.</summary>
+    protected virtual void IdleCheck() { }
+
     protected override void Tick()
     {
+        IdleCheck();
+        if (Dead || !Self.IsAlive) return;
         if (++regenBeats < RegenBeats) return;
         regenBeats = 0;
         if (QueryInCombat() || Hp >= QueryMaxHp()) { hpCarry = 0; return; }
@@ -707,6 +830,7 @@ public abstract class Adventurer : Living
     private bool CmdGet(string args)
     {
         var room = Environment();
+        if (QueryInCombat()) { Write(FightingNote.Replace("do that", "pick things up") + "\n"); return true; }
         var from = args.IndexOf(" from ", StringComparison.Ordinal);
         if (from > 0) return GetFromCorpse(args.Substring(0, from).Trim(), args.Substring(from + 6).Trim());
         if (room == null || !ParseAmount(args, out var count, out var all, out var noun)) { NotifyFail("Get what?"); return false; }
@@ -785,9 +909,20 @@ public abstract class Adventurer : Living
     {
         var room = Environment();
         if (room == null) return null;
-        foreach (var ob in AllInventory(room))
-            if (ob.Call<bool>("IsCorpse") && (name == "" || ob.Call<bool>("Id", name.ToLowerInvariant()))) return ob;
-        return null;
+        return CorpsesHere(room, name).FirstOrDefault();
+    }
+
+    /// <summary>The corpses in the room that answer to a name, in listed order; with a position in the name ("corpse 2", "2.corpse") just that one.</summary>
+    private List<ObjectRef> CorpsesHere(ObjectRef room, string name)
+    {
+        var id = name.ToLowerInvariant();
+        var corpses = AllInventory(room).Where(o => o.IsAlive && o.Call<bool>("IsCorpse")).ToList();
+        var named = corpses.Where(o => id == "" || o.Call<bool>("Id", id)).ToList();
+        if (named.Count > 0 || id == "") return named;
+        var position = SplitOrdinal(id, out var bare);
+        if (position == 0) return named;
+        var same = corpses.Where(o => o.Call<bool>("Id", bare)).ToList();
+        return position <= same.Count ? new List<ObjectRef> { same[position - 1] } : named;
     }
 
     private bool GetFromCorpse(string what, string corpseName)
@@ -803,12 +938,11 @@ public abstract class Adventurer : Living
     {
         var room = Environment();
         if (room == null) return false;
+        if (QueryInCombat()) { Write(FightingNote.Replace("do that", "pick things up") + "\n"); return true; }
         string? refusal = null;
         var found = false;
-        foreach (var ob in AllInventory(room).ToList())
+        foreach (var ob in CorpsesHere(room, args))
         {
-            if (!ob.Call<bool>("IsCorpse")) continue;
-            if (args != "" && !ob.Call<bool>("Id", args.ToLowerInvariant())) continue;
             found = true;
             var result = ob.Call<string>("TakeAll");
             if (result == null) return true;
@@ -882,11 +1016,10 @@ public abstract class Adventurer : Living
 
     private bool CmdInventory(string args)
     {
-        var items = AllInventory()
-            .Where(i => i.Call<string>("Short") != null)
-            .Select(i => i.Call<string>("Short") + (IsEquipped(i) ? (i.Call<string>("QuerySlot") == "weapon" ? " (wielded)" : " (worn)") : ""))
-            .ToList();
-        Write(items.Count == 0 ? "You are empty-handed.\n" : "You are carrying: " + string.Join(", ", items) + ".\n");
+        var shown = AllInventory().Where(i => i.Call<string>("Short") != null).ToList();
+        if (shown.Count == 0) { Write("You are empty-handed.\n"); return true; }
+        var lines = Collapse(shown, i => IsEquipped(i) ? (i.Call<string>("QuerySlot") == "weapon" ? " (wielded)" : " (worn)") : "");
+        Write("Inventory\n" + string.Concat(lines.Select(l => "   " + l.text + "\n")));
         return true;
     }
 
@@ -929,20 +1062,51 @@ public abstract class Adventurer : Living
         return true;
     }
 
+    // Where the character came from by an exit: the room they came from, and the room they arrived in (flee leads back only while they are still there).
+    private string cameFrom = "";
+    private string arrivedIn = "";
+
+    /// <summary>A room tells the character they have just walked through one of its exits into their current room. Only a room may; it is remembered for flee.</summary>
+    public void RecordArrival()
+    {
+        var from = PreviousObject();
+        var here = Environment();
+        if (from == null || from.IsClone || here == null || from == here) return;
+        cameFrom = from.Name;
+        arrivedIn = here.Name;
+    }
+
+    private const string FightingNote = "You are fighting! You cannot do that now. Break away with {cmd}flee{/} first.";
+
+    /// <summary>
+    /// flee [direction]: try to break away from a fight (one chance in four to fail). With a direction, go that way; without,
+    /// go back the way you came; if that way cannot be used, any usable exit. A named direction that cannot be used fails at
+    /// once and costs no attempt.
+    /// </summary>
     private bool CmdFlee(string args)
     {
         var room = Environment();
         if (room == null || !QueryInCombat()) { Write("You are not fighting anyone.\n"); return true; }
-        if (Random(4) == 0) { Write("You try to flee, but cannot get away!\n"); return true; }
-        var exits = (room.Call<List<string>>("QueryExits") ?? new List<string>()).Where(d => room.Call<bool>("CanUseExit", Self, d)).ToList();
-        if (exits.Count > 0)
+        string? direction;
+        args = args.Trim();
+        if (args != "")
         {
-            var direction = exits[Random(exits.Count)];
-            Write($"You flee {direction}!\n");
-            room.Call("MoveThrough", Self, direction);
-            return true;
+            direction = room.Call<string>("QueryUsableExit", Self, args);
+            if (direction == null) { Write($"You cannot flee that way: there is no usable exit '{Esc(args)}' here.\n"); return true; }
         }
-        Write("There is no way out!\n");
+        else
+        {
+            direction = arrivedIn == room.Name ? room.Call<string>("QueryExitTowards", Self, cameFrom) : null;
+            if (direction == null)
+            {
+                var exits = room.Call<List<string>>("QueryUsableExits", Self) ?? new List<string>();
+                if (exits.Count == 0) { Write("There is no way out!\n"); return true; }
+                direction = exits[Random(exits.Count)];
+            }
+        }
+        if (Random(4) == 0) { Write("You try to flee, but cannot get away!\n"); return true; }
+        Write($"You flee {direction}!\n");
+        room.Call("MoveThrough", Self, direction);
         return true;
     }
 

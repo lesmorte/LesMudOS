@@ -319,6 +319,7 @@ class Session:
 
     def cmd(self, line, timeout=20.0):
         c = self.c
+        c.absorb()  # news that came in unasked, and the prompt that followed it, are not part of this reply
         c.send(line)
         end = time.time() + timeout
         data, c.pending = c.pending, ""

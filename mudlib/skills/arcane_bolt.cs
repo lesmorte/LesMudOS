@@ -30,9 +30,10 @@ public class ArcaneBoltSpell : Skill
             return;
         }
         var damage = user.Call<int>("ScaleSpellDamage", 6 + Random(4));
-        TellObject(user, $"Your bolt of arcane force strikes {theirs} for {damage} damage.\n");
-        TellObject(target, $"{label}'s bolt of arcane force strikes you.\n");
+        var applied = Math.Max(0, target.Call<int>("ApplyDamage", damage, user));
+        TellObject(user, $"Your bolt of arcane force strikes {theirs} for {damage} damage." + (user.Call<string>("DamageNote", applied, true) ?? "") + "\n");
+        TellObject(target, $"{label}'s bolt of arcane force strikes you." + (target.Call<string>("DamageNote", applied, false) ?? "") + "\n");
         if (room != null) TellRoom(room, $"{label}'s bolt of arcane force strikes {theirs}.\n", user, target);
-        target.Call("TakeDamage", damage, user);
+        target.Call("FinishDamage", user);
     }
 }

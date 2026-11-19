@@ -315,6 +315,18 @@ def fight_until_timed(c, marker, timeout=90, heal_with=None):
     return data, chunks
 
 
+def leave(c, direction):
+    """Walk out; when the other gnawer is still fighting (walking away is refused during a fight), flee that way instead."""
+    text = c.command(direction)
+    for _ in range(12):
+        if "flee" not in text:
+            break
+        text = c.command("flee " + direction)
+        if "cannot get away" not in text:
+            break
+    return text
+
+
 def go(c, *verbs):
     out = ""
     for verb in verbs:
@@ -603,6 +615,7 @@ def run(work, mudlib):
     hero.command("drop forged orders")
     wiz.command("clone " + HOLLOW + "obj/overseers_orders")
     wiz.command("drop orders")
+    drain(hero, 0.4)
     hero.command("get orders")
     check("quest items cannot be sold", hero.command("sell orders"), "too important")
     hero.command("drop orders")
@@ -653,7 +666,10 @@ def run(work, mudlib):
     check("reset tops up the missing creatures (exactly two again)", text, "Two large rats are here.", absent=("Three large",))
     hero.command("hp")
     # leave quickly; the rats attack
-    go(hero, "out")
+    # (walking away from a fight is refused now: flee, which can fail, so try again)
+    for _ in range(12):
+        if "cannot get away" not in hero.command("flee out"):
+            break
     drain(hero, 1.0)
     s = score_of(hero)
     check("fleeing: leaving the room ends the fight in time", str(s["hp"] > 0), "True")
@@ -666,7 +682,7 @@ def run(work, mudlib):
     check("the other creature joined the fight", "joined" if re.search(r"A gnawer (misses|scratches|hits)", text) else text, "joined")
     check("a gnawer died", text, "A gnawer dies.")
     drain(hero, 1.5)
-    hero.command("out")
+    leave(hero, "out")
 
     # ----- peaceful NPCs and players cannot be attacked -----
     wiz.command("goto " + TEST + "plaza")
@@ -766,6 +782,7 @@ def run(work, mudlib):
     check("still in the same room", hero.command("look"), "Store Room")
     wiz.command("clone " + HOLLOW + "obj/rusty_key")
     wiz.command("drop key")
+    drain(hero, 0.4)
     hero.command("get key")
     check("with the key the exit opens", hero.command("west"), "Vault")
     check("the key is not consumed", hero.command("i"), "a rusty key")
@@ -816,14 +833,13 @@ def run(work, mudlib):
     wiz.command("timers 0 120 3600")
     text = wiz.command("get sword from corpse")
     check("after the lock anyone may take", text, "You take a rusty sword from the corpse of a looter.")
+    drain(hero, 0.5)
     check("the killer may loot at once and gets the gold", hero.command("loot"), "You take 7 gold coins from the corpse of a looter.", "You add 7 gold to your purse.")
     check("the gold arrived", str(score_of(hero)["gold"] - gold0), "7")
-    check("an emptied corpse says so", hero.command("look at corpse"), "It is empty.")
-    check("looting an empty corpse", hero.command("loot"), "There is nothing in the corpse of a looter.")
+    # CHANGED (play-feel): a corpse crumbles at once when its last item or coin is taken (an empty one used to wait two minutes).
+    check("an emptied corpse is gone at once", hero.command("look at corpse"), "You see no 'corpse' here.")
+    check("looting finds nothing more", hero.command("loot"), "There is nothing here to loot.")
     wiz.command("drop sword")
-    wiz.command("timers 0 3 3600")
-    text = quiet(hero, 6)
-    check("an empty corpse decays quietly", text, "The corpse of looter crumbles to dust.")
     check("the corpse is gone", hero.command("look"), "Crypt", absent=("corpse",))
     # a full monster corpse rots away with its contents
     wiz.command("clone " + TEST + "looter")
@@ -886,7 +902,7 @@ def run(work, mudlib):
     check("the items are back, but not worn", hero.command("i"), "a woodcutter axe", "a small shield", absent=("(wielded)", "(worn)"))
     hero.command("wield axe")
     hero.command("wear shield")
-    check("the empty corpse of Hero is still there until it decays", hero.command("look"), "The corpse of Hero is here.")
+    check("the corpse of Hero crumbled when the last thing was taken", hero.command("look"), "Brute Cage", absent=("corpse of Hero",))
     hero.command("out")
     hero.command("up")
     hero.command("south")
@@ -1047,6 +1063,9 @@ def run(work, mudlib):
     drain(wiz, 1.0)
     check("the death line", text, "The Goblin Overseer staggers, drops to his knees, and falls dead among his maps.")
     check("the boss pays experience", text, "You gain 250 experience.")
+    # The summoned minion may still be fighting: nothing can be picked up during a fight, so end it first.
+    wiz.command("slay minion")
+    drain(wiz, 1.0)
     text = wiz.command("look")
     check("the boss leaves a corpse and nothing on the floor", text, "The corpse of the Goblin Overseer is here.", absent=("The Goblin Overseer is here", "axe is here", "vest is here", "orders is here"))
     text = wiz.command("look in corpse")
@@ -1093,6 +1112,7 @@ def run(work, mudlib):
     check("only one encounter at a time", text, "A wandering wolf is here.", absent=("Two",))
     text = fight_until(wiz, "wanders off", timeout=25)
     check("an idle encounter wanders off at reset", text, "A wandering wolf wanders off.")
+    drain(wiz, 0.5)
     check("the wolf is gone", wiz.command("look"), "Wolf Run", absent=("wolf is here",))
     wiz.command("out")
     check("the 60 second rule: no new encounter right away", wiz.command("wolf"), "Wolf Run", absent=("wolf is here",))

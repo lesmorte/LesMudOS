@@ -23,8 +23,8 @@ public class MinorHealSpell : Skill
         var healed = target.Call<int>("Heal", amount);
         var room = Environment(user);
         var who = target == user ? "yourself" : target.Call<string>("QueryLabel") ?? "it";
-        TellObject(user, $"Warm light flows from you to {who}, restoring {healed} hit points.\n");
-        if (target != user) TellObject(target, $"{user.Call<string>("QueryLabel")} heals you for {healed} hit points.\n");
+        TellObject(user, $"Warm light flows from you to {who}, restoring {healed} hit points." + (user.Call<string>("HealNote", healed) ?? "") + "\n");
+        if (target != user) TellObject(target, $"{user.Call<string>("QueryLabel")} heals you for {healed} hit points." + (target.Call<string>("HealNote", healed) ?? "") + "\n");
         if (room != null) TellRoom(room, $"{user.Call<string>("QueryLabel")} heals {(target == user ? "themselves" : target.Call<string>("QueryLabel"))}.\n", user, target);
     }
 }

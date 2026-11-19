@@ -271,8 +271,14 @@ class Hero:
 
     def inventory(self):
         text = self.cmd("i")
-        m = re.search(r"You are carrying: (.*)\.", text)
-        return [x.strip() for x in m.group(1).split(", ")] if m else []
+        found = []
+        for line in text.split("\n"):
+            if not line.startswith("   "):
+                continue
+            line = line.strip()
+            m = re.match(r"(.*) \(x(\d+)\)(.*)$", line)  # "a minor healing potion (x2)": the same line as many times as the count
+            found.extend([(m.group(1) + m.group(3)).strip()] * int(m.group(2)) if m else [line])
+        return found
 
     def count(self, word):
         return sum(1 for item in self.inventory() if word in item)

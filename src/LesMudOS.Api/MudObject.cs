@@ -57,6 +57,19 @@ public abstract class MudObject
     /// </summary>
     public virtual void CatchTell(string message) => DriverHost.Services.Receive(Self, message);
 
+    /// <summary>
+    /// The prompt the driver sends after every line this object's player types, and (if PromptsAfterOutput says so) after output
+    /// that arrives without being asked for. It is sent as it is, with no rendering. Default "> ".
+    /// </summary>
+    public virtual string Prompt() => "> ";
+
+    /// <summary>
+    /// Should the driver send Prompt() after output this object receives outside of a command (a combat round, someone arriving), so
+    /// that the player always ends on a current prompt? Default no: only a fully logged-in player body says yes. Never asked
+    /// while the player is answering a question (InputTo).
+    /// </summary>
+    public virtual bool PromptsAfterOutput() => false;
+
     /// <summary>Called on an interactive object when its connection drops.</summary>
     public virtual void NetDead() { }
 
@@ -108,6 +121,13 @@ public abstract class MudObject
 
     /// <summary>First object inside the container (this object if omitted) whose Id() accepts the name.</summary>
     protected ObjectRef? Present(string id, ObjectRef? container = null) => D.Present(id, container ?? Self);
+
+    /// <summary>
+    /// The position a typed name carries among identical things: "2.rat", "rat 2" and "second rat" give 2 and the name "rat".
+    /// Returns 0 (and the text unchanged) when there is none. Present() already understands these forms; use this when you
+    /// filter a list yourself, so a command's matching works the same way everywhere.
+    /// </summary>
+    protected static int SplitOrdinal(string text, out string name) => NameIndex.Split(text, out name);
 
     // ---- Living and interactive objects ----
 
@@ -186,6 +206,18 @@ public abstract class MudObject
     /// whole seconds are too coarse (combat timing).
     /// </summary>
     protected long TimeMs() => D.TimeMs();
+
+    /// <summary>
+    /// Whole seconds since the object's player last typed a line (0 if it has no connection). An empty line or telnet keep-alive
+    /// is not typing.
+    /// </summary>
+    protected int IdleSeconds(ObjectRef ob) => D.IdleSeconds(ob);
+
+    /// <summary>The server setting: seconds without typing until a player counts as idle.</summary>
+    protected int IdleLimitSeconds() => D.IdleLimitSeconds();
+
+    /// <summary>The server setting: seconds without typing until a player is disconnected.</summary>
+    protected int TimeoutSeconds() => D.TimeoutSeconds();
 
     /// <summary>Random integer in [0, n).</summary>
     protected int Random(int n) => n <= 0 ? 0 : System.Random.Shared.Next(n);

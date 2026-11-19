@@ -269,7 +269,7 @@ Standard experience modifier 1.0 unless stated. Each has two signature features.
 
 ### Allies
 
-Skeletons, companions and turrets are living things under the same combat rules as everything else. An ally has an owner; it treats the owner's enemies as its own, cannot be attacked by its owner or by other players, gives its owner the experience and kill credit for what it kills, leaves no lootable corpse, and disappears when its time runs out, when its owner dies or logs out, or (for a companion) when dismissed. Monsters may target allies. Allies are not saved.
+Skeletons, companions and turrets are living things under the same combat rules as everything else. An ally has an owner; it treats the owner's enemies as its own, cannot be attacked by its owner or by other players, gives its owner the experience and kill credit for what it kills (experience for a kill is otherwise shared by damage among the players who hurt the creature: see GAME_SYSTEMS.md, Shared experience), leaves no lootable corpse, and disappears when its time runs out, when its owner dies or logs out, or (for a companion) when dismissed. Monsters may target allies. Allies are not saved.
 
 | Ally | Level | HP | Damage | Reaction Time | Attack Recovery |
 |---|---|---|---|---|---|
