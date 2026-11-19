@@ -16,9 +16,12 @@
 - smoke, item, find pass (before the restart). Launch appendix fixture (tests/fixtures/crafting/launch) passes craft_sim.
 - docs/CRAFTING.md, BUILDING.md "Crafting", GAME_SYSTEMS.md 9a.
 
+- All suites pass: smoke, item, find, chronicle, chronicle_play, corridor_mob, area, world, load_check (0 failed);
+  class failed once (random "Arcane Bolt can be dodged"), passed on rerun. craft_test 254/254 (final run), craft_sim PASS.
+- Launch fixture boots: "loaded 10 recipes, 33 materials", no problems; its files compile under dotnet build.
+
 ## Next
-- Suites in background: class chronicle chronicle_play corridor_mob area world load_check -> /tmp/suite/summary.
-- Boot the launch fixture in a driver to prove it loads; final report.
+- Nothing: final report.
 
 ## Decisions
 - Recipes and tables are C# data files (house style, type-checked by dotnet build); a file may hold many recipes
