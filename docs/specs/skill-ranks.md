@@ -36,5 +36,23 @@ Some ranks need more than level and gold. The gold is always paid; the unlock on
 
 First use: **Arcane Bolt II**, taught at the Adventurers Guild in Vincent's Hollow: level 5, 40 gold, and 10 goblins slain. Most Mages will have it by the time they finish the cellars; it is there to teach the player that ranks can ask for deeds. The other callings' rank II skills there need level and gold only, unless the owner names unlocks for them.
 
+## Rank tables (owner-approved November 2026; numbers are starting values for the simulator)
+Skills not listed use the default (+30% effect, +15% cost per rank). Resource names are the attribute build's (Focus, Endurance, Vitality).
+
+| Calling | Skill | I (level 1) | II (level 5) | III (level 10) | IV (level 15) |
+|---|---|---|---|---|---|
+| Mage | Arcane Bolt | 6-9, 20 Focus | 8-12, 23 | 10-14, 26 | default |
+| Mage | Magical Lore | rank I only | | | |
+| Priest | Minor Heal | 20 Vitality, 25 Focus | 38, 32 | 60, 40 | half a starting Warrior's Vitality at level 15 |
+| Priest | Blessing | +1 to hit, +1 armour | +2, +2 | +3, +3 | default cost steps |
+| Warrior | Shield Bash | 75% weapon damage, stagger | 98% | 120% | default |
+| Scout | Precision Strike | +2 to hit, 15% critical | +3, 20% | +4, 25% | default cost steps |
+| Scout | Tracking | adjacent rooms | two rooms away | rank II is the last | |
+| Adventurer | Double Strike (new) | 2 hits at 60% | 2 hits at 75% | Triple Strike: 3 at 60% | Quadruple Strike: 4 at 55% |
+| Adventurer | Appraise | rank I only | | | |
+
+- **Minor Heal** restores about half the Vitality of a Warrior with starting attributes at the rank's level (Warrior Vitality = 17 + 9 x level + Vigor x 2 with Vigor 7: 40, 76, 121). The rank I change (8 to 20) applies to every Priest at once. Divine Knowledge's +25% still applies on top. The simulator must show a Priest's Focus runs out before a creature of the Priest's own level does, so the heal cannot make solo fights riskless.
+- **Double Strike** (`strike` is the Scout's word; use `double`): new Adventurer skill granted at level 1, 20 Endurance, preparation 0.5, recovery 1.0. Each hit makes its own hit roll with the wielded weapon (or fists) at the listed fraction of its damage. The name changes with the rank; the command does not.
+- **Jack of All Trades**: new Adventurer trait (no ranks). Crafting and gathering proficiency is gained 25% faster in every craft. One named number.
 ## Open
 - Unlocks for the other rank II skills and for rank III in Oakenfell (a Hall of Legends trial quest, Renown, or Assembly standing are the natural candidates).
