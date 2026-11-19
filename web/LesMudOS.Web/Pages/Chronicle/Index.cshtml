@@ -1,0 +1,43 @@
+@page "/chronicle"
+@{
+    var all = Game.Snapshot.Entries;
+    var top = string.Equals(Request.Query["view"], "top", StringComparison.OrdinalIgnoreCase);
+    var size = Math.Max(1, Site.Value.ChroniclePageSize);
+    var ordered = top ? all.OrderByDescending(e => e.Score).ThenByDescending(e => e.Id).ToList() : all.ToList();
+    var pages = Math.Max(1, (ordered.Count + size - 1) / size);
+    var page = int.TryParse(Request.Query["page"], out var pn) ? Math.Clamp(pn, 1, pages) : 1;
+    var shown = ordered.Skip((page - 1) * size).Take(size).ToList();
+    string Link(int p, bool t) => "/chronicle" + (t || p > 1 ? "?" : "") + (t ? "view=top" : "") + (t && p > 1 ? "&" : "") + (p > 1 ? "page=" + p : "");
+    ViewData["Title"] = "The Chronicle of Hollowmere";
+    ViewData["Description"] = "The permanent history of Hollowmere: the deeds, discoveries and milestones the world remembers, newest first or ranked by significance.";
+    ViewData["Canonical"] = Link(page, top);
+}
+<section class="band">
+    <div class="wrap">
+        <p class="eyebrow">The permanent record</p>
+        <h1>The Chronicle of Hollowmere</h1>
+        <div class="prose">
+            <p>The Chronicle is the memory of the world, kept by the Hall of Legends. Only events of real consequence are written into it, and once written they are never changed. Each carries an Event Significance Score (ESS): the higher it is, the more the deed mattered.</p>
+        </div>
+        <ul class="tabs" aria-label="Order of entries">
+            <li><a href="/chronicle" aria-current="@(top ? "false" : "true")">Newest first</a></li>
+            <li><a href="/chronicle?view=top" aria-current="@(top ? "true" : "false")">Most significant</a></li>
+        </ul>
+        @if (all.Count == 0)
+        {
+            <p class="empty">The Chronicle's first page is still blank. Yours could be the first name on it.</p>
+        }
+        else
+        {
+            <partial name="_Chronicle" model="shown" view-data='new ViewDataDictionary(ViewData) { { "H", "h2" } }' />
+            @if (pages > 1)
+            {
+                <nav class="pager" aria-label="Pages of the Chronicle">
+                    @if (page > 1) { <a href="@Link(page - 1, top)" rel="prev">&larr; Newer</a> } else { <span></span> }
+                    <span>Page @(page) of @pages</span>
+                    @if (page < pages) { <a href="@Link(page + 1, top)" rel="next">Older &rarr;</a> } else { <span></span> }
+                </nav>
+            }
+        }
+    </div>
+</section>

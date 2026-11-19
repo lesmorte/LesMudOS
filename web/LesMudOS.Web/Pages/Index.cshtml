@@ -1,0 +1,175 @@
+@page "/"
+@{
+    ViewData["Title"] = "";
+    var snap = Game.Snapshot;
+    var top = snap.Top(5);
+    var latest = News.Posts.Take(3).ToList();
+    var hasStrip = snap.Characters is > 0 || snap.Entries.Count > 0 || snap.Today != null;
+}
+<section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+        <p class="eyebrow">A persistent online fantasy world</p>
+        <h1 id="hero-title">Legends of Hollowmere</h1>
+        <p class="tagline">The World Beyond Vincent's Hollow</p>
+        <p class="lede">A text-based fantasy world where you read, type and the world answers. Start as an unknown in a quiet village, walk the roads of Greenvale, and make a name the world will remember.</p>
+        <div class="actions">
+            <a class="btn" href="/play">Play Now</a>
+            <a class="btn alt" href="/play#first-login">Create Account</a>
+            <a class="btn alt" href="/chronicle">Read the Chronicle</a>
+        </div>
+        <figure class="plate">
+            <partial name="_HeroArt" />
+            <figcaption>From Vincent's Hollow the road runs north, through the wood, toward Oakenfell.</figcaption>
+        </figure>
+    </div>
+</section>
+
+@if (hasStrip)
+{
+    <section class="strip" aria-label="The world today">
+        <dl>
+            @if (snap.Characters is > 0) { <div><dt>Characters created</dt><dd>@snap.Characters.Value.ToString("N0")</dd></div> }
+            @if (snap.Entries.Count > 0) { <div><dt>Chronicle entries</dt><dd>@snap.Entries.Count.ToString("N0")</dd></div> }
+            @if (snap.Today != null) { <div><dt>Today in Hollowmere</dt><dd>@snap.Today</dd></div> }
+        </dl>
+    </section>
+}
+
+<section class="band" aria-labelledby="about">
+    <div class="wrap prose">
+        <p class="eyebrow">About Hollowmere</p>
+        <h2 id="about">Create your legend</h2>
+        <p>Legends of Hollowmere is a persistent online fantasy world where players carve their own path through exploration, guilds, crafting, faction politics, and adventure.</p>
+        <p>Begin your journey in the village of Vincent's Hollow. Travel the roads of Greenvale. Train within the Hall of Legends. Earn Renown. Become part of the Chronicle.</p>
+        <p><b>Create your legend.</b></p>
+    </div>
+</section>
+
+<section class="band alt" aria-labelledby="world">
+    <div class="wrap">
+        <div class="cols map-first">
+            <figure class="plate">
+                <partial name="_WorldMap" />
+                <figcaption>Greenvale, as far as the maps go.</figcaption>
+            </figure>
+            <div>
+                <p class="eyebrow">The world</p>
+                <h2 id="world">Hollowmere</h2>
+                <dl class="gaz">
+                    <dt>Greenvale</dt>
+                    <dd><span class="tag">The starting region</span>A prosperous frontier region of farms, forests, villages, and ancient mysteries.</dd>
+                    <dt>Vincent's Hollow</dt>
+                    <dd><span class="tag">The starting village</span>A quiet village where every adventurer's story begins.</dd>
+                    <dt>Oakenfell</dt>
+                    <dd><span class="tag">The first major city</span>The largest city in Greenvale and home to the Hall of Legends.</dd>
+                </dl>
+                <p class="more"><a href="/world">Explore the world</a></p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="band" aria-labelledby="features">
+    <div class="wrap">
+        <p class="eyebrow">What awaits</p>
+        <h2 id="features">Six ways to leave your mark</h2>
+        <ol class="features">
+            <li><h3>Choose Your Path</h3><p>Five archetypes to begin with: Warrior, Scout, Priest, Mage and Adventurer.</p></li>
+            <li><h3>Grow Your Legend</h3><p>Advance from archetype to advanced class. Future specializations await discovery.</p></li>
+            <li><h3>Living History</h3><p>Player actions influence the Chronicle. The world remembers achievements.</p></li>
+            <li><h3>Factions</h3><p>Support the Assembly, protect the wilds, build wealth, or forge your own loyalties.</p></li>
+            <li><h3>Craft and Gather</h3><p>Explore Greenvale collecting resources, craft valuable goods, and support the economy.</p></li>
+            <li><h3>Discover Secrets</h3><p>The world contains hidden stories, locations and mysteries. Where they are is for you to find out.</p></li>
+        </ol>
+    </div>
+</section>
+
+<section class="band alt" aria-labelledby="hall">
+    <div class="wrap">
+        <p class="eyebrow">The Hall of Legends</p>
+        <h2 id="hall">Swear yourself to a profession</h2>
+        <p class="prose">At Level 5 adventurers may travel to Oakenfell and swear themselves to a profession within the Hall of Legends.</p>
+        <ul class="callings compact">
+            @foreach (var c in World.Callings)
+            {
+                <li>
+                    <h3>@c.Name</h3>
+                    <ul class="paths paths-inline">@foreach (var p in c.Paths) { <li><b>@p.Name</b></li> }</ul>
+                </li>
+            }
+        </ul>
+        <p class="more"><a href="/classes">All fifteen paths</a></p>
+    </div>
+</section>
+
+<section class="band" aria-labelledby="factions">
+    <div class="wrap">
+        <p class="eyebrow">Factions</p>
+        <h2 id="factions">Who holds the land</h2>
+        <ul class="mottos">
+            @foreach (var f in World.Factions) { <li><b>@f.Name</b><i>&ldquo;@f.Motto&rdquo;</i></li> }
+        </ul>
+        <p class="more"><a href="/factions">Meet the factions</a></p>
+    </div>
+</section>
+
+<section class="band alt" aria-labelledby="chronicle">
+    <div class="wrap">
+        <p class="eyebrow">The Chronicle</p>
+        <h2 id="chronicle">The deeds Hollowmere remembers</h2>
+        <p class="prose">The five most significant events in the world's record, ranked by Event Significance Score (ESS). Written by the game itself, as it happens.</p>
+        @if (top.Count == 0)
+        {
+            <p class="empty">The Chronicle's first page is still blank. Yours could be the first name on it.</p>
+        }
+        else
+        {
+            <partial name="_Chronicle" model="top" view-data='new ViewDataDictionary(ViewData) { { "Ranked", true } }' />
+        }
+        <p class="more"><a href="/chronicle">Read the whole Chronicle</a></p>
+    </div>
+</section>
+
+<section class="band" aria-labelledby="heroes">
+    <div class="wrap">
+        <p class="eyebrow">The Hall of Heroes</p>
+        <h2 id="heroes">The most renowned</h2>
+        <partial name="_Roll" model="snap.Heroes" />
+        <p class="more"><a href="/heroes">About Renown</a></p>
+    </div>
+</section>
+
+<section class="band alt" aria-labelledby="news">
+    <div class="wrap">
+        <p class="eyebrow">Latest news</p>
+        <h2 id="news">From the town crier</h2>
+        @if (latest.Count == 0) { <p class="empty">No news yet. The town crier is still clearing his throat.</p> }
+        else
+        {
+            <ul class="news-list">
+                @foreach (var p in latest)
+                {
+                    <li>
+                        <h3><a href="/news/@p.Slug">@p.Title</a></h3>
+                        <p class="meta"><time datetime="@p.Date.ToString("yyyy-MM-dd")">@p.Date.ToString("d MMMM yyyy")</time></p>
+                        @if (p.Summary != "") { <p>@p.Summary</p> }
+                    </li>
+                }
+            </ul>
+        }
+        <p class="more"><a href="/news">All news</a></p>
+    </div>
+</section>
+
+<section class="band" aria-labelledby="join">
+    <div class="wrap prose">
+        <p class="eyebrow">Join the adventure</p>
+        <h2 id="join">The road is open</h2>
+        <p>Your story begins at a quiet village gate. Everything you need to get there is on one page.</p>
+        <div class="actions">
+            <a class="btn" href="/play#first-login">Create Account</a>
+            <span class="btn soon" aria-disabled="true">Download Client <small>(coming later)</small></span>
+            <a class="btn alt" href="/play">Enter Hollowmere</a>
+        </div>
+    </div>
+</section>

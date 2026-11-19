@@ -1,0 +1,9 @@
+{
+  "advancedClass": "",
+  "archetype": "adventurer",
+  "Level": 20,
+  "passwordHash": "pbkdf2-sha256$210000$FIXTURE$FIXTURE",
+  "title": "the newcomer",
+  "xp": 0,
+  "quests": {}
+}

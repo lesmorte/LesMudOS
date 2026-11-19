@@ -1,0 +1,9 @@
+{
+  "advancedClass": "",
+  "archetype": "priest",
+  "Level": 3,
+  "passwordHash": "pbkdf2-sha256$210000$FIXTURE$FIXTURE",
+  "title": "the newcomer",
+  "xp": 0,
+  "quests": {}
+}

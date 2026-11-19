@@ -1,0 +1,63 @@
+{
+  "contribution": {
+    "bryn": 100,
+    "cade": 750
+  },
+  "entries": [
+    {
+      "ess": "750",
+      "classname": "Major Historical",
+      "category": "Discovery",
+      "subcategory": "Discovery",
+      "area": "an unmapped corner of Hollowmere",
+      "region": "Hollowmere",
+      "participants": "Cade",
+      "actor": "Cade",
+      "factions": "",
+      "headline": "The Great Stump Found",
+      "text": "On the 1st Day of Deepfrost, Year 1, Cade stood before the Great Stump in the Hidden Grove, the ancient root from which Oakenfell takes its name.",
+      "significance": "The city\u0027s namesake, long a rumor, was seen by living eyes for the first time.",
+      "tags": "oakenfell,hidden-grove,great-stump,hollowmere,discover.great_stump",
+      "refs": "",
+      "event": "discover.great_stump",
+      "subject": "great-stump",
+      "first": "1",
+      "featured": "1",
+      "historicname": "",
+      "id": "1",
+      "ts": "1795059255",
+      "day": "0",
+      "date": "the 1st Day of Deepfrost, Year 1"
+    }
+  ],
+  "entryTotal": {
+    "cade": 750
+  },
+  "epochDay": 20776,
+  "occurred": {
+    "discover.hidden|hidden-cache": {
+      "holders": "bryn",
+      "ess": "100",
+      "entry": "0",
+      "listed": "",
+      "milestone": "0",
+      "title": "Hidden location discovered: the Hidden Cache",
+      "event": "discover.hidden",
+      "subject": "hidden-cache",
+      "date": "the 1st Day of Deepfrost, Year 1",
+      "ts": "1795059250"
+    },
+    "discover.great_stump|great-stump": {
+      "holders": "cade",
+      "ess": "750",
+      "entry": "1",
+      "listed": "firsts",
+      "milestone": "0",
+      "title": "The Great Stump",
+      "event": "discover.great_stump",
+      "subject": "great-stump",
+      "date": "the 1st Day of Deepfrost, Year 1",
+      "ts": "1795059255"
+    }
+  }
+}

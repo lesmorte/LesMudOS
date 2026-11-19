@@ -25,6 +25,8 @@ This repository holds two things with different terms.
 - `mudlib/classes/` and `mudlib/skills/` : the callings, classes, skills, spells and traits
 - `mudlib/events/` and `mudlib/factions/` : the event catalogue and the factions
 - `docs/specs/` and `docs/areas/` : the design briefs, area plans and lore
+- `web/` : the public website (its code, copy, illustrations, news and fixtures)
+- `docs/WEBSITE.md`, `docs/specs/website.md`
 - `docs/WORLD.md`, `docs/CLASS_SYSTEM.md`, `docs/CHRONICLE.md`, `docs/FACTIONS.md`, `docs/PLAN-corridor-crafting.md`, `docs/CORRIDOR_BALANCE.md`
 
 ## Where the line falls
@@ -38,5 +40,7 @@ A file not listed here follows its directory. A new top-level directory is the e
 By contributing to this repository you agree that your contribution is licensed under the terms that apply to the part you changed: MIT for the engine, and for the game an assignment of your contribution's rights to the copyright holder, so that the game stays under one owner.
 
 ## Third-party components
+
+The website (`web/`) uses ASP.NET Core and Markdig (BSD-2-Clause), and its headings are set in IM Fell English by Igino Marini under the SIL Open Font License 1.1 (the licence is in `web/LesMudOS.Web/wwwroot/fonts/`).
 
 The driver uses the .NET runtime and the Roslyn compiler (`Microsoft.CodeAnalysis.CSharp`), both under the MIT license, from Microsoft and the .NET Foundation.

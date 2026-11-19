@@ -1,0 +1,20 @@
+@page "/heroes"
+@{
+    ViewData["Title"] = "The Hall of Heroes";
+    ViewData["Description"] = "The ten most renowned living characters of Hollowmere, by Renown: name, title, tier and class.";
+}
+<section class="band">
+    <div class="wrap">
+        <p class="eyebrow">The most renowned</p>
+        <h1>The Hall of Heroes</h1>
+        <div class="prose">
+            <p>Renown is how widely a character's name is known. It is earned by memorable deeds, never lost, and it is the one measure that carries across everything an adventurer does. These are the ten most renowned living characters in Hollowmere today.</p>
+        </div>
+        <partial name="_Roll" model="Game.Snapshot.Heroes" />
+        <div class="prose">
+            <h2>The tiers of Renown</h2>
+            <p>From the least known to the most: Local, Recognized, Acclaimed, Renowned, Famous, Heroic, Legendary, and Mythic. Folk begin to recognize a name from Recognized onward.</p>
+            <p>The deeds that earn it are written into <a href="/chronicle">the Chronicle</a>.</p>
+        </div>
+    </div>
+</section>

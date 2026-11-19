@@ -1,0 +1,81 @@
+@page "/play"
+@{
+    ViewData["Title"] = "How to Play";
+    ViewData["Description"] = "How to enter Hollowmere: what a MUD is, the address to connect to, step-by-step instructions for Windows, macOS, Linux and phones, and what happens at your first login.";
+    ViewData["Script"] = true;
+    var host = Site.Value.GameHost;
+    var port = Site.Value.GamePort;
+    var command = $"telnet {host} {port}";
+}
+<section class="band">
+    <div class="wrap">
+        <p class="eyebrow">Enter Hollowmere</p>
+        <h1>How to play</h1>
+        <div class="prose">
+            <p>Legends of Hollowmere is a MUD: a multiplayer role-playing game told in text, a little like an RPG whose graphics are written out as prose. You read what is around you, type what you want to do, and the world answers, alongside other players.</p>
+            <p>There is no download from this site and no account form on it. You connect to the game with a free MUD client (or plain telnet), and you make your character inside the game the first time you log in.</p>
+        </div>
+
+        <div class="connect">
+            <dl>
+                <dt>Address</dt><dd><code>@host</code></dd>
+                <dt>Port</dt><dd><code>@port</code></dd>
+                <dt>In one line</dt><dd><code>@command</code> <button type="button" class="btn alt small" id="copy-connect" data-copy="@command" hidden>Copy</button></dd>
+            </dl>
+        </div>
+
+        <div class="notice">
+            <b>Your connection is not encrypted.</b> The game is played over plain telnet, so anything you type, including your password, crosses the internet as readable text. Use a password that you use nowhere else.
+        </div>
+
+        <h2 id="first-login">Your first login</h2>
+        <div class="prose">
+            <p>There is nothing to sign up for on the web. Connect, and the game guides you through making a character:</p>
+            <ol class="steps">
+                <li>When it asks <i>By what name are you known?</i>, type the name you want, 2 to 16 letters. A name nobody has used yet starts a new account.</li>
+                <li>Choose a password of at least eight characters, and type it again to confirm. Remember it: it is the only key to your character.</li>
+                <li>Choose your calling: Warrior, Scout, Priest, Mage or Adventurer. Type its name, or <code>help</code> and a name (for example <code>help mage</code>) to read more first.</li>
+                <li>You arrive in Vincent's Hollow. Type <code>help</code> at any time, and <code>look</code> to see where you are.</li>
+            </ol>
+            <p>To come back later, connect the same way, give the same name, and enter your password.</p>
+        </div>
+
+        <h2>Connect, step by step</h2>
+        <div class="platform">
+            <h3>Windows</h3>
+            <ol class="steps">
+                <li>Easiest: install a free MUD client such as Mudlet or MUSHclient, make a new connection to <code>@host</code>, port <code>@port</code>, and leave any "secure" or "SSL" option switched off (the game does not use encryption).</li>
+                <li>Or use plain telnet: open Windows Features, tick <b>Telnet Client</b>, then open a Command Prompt and type <code>@command</code>.</li>
+            </ol>
+        </div>
+        <div class="platform">
+            <h3>macOS</h3>
+            <ol class="steps">
+                <li>Easiest: install a free MUD client such as Mudlet, add a profile for <code>@host</code>, port <code>@port</code>, with encryption off.</li>
+                <li>Or in Terminal: recent macOS no longer includes telnet, but <code>nc @host @port</code> works as a plain connection, and <code>brew install telnet</code> adds telnet itself if you use Homebrew.</li>
+            </ol>
+        </div>
+        <div class="platform">
+            <h3>Linux</h3>
+            <ol class="steps">
+                <li>Install a free MUD client such as Mudlet or TinTin++ from your distribution or its website, and connect to <code>@host</code>, port <code>@port</code>.</li>
+                <li>Or in a terminal: <code>@command</code> (install the <code>telnet</code> package if needed), or <code>nc @host @port</code>.</li>
+            </ol>
+        </div>
+        <div class="platform">
+            <h3>Phones and tablets</h3>
+            <ol class="steps">
+                <li>Search your app store for a MUD client or a telnet app; several free ones exist for both Android and iPhone.</li>
+                <li>Add a connection to <code>@host</code>, port <code>@port</code>, with encryption (SSL/TLS) switched off.</li>
+                <li>A phone keyboard works, but a small external keyboard makes long sessions far more pleasant.</li>
+            </ol>
+        </div>
+
+        <h2>A custom client</h2>
+        <p>A dedicated Legends of Hollowmere client is planned for later. Until then, any client that speaks telnet will do.</p>
+        <div class="actions"><span class="btn soon" aria-disabled="true">Download Client <small>(coming later)</small></span></div>
+
+        <h2>If you get stuck</h2>
+        <p>See the <a href="/support">support page</a>.</p>
+    </div>
+</section>

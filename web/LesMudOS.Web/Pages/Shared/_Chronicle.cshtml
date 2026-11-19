@@ -1,0 +1,26 @@
+@model IEnumerable<ChronicleEntry>
+@* A list of Chronicle entries with the date in the margin. Heading level is passed in ViewData["H"] (default 3). *@
+@{ var h = ViewData["H"] as string ?? "h3"; var ranked = ViewData["Ranked"] is true; var n = 0; }
+<ol class="chron">
+    @foreach (var e in Model)
+    {
+        n++;
+        <li>
+            <div class="when">
+                @if (ranked) { <span class="rank" aria-label="Rank @n">@n.</span> }
+                @if (e.Date.Day != "") { <b>@e.Date.Day</b><span>@e.Date.Month</span><span>@e.Date.Year</span> } else { <span>@e.Date.Full</span> }
+            </div>
+            <div>
+                @Html.Raw($"<{h}>")<a href="/chronicle/@e.Id">@e.Title</a>@Html.Raw($"</{h}>")
+                <p class="meta">
+                    <span class="ess" title="Event Significance Score">ESS @e.Score</span>
+                    @if (e.ClassName != "") { <text> &middot; @e.ClassName</text> }
+                    @if (e.Category != "") { <text> &middot; @e.Category</text> }
+                    @if (e.Featured) { <text> &middot; </text><span class="badge">Featured</span> }
+                </p>
+                <p>@e.Summary</p>
+                <p class="small"><a href="/chronicle/@e.Id">Read the full entry<span class="visually-hidden">: @e.Title</span></a></p>
+            </div>
+        </li>
+    }
+</ol>

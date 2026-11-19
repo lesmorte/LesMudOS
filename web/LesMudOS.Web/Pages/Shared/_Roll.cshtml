@@ -1,0 +1,23 @@
+@model IEnumerable<Hero>
+@if (!Model.Any())
+{
+    <p class="empty">The roll of honour is blank. Be the first name inscribed on it.</p>
+}
+else
+{
+    <ol class="roll">
+        @foreach (var h in Model)
+        {
+            <li>
+                <div>
+                    <span class="name">@h.Name</span>@if (h.Title != "") { <span class="title">, @h.Title</span> }
+                    <span class="rest">
+                    <span class="tier">@h.Tier</span> &middot; Renown @h.Renown.ToString("N0")
+                    @if (h.ClassName != null) { <text> &middot; @h.ClassName</text> }
+                    @if (h.Calling != null) { <text> &middot; @h.Calling</text> }
+                    </span>
+                </div>
+            </li>
+        }
+    </ol>
+}

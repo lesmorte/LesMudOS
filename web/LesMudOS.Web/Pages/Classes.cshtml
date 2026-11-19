@@ -1,0 +1,34 @@
+@page "/classes"
+@{
+    ViewData["Title"] = "Callings and Classes";
+    ViewData["Description"] = "Five callings to begin with and fifteen advanced classes to swear yourself to at the Hall of Legends in Oakenfell, from Knight and Ranger to Cleric, Druid and Artificer.";
+}
+<section class="band">
+    <div class="wrap">
+        <p class="eyebrow">Choose your path</p>
+        <h1>Callings and classes</h1>
+        <div class="prose">
+            <p>Every adventurer begins by choosing one of five callings. Each is a different way of facing the dangers of Hollowmere.</p>
+            <p><b>At Level 5 adventurers may travel to Oakenfell and swear themselves to a profession within the Hall of Legends.</b> Each calling offers three paths, fifteen in all. Further specializations await those who go looking for them.</p>
+        </div>
+        @if (World.Callings.Count == 0)
+        {
+            <p class="empty">The hallmasters are away from their desks. Check back soon.</p>
+        }
+        else
+        {
+            <ul class="callings compact">
+                @foreach (var c in World.Callings)
+                {
+                    <li>
+                        <h2>@c.Name</h2>
+                        <p class="line">@c.Line</p>
+                        <ul class="paths">
+                            @foreach (var p in c.Paths) { <li><b>@p.Name</b>: @p.Line</li> }
+                        </ul>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</section>

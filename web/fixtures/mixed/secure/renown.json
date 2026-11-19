@@ -1,0 +1,41 @@
+{
+  "activeTitle": {
+    "mira": "Hero of Hollowmere"
+  },
+  "discovered": {},
+  "done": {},
+  "infamy": {},
+  "renown": {
+    "alice": 99999,
+    "wilder": 7000,
+    "mira": 5200,
+    "dara": 2600,
+    "bryn": 900,
+    "cade": 40,
+    "eda": 20,
+    "gone": 3000,
+    "zed": 5
+  },
+  "titles": {
+    "mira": [
+      "Local Hero",
+      "Wanderer",
+      "Champion",
+      "Defender of Greenvale",
+      "Voice of the People",
+      "Hero of Hollowmere"
+    ],
+    "dara": [
+      "Local Hero",
+      "Wanderer",
+      "Champion",
+      "Defender of Greenvale",
+      "Voice of the People"
+    ],
+    "bryn": [
+      "Local Hero",
+      "Wanderer",
+      "Champion"
+    ]
+  }
+}

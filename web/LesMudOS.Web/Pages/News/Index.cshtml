@@ -1,0 +1,26 @@
+@page "/news"
+@{
+    ViewData["Title"] = "News";
+    ViewData["Description"] = "News from Hollowmere: announcements, patch notes and world events.";
+    var posts = News.Posts;
+}
+<section class="band">
+    <div class="wrap">
+        <p class="eyebrow">From the town crier</p>
+        <h1>News</h1>
+        @if (posts.Count == 0) { <p class="empty">No news yet. The town crier is still clearing his throat.</p> }
+        else
+        {
+            <ul class="news-list">
+                @foreach (var p in posts)
+                {
+                    <li>
+                        <h2><a href="/news/@p.Slug">@p.Title</a></h2>
+                        <p class="meta"><time datetime="@p.Date.ToString("yyyy-MM-dd")">@p.Date.ToString("d MMMM yyyy")</time></p>
+                        @if (p.Summary != "") { <p>@p.Summary</p> }
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</section>
