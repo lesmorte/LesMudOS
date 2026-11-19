@@ -203,7 +203,7 @@ public class Shopkeeper : Npc
         {
             var price = OfferFor(item);
             var n = QuantityOf(item);
-            Write(price < 1 ? $"{Name} would not buy {item.Call<string>("Short")}.\n"
+            Write(price < 1 ? $"{Name} would not buy {Single(item)} at any number: it is worth nothing here.\n"
                 : n == 1 ? $"{Name} would pay {price} gold for {item.Call<string>("Short")}.\n"
                 : $"{Name} would pay {price} gold each for {item.Call<string>("Short")}, {(long)price * n} gold in all.\n");
             return true;
