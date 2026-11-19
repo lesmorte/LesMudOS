@@ -133,7 +133,8 @@ chmod 750 "$SAVE_DIR"
 NEW_SECRET=""
 if [ ! -f "$ENV_FILE" ]; then
     say "Generating the admin secret"
-    NEW_SECRET="$(tr -dc 'a-z0-9' < /dev/urandom | head -c 32)"
+    # Not 'tr < /dev/urandom | head': with pipefail, head closing the pipe kills tr and the script.
+    NEW_SECRET="$(head -c 256 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-32)"
     printf 'LESMUDOS_ADMIN_SECRET=%s\n' "$NEW_SECRET" > "$ENV_FILE"
 fi
 chown root:root "$ENV_FILE"
