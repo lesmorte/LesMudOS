@@ -207,8 +207,18 @@ public class Player : Adventurer
         lastLogin = Time();
 
         EnableCommands();
+        BindChannelVerbs(); // first, so that no channel name can take over a command the game already has
         BeginAdventure();
         AddAction("say", CmdSay);
+        AddAction("'", CmdSay);
+        AddAction("tell", a => ToComm("DoTell", a));
+        AddAction("reply", a => ToComm("DoReply", a));
+        AddAction("whisper", a => ToComm("DoWhisper", a));
+        AddAction("shout", CmdShout);
+        AddAction("ignore", CmdIgnore);
+        AddAction("unignore", CmdUnignore);
+        AddAction("channels", a => ToChannels("Listing", ""));
+        AddAction("channel", a => ToChannels("Switch", a));
         AddAction("who", CmdWho);
         AddAction("title", CmdTitle);
         AddAction("renown", a => { Write(LoadObject("/secure/renown").Call<string>("RenownText", Name) ?? ""); return true; });
@@ -254,15 +264,7 @@ public class Player : Adventurer
 
     // ---- Player commands ----
 
-    private bool CmdSay(string args)
-    {
-        if (args == "") { NotifyFail("Say what?"); return false; }
-        // What a player types is shown as typed: braces are escaped so that it cannot carry tags.
-        args = Esc(args);
-        Write($"You say: {args}\n");
-        Say($"{Name} says: {args}\n");
-        return true;
-    }
+    private bool CmdSay(string args) => ToComm("DoSay", args);
 
     private bool CmdWho(string args)
     {
@@ -358,6 +360,9 @@ public class Player : Adventurer
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "Corpses:   {cmd}loot{/} [CORPSE], {cmd}get{/} THING (or all) from CORPSE, {cmd}look in{/} CORPSE\n" +
             "Gear:      {cmd}wield{/} THING, {cmd}unwield{/}, {cmd}wear{/} THING, {cmd}remove{/} THING, {cmd}eat{/}/{cmd}drink{/} THING\n" +
+            "Speaking:  {cmd}say{/} TEXT (or {cmd}'{/} TEXT), {cmd}tell{/} PLAYER TEXT, {cmd}reply{/} TEXT, {cmd}whisper{/} TEXT {cmd}to{/} PLAYER, {cmd}shout{/} TEXT\n" +
+            "           {cmd}shout off{/} / {cmd}shout on{/} (stop or hear shouts), {cmd}ignore{/} [PLAYER], {cmd}unignore{/} PLAYER,\n" +
+            "           {cmd}channels{/} (your channels), {cmd}channel{/} NAME {cmd}on{/}|{cmd}off{/}, {cmd}shout{/} NAME TEXT or NAME TEXT to speak on one\n" +
             "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING,\n" +
             "           {cmd}give{/} [N|all] THING {cmd}to{/} PLAYER, {cmd}search{/} (for hidden ways)\n" +
             "Crafting:  {cmd}skin{/}, {cmd}bleed{/}, {cmd}harvest{/}, {cmd}craft{/}, {cmd}combine{/}, {cmd}recipes{/}, {cmd}recipe{/}, {cmd}proficiencies{/},\n" +
@@ -576,6 +581,10 @@ public class Player : Adventurer
         var segs = raw.Select(x => x.Trim()).ToArray();
         if (segs.Any(x => x == "." || x == "..")) return "Illegal path.";
         bool Is(int i, string name) => segs.Length > i && string.Equals(segs[i], name, StringComparison.OrdinalIgnoreCase);
+
+        // The channel files decide who belongs to which channel, so they are as protected as the registry itself.
+        if (Is(0, "channels"))
+            return level >= LevelSystemFiles ? null : $"You need wizard level {LevelSystemFiles} to change /channels.";
 
         if (Is(0, "secure") || Is(0, "std"))
             return level >= LevelSystemFiles ? null : $"You need wizard level {LevelSystemFiles} to change /secure and /std.";
@@ -1025,5 +1034,135 @@ public class Player : Adventurer
         Say($"{Name} disconnects.\n");
         ReleaseInventory();
         Destruct();
+    }
+
+    // ---- Communication (docs/specs/communication.md) ----
+    // A self-contained block. The commands are run by /secure/comm (say, tell, reply, whisper, shout) and /secure/channels
+    // (channels); this body binds the verbs and keeps what the character chose: who is ignored, whether shouts are heard, which
+    // channels are switched off or joined. Only those two daemons may read or change it, which they do for the player whose
+    // command is running. Which channels a character belongs to is not kept here: the channel service decides it from the
+    // wizard level at every message.
+
+    private const string CommDaemon = "/secure/comm";
+    private const string ChannelDaemon = "/secure/channels";
+
+    /// <summary>Lower-case names of the characters this one ignores.</summary>
+    [Saved] private List<string> ignored = new();
+    [Saved] private bool shoutOn = true;
+    [Saved] private List<string> channelsOff = new();
+    [Saved] private List<string> channelsJoined = new();
+    private string lastTeller = "";
+
+    private static bool IsCommDaemon(ObjectRef? ob) => ob != null && !ob.IsClone && (ob.ProgramPath == CommDaemon || ob.ProgramPath == ChannelDaemon);
+
+    private bool FromCommDaemon() => IsCommDaemon(PreviousObject());
+
+    public bool QueryIgnores(string name) => FromCommDaemon() && ignored.Contains(name);
+
+    public bool QueryShoutOn() => FromCommDaemon() && shoutOn;
+
+    public bool QueryChannelOff(string id) => FromCommDaemon() && channelsOff.Contains(id);
+
+    public bool QueryChannelJoined(string id) => FromCommDaemon() && channelsJoined.Contains(id);
+
+    public string QueryLastTeller() => FromCommDaemon() ? lastTeller : "";
+
+    public void SetLastTeller(string name)
+    {
+        if (FromCommDaemon()) lastTeller = name;
+    }
+
+    public void SetShoutOn(bool on)
+    {
+        if (!FromCommDaemon()) return;
+        shoutOn = on;
+        Save();
+    }
+
+    public void SetChannelOff(string id, bool off)
+    {
+        if (!FromCommDaemon()) return;
+        channelsOff.Remove(id);
+        if (off) channelsOff.Add(id);
+        Save();
+    }
+
+    public void SetChannelJoined(string id, bool joined)
+    {
+        if (!FromCommDaemon()) return;
+        channelsJoined.Remove(id);
+        if (joined) channelsJoined.Add(id);
+        Save();
+    }
+
+    private bool ToComm(string function, string args)
+    {
+        var text = LoadObject(CommDaemon).Call<string>(function, args);
+        if (!string.IsNullOrEmpty(text)) Write(text);
+        return true;
+    }
+
+    private bool ToChannels(string function, string args)
+    {
+        var text = LoadObject(ChannelDaemon).Call<string>(function, args);
+        if (!string.IsNullOrEmpty(text)) Write(text);
+        return true;
+    }
+
+    /// <summary>The name of every channel is a command, for those who belong to it (the others get "What?", as for any unknown word).</summary>
+    private void BindChannelVerbs()
+    {
+        foreach (var id in LoadObject(ChannelDaemon).Call<List<string>>("QueryVerbs") ?? new List<string>())
+        {
+            var verb = id;
+            AddAction(verb, a => SpeakOnChannel(verb, a));
+        }
+    }
+
+    private bool SpeakOnChannel(string channel, string text)
+    {
+        var reply = LoadObject(ChannelDaemon).Call<string>("Send", channel, text);
+        if (reply == null) return false; // not a member, or no such channel
+        if (reply != "") Write(reply);
+        return true;
+    }
+
+    /// <summary>"shout text"; "shout channel text" if the first word is a channel the character belongs to; "shout off" and "shout on".</summary>
+    private bool CmdShout(string args)
+    {
+        args = args.Trim();
+        var space = args.IndexOf(' ');
+        var first = space < 0 ? args : args.Substring(0, space);
+        if (first != "" && LoadObject(ChannelDaemon).Call<bool>("IsMember", first))
+            return SpeakOnChannel(first, space < 0 ? "" : args.Substring(space + 1));
+        return ToComm("DoShout", args);
+    }
+
+    private bool CmdIgnore(string args)
+    {
+        var name = args.Trim().ToLowerInvariant();
+        if (name == "")
+        {
+            Write(ignored.Count == 0 ? "You are not ignoring anyone.\n" : "You are ignoring: " + string.Join(", ", ignored.Select(Cap)) + "\n");
+            return true;
+        }
+        if (name.Length < 2 || name.Length > 16 || !name.All(char.IsLetter)) { Write("Usage: {cmd}ignore{/} [PLAYER]\n"); return true; }
+        if (name == Name.ToLowerInvariant()) { Write("You cannot ignore yourself.\n"); return true; }
+        if (ignored.Contains(name)) { Write($"You are already ignoring {Cap(name)}.\n"); return true; }
+        if (ignored.Count >= (LoadObject(CommDaemon).Call<int>("QueryMaxIgnored"))) { Write("Your ignore list is full.\n"); return true; }
+        ignored.Add(name);
+        Save();
+        Write($"You are now ignoring {Cap(name)}: their tells and whispers are not delivered and you do not hear their shouts or channel messages.\n");
+        return true;
+    }
+
+    private bool CmdUnignore(string args)
+    {
+        var name = args.Trim().ToLowerInvariant();
+        if (name == "" || name.Contains(' ')) { Write("Usage: {cmd}unignore{/} PLAYER\n"); return true; }
+        if (!ignored.Remove(name)) { Write($"You are not ignoring {Esc(Cap(name))}.\n"); return true; }
+        Save();
+        Write($"You no longer ignore {Esc(Cap(name))}.\n");
+        return true;
     }
 }

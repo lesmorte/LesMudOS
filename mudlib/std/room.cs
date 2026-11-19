@@ -18,6 +18,10 @@ public abstract class Room : MudObject
     protected bool LogoutRoom;
     /// <summary>Seconds between resets. Set it before the first AddSpawn.</summary>
     protected int ResetSeconds = 300;
+    /// <summary>No tell, from or to anyone in this room (wizards are not bound). docs/specs/communication.md.</summary>
+    protected bool NoTell;
+    /// <summary>Shouts neither leave this room nor are heard in it (wizards are not bound).</summary>
+    protected bool NoShout;
 
     private sealed class Spawn
     {
@@ -142,6 +146,10 @@ public abstract class Room : MudObject
     // ---- Queries ----
 
     public bool QuerySafe() => Safe;
+
+    public bool QueryNoTell() => NoTell;
+
+    public bool QueryNoShout() => NoShout;
 
     public bool QueryLogoutRoom() => LogoutRoom;
 
