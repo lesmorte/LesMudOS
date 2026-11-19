@@ -264,11 +264,44 @@ public class Player : Adventurer
         return true;
     }
 
+    // ---- Idle and timeout (server settings: see docs/DEPLOY.md) ----
+
+    private bool idleWarned;
+
+    /// <summary>True once the player has typed nothing for the server's idle time. Empty lines and telnet keep-alives are not typing.</summary>
+    public override bool QueryIdle() => IdleSeconds(Self) >= IdleLimitSeconds();
+
+    public int QueryIdleSeconds() => IdleSeconds(Self);
+
+    /// <summary>How long before the disconnect the warning comes: two minutes, or half the timeout if that is shorter.</summary>
+    private static int WarningLead(int timeout) => Math.Min(120, timeout / 2);
+
+    protected override void IdleCheck()
+    {
+        var idle = IdleSeconds(Self);
+        var timeout = TimeoutSeconds();
+        var warnAt = timeout - WarningLead(timeout);
+        if (idle < warnAt) { idleWarned = false; return; }
+        if (QueryWizLevel() > 0) return; // wizards stay connected
+        if (idle >= timeout)
+        {
+            Write("You have been idle for too long. Your character is saved and you are disconnected.\n");
+            CmdQuit("");
+            return;
+        }
+        if (idleWarned) return;
+        idleWarned = true;
+        var left = timeout - idle;
+        Write($"You have been idle for a while. Type something in the next {(left >= 90 ? $"{(left + 30) / 60} minutes" : $"{left} seconds")} or you will be saved and disconnected.\n");
+    }
+
+    private static string IdleSuffix(int seconds) => seconds >= 120 ? $" (idle {seconds / 60}m)" : $" (idle {seconds}s)";
+
     private bool CmdWho(string args)
     {
         var users = Users()
             .Where(u => u.Call<string>("Short") != null)
-            .Select(u => u.Call<string>("Short") + (u.Call<int>("QueryWizLevel") > 0 ? $" [wizard {u.Call<int>("QueryWizLevel")}]" : ""))
+            .Select(u => u.Call<string>("Short") + (u.Call<int>("QueryWizLevel") > 0 ? $" [wizard {u.Call<int>("QueryWizLevel")}]" : "") + (u.Call<bool>("QueryIdle") ? IdleSuffix(u.Call<int>("QueryIdleSeconds")) : ""))
             .ToList();
         Write($"{users.Count} player(s) online:\n  " + string.Join("\n  ", users) + "\n");
         return true;
@@ -351,11 +384,13 @@ public class Player : Adventurer
         if (args.Trim() != "" && CraftHelp(args) is { } craftTopic) { Write(craftTopic); return true; }
         Write(
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
-            "          {cmd}who{/}, {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], and the exits of the room you are in.\n" +
+            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
-            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/}, {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/}),\n" +
+            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/}),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
+            "Names:     where a command takes a name you can say which one: {cmd}rat 2{/}, {cmd}2.rat{/}, {cmd}second rat{/}\n" +
+            "           (while fighting you cannot get, loot or walk away: {cmd}flee{/})\n" +
             "Corpses:   {cmd}loot{/} [CORPSE], {cmd}get{/} THING (or all) from CORPSE, {cmd}look in{/} CORPSE\n" +
             "Gear:      {cmd}wield{/} THING, {cmd}unwield{/}, {cmd}wear{/} THING, {cmd}remove{/} THING, {cmd}eat{/}/{cmd}drink{/} THING\n" +
             "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING,\n" +

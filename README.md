@@ -146,7 +146,7 @@ Introduce a syntax error and update again: the error comes back with file and li
 
 New characters now start in the Village Square of Vincent's Hollow (the start room is the `StartRoom` constant in `mudlib/std/player.cs`; `/domains/town` stays as the small technical demo). The gameplay systems are described in [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md), and builders should read [docs/BUILDING.md](docs/BUILDING.md).
 
-Player commands: `ansi`, `kill`/`attack`, `flee`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `skills`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
+Player commands: `ansi`, `verbose`, `prompt`, `kill`/`attack`, `flee [DIRECTION]`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `hp`, `skills`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
 
 Combat has no rounds. Each fighter acts when its own Reaction Time and the Recovery of its last action have passed (an unarmed player strikes every 6 seconds, one with a sword every 8), and `score`, `consider` and `stat` show the numbers. Drinking a potion mid-fight is queued for your next ready moment; `stop` cancels it. See docs/COMBAT_TIMING.md.
 
@@ -201,6 +201,7 @@ public class Lantern : Item
 | `tests/find_test.py` | Finds: treasure in hidden places that each character takes once, for less each time; the register, wizards, the sandbox, restarts, and the five converted places (port 4827, about 1 minute) |
 | `tests/city_test.py` | Walk-through of Oakenfell (the city and the two Vale Road rooms that remain): the map against its build document, every detail, person and shop, a new character walking from the Southgate Approach to the Hall of Callings (about 7 minutes) |
 | `tests/corridor_test.py` | Walk-through of the Greenvale Transit Corridor (122 rooms): map, bands, areas, creatures per zone, hidden ways and the Chronicle, resource nodes, patrols, every detail, person and shop, and a new character walking from the Village Square to Oakenfell (port 4828, about 9 minutes; `corridor_test.py static` needs no game) |
+| `tests/playfeel_test.py` | Numbered targets, inventory and list format, corpses, combat restrictions and flee, shared experience, verbose, prompt, idle and timeout (port 4831, about 6 minutes) |
 | `tests/load_check.py` | Quick check that every area file compiles and loads (port 4821, under a minute) |
 | `tests/timing_test.py` | Measures real intervals between combat actions against the timing formula (port 4815, about 3 minutes) |
 | `tests/balance_sim.py` | Standalone combat balance simulation (event clock); `check` compares it with the mudlib numbers |
@@ -215,6 +216,7 @@ LESMUDOS_TEST_PORT=4811 python3 tests/smoke_test.py
 LESMUDOS_TEST_PORT=4812 python3 tests/area_test.py
 LESMUDOS_TEST_PORT=4813 python3 tests/playthrough_test.py
 LESMUDOS_TEST_PORT=4821 python3 tests/load_check.py
+LESMUDOS_TEST_PORT=4831 python3 tests/playfeel_test.py
 LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
 LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
 python3 tests/balance_sim.py

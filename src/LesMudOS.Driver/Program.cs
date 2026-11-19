@@ -1,10 +1,12 @@
 using LesMudOS.Driver;
 using LesMudOS.Driver.Net;
 
-// Usage: LesMudOS.Driver [--mudlib <dir>] [--save <dir>] [--port <n>]
+// Usage: LesMudOS.Driver [--mudlib <dir>] [--save <dir>] [--port <n>] [--idle-minutes <n>] [--timeout-minutes <n>]
+// (the environment overrides the idle settings: LESMUDOS_IDLE_MINUTES, LESMUDOS_TIMEOUT_MINUTES; see docs/DEPLOY.md)
 var mudlib = "mudlib";
 var save = "save";
 var port = 4000;
+var settings = new DriverSettings();
 
 for (var i = 0; i < args.Length - 1; i++)
 {
@@ -13,6 +15,8 @@ for (var i = 0; i < args.Length - 1; i++)
         case "--mudlib": mudlib = args[++i]; break;
         case "--save": save = args[++i]; break;
         case "--port": port = int.Parse(args[++i]); break;
+        case "--idle-minutes": settings.SetIdle(args[++i], "--idle-minutes"); break;
+        case "--timeout-minutes": settings.SetTimeout(args[++i], "--timeout-minutes"); break;
     }
 }
 
@@ -29,7 +33,11 @@ var adminSecret = Environment.GetEnvironmentVariable("LESMUDOS_ADMIN_SECRET");
 Log.Info(string.IsNullOrEmpty(adminSecret)
     ? "no LESMUDOS_ADMIN_SECRET set: the first level-10 wizard cannot be created"
     : "admin secret configured");
-var kernel = new Kernel(mudlib, save, adminSecret);
+settings.SetIdle(Environment.GetEnvironmentVariable("LESMUDOS_IDLE_MINUTES"), "LESMUDOS_IDLE_MINUTES");
+settings.SetTimeout(Environment.GetEnvironmentVariable("LESMUDOS_TIMEOUT_MINUTES"), "LESMUDOS_TIMEOUT_MINUTES");
+settings.Settle();
+Log.Info($"idle after {settings.IdleSeconds:0.##}s without input, disconnect after {settings.TimeoutSeconds:0.##}s");
+var kernel = new Kernel(mudlib, save, adminSecret, settings);
 var server = new TelnetServer(kernel, port);
 
 // The game loop gets a dedicated thread with a generous stack, so the

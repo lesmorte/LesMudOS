@@ -207,6 +207,18 @@ public abstract class MudObject
     /// </summary>
     protected long TimeMs() => D.TimeMs();
 
+    /// <summary>
+    /// Whole seconds since the object's player last typed a line (0 if it has no connection). An empty line or telnet keep-alive
+    /// is not typing.
+    /// </summary>
+    protected int IdleSeconds(ObjectRef ob) => D.IdleSeconds(ob);
+
+    /// <summary>The server setting: seconds without typing until a player counts as idle.</summary>
+    protected int IdleLimitSeconds() => D.IdleLimitSeconds();
+
+    /// <summary>The server setting: seconds without typing until a player is disconnected.</summary>
+    protected int TimeoutSeconds() => D.TimeoutSeconds();
+
     /// <summary>Random integer in [0, n).</summary>
     protected int Random(int n) => n <= 0 ? 0 : System.Random.Shared.Next(n);
 

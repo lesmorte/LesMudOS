@@ -111,6 +111,17 @@ Set any of these before running the script, for example `MUDLIB_WRITABLE=all bas
 - **`wiz` (default).** Wizards can create and edit files in their own home directories from inside the game. Nobody can change the live world from inside the game: `edit`, `copy`, `delete` and the rest fail outside `/wiz`. The world changes only when you update from the repository. This is the safer choice, and the right one until the sandbox and publishing work is finished.
 - **`all`.** Level 5 wizards and above can edit the live world from inside the game, and approving a wizard's work can publish it into the world. Changes made this way exist only on the droplet until someone copies them back into the repository, and an update replaces them with the repository's versions.
 
+### Idle players
+
+Two server settings of the driver (not of the setup script), given as `--idle-minutes N` / `--timeout-minutes N` on its command line or, taking precedence, as environment variables, for example in the systemd unit:
+
+| Setting | Environment | Default | Meaning |
+|---|---|---|---|
+| `--idle-minutes` | `LESMUDOS_IDLE_MINUTES` | `5` | Minutes without typed input until a player is marked idle in `who` and earns no experience |
+| `--timeout-minutes` | `LESMUDOS_TIMEOUT_MINUTES` | `10` | Minutes without typed input until the player is saved and disconnected, after a warning two minutes before (half the time, if shorter). Wizards are never disconnected |
+
+A value is minutes (`0.5` is allowed), or a number with `s` or `m` (`30s`); the seconds form is for tests. Empty lines and telnet keep-alives do not count as activity. A timeout shorter than the idle time is raised to it.
+
 ## 4. Make yourself the first wizard
 
 1. Connect: `telnet <droplet ip> 4000` (or any MUD client).

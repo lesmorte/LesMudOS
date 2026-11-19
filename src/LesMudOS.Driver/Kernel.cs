@@ -52,8 +52,11 @@ internal sealed class Kernel : IDriverServices
 
     private sealed record CallOutEntry(int Id, ObjectRef Owner, ObjectRef? Player, Action Function);
 
-    public Kernel(string mudlibRoot, string saveRoot, string? adminSecret = null)
+    private readonly DriverSettings _settings;
+
+    public Kernel(string mudlibRoot, string saveRoot, string? adminSecret = null, DriverSettings? settings = null)
     {
+        _settings = settings ?? new DriverSettings();
         if (!string.IsNullOrEmpty(adminSecret))
             _adminSecretHash = SHA256.HashData(Encoding.UTF8.GetBytes(adminSecret));
         _mudlibRoot = Path.GetFullPath(mudlibRoot).TrimEnd(Path.DirectorySeparatorChar);
@@ -677,6 +680,12 @@ internal sealed class Kernel : IDriverServices
     // =====================================================================
 
     public long TimeMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    public int IdleSeconds(ObjectRef ob) => ob.Connection is Connection c ? (int)Math.Max(0, (TimeMs() - c.LastInputMs) / 1000) : 0;
+
+    public int IdleLimitSeconds() => (int)Math.Ceiling(_settings.IdleSeconds);
+
+    public int TimeoutSeconds() => (int)Math.Ceiling(_settings.TimeoutSeconds);
 
     public int CallOut(ObjectRef owner, Action function, double delaySeconds)
     {

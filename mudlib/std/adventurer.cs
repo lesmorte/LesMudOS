@@ -253,7 +253,7 @@ public abstract class Adventurer : Living
 
     public void AddXp(int amount)
     {
-        if (amount <= 0) return;
+        if (amount <= 0 || QueryIdle()) return; // nobody earns experience while away from the keyboard
         xp += amount;
         Tell($"You gain {amount} experience.\n");
         CheckLevelUp();
@@ -734,8 +734,13 @@ public abstract class Adventurer : Living
 
     protected override bool NeedsHeartBeat() => true;
 
+    /// <summary>Called on every heart beat. A player overrides it to watch for idleness; other characters have none.</summary>
+    protected virtual void IdleCheck() { }
+
     protected override void Tick()
     {
+        IdleCheck();
+        if (Dead || !Self.IsAlive) return;
         if (++regenBeats < RegenBeats) return;
         regenBeats = 0;
         if (QueryInCombat() || Hp >= QueryMaxHp()) { hpCarry = 0; return; }

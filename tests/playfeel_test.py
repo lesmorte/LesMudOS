@@ -274,6 +274,17 @@ def run(work, mudlib, box):
     run_shared_xp(wiz)
     run_verbose(wiz)
     run_prompt(wiz)
+    wiz.command("save")
+    wiz.command("shutdown")
+    box[0].wait(timeout=15)
+    box[1].flush()
+    # The idle tests need short times: a second driver on the same mudlib and saves, with the two settings in seconds.
+    os.environ["LESMUDOS_IDLE_MINUTES"] = "4s"
+    os.environ["LESMUDOS_TIMEOUT_MINUTES"] = "14s"
+    box[0], box[1] = a.start_driver(work, mudlib)
+    wiz = login("wiz")
+    wiz.command("goto " + TEST + "hub")
+    run_idle(wiz)
 
 
 # ===== 5. telling identical things apart =====
@@ -728,6 +739,7 @@ def run_prompt(wiz):
     # Live values.
     pat.command("down")
     pat.command("lab")
+    a.drain(pat, 0.5)
     check("prompt: a zapper is taken", pat.command("get zapper"), "You take a zapper.")
     text = pat.command("zap me 5")
     check("prompt: Vitality is live", "ok" if stat3(last_line(text)) and stat3(last_line(text))[0] == 25 else repr(text), "ok")
@@ -821,6 +833,65 @@ def run_prompt(wiz):
 
 
 ANSI_RE = h.ANSI
+
+
+def keep_alive(c, seconds):
+    """Send only what is not typing: empty lines and the telnet NOP, once a second."""
+    end = time.time() + seconds
+    while time.time() < end:
+        c.sock.sendall(b"\r\n")
+        c.sock.sendall(b"\xff\xf1")
+        time.sleep(1)
+
+
+def who_line(wiz, name):
+    for line in wiz.command("who").splitlines():
+        if name in line:
+            return line
+    return "(not listed)"
+
+
+def run_idle(wiz):
+    dozer = login("dozer")
+    dozer.command("title Dozer")
+    sleepy = login("sleepy")
+    check("idle: setup, a second wizard", wiz.command("promote sleepy 1"), "wizard level 1")
+    sleepy.command("save")
+    sleepy_quiet_since = time.time()
+    napper = login("napper")
+    napper.command("look")
+    keep_alive(napper, 6)  # dozer and sleepy are as quiet; the wizard keeps typing
+    check("idle: empty lines and telnet NOP do not count as activity", who_line(wiz, "Napper"), "(idle ")
+    check("idle: a player who keeps typing is not marked", who_line(wiz, "Wiz"), "Wiz", absent=("(idle",))
+    napper.command("look")
+    a.drain(napper, 0.7)
+    check("idle: typing clears the mark", who_line(wiz, "Napper"), "Napper", absent=("(idle",))
+    check("idle: a quiet wizard is marked too", who_line(wiz, "Sleepy"), "[wizard 1]", "(idle ")
+
+    # The warning comes before the disconnect (timeout 14 s, warning at 7 s).
+    check("idle: a warning comes before the disconnect", dozer.read_until("idle for a while", timeout=15), "You have been idle for a while", "disconnected")
+    check("idle: then the disconnect, with a message", dozer.read_until("idle for too long", timeout=20), "saved and you are disconnected")
+    check("idle: and the connection closes", "ok" if dozer.closed(timeout=10) else "still open", "ok")
+    again = login("dozer")
+    check("idle: the character was saved (its title is back)", who_line(wiz, "Dozer"), "Dozer")
+    again.command("quit")
+
+    # A wizard is exempt from the disconnect.
+    time.sleep(max(0, sleepy_quiet_since + 17 - time.time()))
+    check("idle: a wizard idle past the timeout is still connected", sleepy.command("look"), "Obvious exits", absent=("disconnected",))
+
+    # Item 8: someone idle drops out of the shared experience.
+    fresh_pinata(wiz)
+    p1, p2 = lab_player("idlea"), lab_player("idleb")
+    x1, x2 = xp_of(p1), xp_of(p2)
+    p1.command("zap pinata 50")
+    keep_alive(p1, 5)
+    p2.command("zap pinata 50")
+    a.drain(p2, 0.5)
+    check("idle shared xp: the idle contributor is dropped, the other gets it all", "ok" if xp_of(p2) - x2 == 100 else str(xp_of(p2) - x2), "ok")
+    a.drain(p1, 0.7)
+    gained = xp_of(p1) - x1
+    check("idle shared xp: the idle one gains no experience", "ok" if gained == 0 else str(gained), "ok")
 
 
 def ansi_free(text):
