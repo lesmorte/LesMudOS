@@ -727,7 +727,7 @@ public class ExampleArea : Area
 
 (Crafting adds: a corpse remembers the creature's kind, level, skin and blood; each can be taken once, by `skin` and `bleed`, under the same 30-minute lock, and a corpse with a part still to take does not crumble when it is empty. See CRAFTING.md.)
 
-You do not build corpses; `Monster` and the player's death make them. For a builder it means: loot and gold are in the corpse (`loot`, `get X from corpse`, `look in corpse`), nothing falls to the floor, the players who hurt the creature have half an hour to themselves, a corpse is gone at once when its last item is taken (one that was empty from the start, after two minutes), and a monster corpse still holding loot rots after an hour. Items you want a monster to always drop: `AddLoot(path, 100)`. Items lying on the floor of a room are done with `AddSpawn`.
+You do not build corpses; `Monster` and the player's death make them. For a builder it means: loot and gold are in the corpse (`loot`, `get X from corpse`, `look in corpse`), nothing falls to the floor, the players who hurt the creature have half an hour to themselves, a corpse is gone at once when its last item is taken (one that was empty from the start, after two minutes), and a creature's corpse rots after ten minutes whatever it still holds (a skin included; give the creature a public `int CorpseSeconds` to change that, up to an hour), while a player's keeps its hour. Items you want a monster to always drop: `AddLoot(path, 100)`. Items lying on the floor of a room are done with `AddSpawn`.
 
 ## Testing in the game
 

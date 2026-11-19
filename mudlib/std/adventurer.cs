@@ -1478,6 +1478,8 @@ public abstract class Adventurer : Living
 
     /// <summary>Proficiency id to its value in tenths of a point (0 to 1000). Ids are those of the crafting data.</summary>
     [Saved] private Dictionary<string, int> craftProficiencies = new();
+    /// <summary>Proficiency id to the character's place on the growth ladder (never shown). Absent means the first rung.</summary>
+    [Saved] private Dictionary<string, int> craftLadder = new();
     /// <summary>Recipe id to how it was learned: "taught" or "discovered".</summary>
     [Saved] private Dictionary<string, string> craftRecipes = new();
 
@@ -1506,6 +1508,18 @@ public abstract class Adventurer : Living
         if (!FromCraftDaemon() || string.IsNullOrEmpty(id) || id.Length > 40 || tenths < 0 || tenths > 1000) return false;
         if (!craftProficiencies.ContainsKey(id) && craftProficiencies.Count >= 100) return false;
         craftProficiencies[id] = tenths;
+        return true;
+    }
+
+    /// <summary>The place on the growth ladder for a proficiency. Only the crafting daemon is told; anyone else gets 0.</summary>
+    public int QueryCraftLadder(string id) => FromCraftDaemon() ? craftLadder.GetValueOrDefault(id ?? "") : 0;
+
+    /// <summary>Set the place on the growth ladder. Only the crafting daemon may.</summary>
+    public bool CraftSetLadder(string id, int position)
+    {
+        if (!FromCraftDaemon() || string.IsNullOrEmpty(id) || id.Length > 40 || position < 0 || position > 10000) return false;
+        if (!craftLadder.ContainsKey(id) && craftLadder.Count >= 100) return false;
+        if (position == 0) craftLadder.Remove(id); else craftLadder[id] = position;
         return true;
     }
 

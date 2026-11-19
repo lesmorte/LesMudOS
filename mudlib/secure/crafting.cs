@@ -497,8 +497,8 @@ public class CraftingDaemon : Thing
         ["harvest.max_quality"] = new[] { 4.0 },
         ["difficulty.beast_scale"] = new[] { 5.0 }, ["difficulty.level_weight"] = new[] { 1.0 }, ["difficulty.node_scale"] = new[] { 5.0 },
         ["bleed.fresh_seconds"] = new[] { 300.0 },
-        ["growth.near_band"] = new[] { 10.0 }, ["growth.easy_band"] = new[] { 30.0 }, ["growth.near_gain"] = new[] { 10.0 },
-        ["growth.easy_gain"] = new[] { 3.0 }, ["growth.drag"] = new[] { 125.0 }, ["growth.min_factor"] = new[] { 0.2 },
+        ["growth.near_band"] = new[] { 10.0 }, ["growth.easy_band"] = new[] { 30.0 },
+        ["growth.ladder"] = new[] { 20.0, 25, 50, 75, 100 }, ["growth.repeat_every"] = new[] { 20.0 }, ["growth.easy_factor"] = new[] { 0.5 },
         ["craft.shift_per_point"] = new[] { 0.02 }, ["craft.shift_min"] = new[] { -1.5 }, ["craft.shift_max"] = new[] { 1.0 },
         ["craft.noise"] = new[] { 0.75 }, ["craft.noise_steps"] = new[] { 20.0 }, ["craft.max_quality"] = new[] { 4.0 },
         ["craft.bonus_margin"] = new[] { 20.0 }, ["craft.bonus_per_point"] = new[] { 0.5 }, ["craft.bonus_max"] = new[] { 25.0 },
@@ -691,19 +691,72 @@ public class CraftingDaemon : Thing
         _ => (Random(range + 1), Random(range + 1)),
     };
 
-    /// <summary>How many tenths of a point of proficiency one successful piece of work adds, at a skill (in tenths) and a work level.</summary>
-    private int Gain(int tenths, double work)
+    /// <summary>
+    /// The ladder of chances (percent) for a skill in tenths: each rung of growth.ladder repeated (1 + skill / growth.repeat_every)
+    /// times, whole points. A character's position is an index into this list.
+    /// </summary>
+    private List<double> Ladder(int tenths)
     {
-        var skill = tenths / 10.0;
-        var gap = skill - work;
-        var gainBase = gap <= Num1("growth.near_band", 10) ? Num1("growth.near_gain", 10) : gap <= Num1("growth.easy_band", 30) ? Num1("growth.easy_gain", 3) : 0;
-        if (gainBase <= 0 || tenths >= 1000) return 0;
-        var factor = Math.Max(Num1("growth.min_factor", 0.2), 1 - skill / Num1("growth.drag", 125));
-        return Math.Max(1, (int)Math.Round(gainBase * factor, MidpointRounding.AwayFromZero));
+        var rungs = numbers.TryGetValue("growth.ladder", out var l) && l.Count > 0 ? l : Defaults["growth.ladder"].ToList();
+        var every = Math.Max(1.0, Num1("growth.repeat_every", 20));
+        var repeat = 1 + (int)Math.Floor(Math.Max(0, tenths / 10.0) / every);
+        var list = new List<double>();
+        foreach (var r in rungs) for (var i = 0; i < repeat; i++) list.Add(r);
+        return list;
     }
 
-    /// <summary>The gain in tenths for a skill in tenths and a work level, for tests. Pure.</summary>
-    public int GainFor(int tenths, double work) { EnsureLoaded(); return Gain(tenths, work); }
+    /// <summary>
+    /// One successful piece of work at a work level, by a character with this skill (tenths) and ladder position. The roll is
+    /// 0 up to (not including) 100; a point is gained if it is below the chance. Work more than growth.easy_band below the skill
+    /// teaches nothing and leaves the position; easy work rolls at growth.easy_factor of the rung's chance; either way a miss
+    /// moves to the next rung (the last stays). A gain sends the position back to the first rung. speed multiplies the chance
+    /// (1.0 now; a later bonus to learning), which is capped at 100.
+    /// </summary>
+    private (bool Gained, int Next) GrowthStep(int tenths, double work, int position, double roll, double speed)
+    {
+        if (tenths >= 1000) return (false, position);
+        var gap = tenths / 10.0 - work;
+        if (gap > Num1("growth.easy_band", 30)) return (false, position);
+        var rungs = Ladder(tenths);
+        var at = Math.Clamp(position, 0, rungs.Count - 1);
+        var chance = rungs[at];
+        if (gap > Num1("growth.near_band", 10)) chance *= Num1("growth.easy_factor", 0.5);
+        chance = Math.Min(100, chance * speed);
+        return roll < chance ? (true, 0) : (false, Math.Min(at + 1, rungs.Count - 1));
+    }
+
+    /// <summary>The growth roll, 0 to 100. Test rolls: mid and high always gain (roll 0), low never does, random is random.</summary>
+    private double RollGrowth() => rollMode switch
+    {
+        "mid" or "high" => 0.0,
+        "low" or "fail" => 100.0,
+        _ => Random(10000) / 100.0,
+    };
+
+    /// <summary>What multiplies the chance of a point for this character (1.0; a later class bonus to learning goes here).</summary>
+    private double LearnSpeed(ObjectRef who) => 1.0;
+
+    /// <summary>
+    /// A growth step for tests. Pure. Returns [1 if a point is gained else 0, the next ladder position] for a skill in tenths,
+    /// a work level, a ladder position and a roll (0 to 100).
+    /// </summary>
+    public List<int> GrowthFor(int tenths, double work, int position, double roll)
+    {
+        EnsureLoaded();
+        var (gained, next) = GrowthStep(tenths, work, position, roll, 1.0);
+        return new List<int> { gained ? 1 : 0, next };
+    }
+
+    /// <summary>The number of rungs a skill (tenths) climbs through, for tests.</summary>
+    public List<double> LadderFor(int tenths) { EnsureLoaded(); return Ladder(tenths); }
+
+    /// <summary>A character's ladder position for a proficiency, for tests: trusted code acting for a wizard of level 10 only.</summary>
+    public int WizardQueryLadder(ObjectRef who, string id)
+    {
+        var actor = ThisPlayer();
+        if (Self.IsClone || !Trusted(PreviousObject()) || actor == null || actor.Call<int>("QueryWizLevel") < 10 || !IsPlayerBody(who)) return -1;
+        return who.Call<int>("QueryCraftLadder", id);
+    }
 
     // ------------------------------------------------------------------
     // Public queries (read-only, for items, tests and builders)
@@ -836,9 +889,11 @@ public class CraftingDaemon : Thing
     {
         if (!profs.TryGetValue(prof, out var p)) return "";
         var before = Tenths(who, prof);
-        var gain = Gain(before, work);
-        if (gain <= 0) return "";
-        var after = Math.Min(1000, before + gain);
+        var position = who.Call<int>("QueryCraftLadder", prof);
+        var (gained, next) = GrowthStep(before, work, position, RollGrowth(), LearnSpeed(who));
+        if (next != position && !who.Call<bool>("CraftSetLadder", prof, next)) return "";
+        if (!gained) return "";
+        var after = Math.Min(1000, before + 10);
         if (who.Call<bool>("CraftSetProficiency", prof, after) != true) return "";
         return after / 10 > before / 10 ? $"Your {p.Name} rises to {after / 10} ({Word(after / 10)}).\n" : "";
     }
