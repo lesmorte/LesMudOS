@@ -171,11 +171,11 @@ public abstract class Living : Thing
         return total;
     }
 
-    /// <summary>Bonuses to the attack roll other than level: natural, weapon, effects and traits.</summary>
+    /// <summary>Bonuses to the attack roll other than level: natural, weapon, effects and traits, and Precision (Grace).</summary>
     public int QueryToHit()
     {
         var weapon = QueryEquipped("weapon");
-        return ToHit + (weapon?.Call<int>("QueryToHit") ?? 0) + (int)Math.Round(QueryMod("tohit") + (weapon != null ? QueryMod("tohit_armed") : 0));
+        return ToHit + (weapon?.Call<int>("QueryToHit") ?? 0) + (int)Math.Round(QueryMod("tohit") + (weapon != null ? QueryMod("tohit_armed") : 0)) + QueryPrecision();
     }
 
     /// <summary>Attack gained per level. Players take it from their class.</summary>
@@ -184,8 +184,8 @@ public abstract class Living : Thing
     /// <summary>Attack = round(attack rate x level) + QueryToHit(). The only place the rate is applied.</summary>
     public int QueryAttack() => (int)Math.Floor(QueryAttackRate() * Level + 0.5 + 1e-9) + QueryToHit();
 
-    /// <summary>Defense grows one point per level for everyone.</summary>
-    public int QueryDefense() => Math.Max(0, Level - 1);
+    /// <summary>The defender's side of the hit roll besides armor: one point per level for everyone, plus Evasion (Grace).</summary>
+    public int QueryDefense() => Math.Max(0, Level - 1) + QueryEvasion();
 
     // ---- Rolls ----
 
@@ -202,8 +202,19 @@ public abstract class Living : Thing
         return Clamp(basis + (int)Math.Round(QueryMod("block")), 0, 90);
     }
 
-    /// <summary>Chance in percent that a hit is a critical hit: 5 plus effects and traits.</summary>
-    public int QueryCrit() => Clamp(5 + (int)Math.Round(QueryMod("crit")), 0, 100);
+    /// <summary>Chance in percent that a basic hit is a critical hit: 5 plus effects, traits and Critical Chance (Grace).</summary>
+    public double QueryCrit() => QueryCritFor(-1);
+
+    /// <summary>
+    /// The critical chance of an attack, in percent: the action's own chance (a skill's 15) or the basic 5, plus effects and
+    /// traits, plus Critical Chance from Grace and equipment; class modifiers apply to the total. The one place it is worked out.
+    /// </summary>
+    public double QueryCritFor(int actionChance)
+    {
+        var chance = (actionChance >= 0 ? actionChance : BaseCritChance) + Math.Round(QueryMod("crit")) + StatRaw("crit");
+        chance *= 1 + ClassModifier("crit") / 100.0;
+        return Math.Max(0, Math.Min(100, chance));
+    }
 
     /// <summary>The defender's dodge roll, made before the attacker's hit roll. True if the attack is dodged.</summary>
     public bool RollDodge() => Random(100) < QueryDodge();
@@ -219,11 +230,23 @@ public abstract class Living : Thing
 
     public bool QueryHasShield() => QueryEquipped("shield") != null;
 
-    /// <summary>Healing from a spell: the base amount plus what the caster's traits add (Divine Knowledge).</summary>
-    public int ScaleHealing(int amount) => Math.Max(1, (int)Math.Round(amount * (1 + QueryMod("healing_pct") / 100.0), MidpointRounding.AwayFromZero));
+    /// <summary>
+    /// Healing from a spell: the base amount plus what the caster's traits add (Divine Knowledge) and Healing Power (Spirit and
+    /// Insight), the percentages added together. Potions and food are not scaled. The one place spell healing is scaled.
+    /// </summary>
+    public int ScaleHealing(int amount) => Math.Max(1, (int)Math.Round(amount * (1 + (QueryMod("healing_pct") + QueryStat("healing_power")) / 100.0), MidpointRounding.AwayFromZero));
 
-    /// <summary>Damage from a spell: the base amount plus what the caster's traits add (Arcane Mastery).</summary>
-    public int ScaleSpellDamage(int amount) => Math.Max(1, (int)Math.Round(amount * (1 + QueryMod("spell_damage_pct") / 100.0), MidpointRounding.AwayFromZero));
+    /// <summary>
+    /// Damage from a spell: the base amount plus what the caster's traits add (Arcane Mastery) and Spell Power (Insight and
+    /// Spirit), the percentages added together. The one place spell damage is scaled.
+    /// </summary>
+    public int ScaleSpellDamage(int amount) => Math.Max(1, (int)Math.Round(amount * (1 + (QueryMod("spell_damage_pct") + QueryStat("spell_power")) / 100.0), MidpointRounding.AwayFromZero));
+
+    /// <summary>
+    /// Weapon and unarmed damage after the roll: Physical Power (Might) adds its percentage. The one place physical damage is
+    /// scaled; the hit roll, multipliers, critical and block follow.
+    /// </summary>
+    public int ScalePhysicalDamage(int amount) => Math.Max(1, (int)Math.Round(amount * (1 + QueryStat("physical_power") / 100.0), MidpointRounding.AwayFromZero));
 
     protected int EquipmentHpBonus()
     {
@@ -250,13 +273,153 @@ public abstract class Living : Thing
         base.Stat() +
         $"  Level {Level}, HP {Hp}/{QueryMaxHp()}, gold {Gold}\n" +
         $"  Stamina {QueryStamina()}/{QueryMaxStamina()}, Mana {QueryMana()}/{QueryMaxMana()}\n" +
-        $"  Damage {QueryDamageMin()}-{QueryDamageMax()}, attack {QueryAttack()} (rate {Num(QueryAttackRate())}), defense {QueryDefense()}, armor {QueryArmor()}, dodge {QueryDodge()}%, block {QueryBlock()}%, crit {QueryCrit()}%\n" +
+        $"  Regeneration per 10 s: vitality {Num2(QueryVitalityRegen())}, stamina {Num2(QueryStaminaRegen())}, mana {Num2(QueryManaRegen())}\n" +
+        $"  Damage {QueryDamageMin()}-{QueryDamageMax()}, attack {QueryAttack()} (rate {Num(QueryAttackRate())}), defense {QueryDefense()}, armor {QueryArmor()}, dodge {QueryDodge()}%, block {QueryBlock()}%, crit {Pct(QueryCrit())}%\n" +
+        "  Attributes " + string.Join(", ", AttributeNames.Select(a => $"{a} {QueryAttribute(a)}")) + "\n" +
+        $"  Effects of them: damage +{Pct(QueryStat("physical_power"))}%, to hit +{QueryPrecision()}, evasion +{QueryEvasion()}, crit +{Pct(StatRaw("crit"))}%, spell +{Pct(QueryStat("spell_power"))}%, healing +{Pct(QueryStat("healing_power"))}%, physical resistance {Pct(QueryStat("physical_resistance"))}%, mental resistance {Pct(QueryStat("mental_resistance"))}%\n" +
         EffectsStat() +
         $"  Peaceful {QueryPeaceful()}, enemies {enemies.Count(e => e.IsAlive)}\n" +
         TimingStat();
 
     /// <summary>Send text to this creature itself. Safe to call from any execution context.</summary>
     protected void Tell(string message) => TellObject(Self, message);
+
+    // ---- Attributes (docs/ATTRIBUTES.md) ----
+    // Six attributes on every living thing: Might, Grace, Vigor, Insight, Spirit, Resolve. Each derived statistic acts through how
+    // far the attributes behind it stand above 5, the value every character starts from, so that a new character plays as before.
+    // The rules read them only through QueryStat and the helpers beside it (QueryPrecision, QueryEvasion, QueryCritFor,
+    // ScalePhysicalDamage, ScaleSpellDamage, ScaleHealing, RollPhysicalResistance), so that skill ranks, advanced classes and
+    // equipment change a statistic in one place. The rule numbers are these constants.
+
+    /// <summary>The six attributes, in the order they are shown.</summary>
+    public static readonly string[] AttributeNames = { "might", "grace", "vigor", "insight", "spirit", "resolve" };
+
+    /// <summary>The value every character starts each attribute from; the derived effects count the points above it.</summary>
+    public const int AttributeNeutral = 5;
+    /// <summary>The basic critical chance in percent.</summary>
+    public const double BaseCritChance = 5;
+    private const double DamagePctPerMight = 2;      // Physical Power: weapon and unarmed damage +2% a point of Might above 5
+    private const int GracePerPrecision = 4;         // Precision: +1 to hit for every 4 points of Grace above 5
+    private const int GracePerEvasion = 4;           // Evasion: +1 to the defender's side of the hit roll for every 4 points of Grace above 5
+    private const double CritPctPerGrace = 0.5;      // Critical Chance: +0.5% a point of Grace above 5
+    private const double SpellPctPerInsight = 2, SpellPctPerSpirit = 1;   // Spell Power
+    private const double HealPctPerSpirit = 2, HealPctPerInsight = 1;     // Healing Power
+    private const double ResistPctPerPoint = 2, ResistPctMax = 75;        // Mental (Spirit, Resolve) and Physical (Vigor, Resolve) Resistance
+    private const int CarryBase = 50, CarryPerMight = 5;                  // Carry Capacity in pounds (shown, not enforced)
+    private const double GatherPerPoint = 1;         // Gathering Efficiency: harvest quality score +1 a point of Grace and of Insight above 5
+    private const double CraftShiftPerPoint = 0.02;  // Crafting Aptitude: crafted quality shift +0.02 a point of Insight and of Resolve above 5
+    /// <summary>A creature's attribute when its file names none: 4 + level / 2 (whole levels).</summary>
+    private int CreatureAttribute() => 4 + Level / 2;
+
+    /// <summary>A creature's own attributes, set in Create() (Attributes["might"] = 12): a bear is mighty, a spirit is not. Those not set follow the template by level.</summary>
+    protected readonly Dictionary<string, int> Attributes = new();
+
+    /// <summary>An attribute before equipment and effects. Creatures: their file's number or the template; players override it with their saved values.</summary>
+    public virtual int QueryBaseAttribute(string name) =>
+        !AttributeNames.Contains(name) ? 0 : Attributes.TryGetValue(name, out var value) ? value : CreatureAttribute();
+
+    /// <summary>
+    /// An attribute as the rules use it: the base, plus what equipment adds, plus what traits add (modifier key = the attribute's
+    /// name). Timed effects do not change attributes: AddEffect is open to any object, and an attribute is not to be set from outside.
+    /// </summary>
+    public int QueryAttribute(string name)
+    {
+        if (!AttributeNames.Contains(name)) return 0;
+        var total = QueryBaseAttribute(name) + (int)Math.Round(TraitMod(name));
+        foreach (var item in QueryEquipment()) total += item.Call<int>("QueryAttributeBonus", name);
+        return Math.Max(0, total);
+    }
+
+    /// <summary>All six, by name.</summary>
+    public Dictionary<string, int> QueryAttributes() => AttributeNames.ToDictionary(a => a, QueryAttribute);
+
+    /// <summary>Points of an attribute above the neutral 5 (never below 0).</summary>
+    private int Above(string name) => Math.Max(0, QueryAttribute(name) - AttributeNeutral);
+
+    /// <summary>A class modifier in percent for a key ("vitality", "crit"). Players sum their classes; creatures have none.</summary>
+    protected virtual double ClassModifier(string key) => 0;
+
+    private double EquipmentStat(string key)
+    {
+        var total = 0.0;
+        foreach (var item in QueryEquipment()) total += item.Call<double>("QueryStatBonus", key);
+        return total;
+    }
+
+    /// <summary>A derived statistic from the attributes and equipment, before class modifiers.</summary>
+    private double StatRaw(string key)
+    {
+        var value = key switch
+        {
+            "physical_power" => DamagePctPerMight * Above("might"),
+            "precision" => Above("grace") / GracePerPrecision,
+            "evasion" => Above("grace") / GracePerEvasion,
+            "crit" => CritPctPerGrace * Above("grace"),
+            "spell_power" => SpellPctPerInsight * Above("insight") + SpellPctPerSpirit * Above("spirit"),
+            "healing_power" => HealPctPerSpirit * Above("spirit") + HealPctPerInsight * Above("insight"),
+            "mental_resistance" => ResistPctPerPoint * (Above("spirit") + Above("resolve")),
+            "physical_resistance" => ResistPctPerPoint * (Above("vigor") + Above("resolve")),
+            "carry_capacity" => CarryBase + CarryPerMight * QueryAttribute("might"),
+            "gathering" => GatherPerPoint * (Above("grace") + Above("insight")),
+            "crafting" => CraftShiftPerPoint * (Above("insight") + Above("resolve")),
+            _ => 0.0,
+        };
+        return value + EquipmentStat(key);
+    }
+
+    /// <summary>
+    /// A derived statistic as the rules use it, in its own unit: physical_power, spell_power and healing_power in percent added to
+    /// damage or healing; precision and evasion in points of the hit roll; crit in percent added to the critical chance;
+    /// mental_resistance and physical_resistance in percent chance (at most 75); carry_capacity in pounds; gathering in points of
+    /// the harvest quality score; crafting added to the crafted quality shift. Class modifiers apply after the formula.
+    /// </summary>
+    public double QueryStat(string key)
+    {
+        var value = StatRaw(key) * (1 + ClassModifier(key) / 100.0);
+        if (key is "mental_resistance" or "physical_resistance") value = Math.Max(0, Math.Min(ResistPctMax, value));
+        return value;
+    }
+
+    /// <summary>Precision: points added to the attack roll.</summary>
+    public int QueryPrecision() => (int)Math.Floor(QueryStat("precision") + 1e-9);
+
+    /// <summary>Evasion: points added to the defender's side of the hit roll.</summary>
+    public int QueryEvasion() => (int)Math.Floor(QueryStat("evasion") + 1e-9);
+
+    /// <summary>Carry Capacity in pounds. Shown, not enforced: there is no encumbrance yet.</summary>
+    public int QueryCarryCapacity() => (int)Math.Round(QueryStat("carry_capacity"), MidpointRounding.AwayFromZero);
+
+    /// <summary>A roll against a chance in percent, to a tenth of a percent.</summary>
+    protected bool RollPercent(double chance) => chance > 0 && Random(1000) < (int)Math.Round(chance * 10, MidpointRounding.AwayFromZero);
+
+    /// <summary>Physical Resistance: true if this creature resists a stagger, slow or knockdown. The one place it is rolled.</summary>
+    public bool RollPhysicalResistance() => RollPercent(QueryStat("physical_resistance"));
+
+    /// <summary>Mental Resistance: true if this creature shakes off fear, charm, confusion or another mind effect. Ready; nothing uses it yet.</summary>
+    public bool RollMentalResistance() => RollPercent(QueryStat("mental_resistance"));
+
+    /// <summary>The statistics as the owner's brief defines them, for display (score): name and value. The rules use QueryStat.</summary>
+    public List<(string name, int value)> QueryStatDisplay()
+    {
+        var a = QueryAttributes();
+        return new List<(string, int)>
+        {
+            ("Physical Power", a["might"] * 2 + Level / 2), ("Precision", a["grace"] * 2), ("Evasion", a["grace"] + Level / 2),
+            ("Spell Power", a["insight"] * 2 + a["spirit"]), ("Healing Power", a["spirit"] * 2 + a["insight"]),
+            ("Mental Resistance", a["spirit"] + a["resolve"]), ("Physical Resistance", a["vigor"] + a["resolve"]),
+            ("Gathering Efficiency", a["grace"] + a["insight"]), ("Crafting Aptitude", a["insight"] + a["resolve"]),
+        };
+    }
+
+    /// <summary>"his", "her", "its" or "their" for messages. Creatures say "its"; players override it.</summary>
+    public virtual string QueryPossessive() => "its";
+
+    /// <summary>A percentage written without a needless ".0": 5, 5.5, 100.</summary>
+    protected static string Pct(double value)
+    {
+        var tenths = (long)Math.Round(value * 10, MidpointRounding.AwayFromZero);
+        return tenths % 10 == 0 ? (tenths / 10).ToString() : Num(value);
+    }
 
     // ---- Hit points ----
 
@@ -519,8 +682,16 @@ public abstract class Living : Thing
     /// Haste (factor below 1) or slow (above 1) on Reaction Time, for this many seconds. 20% haste is 0.8,
     /// 20% slow is 1.2. It is a timed effect like any other.
     /// </summary>
-    public void AddSpeedEffect(string id, double factor, int seconds) =>
+    public void AddSpeedEffect(string id, double factor, int seconds)
+    {
+        // Physical Resistance: a slow may be shaken off. (The wizard's speed command uses AddEffect, which never is.)
+        if (factor > 1.0 && seconds > 0 && !Dead && RollPhysicalResistance())
+        {
+            if (Environment() is { } room) TellRoom(room, $"{Cap(QueryLabel())} shakes off the slowing.\n");
+            return;
+        }
         AddEffect(id, factor < 1.0 ? "Haste" : "Slow", seconds, "", factor, 0);
+    }
 
     public void RemoveSpeedEffect(string id) => RemoveEffect(id);
 
@@ -571,6 +742,18 @@ public abstract class Living : Thing
     public virtual double QueryStaminaRegen() => StaminaRegen;
 
     public virtual double QueryManaRegen() => ManaRegen;
+
+    /// <summary>Vitality regained per 10 seconds out of combat. Creatures do not regenerate; players override it.</summary>
+    public virtual double QueryVitalityRegen() => 0;
+
+    /// <summary>A number with two decimal places, the same on every machine: 9.90, 0.80.</summary>
+    protected static string Num2(double value)
+    {
+        var hundredths = (long)Math.Round(value * 100, MidpointRounding.AwayFromZero);
+        var sign = hundredths < 0 ? "-" : "";
+        hundredths = Math.Abs(hundredths);
+        return sign + (hundredths / 100) + "." + (hundredths % 100).ToString().PadLeft(2, '0');
+    }
 
     /// <summary>
     /// Bring Stamina and Mana up to the present. Regeneration is lazy: nothing ticks, the amount regained since the last
@@ -1063,13 +1246,12 @@ public abstract class Living : Thing
         // 3. Damage: the roll, flat bonuses, the creature's own rule, the action's multipliers.
         var low = QueryDamageMin();
         var high = Math.Max(low, QueryDamageMax());
-        var damage = Math.Max(1, low + Random(high - low + 1) + (int)Math.Round(QueryMod("damage")));
+        var damage = ScalePhysicalDamage(Math.Max(1, low + Random(high - low + 1) + (int)Math.Round(QueryMod("damage"))));
         damage = Math.Max(1, ModifyDamage(damage, target)) * Math.Max(1, action.DamageMultiplier);
         if (Math.Abs(action.DamageFactor - 1.0) > 0.0001) damage = Math.Max(1, (int)Math.Round(damage * action.DamageFactor, MidpointRounding.AwayFromZero));
 
         // 4. Critical hit, then the defender's block.
-        var critChance = Clamp((action.CritChance >= 0 ? action.CritChance : 5) + (int)Math.Round(QueryMod("crit")), 0, 100);
-        var critical = Random(100) < critChance;
+        var critical = RollPercent(QueryCritFor(action.CritChance));
         if (critical) damage = Math.Max(1, (int)Math.Round(damage * 1.5, MidpointRounding.AwayFromZero));
         var blocked = Random(100) < target.Call<int>("QueryBlock");
         if (blocked) damage = Math.Max(1, damage / 2);
@@ -1096,6 +1278,12 @@ public abstract class Living : Thing
     public bool Stagger(double seconds, ObjectRef? by)
     {
         if (Dead || !Self.IsAlive) return false;
+        // Physical Resistance: a blow from another creature may fail to stagger.
+        if (by != null && by != Self && RollPhysicalResistance())
+        {
+            if (Environment() is { } steady) TellRoom(steady, $"{Cap(QueryLabel())} keeps {QueryPossessive()} footing.\n");
+            return false;
+        }
         var now = TimeMs();
         if (phase == "preparing")
         {

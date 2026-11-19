@@ -40,13 +40,33 @@ public abstract class PlayerClass : MudObject
     /// <summary>True if the class adds the right to carry a shield.</summary>
     protected bool Shield;
 
+    // The resources (docs/ATTRIBUTES.md section 2): maximum = base + per-level x Level + attributes. An archetype names all six;
+    // a later class may name its own. -1 means the class names none: the previous class's number stands, and an archetype that
+    // names none has the Adventurer's (10 / 8, 50 / 2, 50 / 2).
+    /// <summary>Vitality base and gain per level (Warrior 17 and 9).</summary>
+    protected int VitalityBase = -1;
+    protected int VitalityPerLevel = -1;
+    /// <summary>Endurance base and gain per level.</summary>
+    protected int EnduranceBase = -1;
+    protected int EndurancePerLevel = -1;
+    /// <summary>Focus base and gain per level.</summary>
+    protected int FocusBase = -1;
+    protected int FocusPerLevel = -1;
+    /// <summary>
+    /// Percentage modifiers applied after the formulas (docs/ATTRIBUTES.md section 3, "Class modifiers"): "vitality" 15 is
+    /// +15% maximum Vitality. Keys: vitality, endurance, focus, vitality_regen, endurance_regen, focus_regen and the derived
+    /// statistics (physical_power, precision, evasion, crit, spell_power, healing_power, mental_resistance, physical_resistance,
+    /// carry_capacity, gathering, crafting). The modifiers of all of a character's classes add up. The five callings have none.
+    /// </summary>
+    protected Dictionary<string, double> Modifiers = new();
+
     // Archetype values (ignored by the other tiers).
-    protected int StartHp = 30;
+    /// <summary>
+    /// The attributes a new character of this calling starts with: might, grace, vigor, insight, spirit, resolve (5 each and 6
+    /// points by calling). An attribute not named starts at 5.
+    /// </summary>
+    protected Dictionary<string, int> StartAttributes = new();
     protected double StartReaction = 2.5;
-    protected int MaxStamina = 70;
-    protected int MaxMana = 70;
-    protected double StaminaRegen = 6;
-    protected double ManaRegen = 5;
     protected int StartGold = 25;
     /// <summary>Paths of the items a new character starts with. Weapons and shields are put on.</summary>
     protected List<string> Kit = new();
@@ -82,12 +102,18 @@ public abstract class PlayerClass : MudObject
     public List<string> QueryWeapons() => new(Weapons);
     public List<string> QueryArmorTypes() => new(ArmorTypes);
     public bool QueryShield() => Shield;
-    public int QueryStartHp() => StartHp;
     public double QueryStartReaction() => StartReaction;
-    public int QueryMaxStamina() => MaxStamina;
-    public int QueryMaxMana() => MaxMana;
-    public double QueryStaminaRegen() => StaminaRegen;
-    public double QueryManaRegen() => ManaRegen;
+    public int QueryVitalityBase() => VitalityBase;
+    public int QueryVitalityPerLevel() => VitalityPerLevel;
+    public int QueryEnduranceBase() => EnduranceBase;
+    public int QueryEndurancePerLevel() => EndurancePerLevel;
+    public int QueryFocusBase() => FocusBase;
+    public int QueryFocusPerLevel() => FocusPerLevel;
+    /// <summary>A class modifier in percent ("vitality" 15 is +15%), 0 if the class has none.</summary>
+    public double QueryModifier(string key) => Modifiers.TryGetValue(key ?? "", out var value) ? value : 0;
+    public Dictionary<string, double> QueryModifiers() => new(Modifiers);
+    /// <summary>The starting value of an attribute for this calling: the class's number, or 5.</summary>
+    public int QueryStartAttribute(string name) => StartAttributes.TryGetValue(name ?? "", out var value) ? value : 5;
     public int QueryStartGold() => StartGold;
     public List<string> QueryKit() => new(Kit);
     public List<string> QueryRequirementLines() => requirementKinds.Select((k, i) => k + " " + requirementValues[i]).ToList();

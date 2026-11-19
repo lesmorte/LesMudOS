@@ -42,7 +42,7 @@ public class NoviceClass : PlayerClass
     {
         ClassName = "Novice"; Tier = "archetype"; SortOrder = 99; Title = "Novice";
         Tagline = "A bare test character."; Description = "Test only.";
-        StartHp = 30; StartReaction = 2.5; MaxStamina = 70; MaxMana = 70; StaminaRegen = 6; ManaRegen = 5;
+        StartReaction = 2.5; VitalityBase = 12; VitalityPerLevel = 8; EnduranceBase = 55; EndurancePerLevel = 0; FocusBase = 55; FocusPerLevel = 0;
         AttackRate = 1.0; StartGold = 25;
         Weapons.Add("*"); ArmorTypes.AddRange(new[] { "light", "medium", "heavy" }); Shield = true;
         Traits.Add("novice_fists");

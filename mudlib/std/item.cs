@@ -22,6 +22,20 @@ public class Item : Thing
     protected bool Stackable;
     /// <summary>The plural name, used for a quantity above one ("3 wolf skins"). Default: the short description without its article, plus "s".</summary>
     protected string? Plural;
+    /// <summary>What the item adds to its wearer's attributes while equipped ("grace" 2 is +2 Grace). No existing item has any.</summary>
+    protected Dictionary<string, int> AttributeBonus = new();
+    /// <summary>
+    /// What the item adds to a derived statistic while equipped, in the statistic's own unit ("crit" 5 is +5% Critical Chance).
+    /// Keys as Living.QueryStat: physical_power, precision, evasion, crit, spell_power, healing_power, mental_resistance,
+    /// physical_resistance, carry_capacity, gathering, crafting.
+    /// </summary>
+    protected Dictionary<string, double> StatBonus = new();
+
+    /// <summary>The item's bonus to an attribute while equipped.</summary>
+    public int QueryAttributeBonus(string name) => AttributeBonus.TryGetValue(name ?? "", out var value) ? value : 0;
+
+    /// <summary>The item's bonus to a derived statistic while equipped.</summary>
+    public double QueryStatBonus(string key) => StatBonus.TryGetValue(key ?? "", out var value) ? value : 0;
 
     // ---- Quality: the one table ----
 
@@ -395,5 +409,6 @@ public class Item : Thing
 
     public override string Stat() => base.Stat() + $"  Value {Value} gold, quest item {QuestItem}\n" +
         $"  Quality {QualityNames[quality]}, quantity {quantity}, stackable {Stackable}, unit value {QueryValue()}" +
-        (properties.Count > 0 ? ", properties " + string.Join(", ", properties.Select(kv => kv.Key + "=" + kv.Value)) : "") + "\n";
+        (properties.Count > 0 ? ", properties " + string.Join(", ", properties.Select(kv => kv.Key + "=" + kv.Value)) : "") + "\n" +
+        (AttributeBonus.Count + StatBonus.Count > 0 ? "  Bonuses " + string.Join(", ", AttributeBonus.Select(kv => kv.Key + " " + (kv.Value >= 0 ? "+" : "") + kv.Value).Concat(StatBonus.Select(kv => $"{kv.Key} {Num(kv.Value)}"))) + "\n" : "");
 }

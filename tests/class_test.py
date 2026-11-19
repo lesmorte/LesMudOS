@@ -169,7 +169,7 @@ public class SentinelClass : PlayerClass
     public override void Create()
     {
         ClassName = "Sentinel"; Tier = "archetype"; SortOrder = 98; Tagline = "Test archetype with forced rolls."; Description = "Test.";
-        StartHp = 40; StartReaction = 2.5; MaxStamina = 60; MaxMana = 60; StaminaRegen = 5; ManaRegen = 5; AttackRate = 1.0; StartGold = 5;
+        StartReaction = 2.5; VitalityBase = 22; VitalityPerLevel = 8; EnduranceBase = 45; EndurancePerLevel = 0; FocusBase = 45; FocusPerLevel = 0; AttackRate = 1.0; StartGold = 5;
         Weapons.Add("*"); ArmorTypes.AddRange(new[] { "light", "medium", "heavy" }); Shield = true;
         Skills.AddRange(new[] { "test_stagger", "test_flash" }); Traits.Add("test_forced");
         Kit.Add("/domains/hollow/obj/small_shield");
