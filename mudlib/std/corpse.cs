@@ -42,7 +42,21 @@ public class Corpse : Thing
     private long diedAtMs;
     private static readonly string[] TrustedTrees = { "/std/", "/secure/", "/domains/", "/classes/", "/skills/", "/events/" };
 
+    private ObjectRef? setupBy;
+    private readonly HashSet<string> entitled = new();
+
     public override bool CanGet() => false;
+
+    /// <summary>
+    /// A player who shared in the kill may take from the corpse during the lock, like the killer. Only the creature that set the
+    /// corpse up may say so, and only for players.
+    /// </summary>
+    public void Entitle(ObjectRef who)
+    {
+        if (setupBy == null || PreviousObject() != setupBy) return;
+        var name = NameOfPlayer(who);
+        if (name != "" && entitled.Count < 50) entitled.Add(name);
+    }
 
     public bool IsCorpse() => true;
 
@@ -55,6 +69,7 @@ public class Corpse : Thing
     {
         if (ready) return;
         ready = true;
+        setupBy = PreviousObject();
         label = deadLabel;
         diedAt = Time();
         diedAtMs = TimeMs();
@@ -181,7 +196,7 @@ public class Corpse : Thing
     {
         if (Time() - diedAt >= lockSeconds) return false;
         var name = NameOfPlayer(who);
-        return name == "" || (name != killerName && name != deceasedName);
+        return name == "" || (name != killerName && name != deceasedName && !entitled.Contains(name));
     }
 
     private string Refusal() => $"The corpse of {Strip(label)} is not yours to {{cmd}}loot{{/}} yet.";

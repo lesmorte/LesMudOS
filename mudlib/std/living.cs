@@ -106,6 +106,9 @@ public abstract class Living : Thing
     protected bool Dead;
 
     private readonly List<ObjectRef> enemies = new();
+    // The damage each player has dealt to this creature, capped at the Vitality it actually lost (overkill does not count).
+    // It is cleared when the creature is back at full Vitality with no fight in progress. See Experience below.
+    private readonly Dictionary<ObjectRef, int> damageDealt = new();
     private readonly Dictionary<ObjectRef, long> absentSince = new();
     private readonly Dictionary<string, ObjectRef> equipment = new();
     private readonly List<CombatAction> actions = new();
@@ -263,6 +266,7 @@ public abstract class Living : Thing
         if (Dead || amount <= 0) return 0;
         var before = Hp;
         Hp = before + amount;
+        ForgetDamageIfRecovered();
         return Hp - before;
     }
 
@@ -270,11 +274,73 @@ public abstract class Living : Thing
     public void TakeDamage(int amount, ObjectRef? from)
     {
         if (Dead || amount <= 0) return;
+        ForgetDamageIfRecovered();
         if (from != null && from.IsAlive && from != Self && Environment(from) == Environment()) AddEnemy(from);
         amount = Absorb(amount);
         if (amount <= 0) return;
+        // A player's damage is recorded as the Vitality actually lost, for the sharing of experience.
+        if (from != null && from.IsAlive && from != Self && from.Call<bool>("IsPlayerCharacter"))
+            damageDealt[from] = damageDealt.GetValueOrDefault(from) + Math.Min(amount, Hp);
         Hp -= amount;
         if (hp <= 0) Die(from);
+    }
+
+    // ---- Experience: shared by damage ----
+    // Experience goes by the share of the damage each player dealt, among those still alive, in the room and awake when the
+    // creature dies; a small bonus goes to the killing blow if it was a fair share of the work. The numbers are named here, once.
+
+    /// <summary>The percent of a creature's experience that goes to the killing blow, if it earns it.</summary>
+    protected const int KillingBlowPercent = 10;
+
+    /// <summary>The killing blow earns its bonus only with at least this percent of an even share of the eligible damage (85 / the number of eligible players).</summary>
+    protected const int KillingBlowFairPercent = 85;
+
+    /// <summary>Is this creature too long without input to earn experience? Players override it; nothing else is ever idle.</summary>
+    public virtual bool QueryIdle() => false;
+
+    private void ForgetDamageIfRecovered()
+    {
+        if (damageDealt.Count > 0 && enemies.Count == 0 && Hp >= QueryMaxHp()) damageDealt.Clear();
+    }
+
+    /// <summary>
+    /// The players who share this creature's death: those with damage recorded who are alive, in its room and not idle, with the
+    /// damage each dealt. A player who struck the killing blow with no record (a wizard's "slay") counts alone, as before.
+    /// </summary>
+    protected List<(ObjectRef who, int damage)> EligibleDamage(ObjectRef? killer)
+    {
+        var room = Environment();
+        var list = new List<(ObjectRef, int)>();
+        if (room == null) return list;
+        foreach (var kv in damageDealt)
+            if (Eligible(kv.Key, room) && kv.Value > 0) list.Add((kv.Key, kv.Value));
+        if (list.Count == 0 && killer != null && killer != Self && killer.Call<bool>("IsPlayerCharacter") && Eligible(killer, room)) list.Add((killer, 1));
+        return list;
+    }
+
+    private bool Eligible(ObjectRef who, ObjectRef room) =>
+        who.IsAlive && who.Call<bool>("IsPlayerCharacter") && !who.Call<bool>("IsDead") && who.Call<int>("QueryHp") > 0 && Environment(who) == room && !who.Call<bool>("QueryIdle");
+
+    /// <summary>
+    /// Divide experience among the eligible players by damage. The killing blow (if it came from an eligible player who dealt at least
+    /// 85 / N percent of the damage) gets 10% of the whole besides its share of the other 90%; otherwise all of it goes by damage.
+    /// Each share is rounded down, at least 1. A lone contributor gets all of it.
+    /// </summary>
+    protected List<(ObjectRef who, int xp)> DivideExperience(int xp, ObjectRef? killer, List<(ObjectRef who, int damage)> eligible)
+    {
+        var result = new List<(ObjectRef, int)>();
+        if (xp <= 0 || eligible.Count == 0) return result;
+        long total = eligible.Sum(e => (long)e.damage);
+        var bonusTo = eligible.FindIndex(e => e.who == killer);
+        if (bonusTo >= 0 && (long)eligible[bonusTo].damage * eligible.Count * 100 < (long)KillingBlowFairPercent * total) bonusTo = -1;
+        for (var i = 0; i < eligible.Count; i++)
+        {
+            long numerator = bonusTo >= 0
+                ? (100 - KillingBlowPercent) * (long)eligible[i].damage + (i == bonusTo ? KillingBlowPercent * total : 0)
+                : 100L * eligible[i].damage;
+            result.Add((eligible[i].who, (int)Math.Max(1, xp * numerator / (100 * total))));
+        }
+        return result;
     }
 
     /// <summary>The creature dies. Monsters, players and bystanders override this.</summary>
@@ -712,6 +778,7 @@ public abstract class Living : Thing
 
     private void CheckFightOver()
     {
+        if (enemies.Count == 0) ForgetDamageIfRecovered();
         if (enemies.Count > 0 || !wasFighting) return;
         wasFighting = false;
         actionsTaken = 0;

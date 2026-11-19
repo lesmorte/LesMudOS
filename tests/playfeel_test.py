@@ -117,6 +117,42 @@ public class PfDummy : Monster
 }
 '''
 
+# Players deal exactly known damage with this: "zap pinata 30". "credit PATH" tells whether the kill credit for a creature is theirs.
+ZAPPER = '''// @inherit /std/item
+public class Zapper : Item
+{
+    public override void Create() { Name = "zapper"; Ids.Add("zapper"); ShortDesc = "a zapper"; }
+    public override void Init() { base.Init(); AddAction("zap", Zap); AddAction("credit", Credit); }
+    private bool Zap(string args)
+    {
+        var who = ThisPlayer()!;
+        var w = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var target = w[0] == "me" ? who : Present(w[0], Environment(who)!);
+        if (target == null) { Write("No target.\\n"); return true; }
+        target.Call("TakeDamage", int.Parse(w[1]), who);
+        return true;
+    }
+    private bool Credit(string args) { Write("credit " + ThisPlayer()!.Call<bool>("QueryKilled", args.Trim()) + "\\n"); return true; }
+}
+'''
+
+
+def pinata(cls, name, hp):
+    return f'''// @inherit /std/monster
+public class {cls} : Monster
+{{
+    public override void Create()
+    {{
+        Name = "{name}"; Ids.Add("{name}");
+        ShortDesc = "a pinata"; LongDesc = "A paper pinata full of experience.";
+        Level = 1; MaxHp = {hp}; DamageMin = 1; DamageMax = 1; ToHit = -30; XpValue = 100;
+        Aggressive = false;
+        AddLoot("/domains/hollow/obj/rusty_sword", 100);
+    }}
+}}
+'''
+
+
 TRINKET_RED = '''// @inherit /std/item
 public class RedTrinket : Item
 {
@@ -132,7 +168,7 @@ public class BlueTrinket : Item
 
 
 def files():
-    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell"}
+    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab"}
     out = {"out": TEST + "hub"}
     return {
         "hub": a.room("PfHub", "Play Hub", hub_exits, safe=True),
@@ -146,6 +182,9 @@ def files():
         "cell": a.room("PfCell", "Locked Cell", {"north": TEST + "hub"},
                        f'        AddSpawn("{TEST}dummy");\n        LockExit("north", "gold key", "The cell door is locked.");\n', reset=3000),
         "dummy": DUMMY,
+        "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 20);\n', reset=3000),
+        "zapper": ZAPPER,
+        "pinata": pinata("Pinata", "pinata", 100), "pinata90": pinata("Pinata90", "pinata", 90),
         "ratling": RATLING, "mouse": MOUSE, "skinner": SKINNER, "bare": BARE, "twin": TWIN,
         "red_trinket": TRINKET_RED, "blue_trinket": TRINKET_BLUE,
         "shopper": '''// @inherit /std/shopkeeper
@@ -216,6 +255,7 @@ def run(work, mudlib, box):
     run_lists(wiz)
     run_corpses(wiz)
     run_fleeing(wiz)
+    run_shared_xp(wiz)
 
 
 # ===== 5. telling identical things apart =====
@@ -402,6 +442,138 @@ def run_fleeing(wiz):
     wiz.command("goto " + TEST + "yard")
     wiz.command("get all")
     wiz.command("drop all")
+
+
+# ===== 8. shared experience =====
+
+def xp_of(c):
+    return a.score_of(c)["xp"]
+
+
+def lab_player(name):
+    """A new character with a zapper, standing in the lab."""
+    c = login(name)
+    c.command("down")
+    c.command("lab")
+    c.command("get zapper")
+    return c
+
+
+def fresh_pinata(wiz, kind="pinata"):
+    wiz.command("goto " + TEST + "lab")
+    wiz.command("clone " + TEST + kind)
+    wiz.command("goto " + TEST + "hub")
+
+
+def run_shared_xp(wiz):
+    fresh_pinata(wiz)
+    ann = lab_player("anna")
+    check("shared xp: a lone kill pays 100%", (ann.command("zap pinata 100"), a.drain(ann, 0.5))[0], "You gain 100 experience.")
+    check("shared xp: and the kill credit", ann.command("credit /domains/test/pinata"), "credit True")
+
+    # Two players, 50/50, the killing blow from the second: 55/45.
+    fresh_pinata(wiz)
+    ben, cat = lab_player("benn"), lab_player("cato")
+    b0, c0 = xp_of(ben), xp_of(cat)
+    ben.command("zap pinata 50")
+    cat.command("zap pinata 50")
+    a.drain(ben, 0.5); a.drain(cat, 0.5)
+    check("shared xp: two players, even damage, killing blow +10%: 55 for the killer", "ok" if xp_of(cat) - c0 == 55 else str(xp_of(cat) - c0), "ok")
+    check("shared xp: and 45 for the other", "ok" if xp_of(ben) - b0 == 45 else str(xp_of(ben) - b0), "ok")
+    check("shared xp: both have the kill credit", ben.command("credit /domains/test/pinata"), "credit True")
+    check("shared xp: the other contributor may loot the corpse during the lock", ben.command("loot corpse"), "You take a rusty sword from the corpse of a pinata.")
+
+    # Three equal contributors: 40 / 30 / 30.
+    fresh_pinata(wiz, "pinata90")
+    dee, eve, fay = lab_player("deen"), lab_player("evee"), lab_player("faye")
+    base = [xp_of(x) for x in (dee, eve, fay)]
+    dee.command("zap pinata 30")
+    eve.command("zap pinata 30")
+    fay.command("zap pinata 30")
+    for x in (dee, eve, fay):
+        a.drain(x, 0.5)
+    got = [xp_of(x) - b for x, b in zip((dee, eve, fay), base)]
+    check("shared xp: three equal contributors get 30, 30 and 40 for the killing blow", "ok" if got == [30, 30, 40] else str(got), "ok")
+    # A bystander is refused the corpse.
+    gus = lab_player("gust")
+    check("shared xp: someone who did nothing may not loot it yet", gus.command("loot corpse"), "not yours to")
+
+    # The fair-share rule for the killing blow: 30% of three gets the bonus, 10% does not.
+    fresh_pinata(wiz)
+    hal, ivy, jon = lab_player("halo"), lab_player("ivyy"), lab_player("jono")
+    base = [xp_of(x) for x in (hal, ivy, jon)]
+    hal.command("zap pinata 35")
+    ivy.command("zap pinata 35")
+    jon.command("zap pinata 30")
+    for x in (hal, ivy, jon):
+        a.drain(x, 0.5)
+    got = [xp_of(x) - b for x, b in zip((hal, ivy, jon), base)]
+    check("shared xp: a killing blow with 30% of three gets the bonus (31, 31, 37)", "ok" if got == [31, 31, 37] else str(got), "ok")
+    fresh_pinata(wiz)
+    base = [xp_of(x) for x in (hal, ivy, jon)]
+    hal.command("zap pinata 45")
+    ivy.command("zap pinata 45")
+    jon.command("zap pinata 10")
+    for x in (hal, ivy, jon):
+        a.drain(x, 0.5)
+    got = [xp_of(x) - b for x, b in zip((hal, ivy, jon), base)]
+    check("shared xp: a killing blow with 10% of three gets no bonus: the shares follow damage alone (45, 45, 10)", "ok" if got == [45, 45, 10] else str(got), "ok")
+    # Two players: 40% is under 42.5%, no bonus; the lone killer always gets all of it.
+    fresh_pinata(wiz)
+    base = [xp_of(x) for x in (hal, ivy)]
+    hal.command("zap pinata 60")
+    ivy.command("zap pinata 40")
+    for x in (hal, ivy):
+        a.drain(x, 0.5)
+    got = [xp_of(x) - b for x, b in zip((hal, ivy), base)]
+    check("shared xp: with two players the bonus needs 42.5%: 40% gets none (60, 40)", "ok" if got == [60, 40] else str(got), "ok")
+
+    # Overkill does not count.
+    fresh_pinata(wiz)
+    base = [xp_of(x) for x in (hal, ivy)]
+    hal.command("zap pinata 60")
+    ivy.command("zap pinata 400")
+    for x in (hal, ivy):
+        a.drain(x, 0.5)
+    got = [xp_of(x) - b for x, b in zip((hal, ivy), base)]
+    check("shared xp: overkill does not count (the killing blow dealt 40 of 100: 60 and 40)", "ok" if got == [60, 40] else str(got), "ok")
+
+    # A contributor who left the room or died is dropped; the rest still add up to the whole.
+    fresh_pinata(wiz)
+    kay, lou = lab_player("kayy"), lab_player("loui")
+    lb = xp_of(lou)
+    kay.command("kill pinata")
+    kay.command("zap pinata 50")
+    lou.command("zap pinata 20")
+    for _ in range(30):
+        if "You flee out!" in kay.command("flee out"):
+            break
+    lou.command("zap pinata 100")
+    a.drain(lou, 0.5)
+    check("shared xp: a contributor who left the room is dropped; the one left gets the whole 100", "ok" if xp_of(lou) - lb == 100 else str(xp_of(lou) - lb), "ok")
+    fresh_pinata(wiz)
+    mia, ned = lab_player("miaa"), lab_player("nedd")
+    nb = xp_of(ned)
+    mia.command("zap pinata 50")
+    mia.command("zap me 9999")
+    a.drain(mia, 0.5)
+    ned.command("zap pinata 100")
+    a.drain(ned, 0.5)
+    check("shared xp: a contributor who died is dropped; the one left gets the whole 100", "ok" if xp_of(ned) - nb == 100 else str(xp_of(ned) - nb), "ok")
+
+    # A wizard who shares in a kill gets a share but makes no history.
+    fresh_pinata(wiz)
+    wiz.command("goto " + TEST + "lab")
+    wiz.command("get zapper")
+    oto = lab_player("otto")
+    ob = xp_of(oto)
+    wiz.command("zap pinata 40")
+    oto.command("zap pinata 100")
+    text = a.quiet(wiz, 1.0)
+    check("shared xp: a wizard among the participants makes no history", text, "Wizards make no history.")
+    check("shared xp: and the player gets the share of the damage (60 of 100, with 60% killing blow: 10 + 54)", "ok" if xp_of(oto) - ob == 64 else str(xp_of(oto) - ob), "ok")
+    wiz.command("drop all")
+    wiz.command("goto " + TEST + "hub")
 
 
 if __name__ == "__main__":

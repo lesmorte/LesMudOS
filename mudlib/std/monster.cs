@@ -64,16 +64,17 @@ public class Monster : Npc
     /// <summary>For a creature of rank: the subject that tells it apart ("goblin-overseer"). Default: the file name.</summary>
     public string ChronicleSubject { get; set; } = "";
 
-    // Tells the event service about this death. History is best-effort: a failure here must never stop a death.
-    private void ReportDeath(ObjectRef killer, ObjectRef? room)
+    // Tells the event service about this death: the actor is the player who struck the killing blow (else the one who dealt most damage),
+    // and everyone who shared in it takes part. History is best-effort: a failure here must never stop a death.
+    private void ReportDeath(ObjectRef actor, List<ObjectRef> participants, ObjectRef? room)
     {
         try
         {
-            if (!Interactive(killer)) return;
+            if (!Interactive(actor)) return;
             var file = Self.ProgramPath.Substring(Self.ProgramPath.LastIndexOf('/') + 1);
             var names = new Dictionary<string, string> { ["name"] = Cap(QueryLabel()) };
             var boss = ChronicleEvent != "";
-            LoadObject("/secure/events").Call<string>("Report", boss ? ChronicleEvent : "kill.ordinary", killer, new List<ObjectRef> { killer }, room,
+            LoadObject("/secure/events").Call<string>("Report", boss ? ChronicleEvent : "kill.ordinary", actor, participants, room,
                 boss ? (ChronicleSubject == "" ? file.Replace('_', '-') : ChronicleSubject) : (ChronicleKind == "" ? file : ChronicleKind), names);
         }
         catch (MudRuntimeException) { }
@@ -89,11 +90,15 @@ public class Monster : Npc
         if (room != null) TellRoom(room, (DeathMessage == "" ? $"{label} dies." : DeathMessage) + "\n");
 
         var gold = GoldMax > 0 ? GoldMin + Random(Math.Max(1, GoldMax - GoldMin + 1)) : 0;
-        if (killer != null && killer.IsAlive)
+        // Experience goes by damage dealt among the players still alive, in the room and awake (see Living, "Experience").
+        // Each of them gets the kill credit; a blow from anything else is no player's, and gives no bonus.
+        var eligible = EligibleDamage(killer);
+        if (eligible.Count > 0)
         {
-            if (XpValue > 0) killer.Call("AddXp", XpValue);
-            killer.Call("NotifyKill", Self.ProgramPath);
-            ReportDeath(killer, room);
+            foreach (var (who, share) in DivideExperience(XpValue, killer, eligible)) who.Call("AddXp", share);
+            foreach (var (who, _) in eligible) who.Call("NotifyKill", Self.ProgramPath);
+            var actor = eligible.Any(e => e.who == killer) ? killer! : eligible.OrderByDescending(e => e.damage).First().who;
+            ReportDeath(actor, eligible.Select(e => e.who).ToList(), room);
         }
 
         if (room != null)
@@ -119,6 +124,7 @@ public class Monster : Npc
                     }
                 }
                 corpse.Call("Setup", QueryLabel(), killer ?? Self, Self);
+                foreach (var (who, _) in eligible) corpse.Call("Entitle", who); // the loot lock belongs to everyone who shared in the kill
             }
             catch (MudRuntimeException)
             {
