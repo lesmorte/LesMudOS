@@ -193,6 +193,32 @@ public abstract class Room : MudObject
         return !locks.TryGetValue(direction, out var door) || (door.KeyId != "" && Present(door.KeyId, who) != null);
     }
 
+    /// <summary>
+    /// The way a typed direction ("north", "n") goes for this creature, if it can be used right now (it exists for them, is not locked
+    /// against them), else null. Hidden exits count only for a creature that has found them.
+    /// </summary>
+    public string? QueryUsableExit(ObjectRef who, string typed)
+    {
+        typed = typed.Trim().ToLowerInvariant();
+        if (typed == "") return null;
+        var ways = Exits.Keys.Concat(hidden.Keys.Where(d => Found(who, d))).Distinct().ToList();
+        var direction = ways.Contains(typed) ? typed : typed.Length == 1 ? ways.FirstOrDefault(d => d.StartsWith(typed)) : null;
+        return direction != null && CanUseExit(who, direction) ? direction : null;
+    }
+
+    /// <summary>Every exit this creature can use right now.</summary>
+    public List<string> QueryUsableExits(ObjectRef who)
+        => Exits.Keys.Concat(hidden.Keys.Where(d => Found(who, d))).Distinct().Where(d => CanUseExit(who, d)).ToList();
+
+    /// <summary>The exit that leads to the room at a path, if this creature can use it right now, else null.</summary>
+    public string? QueryExitTowards(ObjectRef who, string path)
+    {
+        if (path == "") return null;
+        foreach (var direction in QueryUsableExits(who))
+            if ((Exits.GetValueOrDefault(direction) ?? (hidden.TryGetValue(direction, out var h) ? h.Path : null)) == path) return direction;
+        return null;
+    }
+
     public string Stat()
     {
         var text = new StringBuilder($"{Self.Name}: {ShortDesc}\n  Safe {Safe}, logout room {LogoutRoom}, reset every {ResetSeconds}s\n");
@@ -235,6 +261,11 @@ public abstract class Room : MudObject
             TellObject(player, "That way is hidden, and you have not found it yet. (Wizard note: it is found by search or by looking at its detail; see stat here.)\n");
             return true;
         }
+        if (player.Call<bool>("QueryInCombat"))
+        {
+            TellObject(player, "You are in the middle of a fight and cannot just walk away. Try {cmd}flee{/} (or {cmd}flee{/} DIRECTION).\n");
+            return true;
+        }
         if (!Exits.ContainsKey(direction) && !hidden.ContainsKey(direction)) TellObject(player, locks[direction].Refusal + "\n"); // blocked, and not listed
         else MoveThrough(player, direction);
         return true;
@@ -273,6 +304,7 @@ public abstract class Room : MudObject
         }
         else TellRoom(Self, $"{name} leaves {direction}.\n", who);
         MoveObject(who, destination);
+        if (Interactive(who)) who.Call("RecordArrival"); // so that flee can lead back the way they came
         TellRoom(destination, $"{name} arrives.\n", who);
         who.Call("Look");
         WarnIfDangerous(who, destination);

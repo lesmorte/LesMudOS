@@ -707,6 +707,7 @@ public abstract class Adventurer : Living
     private bool CmdGet(string args)
     {
         var room = Environment();
+        if (QueryInCombat()) { Write(FightingNote.Replace("do that", "pick things up") + "\n"); return true; }
         var from = args.IndexOf(" from ", StringComparison.Ordinal);
         if (from > 0) return GetFromCorpse(args.Substring(0, from).Trim(), args.Substring(from + 6).Trim());
         if (room == null || !ParseAmount(args, out var count, out var all, out var noun)) { NotifyFail("Get what?"); return false; }
@@ -814,6 +815,7 @@ public abstract class Adventurer : Living
     {
         var room = Environment();
         if (room == null) return false;
+        if (QueryInCombat()) { Write(FightingNote.Replace("do that", "pick things up") + "\n"); return true; }
         string? refusal = null;
         var found = false;
         foreach (var ob in CorpsesHere(room, args))
@@ -937,20 +939,51 @@ public abstract class Adventurer : Living
         return true;
     }
 
+    // Where the character came from by an exit: the room they came from, and the room they arrived in (flee leads back only while they are still there).
+    private string cameFrom = "";
+    private string arrivedIn = "";
+
+    /// <summary>A room tells the character they have just walked through one of its exits into their current room. Only a room may; it is remembered for flee.</summary>
+    public void RecordArrival()
+    {
+        var from = PreviousObject();
+        var here = Environment();
+        if (from == null || from.IsClone || here == null || from == here) return;
+        cameFrom = from.Name;
+        arrivedIn = here.Name;
+    }
+
+    private const string FightingNote = "You are fighting! You cannot do that now. Break away with {cmd}flee{/} first.";
+
+    /// <summary>
+    /// flee [direction]: try to break away from a fight (one chance in four to fail). With a direction, go that way; without,
+    /// go back the way you came; if that way cannot be used, any usable exit. A named direction that cannot be used fails at
+    /// once and costs no attempt.
+    /// </summary>
     private bool CmdFlee(string args)
     {
         var room = Environment();
         if (room == null || !QueryInCombat()) { Write("You are not fighting anyone.\n"); return true; }
-        if (Random(4) == 0) { Write("You try to flee, but cannot get away!\n"); return true; }
-        var exits = (room.Call<List<string>>("QueryExits") ?? new List<string>()).Where(d => room.Call<bool>("CanUseExit", Self, d)).ToList();
-        if (exits.Count > 0)
+        string? direction;
+        args = args.Trim();
+        if (args != "")
         {
-            var direction = exits[Random(exits.Count)];
-            Write($"You flee {direction}!\n");
-            room.Call("MoveThrough", Self, direction);
-            return true;
+            direction = room.Call<string>("QueryUsableExit", Self, args);
+            if (direction == null) { Write($"You cannot flee that way: there is no usable exit '{Esc(args)}' here.\n"); return true; }
         }
-        Write("There is no way out!\n");
+        else
+        {
+            direction = arrivedIn == room.Name ? room.Call<string>("QueryExitTowards", Self, cameFrom) : null;
+            if (direction == null)
+            {
+                var exits = room.Call<List<string>>("QueryUsableExits", Self) ?? new List<string>();
+                if (exits.Count == 0) { Write("There is no way out!\n"); return true; }
+                direction = exits[Random(exits.Count)];
+            }
+        }
+        if (Random(4) == 0) { Write("You try to flee, but cannot get away!\n"); return true; }
+        Write($"You flee {direction}!\n");
+        room.Call("MoveThrough", Self, direction);
         return true;
     }
 

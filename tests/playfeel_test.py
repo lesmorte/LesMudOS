@@ -103,6 +103,20 @@ public class Twin : Monster
 }
 '''
 
+# A creature that fights and never hurts anyone and never dies, for the tests of fighting rules.
+DUMMY = '''// @inherit /std/monster
+public class PfDummy : Monster
+{
+    public override void Create()
+    {
+        Name = "dummy"; Ids.Add("dummy");
+        ShortDesc = "a sparring dummy"; LongDesc = "A sack of straw that hits back, a little.";
+        Level = 1; MaxHp = 100000; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Aggressive = false;
+    }
+}
+'''
+
 TRINKET_RED = '''// @inherit /std/item
 public class RedTrinket : Item
 {
@@ -118,13 +132,20 @@ public class BlueTrinket : Item
 
 
 def files():
-    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop"}
+    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell"}
     out = {"out": TEST + "hub"}
     return {
         "hub": a.room("PfHub", "Play Hub", hub_exits, safe=True),
         "pen": a.room("PfPen", "Rat Pen", out, f'        AddSpawn("{TEST}ratling", 2);\n', reset=3000),
         "yard": a.room("PfYard", "Quiet Yard", out, reset=3000),
         "shop": a.room("PfShop", "Test Shop", out, f'        AddSpawn("{TEST}shopper");\n', safe=True, reset=3000),
+        "arena": a.room("PfArena", "Fighting Pit", {"out": TEST + "hub", "east": TEST + "arena2", "south": TEST + "vault"},
+                        f'        AddSpawn("{TEST}dummy");\n        LockExit("south", "gold key", "The gate to the south is locked.");\n', reset=3000),
+        "arena2": a.room("PfArena2", "Second Pit", {"west": TEST + "arena"}, reset=3000),
+        "vault": a.room("PfVault", "Closed Vault", {"north": TEST + "arena"}, reset=3000),
+        "cell": a.room("PfCell", "Locked Cell", {"north": TEST + "hub"},
+                       f'        AddSpawn("{TEST}dummy");\n        LockExit("north", "gold key", "The cell door is locked.");\n', reset=3000),
+        "dummy": DUMMY,
         "ratling": RATLING, "mouse": MOUSE, "skinner": SKINNER, "bare": BARE, "twin": TWIN,
         "red_trinket": TRINKET_RED, "blue_trinket": TRINKET_BLUE,
         "shopper": '''// @inherit /std/shopkeeper
@@ -194,6 +215,7 @@ def run(work, mudlib, box):
     run_numbers(wiz)
     run_lists(wiz)
     run_corpses(wiz)
+    run_fleeing(wiz)
 
 
 # ===== 5. telling identical things apart =====
@@ -305,6 +327,81 @@ def run_corpses(wiz):
     text = wiz.command("loot corpse")
     check("corpse: a corpse empty from the start is not looted into dust; it keeps its timer", text, "There is nothing in the corpse of a bare thing.")
     check("corpse: it is still there", wiz.command("look at corpse"), "It is empty.")
+
+
+# ===== 3. combat restrictions and flee =====
+
+def flee_until(c, command, tries=40):
+    """Repeat a flee command until it is not the 1-in-4 failure. Returns the text of the last try."""
+    text = ""
+    for _ in range(tries):
+        text = c.command(command)
+        if "cannot get away" not in text:
+            break
+        a.drain(c, 0.2)
+    return text
+
+
+def run_fleeing(wiz):
+    wiz.command("goto " + TEST + "yard")
+    wiz.command("drop all")
+    wiz.command("clone " + TEST + "red_trinket")
+    wiz.command("drop trinket")
+    wiz.command("goto " + TEST + "arena")
+    wiz.command("clone " + TEST + "red_trinket")
+    wiz.command("drop trinket")
+    check("fleeing: not fighting, flee says so", wiz.command("flee"), "You are not fighting anyone.")
+    check("fleeing: a fight begins", wiz.command("kill dummy"), "You attack a sparring dummy.")
+    check("fleeing: picking up from the floor is refused, pointing to flee", wiz.command("get trinket"), "You are fighting!", "pick things up", "flee")
+    check("fleeing: the thing is still on the floor", wiz.command("look"), "A red trinket is here.")
+    check("fleeing: get from a corpse is refused too", wiz.command("get sword from corpse"), "You are fighting!", "flee")
+    check("fleeing: loot is refused", wiz.command("loot"), "You are fighting!", "flee")
+    check("fleeing: walking away is refused, pointing to flee", wiz.command("east"), "cannot just walk away", "flee")
+    check("fleeing: the abbreviated exit is refused as well", wiz.command("e"), "cannot just walk away")
+    check("fleeing: still in the same room", wiz.command("look"), "Fighting Pit")
+    # A named direction that cannot be used fails without spending the attempt: never the 1-in-4 failure line.
+    texts = [wiz.command("flee south") for _ in range(20)]
+    check("fleeing: a locked direction is refused every time, without a try", "ok" if all("You cannot flee that way" in t and "cannot get away" not in t for t in texts) else str(texts[:3]), "ok")
+    check("fleeing: so is a direction that does not exist", wiz.command("flee up"), "You cannot flee that way")
+    check("fleeing: the fight goes on after refusals", wiz.command("look"), "Fighting Pit")
+    # With a direction.
+    text = flee_until(wiz, "flee east")
+    check("fleeing: with a direction you go that way", text, "You flee east!", "Second Pit")
+    check("fleeing: the fight is over for you", wiz.command("flee"), "You are not fighting anyone.")
+    check("fleeing: you can walk and pick things up again", wiz.command("west"), "Fighting Pit")
+    wiz.command("kill dummy")
+    # Without a direction: back the way you came (twice from each side, so a random pick would show).
+    for round_ in range(1, 5):
+        wiz.command("flee")  # (may or may not get away; make sure we are out)
+        flee_until(wiz, "flee") if "Fighting Pit" in wiz.command("look") else None
+        where = wiz.command("look")
+        if "Second Pit" not in where:
+            wiz.command("goto " + TEST + "arena2")
+        wiz.command("west")
+        wiz.command("kill dummy")
+        text = flee_until(wiz, "flee")
+        check(f"fleeing: with no direction you go back the way you came (round {round_})", text, "You flee east!", "Second Pit")
+    # The way back cannot be used (not arrived by an exit): any usable exit, never the locked one.
+    seen = set()
+    for _ in range(12):
+        wiz.command("goto " + TEST + "arena")
+        wiz.command("kill dummy")
+        text = flee_until(wiz, "flee")
+        if "You flee east!" in text:
+            seen.add("east")
+        elif "You flee out!" in text:
+            seen.add("out")
+        else:
+            seen.add("other: " + text[:60])
+    check("fleeing: with no way back, a random usable exit is used (never the locked south)", "ok" if seen <= {"east", "out"} and seen else str(seen), "ok")
+    # No usable exit at all.
+    wiz.command("goto " + TEST + "cell")
+    wiz.command("kill dummy")
+    check("fleeing: with no usable exit there is no way out", wiz.command("flee"), "There is no way out!")
+    check("fleeing: still fighting", wiz.command("get trinket"), "You are fighting!")
+    wiz.command("goto " + TEST + "yard")
+    wiz.command("get all")
+    wiz.command("drop all")
 
 
 if __name__ == "__main__":
