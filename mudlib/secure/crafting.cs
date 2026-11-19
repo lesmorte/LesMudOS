@@ -1582,7 +1582,7 @@ public class CraftingDaemon : Thing
         if (!heals.TryGetValue(key, out var h) || h.Generation != generation) return;
         if (!h.Who.IsAlive || h.Who.Call<bool>("IsDead")) { heals.Remove(key); return; }
         var healed = h.Who.Call<int>("Heal", h.PerTick);
-        if (healed > 0) TellObject(h.Who, $"{h.Name} soothes you. (+{healed} hit points)\n");
+        if (healed > 0) TellObject(h.Who, $"{h.Name} soothes you. (+{healed} hit points)" + (h.Who.Call<string>("HealNote", healed) ?? "") + "\n");
         h.Left--;
         if (h.Left <= 0) { heals.Remove(key); return; }
         CallOut(() => HealTick(key, generation), h.Seconds);

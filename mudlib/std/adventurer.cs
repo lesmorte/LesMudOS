@@ -35,6 +35,8 @@ public abstract class Adventurer : Living
     [Saved] private List<string> carried = new();
     [Saved] private List<int> carriedEquipped = new();
     [Saved] private string logoutRoom = "";
+    // "verbose on": combat lines and healing lines show the numbers. Off by default; saved with the character.
+    [Saved] private bool verbose;
 
     private int regenBeats;
     private bool dying;
@@ -92,6 +94,29 @@ public abstract class Adventurer : Living
     }
 
     public override bool IsPlayerCharacter() => true;
+
+    public bool QueryVerbose() => verbose;
+
+    public override string DamageNote(int applied, bool dealt) =>
+        !verbose ? "" : dealt ? $" {{green}}(+{applied} damage){{/}}" : $" {{red}}(-{applied} damage){{/}}";
+
+    public override string HealNote(int healed) => !verbose || healed <= 0 ? "" : $" {{green}}(+{healed} Vitality){{/}}";
+
+    /// <summary>"verbose" shows the setting; "verbose on" and "verbose off" change it.</summary>
+    private bool CmdVerbose(string args)
+    {
+        var word = args.Trim().ToLowerInvariant();
+        if (word == "")
+        {
+            Write(verbose ? "Verbose is on: combat shows the damage you deal {green}(+2 damage){/} and take {red}(-5 damage){/}, and healing shows {green}(+4 Vitality){/}. Type {cmd}verbose off{/} to turn it off.\n"
+                : "Verbose is off. Type {cmd}verbose on{/} to see the numbers in combat: the damage you deal and take, and healing.\n");
+            return true;
+        }
+        if (word != "on" && word != "off") { NotifyFail("Usage: {cmd}verbose{/} [{cmd}on{/}|{cmd}off{/}]"); return false; }
+        verbose = word == "on";
+        Write(verbose ? "Verbose is now on. Combat lines will show the damage done.\n" : "Verbose is now off.\n");
+        return true;
+    }
 
     public override string QueryLabel() => Name;
 
@@ -525,6 +550,7 @@ public abstract class Adventurer : Living
         AddAction("score", CmdScore);
         AddAction("sc", CmdScore);
         AddAction("hp", CmdHp);
+        AddAction("verbose", CmdVerbose);
         AddAction("skills", CmdSkills);
         AddAction("quests", CmdQuests);
         AddAction("search", CmdSearch);

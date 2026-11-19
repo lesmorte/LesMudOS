@@ -270,20 +270,60 @@ public abstract class Living : Thing
         return Hp - before;
     }
 
-    /// <summary>Lose hit points. A creature that reaches 0 dies. The attacker, if any, becomes an enemy.</summary>
+    /// <summary>
+    /// Lose hit points from a source that tells its own story (damage over time, say). A creature that reaches 0 dies. The attacker,
+    /// if any, becomes an enemy. A player with verbose on is shown the damage actually done: the one who dealt it "(+N damage)",
+    /// the one who took it "(-N damage)", each on a line of its own, because the caller has no line to put it on.
+    /// Attacks that have a combat line use ApplyDamage and FinishDamage and put DamageNote on that line instead.
+    /// </summary>
     public void TakeDamage(int amount, ObjectRef? from)
     {
-        if (Dead || amount <= 0) return;
+        var applied = ApplyDamage(amount, from);
+        if (applied >= 0)
+        {
+            if (from != null && from.IsAlive && from != Self && from.Call<string>("DamageNote", applied, true) is { Length: > 0 } dealt) TellObject(from, dealt.TrimStart() + "\n");
+            if (DamageNote(applied, false) is { Length: > 0 } taken) Tell(taken.TrimStart() + "\n");
+        }
+        FinishDamage(from);
+    }
+
+    private readonly StringBuilder absorbed = new();
+
+    /// <summary>
+    /// The first half of taking damage: the hit points are lost now and the result is returned, but a death waits for FinishDamage so
+    /// that the caller can first say what happened. Returns the damage actually applied (after absorption, and no more than the
+    /// Vitality the creature had), or -1 if nothing could be done (already dead, or no damage).
+    /// </summary>
+    public int ApplyDamage(int amount, ObjectRef? from)
+    {
+        if (Dead || amount <= 0) return -1;
         ForgetDamageIfRecovered();
         if (from != null && from.IsAlive && from != Self && Environment(from) == Environment()) AddEnemy(from);
         amount = Absorb(amount);
-        if (amount <= 0) return;
+        if (amount <= 0) return 0;
+        var applied = Math.Min(amount, Hp);
         // A player's damage is recorded as the Vitality actually lost, for the sharing of experience.
         if (from != null && from.IsAlive && from != Self && from.Call<bool>("IsPlayerCharacter"))
-            damageDealt[from] = damageDealt.GetValueOrDefault(from) + Math.Min(amount, Hp);
+            damageDealt[from] = damageDealt.GetValueOrDefault(from) + applied;
         Hp -= amount;
-        if (hp <= 0) Die(from);
+        return applied;
     }
+
+    /// <summary>The second half of taking damage: what absorbed damage has to say, then the death if the creature is out of hit points.</summary>
+    public void FinishDamage(ObjectRef? from)
+    {
+        if (absorbed.Length > 0) { var text = absorbed.ToString(); absorbed.Clear(); Tell(text); }
+        if (!Dead && hp <= 0) Die(from);
+    }
+
+    /// <summary>
+    /// What verbose adds to a combat line for damage: " {green}(+2 damage){/}" for the one who dealt it, " {red}(-5 damage){/}" for the
+    /// one who took it; "" when this creature has verbose off (creatures never have it on).
+    /// </summary>
+    public virtual string DamageNote(int applied, bool dealt) => "";
+
+    /// <summary>What verbose adds to a line about healing received or given: " {green}(+4 Vitality){/}", or "".</summary>
+    public virtual string HealNote(int healed) => "";
 
     // ---- Experience: shared by damage ----
     // Experience goes by the share of the damage each player dealt, among those still alive, in the room and awake when the
@@ -503,7 +543,7 @@ public abstract class Living : Thing
             var soaked = Math.Min(effect.Absorb, amount);
             effect.Absorb -= soaked;
             amount -= soaked;
-            Tell($"{effect.Name} absorbs {soaked} damage.\n");
+            absorbed.Append($"{effect.Name} absorbs {soaked} damage.\n");
             if (amount <= 0) break;
         }
         return amount;
@@ -1035,10 +1075,14 @@ public abstract class Living : Thing
         if (blocked) damage = Math.Max(1, damage / 2);
 
         var tier = damage <= 2 ? 0 : damage <= 4 ? 1 : damage <= 7 ? 2 : 3;
-        Tell($"You {HitYou[tier]} {theirs}{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n");
-        TellObject(target, $"{label} {HitThem[tier]} you{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? " You block part of the blow." : "") + "\n");
+        // The damage is applied first, so that the lines can say how much of it really was; the death waits until they are told.
+        var applied = Math.Max(0, target.Call<int>("ApplyDamage", damage, Self));
+        var mine = DamageNote(applied, true);
+        var theirNote = target.Call<string>("DamageNote", applied, false) ?? "";
+        Tell($"You {HitYou[tier]} {theirs}{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + mine + "\n");
+        TellObject(target, $"{label} {HitThem[tier]} you{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? " You block part of the blow." : "") + theirNote + "\n");
         TellRoom(room, $"{label} {HitThem[tier]} {theirs}{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n", Self, target);
-        target.Call("TakeDamage", damage, Self);
+        target.Call("FinishDamage", Self);
         action.Skill?.Call("OnHit", Self, target, damage);
     }
 

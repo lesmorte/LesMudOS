@@ -153,6 +153,20 @@ public class {cls} : Monster
 '''
 
 
+# Hits every time for 1, and has plenty of Vitality: for the checks that verbose shows what was actually done.
+BITER = '''// @inherit /std/monster
+public class PfBiter : Monster
+{
+    public override void Create()
+    {
+        Name = "biter"; Ids.Add("biter");
+        ShortDesc = "a biter"; LongDesc = "It bites.";
+        Level = 1; MaxHp = 5000; DamageMin = 1; DamageMax = 1; ToHit = 30;
+        Aggressive = false;
+    }
+}
+'''
+
 TRINKET_RED = '''// @inherit /std/item
 public class RedTrinket : Item
 {
@@ -168,7 +182,7 @@ public class BlueTrinket : Item
 
 
 def files():
-    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab"}
+    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite"}
     out = {"out": TEST + "hub"}
     return {
         "hub": a.room("PfHub", "Play Hub", hub_exits, safe=True),
@@ -182,6 +196,8 @@ def files():
         "cell": a.room("PfCell", "Locked Cell", {"north": TEST + "hub"},
                        f'        AddSpawn("{TEST}dummy");\n        LockExit("north", "gold key", "The cell door is locked.");\n', reset=3000),
         "dummy": DUMMY,
+        "bite": a.room("PfBite", "Biting Room", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}biter");\n', reset=3000),
+        "biter": BITER,
         "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 20);\n', reset=3000),
         "zapper": ZAPPER,
         "pinata": pinata("Pinata", "pinata", 100), "pinata90": pinata("Pinata90", "pinata", 90),
@@ -256,6 +272,7 @@ def run(work, mudlib, box):
     run_corpses(wiz)
     run_fleeing(wiz)
     run_shared_xp(wiz)
+    run_verbose(wiz)
 
 
 # ===== 5. telling identical things apart =====
@@ -573,6 +590,105 @@ def run_shared_xp(wiz):
     check("shared xp: a wizard among the participants makes no history", text, "Wizards make no history.")
     check("shared xp: and the player gets the share of the damage (60 of 100, with 60% killing blow: 10 + 54)", "ok" if xp_of(oto) - ob == 64 else str(xp_of(oto) - ob), "ok")
     wiz.command("drop all")
+    wiz.command("goto " + TEST + "hub")
+
+
+# ===== 1. verbose =====
+
+def fight_text(c, minutes_of_text=None, until=None, timeout=40):
+    """Read what a fight prints until `until(text)` is true."""
+    end = time.time() + timeout
+    text = ""
+    while time.time() < end and not until(text):
+        text += a.quiet(c, 0.4)
+    return text
+
+
+def run_verbose(wiz):
+    fresh_pinata(wiz)
+    vic = lab_player("vera")
+    check("verbose: off by default", vic.command("verbose"), "Verbose is off.")
+    check("verbose: usage", vic.command("verbose maybe"), "Usage: verbose")
+    # Off: a fight shows no numbers.
+    vic.command("out")
+    vic.command("bite")
+    wiz.command("goto " + TEST + "bite")
+    vic.command("kill biter")
+    text = fight_text(vic, until=lambda t: t.count("You hit") + t.count("You scratch") + t.count("You smash") >= 2 and "bites you" in t or "biter hits you" in t or "biter scratches you" in t)
+    check("verbose: with it off, combat lines carry no numbers", text, absent=(" damage)", "Vitality)"))
+    for _ in range(40):
+        if "You flee" in vic.command("flee"):
+            break
+    a.drain(vic, 0.3)
+    wiz.command("restore vera")
+    base = int(re.search(r"HP (\d+)/5000", wiz.command("stat biter")).group(1))
+    vic.command("bite")
+    check("verbose: turn it on", vic.command("verbose on"), "Verbose is now on.")
+    check("verbose: and the status says so", vic.command("verbose"), "Verbose is on")
+    start_hp = a.hp_of(vic)[0]
+    vic.command("kill biter")
+    # The damage a player deals and takes in real combat matches what was done.
+    text = fight_text(vic, until=lambda t: len(re.findall(r"\(\+\d+ damage\)", t)) >= 4 and len(re.findall(r"\(-\d+ damage\)", t)) >= 2, timeout=60)
+    # Stop the fight (as soon as it will let us) and read the totals straight away.
+    for _ in range(30):
+        out = vic.command("flee")
+        text += out
+        if "You flee" in out:
+            break
+    left = a.hp_of(vic)[0]
+    check("verbose: out of the fight again", vic.command("look"), "Play Hub")
+    dealt = sum(int(n) for n in re.findall(r"\(\+(\d+) damage\)", text))
+    taken = sum(int(n) for n in re.findall(r"\(-(\d+) damage\)", text))
+    lost_by_biter = base - int(re.search(r"HP (\d+)/5000", wiz.command("stat biter")).group(1))
+    check("verbose: the damage you deal is shown after the combat line", text, "(+")
+    check("verbose: the damage you take is shown too", text, "(-")
+    check("verbose: damage shown as dealt adds up to the Vitality the creature lost", "ok" if dealt == lost_by_biter + 0 and dealt > 0 else f"shown {dealt}, lost {lost_by_biter}", "ok")
+    check("verbose: damage shown as taken adds up to the Vitality you lost", "ok" if taken == start_hp - left + 0 and taken > 0 else f"shown {taken}, lost {start_hp - left} (hp {start_hp} -> {left}, the lines before the setting was on are not counted)", "ok")
+
+    # Exact numbers from any source: the zapper (damage over time and other sources use the same call).
+    wiz.command("goto " + TEST + "lab")
+    wiz.command("clone " + TEST + "pinata")
+    wiz.command("goto " + TEST + "hub")
+    check("verbose: into the lab", vic.command("lab"), "Zap Lab")
+    a.drain(vic, 0.5)
+    hp0 = a.hp_of(vic)[0]
+    text = vic.command("zap pinata 7")
+    check("verbose: a zap that deals 7 shows (+7 damage)", text, "(+7 damage)")
+    text = vic.command("zap me 6")
+    check("verbose: damage taken shows (-6 damage)", text, "(-6 damage)")
+    check("verbose: and 6 Vitality really went", "ok" if hp0 - a.hp_of(vic)[0] in (6, 5, 4) and hp0 - a.hp_of(vic)[0] >= 4 else "?", "ok")
+    raw = vic.raw_command("zap pinata 3")
+    check("verbose: damage you deal is green", raw, "\x1b[32m(+3 damage)")
+    raw = vic.raw_command("zap me 2")
+    check("verbose: damage you take is red", raw, "\x1b[31m(-2 damage)")
+    vic.command("ansi off")
+    raw = vic.raw_command("zap pinata 4")
+    check("verbose: ansi off gives plain text", raw, "(+4 damage)", absent=("\x1b",))
+    vic.command("ansi on")
+    # Overkill does not count: with 30 left in the pinata, a blow of 500 is 30 damage.
+    fresh_left = 100 - 7 - 3 - 4
+    text = vic.command("zap pinata 500")
+    check("verbose: only the Vitality actually lost counts (overkill does not)", text, f"(+{fresh_left} damage)")
+    # Healing.
+    wiz.command("goto " + TEST + "lab")
+    wiz.command("clone " + HOLLOW + "obj/healing_potion")
+    wiz.command("give potion to vera")
+    vic.command("zap me 10")
+    a.drain(vic, 0.3)
+    before = a.hp_of(vic)[0]
+    text = vic.command("drink potion")
+    text += fight_text(vic, until=lambda t: "Vitality)" in t, timeout=20)
+    m = re.search(r"You recover (\d+) hit points\. \(\+(\d+) Vitality\)", text)
+    gained = a.hp_of(vic)[0] - before
+    check("verbose: healing shows (+N Vitality), the number it really healed", "ok" if m and m.group(1) == m.group(2) and gained in (int(m.group(1)), int(m.group(1)) + 1) else f"{text[-200:]!r} gained {gained}", "ok")
+    raw = vic.raw_command("verbose")
+    # Saved with the character.
+    vic.command("quit")
+    vic.closed(3)
+    again = login("vera")
+    check("verbose: saved with the character", again.command("verbose"), "Verbose is on")
+    again.command("verbose off")
+    check("verbose: off again", again.command("verbose"), "Verbose is off.")
     wiz.command("goto " + TEST + "hub")
 
 
