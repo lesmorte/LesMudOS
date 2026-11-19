@@ -87,6 +87,7 @@ h3 { font-size: 1.4rem; }
 .hero .actions { justify-content: center; }
 .plate { margin: 2rem 0 0; padding: .4rem; background: var(--card); border: 3px solid var(--oak); box-shadow: 0 0 0 2px var(--parch), 0 0 0 3px var(--line); }
 .plate svg { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; }
+.plate img.art { display: block; width: 100%; height: auto; }
 .plate figcaption { font: italic .95rem/1.4 var(--head); color: var(--ink-2); text-align: center; padding: .5rem .5rem .2rem; }
 .art.map { aspect-ratio: auto; }
 .plate .map { aspect-ratio: 640 / 820; max-height: 44rem; margin-inline: auto; }

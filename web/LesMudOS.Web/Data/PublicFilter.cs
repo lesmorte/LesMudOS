@@ -10,7 +10,7 @@ namespace LesMudOS.Web.Data;
 ///   1. its event id does not start with any "hiddenEventPrefixes" entry (deny always wins);
 ///   2. its event id matches an entry of "publicEvents" (exact, or a prefix when the entry ends in "*"):
 ///      an event type that is not listed is hidden, so a secret type added to the game later stays hidden until someone lists it;
-///   3. none of the "forbiddenTerms" appears in the entry's headline, text, significance, place, region, tags, subject or event id
+///   3. none of the "forbiddenTerms" appears in the entry's headline, text, significance, region, tags, subject or event id
 ///      (compared case-insensitively with punctuation ignored, so "great_stump" and "Great Stump" are the same);
 ///   4. nobody it names is a wizard, and no wizard's name appears in its text.
 /// If the file is missing or unreadable nothing is public (the filter fails closed).
@@ -107,7 +107,7 @@ public sealed class PublicFilter
         string F(string k) => entry.TryGetValue(k, out var v) ? v ?? "" : "";
         var ev = F("event");
         if (!IsPublicEventType(ev)) return false;
-        if (ContainsForbiddenTerm(F("headline"), F("text"), F("significance"), F("area"), F("region"), F("tags"), F("subject"), ev, F("participants"), F("actor"))) return false;
+        if (ContainsForbiddenTerm(F("headline"), F("text"), F("significance"), F("region"), F("tags"), F("subject"), ev, F("participants"), F("actor"))) return false;
         foreach (var n in F("participants").Split('|', StringSplitOptions.RemoveEmptyEntries).Append(F("actor")))
             if (n.Trim() != "" && wizards.Contains(n.Trim().ToLowerInvariant())) return false;
         if (wizards.Count > 0)

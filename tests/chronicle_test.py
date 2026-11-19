@@ -257,7 +257,7 @@ def run(work, mudlib, driver, start_day):
     ck("the entry exists", eid > 0, r)
     ent = q(a, "chronicle", "EntryText", f"i:{eid}")
     check("the entry has the named headline", ent, "The Quieting of the Cellars")
-    check("the entry is dated in Year 1 and names the actor and place", ent, "Year 1", "Bob brought down the Goblin Overseer in the tunnels beneath The Village of Vincent's Hollow")
+    check("the entry is dated in Year 1 and names the actor and place", ent, "Year 1", "Bob brought down the Goblin Overseer in the tunnels beneath Vincent's Hollow")
     check("the entry carries the significance text", ent, "the village slept easier")
     check("Renown: 30 (hidden cache) + 10 + 15 first + 5 Historical bonus", q(a, "renown", "QueryRenown", "bob"), "60")
     r = rep(a, "carol", "boss.goblin_overseer", "goblin-overseer", name="Goblin Overseer")
