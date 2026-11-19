@@ -366,6 +366,13 @@ class Economy:
                 self.errors.append(f"{path}: a shop stocks {m.id}, which may only come from bleeding")
             if m is not None and round_price(price, q, mult) < value_for(m.value, q, mult):
                 self.errors.append(f"{path}: a shop sells {m.id} at {round_price(price, q, mult)}, below its value {value_for(m.value, q, mult)} (the pricing rule)")
+        # Every material and every recipe output names a file that exists (the daemon does not open files when it loads).
+        for m in self.mats.values():
+            if self.tree.read(m.record.split("?")[0]) is None:
+                self.errors.append(f"material {m.id}: its file {m.record.split('?')[0]}.cs does not exist")
+        for r in self.recipes:
+            if r.output.startswith("/") and self.tree.read(r.output.split("?")[0]) is None:
+                self.errors.append(f"recipe {r.id}: its output {r.output}.cs does not exist")
         worst = None
         for r in self.recipes:
             work = self.difficulties.get(r.difficulty, 0)
