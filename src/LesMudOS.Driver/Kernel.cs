@@ -497,8 +497,15 @@ internal sealed class Kernel : IDriverServices
     {
         id = id.Trim().ToLowerInvariant();
         if (id.Length == 0) return null;
-        foreach (var item in container.Inventory.ToArray())
+        var contents = container.Inventory.ToArray();
+        foreach (var item in contents)
             if (item.Target is { } target && In(item, () => target.Id(id))) return item;
+        // Nothing answers to the whole text: it may carry a position among identical things ("rat 2", "2.rat", "second rat").
+        var position = NameIndex.Split(id, out var name);
+        if (position == 0) return null;
+        var seen = 0;
+        foreach (var item in contents)
+            if (item.Target is { } target && In(item, () => target.Id(name)) && ++seen == position) return item;
         return null;
     }
 

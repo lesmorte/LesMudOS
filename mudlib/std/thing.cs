@@ -132,7 +132,14 @@ public abstract class Thing : MudObject
     protected List<ObjectRef> Matching(ObjectRef container, string noun)
     {
         var id = noun.ToLowerInvariant();
-        return AllInventory(container).Where(o => o.IsAlive && o != Self && (id == "" || o.Call<bool>("Id", id))).ToList();
+        var all = AllInventory(container).Where(o => o.IsAlive && o != Self).ToList();
+        var found = all.Where(o => id == "" || o.Call<bool>("Id", id)).ToList();
+        if (found.Count > 0 || id == "") return found;
+        // "skin 2", "2.skin", "second skin": only that one of the things the name fits, in listed order.
+        var position = SplitOrdinal(id, out var name);
+        if (position == 0) return found;
+        var same = all.Where(o => o.Call<bool>("Id", name)).ToList();
+        return position <= same.Count ? new List<ObjectRef> { same[position - 1] } : found;
     }
 
     /// <summary>

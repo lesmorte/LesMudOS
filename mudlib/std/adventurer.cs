@@ -785,9 +785,20 @@ public abstract class Adventurer : Living
     {
         var room = Environment();
         if (room == null) return null;
-        foreach (var ob in AllInventory(room))
-            if (ob.Call<bool>("IsCorpse") && (name == "" || ob.Call<bool>("Id", name.ToLowerInvariant()))) return ob;
-        return null;
+        return CorpsesHere(room, name).FirstOrDefault();
+    }
+
+    /// <summary>The corpses in the room that answer to a name, in listed order; with a position in the name ("corpse 2", "2.corpse") just that one.</summary>
+    private List<ObjectRef> CorpsesHere(ObjectRef room, string name)
+    {
+        var id = name.ToLowerInvariant();
+        var corpses = AllInventory(room).Where(o => o.IsAlive && o.Call<bool>("IsCorpse")).ToList();
+        var named = corpses.Where(o => id == "" || o.Call<bool>("Id", id)).ToList();
+        if (named.Count > 0 || id == "") return named;
+        var position = SplitOrdinal(id, out var bare);
+        if (position == 0) return named;
+        var same = corpses.Where(o => o.Call<bool>("Id", bare)).ToList();
+        return position <= same.Count ? new List<ObjectRef> { same[position - 1] } : named;
     }
 
     private bool GetFromCorpse(string what, string corpseName)
@@ -805,10 +816,8 @@ public abstract class Adventurer : Living
         if (room == null) return false;
         string? refusal = null;
         var found = false;
-        foreach (var ob in AllInventory(room).ToList())
+        foreach (var ob in CorpsesHere(room, args))
         {
-            if (!ob.Call<bool>("IsCorpse")) continue;
-            if (args != "" && !ob.Call<bool>("Id", args.ToLowerInvariant())) continue;
             found = true;
             var result = ob.Call<string>("TakeAll");
             if (result == null) return true;

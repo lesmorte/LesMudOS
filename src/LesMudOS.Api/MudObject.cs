@@ -109,6 +109,13 @@ public abstract class MudObject
     /// <summary>First object inside the container (this object if omitted) whose Id() accepts the name.</summary>
     protected ObjectRef? Present(string id, ObjectRef? container = null) => D.Present(id, container ?? Self);
 
+    /// <summary>
+    /// The position a typed name carries among identical things: "2.rat", "rat 2" and "second rat" give 2 and the name "rat".
+    /// Returns 0 (and the text unchanged) when there is none. Present() already understands these forms; use this when you
+    /// filter a list yourself, so a command's matching works the same way everywhere.
+    /// </summary>
+    protected static int SplitOrdinal(string text, out string name) => NameIndex.Split(text, out name);
+
     // ---- Living and interactive objects ----
 
     /// <summary>The living object whose command, heartbeat or arrival caused the current execution.</summary>

@@ -1026,12 +1026,25 @@ public class CraftingDaemon : Thing
         var corpses = CorpsesHere(who);
         if (corpses.Count == 0) return null;
         if (args == "" || args == "corpse") return corpses.FirstOrDefault(c => c.Call<bool>("QueryYieldAvailable", verb)) ?? corpses[0];
-        var id = args.ToLowerInvariant();
-        if (id.StartsWith("corpse of ")) id = id.Substring(10);
-        var named = corpses.Where(c => c.Call<bool>("Id", args.ToLowerInvariant()) || c.Call<bool>("Id", "corpse of " + id) || (c.Call<string>("QueryCreatureKind") ?? "") == id
-                                       || (c.Call<string>("QueryName") ?? "").ToLowerInvariant().Contains(id)).ToList();
+        var named = CorpsesNamed(corpses, args.ToLowerInvariant());
+        if (named.Count == 0)
+        {
+            // A position among identical corpses: "skin corpse 2", "skin 2.wolf", "skin second rat".
+            var position = SplitOrdinal(args.ToLowerInvariant(), out var bare);
+            if (position == 0) return null;
+            var same = bare == "corpse" ? corpses : CorpsesNamed(corpses, bare);
+            return position <= same.Count ? same[position - 1] : null;
+        }
         // Of several corpses that answer, the first that still has this part to give, else the first.
         return named.FirstOrDefault(c => c.Call<bool>("QueryYieldAvailable", verb)) ?? named.FirstOrDefault();
+    }
+
+    private static List<ObjectRef> CorpsesNamed(List<ObjectRef> corpses, string name)
+    {
+        var id = name;
+        if (id.StartsWith("corpse of ")) id = id.Substring(10);
+        return corpses.Where(c => c.Call<bool>("Id", name) || c.Call<bool>("Id", "corpse of " + id) || (c.Call<string>("QueryCreatureKind") ?? "") == id
+                                  || (c.Call<string>("QueryName") ?? "").ToLowerInvariant().Contains(id)).ToList();
     }
 
     /// <summary>Why this character cannot take this part from this corpse now, or null.</summary>

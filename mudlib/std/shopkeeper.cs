@@ -97,7 +97,17 @@ public class Shopkeeper : Npc
         AddAction("value", CmdValue);
     }
 
-    private Stock? Find(string name) => stock.FirstOrDefault(s => s.Sample is { IsAlive: true } sample && sample.Call<bool>("Id", name.ToLowerInvariant()));
+    private Stock? Find(string name)
+    {
+        var id = name.ToLowerInvariant();
+        var first = stock.FirstOrDefault(s => s.Sample is { IsAlive: true } sample && sample.Call<bool>("Id", id));
+        if (first != null) return first;
+        // "buy sword 2": the second thing for sale that answers to "sword", in the order browse lists them.
+        var position = SplitOrdinal(id, out var bare);
+        if (position == 0) return null;
+        var same = stock.Where(s => s.Sample is { IsAlive: true } sample && sample.Call<bool>("Id", bare)).ToList();
+        return position <= same.Count ? same[position - 1] : null;
+    }
 
     private bool CmdBrowse(string args)
     {
