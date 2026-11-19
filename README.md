@@ -237,6 +237,10 @@ Copy `publish/` to `/opt/lesmudos/bin` and `mudlib/` to `/opt/lesmudos/mudlib` o
 
 The full list is in [DESIGN.md](docs/DESIGN.md#13-proof-of-concept-status).
 
+## The website
+
+The public website for Legends of Hollowmere (the Chronicle, the Hall of Heroes, the world and how to play) lives in [web/](web/) and reads the game's own save files, read only. How it is built, configured and deployed: [docs/WEBSITE.md](docs/WEBSITE.md).
+
 ## License
 
 The repository holds two things under different terms. The LesMudOS engine (the driver, the standard objects, the tests and the deployment scripts) is under the MIT license: see [LICENSE](LICENSE). The game built on it, Legends of Hollowmere (its world, classes, factions and design documents), is all rights reserved: see [LICENSE-GAME.md](LICENSE-GAME.md). [LICENSING.md](LICENSING.md) lists which files are which.

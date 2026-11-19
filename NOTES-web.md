@@ -1,17 +1,14 @@
 # NOTES-web (resumable state)
 
-Branch work/web, worktree /home/claude/wt-web. Task: public website under web/ (see docs/specs/website.md).
-
-## Decisions
-- Reader never touches players/*.json in production: a sync job (deploy/lesmudos-web-sync, run as the game user) writes a sanitized
-  directory (chronicle.json, renown.json, wizlist.json, roster.json without password hashes) that the website user reads.
-  Reader also accepts a raw save dir (secure/*.json, players/*.json) for local dev and tests.
-- Font: IM Fell English (OFL) regular only, 56 KB, in wwwroot/fonts. Body: system sans.
-- Real fixtures captured with web/tools/capture_fixtures.py -> web/fixtures/real (copied from /tmp/webfix-real).
-- Entries whose text/headline/area contain a forbidden term are hidden (so Overseer / Clear the Cellar entries vanish: they name the Forgotten Cellars).
+Branch work/web, worktree /home/claude/wt-web. Task: public website under web/ (see docs/specs/website.md, docs/WEBSITE.md).
 
 ## Done
-(see git log)
+Project, data layer, secrets filter, all pages, CSS, SVG art, 42 tests passing, deploy/setup-website.sh (with sync job), docs/WEBSITE.md, LICENSING/README.
+
+## Decisions
+- Website user never reads players/*.json: sync job (in setup-website.sh) writes sanitized roster.json etc.
+- Entries naming forbidden terms are hidden, so Overseer / Clear the Cellar entries vanish (they name the Forgotten Cellars).
+- Font: IM Fell English regular (OFL), font-display optional.
 
 ## Next
-- project, data layer, pages, css, svg, tests, deploy script, docs
+Nothing required; final report only.
