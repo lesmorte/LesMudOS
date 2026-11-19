@@ -8,7 +8,6 @@ public class GrCampPasty : Consumable
         Ids.Add("pasty");
         Ids.Add("pie");
         Ids.Add("camp pasty");
-        Ids.Add("food");
         ShortDesc = "a camp pasty";
         LongDesc = "A fat half-moon of pastry, crimped at the edge, filled with mutton and onion and still faintly warm from the caravan's pot. You could {cmd}eat{/} it.";
         HealAmount = 8;

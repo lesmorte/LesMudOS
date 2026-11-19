@@ -581,6 +581,7 @@ def hidden_ways(wk, game, probe_holder):
             R.ok(re.search(r"Finder discovered " + re.escape(name) + r" beneath Heartwood", joined) is not None and "Where: Heartwood" in joined,
                  f"chronicle: the entry for {name} says it lies beneath Heartwood", joined[:600])
     R.ok(all("Where:" in t for t in entries.values()), "chronicle: each entry names its place")
+    w.cmd("goto " + HOLLOW + "village/guild")
     nowiz = wk.say(w, "chronicle about wiz")
     R.ok("does not yet appear" in nowiz, "chronicle: the wizard appears in no entry", body(nowiz)[:200])
     p.cmd("quit")
