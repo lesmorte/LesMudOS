@@ -158,9 +158,12 @@ Because a new character has today's numbers, little needs redoing.
 - **Crafted consumables** and other healing keep their numbers.
 - **Advanced classes** (stage B) should be built on the new system, so stage B comes after this.
 
-## 7. Decisions needed from the owner
+## 7. The owner's decisions (18 November 2026)
 
-1. **Starting attributes.** The table in section 3 (5 each, plus 6 points by calling)? The formulas' bases were fitted to it; a different table means refitting, which is quick.
-2. **Vitality per level.** Warrior 9, Scout 8, Adventurer 8, Priest 7, Mage 6?
-3. **The Priest's faster Focus.** Keep it (recommended, since the Priest was the slowest class), or pin it back to today's rate?
-4. **Carry Capacity.** Computed and shown but not enforced until encumbrance is built?
+1. **Starting attributes.** As in section 3: 5 in each, plus 6 points by calling.
+2. **Vitality per level by class.** Warrior 9, Scout 8, Adventurer 8, Priest 7, Mage 6.
+3. **Focus per level by class**, in the same way as Vitality: Mage 4, Priest 4, Adventurer 2, Warrior 1, Scout 1. Endurance likewise: Warrior 2, Scout 2, Adventurer 2, Priest 1, Mage 1. All three are numbers in each class's file, and an advanced class may set its own.
+4. **The Priest's faster Focus regeneration** is kept.
+5. **Carry Capacity** is computed and shown, and not enforced until encumbrance is built.
+
+Nothing is open. The build starts when the corridor, the crafting engine and the crafting content have merged (section 5).
