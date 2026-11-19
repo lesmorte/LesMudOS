@@ -79,7 +79,8 @@ fi
 # ---- 2. .NET (setup-droplet.sh installed the SDK; it includes the ASP.NET Core runtime the site needs) ----
 DOTNET="$(command -v dotnet || true)"
 [ -n "$DOTNET" ] || die "dotnet was not found: run setup-droplet.sh first."
-dotnet --list-sdks | grep -q '^10\.' || die "The .NET 10 SDK was not found: run setup-droplet.sh first."
+SDKS="$(dotnet --list-sdks 2>/dev/null || true)"
+grep -q '^10\.' <<<"$SDKS" || die "The .NET 10 SDK was not found: run setup-droplet.sh first."
 
 # ---- 3. The website's own user: no login, no home but its data directory, and no access to the game's files ----
 if ! id "$WEB_USER" >/dev/null 2>&1; then
