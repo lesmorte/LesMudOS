@@ -11,7 +11,13 @@
 - E: notice post on the Hollow square; help text.
 
 ## Next
-- tests/craft_content_test.py; run all checks; docs (CRAFTING.md appendix, BUILDING.md); final report.
+- Nothing: final report. All parts committed (A c8fdad3, B 305f79e, C/D 5f24650, E 7557698).
+
+## Results
+- build 0/0; lint hollow 0 errors, oakenfell 0; load_check 0 failed; craft_sim PASS; craft_content_test 285/0; craft_test 254/0;
+  smoke, area, class, item, find (158), chronicle, chronicle_play 0 failures.
+- city_test: 234 failures, identical count on the base commit b59db8f (corridor rooms not in the build doc, etc.); 3 non-corridor ones also on base.
+- world_test: 2 fail (hidden exit use, room band) mine; 4 fail on the base copy (partial run, killed by restart): timing-related/pre-existing.
 
 ## Decisions
 - Lessons: Berry Juice 3, Simple Bandage 2 (Tobin) , Herbal Bandage 5, Minor Healing Salve 8, Minor Stamina Tonic 6, Hunter's Poultice 15,
