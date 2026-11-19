@@ -1,6 +1,6 @@
 # Legends of Hollowmere: all rights reserved
 
-Copyright (c) 2026 lesmorte. All rights reserved.
+Copyright (c) 2026 Keith Turnbull. All rights reserved.
 
 Legends of Hollowmere, the game built on the LesMudOS engine, is not open source. The parts of this repository listed under "The game" in [LICENSING.md](LICENSING.md) are published so that they can be read, and so that the project can be developed in the open. No license is granted to copy, modify, distribute, host or otherwise use them, in whole or in part, except as follows:
 
