@@ -181,7 +181,7 @@ class Client:
         deadline = time.time() + timeout
         data, self.pending = self.pending, ""
         if self.seen(marker, data):
-            return data
+            return data + self.linger(marker)
         while time.time() < deadline:
             try:
                 chunk = self.sock.recv(65536)
@@ -189,10 +189,29 @@ class Client:
                     break
                 data += self.rx(chunk)
                 if self.seen(marker, data):
-                    return data
+                    return data + self.linger(marker)
             except socket.timeout:
                 pass
         return data
+
+    def linger(self, marker):
+        """Reading up to some text that is not the prompt: the prompt the server sends after that output may still be on its way.
+        Take it in now (without the prompt line), or it would be taken for the end of the next command's reply."""
+        if marker == "> ":
+            return ""
+        got = ""
+        end = time.time() + 0.12
+        while time.time() < end:
+            try:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    break
+                got += self.rx(chunk)
+                if PROMPT_LINE.search(got):
+                    break
+            except socket.timeout:
+                pass
+        return PROMPT_LINE.sub("", got)
 
     def ed(self, line, timeout=30.0):
         """Send a line to the in-game editor and read until its ':' prompt."""

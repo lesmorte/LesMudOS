@@ -108,7 +108,7 @@ public abstract class Thing : MudObject
 
     /// <summary>One item of a stack or one separate object, described singly ("a fine wolf skin"); never the count.</summary>
     protected static string Single(ObjectRef item) =>
-        (item.Call<int>("QueryAmount") > 0 ? item.Call<string>("Short") : item.Call<string>("DescribeCount", 1)) ?? item.Call<string>("Short") ?? "something";
+        (item.Call<int>("QueryAmount") > 0 || QuantityOf(item) == 1 ? item.Call<string>("Short") : item.Call<string>("DescribeCount", 1)) ?? item.Call<string>("Short") ?? "something";
 
     /// <summary>
     /// What makes two items identical in a list: the same single description and the same state (quality and properties; the

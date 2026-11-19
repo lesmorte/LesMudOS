@@ -385,7 +385,7 @@ public abstract class Room : MudObject
             if (desc == null) continue;
             if (!Living(ob) && ob.Call<int>("QueryQuantity") > 0)
             {
-                var single = ob.Call<int>("QueryAmount") > 0 ? desc : ob.Call<string>("DescribeCount", 1) ?? desc;
+                var single = ob.Call<int>("QueryAmount") > 0 || ob.Call<int>("QueryQuantity") == 1 ? desc : ob.Call<string>("DescribeCount", 1) ?? desc;
                 var state = string.Join("&", (ob.Call<string>("QueryState") ?? "").Split('&', StringSplitOptions.RemoveEmptyEntries).Where(p => !p.StartsWith("n=")));
                 var key = single + "|" + state;
                 if (!floor.TryGetValue(key, out var g)) { g = (single, 0); order.Add("\u0001" + key); }

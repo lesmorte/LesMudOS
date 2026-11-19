@@ -221,6 +221,23 @@ def take(c, word, verb="get"):
     return text, gold(c) - before
 
 
+def everything(c, silence=1.0):
+    """All the text that arrives until nothing has come for `silence` seconds. When several characters act at once each one's
+    reply is mixed with news of the others' actions, each with a prompt of its own, so the first prompt does not end the reply."""
+    text, c.pending = c.pending, ""
+    last = time.time()
+    while time.time() - last < silence:
+        try:
+            chunk = c.sock.recv(65536)
+            if not chunk:
+                break
+            text += c.rx(chunk)
+            last = time.time()
+        except Exception:
+            pass
+    return text
+
+
 def record():
     with open(RECORD) as fh:
         return json.load(fh)["found"]
@@ -325,8 +342,10 @@ def run(work, mudlib, box):
 
     # ================= simultaneous takes =================
     for c in P[:4]:
+        c.absorb()
+    for c in P[:4]:
         c.send("get vase")
-    results = [c.read_until("> ") for c in P[:4]]
+    results = [everything(c) for c in P[:4]]
     gains = sorted(int(m.group(1)) for t in results for m in [re.search(r"You take (\d+) gold", t)] if m)
     ok("four characters taking in the same moment: four distinct amounts, the first four of the rule", gains == sorted(table(50)[:4]), gains)
     ok("four at once: the register has exactly four names for the vase", len(record()[T + "stash_c"]) == 4)
