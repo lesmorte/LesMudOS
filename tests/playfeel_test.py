@@ -88,6 +88,21 @@ public class Bare : Monster
 }
 '''
 
+TWIN = '''// @inherit /std/monster
+public class Twin : Monster
+{
+    public override void Create()
+    {
+        Name = "twin"; Ids.Add("twin");
+        ShortDesc = "a twin"; LongDesc = "Two swords in one.";
+        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Aggressive = false;
+        AddLoot("/domains/hollow/obj/rusty_sword", 100);
+        AddLoot("/domains/hollow/obj/rusty_sword", 100);
+    }
+}
+'''
+
 TRINKET_RED = '''// @inherit /std/item
 public class RedTrinket : Item
 {
@@ -110,7 +125,7 @@ def files():
         "pen": a.room("PfPen", "Rat Pen", out, f'        AddSpawn("{TEST}ratling", 2);\n', reset=3000),
         "yard": a.room("PfYard", "Quiet Yard", out, reset=3000),
         "shop": a.room("PfShop", "Test Shop", out, f'        AddSpawn("{TEST}shopper");\n', safe=True, reset=3000),
-        "ratling": RATLING, "mouse": MOUSE, "skinner": SKINNER, "bare": BARE,
+        "ratling": RATLING, "mouse": MOUSE, "skinner": SKINNER, "bare": BARE, "twin": TWIN,
         "red_trinket": TRINKET_RED, "blue_trinket": TRINKET_BLUE,
         "shopper": '''// @inherit /std/shopkeeper
 public class PfShopper : Shopkeeper
@@ -177,6 +192,7 @@ def run(work, mudlib, box):
     check("setup: the first wizard", wiz.command("promote " + SECRET), "level 10 wizard")
     wiz.command("goto " + TEST + "hub")
     run_numbers(wiz)
+    run_lists(wiz)
 
 
 # ===== 5. telling identical things apart =====
@@ -218,6 +234,39 @@ def run_numbers(wiz):
     check("numbers: 'get 1.trinket' takes the first", wiz.command("get 1.trinket"), "You take a red trinket.")
     check("numbers: 'drop second trinket' drops the second carried (the blue one was picked up first)", wiz.command("drop second trinket"), "You drop a red trinket.")
     check("numbers: a number beyond the matches is refused", wiz.command("drop trinket 4"), "Drop what?")
+    wiz.command("drop all")
+
+
+# ===== 6. inventory and list format =====
+
+def run_lists(wiz):
+    wiz.command("goto " + TEST + "yard")
+    wiz.command("drop all")
+    wiz.command("clone " + HOLLOW + "obj/healing_potion")
+    wiz.command("clone " + HOLLOW + "obj/healing_potion")
+    wiz.command("clone " + HOLLOW + "obj/rusty_sword")
+    wiz.command("clone " + HOLLOW + "obj/rusty_sword")
+    wiz.command("wield sword")
+    text = wiz.command("i")
+    check("inventory: a heading and one item per line, indented", text, "Inventory\r\n   ")
+    check("inventory: identical carried items collapse with a count", text, "   a minor healing potion (x2)\r\n")
+    check("inventory: a wielded item is never merged with a carried one", text, "   a rusty sword (wielded)\r\n", "   a rusty sword\r\n")
+    check("inventory: the old one-line form is gone", text, absent=("You are carrying", ", a rusty"))
+    wiz.command("drop all")
+    text = wiz.command("look")
+    check("floor: identical things are listed with a count", text, "A minor healing potion (x2) is here.", "A rusty sword is here.", absent=("Two minor healing",))
+    wiz.command("get all")
+    wiz.command("goto " + TEST + "shop")
+    check("shop sale: identical items in one sentence with a count", wiz.command("sell all"),
+          "You sell a minor healing potion (x2) to Shopper for", absent=("You sell a minor healing potion to",))
+    # A corpse's contents.
+    wiz.command("drop all")
+    wiz.command("clone " + TEST + "twin")
+    wiz.command("slay twin")
+    check("corpse: the contents are listed with a count", wiz.command("look at corpse"), "It holds: a rusty sword (x2).")
+    check("corpse: taking identical things is one sentence", wiz.command("loot corpse"), "You take a rusty sword (x2) from the corpse of a twin.")
+    check("floor: a stack is told with its count too", (wiz.command("drop all"), wiz.command("look"))[1], "A rusty sword (x2) is here.")
+    wiz.command("get all")
     wiz.command("drop all")
 
 

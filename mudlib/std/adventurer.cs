@@ -891,11 +891,10 @@ public abstract class Adventurer : Living
 
     private bool CmdInventory(string args)
     {
-        var items = AllInventory()
-            .Where(i => i.Call<string>("Short") != null)
-            .Select(i => i.Call<string>("Short") + (IsEquipped(i) ? (i.Call<string>("QuerySlot") == "weapon" ? " (wielded)" : " (worn)") : ""))
-            .ToList();
-        Write(items.Count == 0 ? "You are empty-handed.\n" : "You are carrying: " + string.Join(", ", items) + ".\n");
+        var shown = AllInventory().Where(i => i.Call<string>("Short") != null).ToList();
+        if (shown.Count == 0) { Write("You are empty-handed.\n"); return true; }
+        var lines = Collapse(shown, i => IsEquipped(i) ? (i.Call<string>("QuerySlot") == "weapon" ? " (wielded)" : " (worn)") : "");
+        Write("Inventory\n" + string.Concat(lines.Select(l => "   " + l.text + "\n")));
         return true;
     }
 

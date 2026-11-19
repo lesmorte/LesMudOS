@@ -203,7 +203,7 @@ public class Corpse : Thing
     public override string Long()
     {
         var text = new System.Text.StringBuilder(LongDesc + "\n");
-        var shorts = Contents().Select(i => i.Call<string>("Short")).Where(s => s != null).ToList();
+        var shorts = Collapse(Contents().Where(i => i.Call<string>("Short") != null)).Select(l => l.text).ToList();
         text.Append(shorts.Count == 0 ? "It is empty.\n" : "It holds: " + string.Join(", ", shorts) + ".\n");
         if (LockedFor(ThisPlayer())) text.Append("It was felled moments ago; only those involved may touch it.\n");
         if (QueryYieldAvailable("skin")) text.Append("Its hide could still be taken ({cmd}skin{/}).\n");
@@ -228,13 +228,15 @@ public class Corpse : Thing
         var held = found.Sum(QuantityOf);
         if (!all && held < count) return $"There {(held == 1 ? "is" : "are")} only {held} in {Short()}.";
         var left = all ? int.MaxValue : count;
+        var plan = new List<(ObjectRef item, int n)>();
         foreach (var item in found)
         {
             if (left <= 0) break;
             var n = Math.Min(left, QuantityOf(item));
-            Hand(item, n, taker);
+            plan.Add((item, n));
             left -= n;
         }
+        Hand(plan, taker);
         AfterTaking();
         return null;
     }
@@ -247,20 +249,36 @@ public class Corpse : Thing
         if (LockedFor(taker)) return Refusal();
         var items = Contents();
         if (items.Count == 0) return $"There is nothing in {Short()}.";
-        foreach (var item in items) Hand(item, QuantityOf(item), taker);
+        Hand(items.Select(i => (i, QuantityOf(i))).ToList(), taker);
         AfterTaking();
         return null;
     }
 
-    private void Hand(ObjectRef item, int n, ObjectRef taker)
+    /// <summary>Move the planned amounts to the taker and say so once per kind of thing: "a rusty sword (x2)", not two lines.</summary>
+    private void Hand(List<(ObjectRef item, int n)> plan, ObjectRef taker)
     {
-        var description = Describe(item, n);
-        var held = MovePortion(item, n, taker);
-        if (held == null) return;
-        TellObject(taker, $"You take {description} from {Short()}.\n");
+        var order = new List<string>();
+        var groups = new Dictionary<string, (string single, int n, List<ObjectRef> held)>();
+        foreach (var (item, n) in plan)
+        {
+            var key = SameKey(item);
+            var single = Single(item);
+            var held = MovePortion(item, n, taker);
+            if (held == null) continue;
+            if (!groups.TryGetValue(key, out var g)) { g = (single, 0, new List<ObjectRef>()); order.Add(key); }
+            g.n += n;
+            g.held.Add(held);
+            groups[key] = g;
+        }
         var room = Environment();
-        if (room != null) TellRoom(room, $"{taker.Call<string>("QueryName")} takes {description} from {Short()}.\n", taker);
-        held.Call("Taken", taker);
+        foreach (var key in order)
+        {
+            var g = groups[key];
+            var description = ListName(g.single, g.n);
+            TellObject(taker, $"You take {description} from {Short()}.\n");
+            if (room != null) TellRoom(room, $"{taker.Call<string>("QueryName")} takes {description} from {Short()}.\n", taker);
+            foreach (var held in g.held.Distinct()) held.Call("Taken", taker);
+        }
     }
 
     private void AfterTaking()

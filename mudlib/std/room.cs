@@ -341,26 +341,38 @@ public abstract class Room : MudObject
         var ways = Exits.Keys.Concat(hidden.Keys.Where(d => !Exits.ContainsKey(d) && viewer != null && (wizard || Found(viewer, d)))).ToList();
         text.Append(ways.Count == 0 ? "There are no obvious exits.\n" : "Obvious exits: " + string.Join(", ", ways.Select(d => "{cmd}" + d + "{/}" + (wizard && hidden.ContainsKey(d) && !Exits.ContainsKey(d) ? " (hidden)" : "") + (detailed ? ExitNote(d, viewer!) : ""))) + "\n");
 
-        // Identical shorts are merged: "Two giant rats are here."
+        // Identical shorts are merged: "Two giant rats are here." Things lying about (not creatures) are listed the same way as
+        // everywhere else: "A minor healing potion (x2) is here."
         var counts = new Dictionary<string, int>();
         var order = new List<string>();
+        var floor = new Dictionary<string, (string single, int n)>();
         foreach (var ob in AllInventory())
         {
             if (ob == viewer) continue;
             var desc = ob.Call<string>("Short");
             if (desc == null) continue;
+            if (!Living(ob) && ob.Call<int>("QueryQuantity") > 0)
+            {
+                var single = ob.Call<int>("QueryAmount") > 0 ? desc : ob.Call<string>("DescribeCount", 1) ?? desc;
+                var state = string.Join("&", (ob.Call<string>("QueryState") ?? "").Split('&', StringSplitOptions.RemoveEmptyEntries).Where(p => !p.StartsWith("n=")));
+                var key = single + "|" + state;
+                if (!floor.TryGetValue(key, out var g)) { g = (single, 0); order.Add("\u0001" + key); }
+                floor[key] = (g.single, g.n + Math.Max(1, ob.Call<int>("QueryQuantity")));
+                continue;
+            }
             if (!counts.ContainsKey(desc)) { counts[desc] = 0; order.Add(desc); }
             counts[desc]++;
         }
         foreach (var desc in order)
         {
-            var n = counts[desc];
-            // A stack names its own count ("3 wolf skins"): it reads as a plural and is never counted again.
-            if (desc.Length > 0 && char.IsDigit(desc[0]))
+            if (desc.Length > 0 && desc[0] == '\u0001')
             {
-                for (var i = 0; i < n; i++) text.Append(Cap(desc) + " are here.\n");
+                var g = floor[desc.Substring(1)];
+                // A pile of coins names its own count ("100 gold coins"): it reads as a plural.
+                text.Append(Cap(g.n > 1 ? $"{g.single} (x{g.n})" : g.single) + (char.IsDigit(g.single[0]) ? " are here.\n" : " is here.\n"));
                 continue;
             }
+            var n = counts[desc];
             text.Append(n == 1 ? Cap(desc) : $"{(n < CountWords.Length ? CountWords[n] : n.ToString())} {Plural(desc)}");
             text.Append(n == 1 ? " is here.\n" : " are here.\n");
         }

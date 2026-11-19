@@ -106,6 +106,45 @@ public abstract class Thing : MudObject
     protected static string Describe(ObjectRef item, int n) =>
         (n >= QuantityOf(item) ? item.Call<string>("Short") : item.Call<string>("DescribeCount", n)) ?? item.Call<string>("Short") ?? "something";
 
+    /// <summary>One item of a stack or one separate object, described singly ("a fine wolf skin"); never the count.</summary>
+    protected static string Single(ObjectRef item) =>
+        (item.Call<int>("QueryAmount") > 0 ? item.Call<string>("Short") : item.Call<string>("DescribeCount", 1)) ?? item.Call<string>("Short") ?? "something";
+
+    /// <summary>
+    /// What makes two items identical in a list: the same single description and the same state (quality and properties; the
+    /// quantity of a stack does not count), and the same mark (so worn or wielded items never merge with carried ones).
+    /// </summary>
+    protected static string SameKey(ObjectRef item, string mark = "")
+    {
+        var state = (item.Call<string>("QueryState") ?? "").Split('&', StringSplitOptions.RemoveEmptyEntries).Where(p => !p.StartsWith("n="));
+        return Single(item) + "|" + string.Join("&", state) + "|" + mark;
+    }
+
+    /// <summary>A list entry: "a minor healing potion", or "a minor healing potion (x2)" for more than one.</summary>
+    protected static string ListName(string single, int n) => n > 1 ? $"{single} (x{n})" : single;
+
+    /// <summary>
+    /// The items grouped into list entries, in the order each first appears: identical items collapse into one entry with a
+    /// count ("a minor healing potion (x2)"). mark gives an item's suffix (" (wielded)"); marked items are never merged with
+    /// unmarked ones. Each entry also carries the items it stands for and how many there are in all.
+    /// </summary>
+    protected static List<(string text, int n, List<ObjectRef> items)> Collapse(IEnumerable<ObjectRef> items, Func<ObjectRef, string>? mark = null)
+    {
+        var order = new List<string>();
+        var groups = new Dictionary<string, (string single, string mark, int n, List<ObjectRef> items)>();
+        foreach (var item in items)
+        {
+            if (!item.IsAlive) continue;
+            var m = mark?.Invoke(item) ?? "";
+            var key = SameKey(item, m);
+            if (!groups.TryGetValue(key, out var g)) { g = (Single(item), m, 0, new List<ObjectRef>()); order.Add(key); }
+            g.n += QuantityOf(item);
+            g.items.Add(item);
+            groups[key] = g;
+        }
+        return order.Select(k => (ListName(groups[k].single, groups[k].n) + groups[k].mark, groups[k].n, groups[k].items)).ToList();
+    }
+
     /// <summary>
     /// Read a typed amount: "3 skins" (count 3), "all skins" (all), "all" (all, noun ""), "skin" (count 1). False if the
     /// text names nothing or the count is not positive.
