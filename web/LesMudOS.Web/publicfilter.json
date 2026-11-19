@@ -1,0 +1,65 @@
+{
+  // THE SECRETS FILTER. Read docs/WEBSITE.md before editing. Deny always wins; unknown event types are hidden.
+  // The site re-reads this file when it starts; restart the service after editing it.
+
+  // Entries whose event id starts with any of these are never shown, whatever else this file says.
+  "hiddenEventPrefixes": [
+    "discover.hidden",
+    "discover.secret_dungeon",
+    "discover.great_stump",
+    "craft.discover_"
+  ],
+
+  // The only event types that may be shown. A trailing * matches a prefix. Anything not listed here is hidden,
+  // so a new event type added to the game stays out of sight until someone lists it here.
+  "publicEvents": [
+    "aggregate.goblin_purge",
+    "boss.dungeon",
+    "boss.goblin_overseer",
+    "boss.world",
+    "class.advanced",
+    "class.prestige",
+    "item.legendary",
+    "item.artifact",
+    "level.milestone",
+    "quest.local",
+    "quest.clear_the_cellar",
+    "quest.story",
+    "quest.overseers_orders",
+    "renown.*",
+    "travel.pass"
+  ],
+
+  // An entry that contains any of these words anywhere in its headline, text, significance, place, tags or event id is hidden
+  // (case and punctuation are ignored). The Circle of Ash is on this list and must stay on it.
+  "forbiddenTerms": [
+    "Circle of Ash",
+    "Root Warrens",
+    "Forgotten Barrow",
+    "Hidden Grove",
+    "Great Stump",
+    "Forgotten Cellars",
+    "Blood Ink",
+    "Hidden Cache",
+    "Collapsed Passage",
+    "Hollow Below",
+    "Dry Well",
+    "Hunter's Hide",
+    "Watchtower Cellar",
+    "Sealed Culvert",
+    "Overgrown Way",
+    "Ritual Stones",
+    "Marked Oak",
+    "Free Companies",
+    "Philippa Reeve"
+  ],
+
+  // The places a visitor may be told an entry happened in. Any other place is left off the entry.
+  "publicPlaces": [
+    "Hollowmere",
+    "Greenvale",
+    "Vincent's Hollow",
+    "The Village of Vincent's Hollow",
+    "Oakenfell"
+  ]
+}

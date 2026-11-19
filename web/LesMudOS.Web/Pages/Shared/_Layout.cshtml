@@ -1,0 +1,76 @@
+@{
+    var o = Site.Value;
+    var baseUrl = o.BaseUrl.TrimEnd('/');
+    var title = ViewData["Title"] as string;
+    var fullTitle = string.IsNullOrEmpty(title) ? "Legends of Hollowmere: The World Beyond Vincent's Hollow" : title + " | Legends of Hollowmere";
+    var description = ViewData["Description"] as string ?? "Legends of Hollowmere is a persistent online fantasy world. Begin in the village of Vincent's Hollow, travel the roads of Greenvale, earn Renown and become part of the Chronicle.";
+    var noindex = ViewData["NoIndex"] is true;
+    var path = (ViewData["Canonical"] as string) ?? ((Context.Request.Path.Value ?? "/").Length > 1 ? Context.Request.Path.Value!.TrimEnd('/').ToLowerInvariant() : "/");
+    var canonical = baseUrl + path;
+    var ogType = ViewData["OgType"] as string ?? "website";
+    bool Here(string p) => p == "/" ? (Context.Request.Path.Value ?? "/") == "/" : Context.Request.Path.StartsWithSegments(p);
+    (string Path, string Label)[] nav = { ("/chronicle", "Chronicle"), ("/heroes", "Hall of Heroes"), ("/world", "World"), ("/classes", "Classes"), ("/factions", "Factions"), ("/news", "News") };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@fullTitle</title>
+    <meta name="description" content="@description">
+    @if (noindex) { <meta name="robots" content="noindex"> } else { <link rel="canonical" href="@canonical"> }
+    <meta name="theme-color" content="#2f4a2b">
+    <meta property="og:site_name" content="Legends of Hollowmere">
+    <meta property="og:type" content="@ogType">
+    <meta property="og:title" content="@fullTitle">
+    <meta property="og:description" content="@description">
+    <meta property="og:url" content="@canonical">
+    <meta property="og:image" content="@(baseUrl)/img/og.png">
+    <meta property="og:image:alt" content="An engraved view of a forest road running from a village to a walled city">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/fonts/imfell-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="/css/site.css" asp-append-version="true">
+</head>
+<body>
+    <a class="skip" href="#main">Skip to the page</a>
+    <header class="masthead">
+        <div class="wrap">
+            <a class="brand" href="/">Legends of Hollowmere</a>
+            <nav aria-label="Main">
+                <ul class="nav">
+                    @foreach (var (p, label) in nav)
+                    {
+                        <li><a href="@p" aria-current="@(Here(p) ? "page" : null)">@label</a></li>
+                    }
+                    <li class="play"><a href="/play" aria-current="@(Here("/play") ? "page" : null)">Play Now</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main id="main" tabindex="-1">
+        @RenderBody()
+    </main>
+    <footer class="foot">
+        <div class="wrap">
+            <div>
+                <p class="brand">Legends of Hollowmere</p>
+                <p class="fine">The World Beyond Vincent's Hollow. No cookies, no trackers, no advertisements.</p>
+                <p class="fine">&copy; Legends of Hollowmere. All rights reserved.</p>
+            </div>
+            <nav aria-label="Footer">
+                <ul>
+                    <li><a href="/chronicle">Chronicle</a></li>
+                    <li><a href="/heroes">Hall of Heroes</a></li>
+                    <li><a href="/world">World Map</a></li>
+                    <li><a href="/play">How to Play</a></li>
+                    <li><a href="/rules">Rules</a></li>
+                    @if (!string.IsNullOrWhiteSpace(o.DiscordUrl)) { <li><a href="@o.DiscordUrl" rel="noopener">Discord</a></li> }
+                    <li><a href="/support">Support</a></li>
+                </ul>
+            </nav>
+        </div>
+    </footer>
+    @if (ViewData["Script"] is true) { <script src="/js/site.js" asp-append-version="true" defer></script> }
+</body>
+</html>

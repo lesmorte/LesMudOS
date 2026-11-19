@@ -1,0 +1,23 @@
+@page "/support"
+@{
+    ViewData["Title"] = "Support";
+    ViewData["Description"] = "How to get help with Legends of Hollowmere: in the game, and how to reach the people who run it.";
+    var contact = Site.Value.SupportContact;
+}
+<section class="band">
+    <div class="wrap">
+        <p class="eyebrow">Lost on the road?</p>
+        <h1>Support</h1>
+        <div class="prose">
+            <h2>In the game</h2>
+            <p>Type <code>help</code> to see what the game can tell you, and <code>help</code> followed by a word (a command, a calling, a place) to read about it. Other players are usually glad to point a newcomer the right way.</p>
+            <h2>Connecting</h2>
+            <p>If you cannot connect at all, read <a href="/play">How to play</a> first: the address, the port and the note about encryption solve most problems.</p>
+            <h2>Reaching the people who run the game</h2>
+            @if (!string.IsNullOrWhiteSpace(contact)) { <p>@contact</p> }
+            else { <p>A contact address will be posted here soon.</p> }
+            @if (!string.IsNullOrWhiteSpace(Site.Value.DiscordUrl)) { <p><a href="@Site.Value.DiscordUrl" rel="noopener">Join the community on Discord</a>.</p> }
+            <p>We cannot ask for or look up your password. If you have forgotten it, say so when you write.</p>
+        </div>
+    </div>
+</section>

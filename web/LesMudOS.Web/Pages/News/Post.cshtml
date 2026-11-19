@@ -1,0 +1,24 @@
+@page "/news/{slug}"
+@using Microsoft.AspNetCore.Mvc
+@functions {
+    public NewsPost? Post { get; set; }
+    public IActionResult OnGet(string slug)
+    {
+        Post = News.Find(slug);
+        return Post == null ? NotFound() : Page();
+    }
+}
+@{
+    var p = Post!;
+    ViewData["Title"] = p.Title;
+    ViewData["Description"] = p.Summary != "" ? p.Summary : p.Title;
+    ViewData["OgType"] = "article";
+}
+<article class="band">
+    <div class="wrap">
+        <p class="crumbs"><a href="/news">News</a></p>
+        <h1>@p.Title</h1>
+        <p class="entry-meta"><time datetime="@p.Date.ToString("yyyy-MM-dd")">@p.Date.ToString("d MMMM yyyy")</time></p>
+        <div class="post">@Html.Raw(p.Html)</div>
+    </div>
+</article>

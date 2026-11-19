@@ -1,0 +1,72 @@
+{
+  "_about": "The copy for /classes and /factions. Public information only: see docs/WEBSITE.md before adding anything here.",
+  "callings": [
+    {
+      "name": "Warrior",
+      "line": "Steel and stubbornness: the sturdiest of the five callings, hard to put down.",
+      "paths": [
+        { "name": "Knight", "line": "Holds the line behind shield and heavy armor, and keeps others standing." },
+        { "name": "Berserker", "line": "Gives up armor for fury, and hits harder than anyone dares to stand against." },
+        { "name": "Monk", "line": "Needs no weapon: a disciplined fighter whose body is the blade." }
+      ]
+    },
+    {
+      "name": "Scout",
+      "line": "Quick hands and quicker feet. Dodges, tracks and strikes where it counts.",
+      "paths": [
+        { "name": "Ranger", "line": "A hunter of the wild roads with a bow, who marks a quarry and does not lose it." },
+        { "name": "Rogue", "line": "Strikes from where no one was looking, and is gone before the shout." },
+        { "name": "Bard", "line": "Carries songs that steady friends on the road and sour the courage of foes." }
+      ]
+    },
+    {
+      "name": "Priest",
+      "line": "Healing hands and a hard mace. Keeps itself and its friends on their feet.",
+      "paths": [
+        { "name": "Cleric", "line": "A healer and warder whose prayers close wounds and turn aside blows." },
+        { "name": "Templar", "line": "A holy warrior in armor, whose faith lands with the sword." },
+        { "name": "Oracle", "line": "Reads what is about to happen, and lets friends meet it a step ahead." }
+      ]
+    },
+    {
+      "name": "Mage",
+      "line": "Raw arcane power, and little else. Fragile, and best at a distance.",
+      "paths": [
+        { "name": "Mage", "line": "The scholar of the arcane, devoted to spellcraft in its purest form." },
+        { "name": "Druid", "line": "Draws on the green world: binding roots, and the shape of a bear." },
+        { "name": "Necromancer", "line": "Bargains with death itself, drawing on life and raising the fallen to serve." }
+      ]
+    },
+    {
+      "name": "Adventurer",
+      "line": "A little of everything and a nose for the road. Hardy, resourceful and well supplied.",
+      "paths": [
+        { "name": "Spellblade", "line": "Weaves magic into every swing of the blade. Slower to master, and worth it." },
+        { "name": "Beastmaster", "line": "Walks the roads with a loyal wolf at heel and a bow in hand." },
+        { "name": "Artificer", "line": "Builds clever devices on the spot: turrets, snares and surprises." }
+      ]
+    }
+  ],
+  "factions": [
+    {
+      "name": "The Greenvale Assembly",
+      "motto": "Prosperity Through Unity",
+      "text": "The Assembly governs most of the settled lands of Greenvale. It began as village leaders and merchants seeking protection together, and most citizens think well of it, though some say it has grown a little too comfortable."
+    },
+    {
+      "name": "The Merchant Consortium",
+      "motto": "Trade Builds Tomorrow",
+      "text": "The wealthiest merchants in Greenvale belong to the Consortium, which keeps caravans, shipping contracts, warehouses and banks. Its coin has a way of reaching the Assembly's decisions."
+    },
+    {
+      "name": "The Riverwatch Rangers",
+      "motto": "Ever Vigilant",
+      "text": "The Rangers patrol the borders of Greenvale: they guard the roads, escort travelers and hunt dangerous creatures before they reach the settled lands. Among common folk they are counted as heroes."
+    },
+    {
+      "name": "The Thorn Pact",
+      "motto": "The Forest Remembers",
+      "text": "A druidic alliance that holds Greenvale is growing too fast, with its forests cleared and its old places disturbed. Many who follow it seek only balance between the settled lands and the wild."
+    }
+  ]
+}

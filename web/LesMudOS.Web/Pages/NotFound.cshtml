@@ -1,0 +1,15 @@
+@page "/not-found"
+@{
+    ViewData["Title"] = "Lost on the road";
+    ViewData["Description"] = "That page could not be found.";
+    ViewData["NoIndex"] = true;
+    Response.StatusCode = 404;
+}
+<section class="band lost">
+    <div class="wrap prose">
+        <p class="eyebrow">Page not found</p>
+        <h1>You have wandered off the road</h1>
+        <p>The track you followed ends in bracken and birdsong. Whatever you were looking for is not here, or never was. Perhaps the way was never written down, or the Chronicle has not recorded it yet.</p>
+        <div class="actions"><a class="btn" href="/">Back to the village</a><a class="btn alt" href="/chronicle">Read the Chronicle</a></div>
+    </div>
+</section>

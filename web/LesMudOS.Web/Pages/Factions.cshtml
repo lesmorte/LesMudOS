@@ -1,0 +1,23 @@
+@page "/factions"
+@{
+    ViewData["Title"] = "The Factions of Greenvale";
+    ViewData["Description"] = "The Greenvale Assembly, the Merchant Consortium, the Riverwatch Rangers and the Thorn Pact: who holds the land, and what each stands for.";
+}
+<section class="band">
+    <div class="wrap">
+        <p class="eyebrow">Loyalties</p>
+        <h1>The factions of Greenvale</h1>
+        <div class="prose"><p>Support the Assembly, protect the wilds, build wealth, or forge your own loyalties. These are the four powers that every traveler in Greenvale soon hears of.</p></div>
+        @if (World.Factions.Count == 0) { <p class="empty">The envoys have not yet arrived. Check back soon.</p> }
+        else
+        {
+            <dl class="gaz prose">
+                @foreach (var f in World.Factions)
+                {
+                    <dt>@f.Name</dt>
+                    <dd><span class="tag">&ldquo;@f.Motto&rdquo;</span>@f.Text</dd>
+                }
+            </dl>
+        }
+    </div>
+</section>

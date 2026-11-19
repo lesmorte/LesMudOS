@@ -1,0 +1,32 @@
+{
+  "activeTitle": {},
+  "discovered": {
+    "bryn": [
+      "discover.hidden|hidden-cache"
+    ],
+    "cade": [
+      "discover.great_stump|great-stump"
+    ]
+  },
+  "done": {
+    "bryn": [
+      "discover.hidden|hidden-cache"
+    ],
+    "cade": [
+      "discover.great_stump|great-stump"
+    ]
+  },
+  "infamy": {},
+  "renown": {
+    "bryn": 30,
+    "cade": 40
+  },
+  "titles": {
+    "bryn": [
+      "Local Hero"
+    ],
+    "cade": [
+      "Local Hero"
+    ]
+  }
+}

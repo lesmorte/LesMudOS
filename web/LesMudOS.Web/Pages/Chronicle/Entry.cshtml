@@ -1,0 +1,44 @@
+@page "/chronicle/{id:int}"
+@using Microsoft.AspNetCore.Mvc
+@functions {
+    public ChronicleEntry? Entry { get; set; }
+    public ChronicleEntry? Newer { get; set; }
+    public ChronicleEntry? Older { get; set; }
+    public IActionResult OnGet(int id)
+    {
+        var entries = Game.Snapshot.Entries; // newest first
+        Entry = entries.FirstOrDefault(e => e.Id == id);
+        if (Entry == null) return NotFound();
+        var i = entries.ToList().IndexOf(Entry);
+        Newer = i > 0 ? entries[i - 1] : null;
+        Older = i < entries.Count - 1 ? entries[i + 1] : null;
+        return Page();
+    }
+    private static string Trim(string s) => s.Length <= 180 ? s : s[..177].TrimEnd() + "...";
+}
+@{
+    var e = Entry!;
+    ViewData["Title"] = e.Title;
+    ViewData["Description"] = Trim(e.Summary);
+    ViewData["OgType"] = "article";
+    var date = e.Date.Full.Length > 0 ? char.ToUpperInvariant(e.Date.Full[0]) + e.Date.Full[1..] : "";
+}
+<article class="band entry-page">
+    <div class="wrap prose">
+        <p class="crumbs"><a href="/chronicle">The Chronicle</a> &rsaquo; Entry @e.Id</p>
+        <h1>@e.Title</h1>
+        <p class="entry-meta">@date@if (e.Featured) { <text> &middot; </text><span class="badge">Featured</span> }</p>
+        <div class="dropcap entry-body"><p>@e.Summary</p></div>
+        @if (e.Significance != "") { <p class="sig">@e.Significance</p> }
+        <dl class="facts">
+            <dt>Score</dt><dd><span class="ess">ESS @e.Score</span>@if (e.ClassName != "") { <text> (@e.ClassName)</text> }</dd>
+            @if (e.Category != "") { <dt>Kind</dt><dd>@e.Category</dd> }
+            @if (e.Names.Count > 0) { <dt>Named</dt><dd>@string.Join(", ", e.Names)</dd> }
+            @if (e.Where != null) { <dt>Where</dt><dd>@e.Where</dd> }
+        </dl>
+        <nav class="pager" aria-label="Other entries">
+            @if (Older != null) { <a href="/chronicle/@Older.Id" rel="prev">&larr; @Older.Title</a> } else { <span></span> }
+            @if (Newer != null) { <a href="/chronicle/@Newer.Id" rel="next">@Newer.Title &rarr;</a> } else { <span></span> }
+        </nav>
+    </div>
+</article>

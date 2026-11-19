@@ -1,0 +1,30 @@
+@page "/world"
+@{
+    ViewData["Title"] = "The World of Hollowmere";
+    ViewData["Description"] = "Hollowmere and its first region, Greenvale: the village of Vincent's Hollow, the North Road through the Eldergreen Wood, and the city of Oakenfell on the River Mere.";
+}
+<section class="band">
+    <div class="wrap">
+        <p class="eyebrow">The world</p>
+        <h1>Hollowmere</h1>
+        <div class="cols map-first">
+            <figure class="plate">
+                <partial name="_WorldMap" />
+                <figcaption>Greenvale, as far as the maps go. The world goes on beyond the edge.</figcaption>
+            </figure>
+            <div>
+                <p>Hollowmere is a wide land, and you will begin in one small corner of it. Greenvale is a prosperous frontier region of farms, forests, villages, and ancient mysteries, and every adventurer's story starts here.</p>
+                <dl class="gaz">
+                    <dt>Vincent's Hollow</dt>
+                    <dd><span class="tag">The starting village</span>A quiet village where every adventurer's story begins. Traders, woodsmen, miners and adventurers use it as the last safe stop before the wild lands beyond. A sign at the gate says it was founded by Vincent Holloway.</dd>
+                    <dt>The North Road</dt>
+                    <dd><span class="tag">The way out</span>A road runs north from the village through the Eldergreen Wood. On foot it is about two days to the city, and it is not a safe walk for the untested.</dd>
+                    <dt>Oakenfell</dt>
+                    <dd><span class="tag">The first major city</span>The largest city in Greenvale, on the River Mere. It is the region's trade center, its seat of government and its banking center, and home to the Hall of Legends, where adventurers who have proved themselves choose a profession. Its motto is &ldquo;From Strong Roots Grow Great Things&rdquo;.</dd>
+                </dl>
+                <p>Past the last milestone the map simply stops. There is more to Hollowmere than any chart shows, and countless stories waiting beyond Vincent's Hollow.</p>
+                <div class="actions"><a class="btn" href="/play">Walk the road</a><a class="btn alt" href="/classes">The Hall of Legends</a></div>
+            </div>
+        </div>
+    </div>
+</section>
