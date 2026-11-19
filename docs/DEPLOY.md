@@ -146,7 +146,7 @@ At the registrar or DNS host for `legendsofhollowmere.com`, add:
 | A | `@` | the droplet's IP address |
 | A | `play` | the droplet's IP address (optional: `play.legendsofhollowmere.com`) |
 
-Players then connect with `telnet legendsofhollowmere.com 4000`. If the domain's DNS is hosted at DigitalOcean: `doctl compute domain records create legendsofhollowmere.com --record-type A --record-name @ --record-data <ip>`.
+Players then connect with `telnet play.legendsofhollowmere.com 4000`. The game needs its own name, `play.legendsofhollowmere.com`, as an A record pointing straight at the droplet ("DNS only"): if the main name goes through a web proxy such as Cloudflare, the proxy passes web traffic only and port 4000 never arrives. If the domain's DNS is hosted at DigitalOcean: `doctl compute domain records create legendsofhollowmere.com --record-type A --record-name @ --record-data <ip>`.
 
 To keep the address when you rebuild or replace the droplet, assign a Reserved IP to it in the control panel (Networking, Reserved IPs) and point the domain at that.
 

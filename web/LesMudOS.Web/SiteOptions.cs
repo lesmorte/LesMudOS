@@ -20,7 +20,7 @@ public sealed class SiteOptions
     /// <summary>The secrets filter: which Chronicle entries are public. Relative to the content root or the application directory.</summary>
     public string FilterFile { get; set; } = "publicfilter.json";
 
-    public string GameHost { get; set; } = "legendsofhollowmere.com";
+    public string GameHost { get; set; } = "play.legendsofhollowmere.com";
     public int GamePort { get; set; } = 4000;
 
     /// <summary>Invite link. When empty the Discord link is not shown anywhere.</summary>

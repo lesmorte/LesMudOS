@@ -40,7 +40,7 @@ Set in `appsettings.json`, by environment variables (`Site__GamePort=4000`), or 
 | `Site:SaveDirectory` | empty | Where the data is read from (read only). Empty or missing: every dynamic section shows its empty state |
 | `Site:ContentDirectory` | `content` | News and `world.json`. A relative path is looked up under the content root, then in `../content` |
 | `Site:FilterFile` | `publicfilter.json` | The secrets filter |
-| `Site:GameHost`, `Site:GamePort` | `legendsofhollowmere.com`, `4000` | Shown on `/play` |
+| `Site:GameHost`, `Site:GamePort` | `play.legendsofhollowmere.com`, `4000` | Shown on `/play` |
 | `Site:DiscordUrl` | empty | The Discord link in the footer and on `/support`. Empty: no link anywhere |
 | `Site:SupportContact` | empty | The contact line on `/support` (an address, for example). Empty: "A contact address will be posted here soon." |
 | `Site:CacheSeconds` | `45` | How long the game's files are cached (30 to 60 is right) |

@@ -27,6 +27,7 @@ set -euo pipefail
 WEB_DOMAIN="${WEB_DOMAIN:-legendsofhollowmere.com}"   # the site is served at https://$WEB_DOMAIN (and www redirects to it)
 WEB_USER="${WEB_USER:-lesmudos-web}"
 WEB_PORT="${WEB_PORT:-5080}"                          # the site listens on 127.0.0.1 only; Caddy is the public face
+GAME_HOST="${GAME_HOST:-play.$WEB_DOMAIN}"              # the name players telnet to: a DNS-only record, NOT behind a web proxy such as Cloudflare
 APP_DIR="${APP_DIR:-/opt/lesmudos}"
 GAME_USER="${GAME_USER:-lesmudos}"
 GAME_UNIT="${GAME_UNIT:-/etc/systemd/system/lesmudos.service}"
@@ -214,7 +215,7 @@ if [ ! -f "$WEB_ENV" ]; then
     cat > "$WEB_ENV" <<ENV
 # Settings for the website. Restart after editing:  systemctl restart lesmudos-web
 Site__BaseUrl=https://$WEB_DOMAIN
-Site__GameHost=$WEB_DOMAIN
+Site__GameHost=$GAME_HOST
 Site__GamePort=$GAME_PORT
 # Shown in the footer and on the support page only when filled in:
 Site__DiscordUrl=
