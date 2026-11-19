@@ -43,6 +43,9 @@ public class NoviceClass : PlayerClass
         ClassName = "Novice"; Tier = "archetype"; SortOrder = 99; Title = "Novice";
         Tagline = "A bare test character."; Description = "Test only.";
         StartReaction = 2.5; VitalityBase = 12; VitalityPerLevel = 8; EnduranceBase = 55; EndurancePerLevel = 0; FocusBase = 55; FocusPerLevel = 0;
+        // Attributes 5 each (no derived effect), and class modifiers that keep the bare character's regeneration exactly as before
+        // the attribute system: 1 Vitality, 6 Stamina and 5 Mana per 10 s (the formulas give 0.8, 6.3 and 3.5).
+        Modifiers["vitality_regen"] = 25; Modifiers["endurance_regen"] = -100.0 / 21; Modifiers["focus_regen"] = 300.0 / 7;
         AttackRate = 1.0; StartGold = 25;
         Weapons.Add("*"); ArmorTypes.AddRange(new[] { "light", "medium", "heavy" }); Shield = true;
         Traits.Add("novice_fists");
