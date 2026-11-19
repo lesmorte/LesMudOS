@@ -13,9 +13,12 @@
 - /std/trainer, armor CarryBonus, tests/fixtures/crafting/samples, tests/craft_sim.py (passes), tests/craft_test.py
   (254 checks, all pass on port 4901, ~4.5 min).
 
+- smoke, item, find pass (before the restart). Launch appendix fixture (tests/fixtures/crafting/launch) passes craft_sim.
+- docs/CRAFTING.md, BUILDING.md "Crafting", GAME_SYSTEMS.md 9a.
+
 ## Next
-- Run existing suites (smoke, area, class, item, world, find, chronicle, chronicle_play, corridor_mob, load_check).
-- Launch appendix fixture (tests/fixtures/crafting/launch) + sim; docs/CRAFTING.md, BUILDING.md, GAME_SYSTEMS.md.
+- Suites in background: class chronicle chronicle_play corridor_mob area world load_check -> /tmp/suite/summary.
+- Boot the launch fixture in a driver to prove it loads; final report.
 
 ## Decisions
 - Recipes and tables are C# data files (house style, type-checked by dotnet build); a file may hold many recipes
