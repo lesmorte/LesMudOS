@@ -90,7 +90,7 @@ public class Shopkeeper : Npc
     protected override void Noticed(ObjectRef other)
     {
         base.Noticed(other);
-        if (!Interactive(other)) return;
+        if (!Interactive(other) || stock.Count == 0) return; // a trainer with nothing to sell is not a shop
         AddAction("browse", CmdBrowse);
         AddAction("buy", CmdBuy);
         AddAction("sell", CmdSell);

@@ -1,13 +1,14 @@
-// @inherit /std/npc
+// @inherit /std/shopkeeper
 
 /// <summary>
 /// A crafting trainer: an NPC who teaches recipes for gold. Add lessons in Create() with AddLesson("berry_juice", 10) (recipe id
 /// and price; 0 is free). Players in the room get two commands: "lessons" lists what the trainer teaches, with prices and
 /// whether you know it, and "learn NAME" pays and learns. Teaching goes through the crafting daemon's Teach, which checks that
-/// the trainer's file lies in a trusted tree and refuses Secret recipes. Any other NPC (a quest giver) can teach the same way:
+/// the trainer's file lies in a trusted tree and refuses Secret recipes. A trainer is also a shopkeeper: give it AddStock lines and
+/// it sells (browse, buy, sell, value); with none it only teaches. Any other NPC (a quest giver) can teach the same way:
 /// LoadObject("/secure/crafting").Call&lt;string&gt;("Teach", player, "recipe_id"). See docs/CRAFTING.md.
 /// </summary>
-public class Trainer : Npc
+public class Trainer : Shopkeeper
 {
     private readonly List<(string Id, int Price)> lessons = new();
 
