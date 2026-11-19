@@ -75,11 +75,11 @@ public abstract class Adventurer : Living
     // ---- Resources from the class and the attributes (docs/ATTRIBUTES.md section 2) ----
     // Maximum Vitality = class base + class per-level x Level + Vigor x 2; Endurance = base + per-level x Level + Resolve x 2 + Vigor;
     // Focus = base + per-level x Level + Insight x 2 + Spirit. Class modifiers (percent) apply after. Regeneration per 10 seconds:
-    // Vitality 0.3 + Vigor / 10; Endurance Maximum x (6% + (Resolve + Vigor) x 0.3%); Focus Maximum x (1% + (Insight + Spirit) x 0.4%).
+    // Vitality 0.3 + Vigor / 10; Endurance Maximum x (6% + (Resolve + Vigor) x 0.3%); Focus Maximum x (1% + (Insight + Spirit) x 0.15%).
 
     private const double VitalityRegenBase = 0.3, VitalityRegenPerVigor = 0.1;
     private const double EnduranceRegenBase = 0.06, EnduranceRegenPerPoint = 0.003;
-    private const double FocusRegenBase = 0.01, FocusRegenPerPoint = 0.004;
+    private const double FocusRegenBase = 0.01, FocusRegenPerPoint = 0.0015; // 0.15% a point (docs/ATTRIBUTES.md section 8)
 
     private int Modified(double value, string key) => (int)Math.Round(value * (1 + ClassModifier(key) / 100.0), MidpointRounding.AwayFromZero);
 

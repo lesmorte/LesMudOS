@@ -19,15 +19,15 @@ Rules (identical to the code; `python3 tests/balance_sim.py check` compares the 
     Attack = round(AttackRate x Level) + to-hit bonuses and Defense = Level - 1. A natural 20 always hits, a natural 1
     always misses. Damage is uniform in the weapon's range, 5% critical (x1.5), a block (15% with a shield) halves it.
     Creatures have AttackRate 1.0 and no dodge or block.
-  * Attributes (docs/ATTRIBUTES.md): a player has the calling's starting attributes (no points placed: the simulated player
-    keeps them, so these tables show the callings as they start); a creature has 4 + level / 2 in each. Each effect counts
-    the points above 5: weapon damage +2% a point of Might (rounded half away from zero, after the roll); +1 to hit and +1
-    to the defender's side of the roll for every 4 points of Grace; critical chance +0.5% a point of Grace; spell damage
+  * Attributes (docs/ATTRIBUTES.md, sections 2, 3 and 8): a player has the calling's starting attributes and places the 2
+    points of every level in the calling's obvious attributes (PLACEMENT); table 2b shows a character who places none. A
+    creature has 4 + level / 2 in each. Each effect counts the points above 5: weapon damage +2% a point of Might (rounded
+    half away from zero, after the roll); +1 to hit for every 8 points of Grace; critical chance +0.25% a point of Grace; spell damage
     +2% a point of Insight and +1% of Spirit; spell healing +2% a point of Spirit and +1% of Insight (added to Divine
     Knowledge's 25%); Physical Resistance 2% a point of Vigor and Resolve (at most 75%) against staggers and slows.
   * Maximum HP (Vitality), Stamina (Endurance) and Mana (Focus) are class base + class per-level x level + attributes;
     Stamina and Mana come back continuously at Maximum x (6% + (Resolve + Vigor) x 0.3%) and Maximum x (1% + (Insight +
-    Spirit) x 0.4%) per 10 seconds, HP out of combat at 0.3 + Vigor / 10; the player is rested to full between fights.
+    Spirit) x 0.15%) per 10 seconds, HP out of combat at 0.3 + Vigor / 10; the player is rested to full between fights.
     Level n needs 50 n (n-1) experience (100, 300, 600, 1000 for levels 2-5); a level-up heals fully, in the middle of a
     fight too.
   * Player policies (what a sensible player does): potions at 35% HP; warrior Shield Bash on a creature that is
@@ -158,10 +158,10 @@ class Arch:
 
 
 ARCHS = {a.name: a for a in [
-    Arch("warrior", (17, 9), 3.0, 1.00, (79, 2), (4, 1), (8, 5, 7, 5, 5, 6), 10, ("rusty sword", "woodcutter axe", "fine longsword"), True, armor_bonus=2, hit_armed=2),
-    Arch("scout", (8, 8), 2.0, 1.00, (81, 2), (2, 1), (5, 9, 5, 6, 5, 6), 10, ("hunting bow", "fine longsword"), False, dodge=8),
+    Arch("warrior", (13, 8), 3.0, 1.00, (79, 2), (4, 1), (8, 5, 7, 5, 5, 6), 10, ("rusty sword", "woodcutter axe", "fine longsword"), True, armor_bonus=2, hit_armed=2),
+    Arch("scout", (3, 7), 2.0, 1.00, (81, 2), (2, 1), (5, 9, 5, 6, 5, 6), 10, ("hunting bow", "fine longsword"), False, dodge=5),
     Arch("priest", (7, 7), 2.5, 0.97, (23, 1), (75, 4), (5, 5, 6, 6, 9, 5), 15, ("novice mace",), True, healing_pct=25, potions=1),
-    Arch("mage", (8, 6), 2.5, 0.96, (14, 1), (71, 4), (5, 5, 5, 9, 7, 5), 15, ("apprentice staff",), False, spell_cost_pct=-20, potions=1),
+    Arch("mage", (4, 6), 2.5, 0.96, (14, 1), (71, 4), (5, 5, 5, 9, 7, 5), 15, ("apprentice staff",), False, spell_cost_pct=-20, potions=1),
     Arch("adventurer", (10, 8), 2.5, 0.98, (50, 2), (50, 2), (6, 6, 6, 6, 6, 6), 20, ("training spear", "woodcutter axe", "fine longsword"), True),
 ]}
 TRINKET_HP = 5
@@ -181,10 +181,12 @@ def stat(attrs, key):
     """Living.QueryStat for the statistics the combat rules use (no equipment bonus, no class modifier: the callings have none)."""
     if key == "physical_power":
         return 2 * above(attrs, "might")
-    if key in ("precision", "evasion"):
-        return above(attrs, "grace") // 4
+    if key == "precision":
+        return above(attrs, "grace") // 8
+    if key == "evasion":
+        return 0                     # nothing from Grace (docs/ATTRIBUTES.md section 8)
     if key == "crit":
-        return 0.5 * above(attrs, "grace")
+        return 0.25 * above(attrs, "grace")
     if key == "spell_power":
         return 2 * above(attrs, "insight") + above(attrs, "spirit")
     if key == "healing_power":
@@ -194,13 +196,31 @@ def stat(attrs, key):
     raise KeyError(key)
 
 
+# Where a sensible player puts the 2 points of every level (docs/ATTRIBUTES.md section 8): the calling's obvious attributes,
+# in turn. PLACE_POINTS False is a character who places none (table 2b).
+PLACEMENT = {"warrior": ("might", "vigor"), "scout": ("grace",), "priest": ("spirit", "vigor"), "mage": ("insight",),
+             "adventurer": ("might", "vigor")}
+PLACE_POINTS = True
+
+
+def attrs_at(arch, level):
+    """The calling's starting attributes plus 2 points a level placed by PLACEMENT (when PLACE_POINTS)."""
+    values = list(arch.attrs)
+    if PLACE_POINTS:
+        order = PLACEMENT[arch.name]
+        for k in range(2 * (level - 1)):
+            values[ATTR.index(order[k % len(order)])] += 1
+    return tuple(values)
+
+
 def resources(arch, level):
-    """(max HP, max Stamina, max Mana, Stamina per 10 s, Mana per 10 s, HP per 10 s out of combat) by docs/ATTRIBUTES.md section 2."""
-    m, g, v, i, s, r = arch.attrs
+    """(max HP, max Stamina, max Mana, Stamina per 10 s, Mana per 10 s, HP per 10 s out of combat) by docs/ATTRIBUTES.md
+    sections 2 and 8."""
+    m, g, v, i, s, r = attrs_at(arch, level)
     hp = arch.vitality[0] + arch.vitality[1] * level + 2 * v
     end = arch.endurance[0] + arch.endurance[1] * level + 2 * r + v
     foc = arch.focus[0] + arch.focus[1] * level + 2 * i + s
-    return hp, end, foc, end * (0.06 + (r + v) * 0.003), foc * (0.01 + (i + s) * 0.004), 0.3 + v / 10
+    return hp, end, foc, end * (0.06 + (r + v) * 0.003), foc * (0.01 + (i + s) * 0.0015), 0.3 + v / 10
 SHIELD_PRICE = 12
 # Improvised Combat (adventurer) removes 0.5 of a weapon's reaction modifier.
 REACTION_CUT = {"adventurer": 0.5}
@@ -213,7 +233,7 @@ def rnd(x):
 class Fighter:
     def __init__(self, level, hp, dmg, to_hit, armor, reaction, acts, kind=None, arch=None, shield=False, rate=1.0):
         self.level, self.hp, self.max_hp = level, hp, hp
-        self.attrs = arch.attrs if arch is not None else creature_attrs(level)
+        self.attrs = attrs_at(arch, level) if arch is not None else creature_attrs(level)
         self.max_stamina = self.max_mana = 0
         self.stamina_regen = self.mana_regen = 0.0
         self.dmg, self.to_hit, self.armor = dmg, to_hit, armor
@@ -309,6 +329,7 @@ def player_max_hp(arch, level, extra=0):
 def set_level_resources(p, level):
     """A player's resource maxima and rates at a level (they grow with it)."""
     _, p.max_stamina, p.max_mana, p.stamina_regen, p.mana_regen, _ = resources(p.arch, level)
+    p.attrs = attrs_at(p.arch, level)
 
 
 def make_monster(name):
@@ -1011,6 +1032,10 @@ def regen_hp(arch):
     return resources(ARCHS[arch], 1)[5] / 10.0 * (1.5 if arch == "adventurer" else 1.0)
 
 
+def regen_hp_at(arch, level):
+    return resources(ARCHS[arch], level)[5] / 10.0 * (1.5 if arch == "adventurer" else 1.0)
+
+
 def pace_cell(arch, level, key, f=0.0, runs=400, haven=True):
     """One calling at one level hunting one creature, in the steady state. f is the share of the damage taken that is
     healed by bought potions (15 gold for 20 HP, drunk after the fight); the rest heals by natural regeneration. Returns the
@@ -1023,8 +1048,8 @@ def pace_cell(arch, level, key, f=0.0, runs=400, haven=True):
     for _ in range(3):
         c = cfight(arch, level, key, 0, runs, start)
         potions = f * c["dtot"] / POTION_HEAL
-        t_place = max(0.0, c["dtot"] * (1 - f)) / regen_hp(arch) + potions * POTION_SECONDS
-        t_haven = 2 * HAVEN_ROOMS * ROOM_SECONDS + max(0.0, c["dtot"] * (1 - f)) / (3 * regen_hp(arch)) + potions * POTION_SECONDS
+        t_place = max(0.0, c["dtot"] * (1 - f)) / regen_hp_at(arch, level) + potions * POTION_SECONDS
+        t_haven = 2 * HAVEN_ROOMS * ROOM_SECONDS + max(0.0, c["dtot"] * (1 - f)) / (3 * regen_hp_at(arch, level)) + potions * POTION_SECONDS
         h = HAVEN_SHARE[min(10, max(5, level))] if haven else 0.0
         t_hp = (1 - h) * t_place + h * min(t_place, t_haven)
         wait = t_hp + walk
@@ -1344,7 +1369,18 @@ def main():
                 boss[(n, level, potions)] = kill
                 print(f"{n:<12}{level:>4}{potions:>8}{kill * 100:>6.0f}%{survive * 100:>9.0f}%{lost:>9.1f}{secs:>9.1f}{acts:>9.1f}")
     print()
-
+    print("2b. The same, for a character who has placed none of its attribute points (2 potions):")
+    global PLACE_POINTS
+    PLACE_POINTS = False
+    unspent = []
+    for n in names:
+        a = ARCHS[n]
+        for level in (4, 5):
+            kill = boss_stats(n, level, a.weapons[-1], 2, TRINKET_HP, runs)[0]
+            unspent.append(f"{n} L{level} {kill * 100:.0f}%")
+    PLACE_POINTS = True
+    print("   " + "   ".join(unspent))
+    print()
     print("=" * 118)
     print(f"3. A whole run, Tavern Cellar to the Overseer ({max(100, runs // 3)} runs per archetype). The player buys gear with loot gold, keeps")
     print("   up to 2 potions, rests between rooms and farms respawns until he has the level each room wants.")

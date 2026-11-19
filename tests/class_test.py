@@ -542,7 +542,7 @@ def run(work, mudlib):
     # ===== features: scout =====
     setroom(wiz, "tscout")
     sc = chars["scout"]
-    check("Evasion gives 8% dodge", a.score_of(sc)["text"], "Dodge 8%")
+    check("Evasion gives 5% dodge (docs/ATTRIBUTES.md section 8)", a.score_of(sc)["text"], "Dodge 5%")
     wiz.command("goto " + TEST + "lair")
     wiz.command("goto " + TEST + "lair")
     wiz.command("clone " + TEST + "dummy")

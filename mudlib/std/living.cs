@@ -184,7 +184,7 @@ public abstract class Living : Thing
     /// <summary>Attack = round(attack rate x level) + QueryToHit(). The only place the rate is applied.</summary>
     public int QueryAttack() => (int)Math.Floor(QueryAttackRate() * Level + 0.5 + 1e-9) + QueryToHit();
 
-    /// <summary>The defender's side of the hit roll besides armor: one point per level for everyone, plus Evasion (Grace).</summary>
+    /// <summary>The defender's side of the hit roll besides armor: one point per level for everyone, plus Evasion (equipment and traits; nothing from Grace since section 8 of docs/ATTRIBUTES.md).</summary>
     public int QueryDefense() => Math.Max(0, Level - 1) + QueryEvasion();
 
     // ---- Rolls ----
@@ -299,9 +299,10 @@ public abstract class Living : Thing
     /// <summary>The basic critical chance in percent.</summary>
     public const double BaseCritChance = 5;
     private const double DamagePctPerMight = 2;      // Physical Power: weapon and unarmed damage +2% a point of Might above 5
-    private const int GracePerPrecision = 4;         // Precision: +1 to hit for every 4 points of Grace above 5
-    private const int GracePerEvasion = 4;           // Evasion: +1 to the defender's side of the hit roll for every 4 points of Grace above 5
-    private const double CritPctPerGrace = 0.5;      // Critical Chance: +0.5% a point of Grace above 5
+    // Section 8 of docs/ATTRIBUTES.md (the owner's balance revision) set these three: Precision per 8 points, no Evasion from
+    // Grace (the statistic stays, for equipment and traits), Critical Chance +0.25% a point.
+    private const int GracePerPrecision = 8;         // Precision: +1 to hit for every 8 points of Grace above 5
+    private const double CritPctPerGrace = 0.25;     // Critical Chance: +0.25% a point of Grace above 5
     private const double SpellPctPerInsight = 2, SpellPctPerSpirit = 1;   // Spell Power
     private const double HealPctPerSpirit = 2, HealPctPerInsight = 1;     // Healing Power
     private const double ResistPctPerPoint = 2, ResistPctMax = 75;        // Mental (Spirit, Resolve) and Physical (Vigor, Resolve) Resistance
@@ -353,7 +354,7 @@ public abstract class Living : Thing
         {
             "physical_power" => DamagePctPerMight * Above("might"),
             "precision" => Above("grace") / GracePerPrecision,
-            "evasion" => Above("grace") / GracePerEvasion,
+            "evasion" => 0.0,                                   // nothing from Grace (section 8); equipment may add
             "crit" => CritPctPerGrace * Above("grace"),
             "spell_power" => SpellPctPerInsight * Above("insight") + SpellPctPerSpirit * Above("spirit"),
             "healing_power" => HealPctPerSpirit * Above("spirit") + HealPctPerInsight * Above("insight"),
