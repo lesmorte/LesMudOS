@@ -101,11 +101,16 @@ public class WtProbe : Thing
         who.Call("Look");
         return true;
     }
+    // The clone numbers are global and grow with everything the game makes, so the probe looks through 800 numbers at a time,
+    // from the number given after the name: `pinfo guard 1601`. It says "PINFO none" if the 800 hold no live clone of that file.
     private bool PInfo(string args)
     {
-        for (var i = 1; i < 800; i++)
+        var parts = args.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var name = parts[0];
+        var first = parts.Length > 1 ? int.Parse(parts[1]) : 1;
+        for (var i = first; i < first + 800; i++)
         {
-            var ob = FindObject((args.Trim().StartsWith("/") ? "" : W) + args.Trim() + "#" + i);
+            var ob = FindObject((name.StartsWith("/") ? "" : W) + name + "#" + i);
             if (ob == null || !ob.IsAlive) continue;
             Write("PINFO state=" + ob.Call<string>("QueryPatrolState") + " room=" + (Environment(ob)?.Name ?? "none") + " steps=" + ob.Call<int>("QuerySteps") + " blocked=" + ob.Call<int>("QueryBlocked") + " hp=" + ob.Call<int>("QueryHp") + "\\n");
             return true;
@@ -258,9 +263,25 @@ def fresh(name):
     return c
 
 
+PINFO_CHUNK = {}
+
+
+def pinfo_text(c, who):
+    """The probe's PINFO line for the first live clone of a file, looking through the clone numbers 800 at a time (they are global and
+    grow with everything the game makes). The chunk that held it last time is tried first."""
+    chunks = [PINFO_CHUNK.get(who, 1)] + [1 + 800 * n for n in range(40)]
+    for first in dict.fromkeys(chunks):
+        text = c.command(f"pinfo {who} {first}")
+        m = re.search(r"PINFO (state=.*)", text)
+        if m:
+            PINFO_CHUNK[who] = first
+            return m.group(1)
+    return None
+
+
 def pinfo(c, who):
-    text = c.command("pinfo " + who)
-    m = re.search(r"PINFO state=(\w+) room=(\S+) steps=(\d+) blocked=(\d+) hp=(\d+)", text)
+    text = pinfo_text(c, who)
+    m = re.search(r"state=(\w+) room=(\S+) steps=(\d+) blocked=(\d+) hp=(\d+)", text or "")
     return (m.group(1), m.group(2), int(m.group(3)), int(m.group(4)), int(m.group(5))) if m else None
 
 
@@ -731,9 +752,8 @@ def run_sandbox(wiz, mudlib):
 
 
 def pinfo_path(wiz, path):
-    text = wiz.command("pinfo " + path)
-    m = re.search(r"PINFO (.*)", text)
-    return m.group(1).strip() if m else None
+    text = pinfo_text(wiz, path)
+    return text.strip() if text else None
 
 
 def run_examples(wiz):
@@ -786,6 +806,7 @@ def main():
             print("\n--- driver log ---")
             print(open(os.path.join(work, "driver.log")).read()[-4000:])
         shutil.rmtree(work, ignore_errors=True)
+    print("\npatrol clones were found in the clone-number chunks starting at", PINFO_CHUNK, "(a chunk is 800 numbers; the old probe saw only the first)")
     print(f"\n{len(h.failures)} failure(s)")
     return 1 if h.failures else 0
 

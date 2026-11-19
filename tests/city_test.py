@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Walk-through test of the city of Oakenfell (Legends of Hollowmere).
 
-Starts the driver against a temporary copy of the mudlib and walks the 68-odd rooms of /domains/greenvale: the map against
+Starts the driver against a temporary copy of the mudlib and walks the 68-odd rooms of the city (oakenfell/ and the two Vale Road rooms that remain; the corridor has tests/corridor_test.py): the map against
 docs/areas/oakenfell-build.md, every exit both ways (as a level 10 wizard), every detail and readable, every person
 (talk, every topic, topics shadowed by an earlier topic), every shop, a new character walking in from Vincent's Hollow, and
 the text rules. It runs to the end whatever it finds: a content defect is a FAIL line, not a stop.
@@ -21,6 +21,7 @@ import city_infra as ci  # noqa: E402  (also sets the default port 4824)
 import smoke_test as h  # noqa: E402
 
 OAK, VALE, HOLLOW = ci.OAK, ci.VALE, ci.HOLLOW
+CORRIDOR = "/domains/greenvale/corridor/"
 COMPASS = {"north": "n", "south": "s", "east": "e", "west": "w", "up": "u", "down": "d"}
 TITLES = {"old", "widow", "ranger", "sergeant", "captain", "master", "mistress", "brother", "sister", "elder", "lady", "lord", "goodwife", "goodman"}
 RAW_TAG = re.compile(r"\{(?:cmd|title|b|u|/|red|green|yellow|blue|magenta|cyan|white|bred|bgreen|byellow|bblue|bmagenta|bcyan|bwhite)\}")
@@ -99,7 +100,7 @@ def check_map(doc, rooms, others):
         for direction, dest in want["exits"].items():
             have = src.exits.get(direction)
             R.ok(have == dest, f"map: {path} exit {direction}", f"document: {dest}\nfile:     {have}")
-            R.ok(dest in rooms or dest == VALE + "road", f"map: the destination of {path} {direction} is a room file: {dest}")
+            R.ok(dest in rooms or os.path.isfile(os.path.join(ci.MUDLIB, dest.lstrip("/") + ".cs")), f"map: the destination of {path} {direction} is a room file: {dest}")
         extra = sorted(set(src.exits) - set(want["exits"]))
         R.ok(not extra, f"map: {path} has no exit the document lacks", f"extra exits: {[(d, src.exits[d]) for d in extra]}")
         blocked = {a[0]: a[1] for a in src.of("BlockExit")}
@@ -118,11 +119,14 @@ def check_map(doc, rooms, others):
         R.ok("west" not in elder.exits, "map: Elder Lane has no west exit (the hidden way is left for integration)")
     # The room files that the document does not list.
     for path, src in sorted(rooms.items()):
-        if path not in doc and path != VALE + "road":
+        if path not in doc:
             R.ok(False, f"map: a room file the build document does not list: {path}", f"short name {src.short!r}")
     road = rooms.get(VALE + "road")
     if R.ok(road is not None, "map: the existing Vale Road room exists"):
-        R.ok(road.exits.get("north") == VALE + "meadows", "map: the Vale Road's north exit leads to the Long Meadows", f"north: {road.exits.get('north')}")
+        R.ok(road.exits.get("north") == CORRIDOR + "south_road/m01", "map: the Vale Road's north exit leads to the corridor's South Road", f"north: {road.exits.get('north')}")
+    approach = rooms.get(VALE + "approach")
+    if R.ok(approach is not None, "map: the Southgate Approach exists"):
+        R.ok(approach.exits.get("south") == CORRIDOR + "approach/m11", "map: the Southgate Approach's south exit leads to the corridor's Carters' Mile", f"south: {approach.exits.get('south')}")
     # Every spawn and encounter names a file, and every person's file is used.
     spawned = set()
     for path, src in rooms.items():
@@ -442,11 +446,20 @@ class Walker:
 # ------------------------------------------------------------------ part 6: a new character walks in
 
 def player_walk(wk, rooms):
-    R.section("6. A new character walks in from Vincent's Hollow to the Hall of Callings")
+    R.section("6. A new character walks from the Southgate Approach to the Hall of Callings")
     w = wk.w
     p = ci.Session("walker", archetype="warrior")
     first = body(p.cmd("look"))
     R.ok("Village Square" in first, "player: a new character starts in the Village Square", first[:80])
+    # The way from the Hollow to the Approach is the corridor's (corridor_test) and the travel pass is class_test's. Here the wizard
+    # lays a probe in the square and the character carries it to the Approach, as the other tests bring a character to a far room.
+    w.cmd("goto " + HOLLOW + "village/square")
+    w.cmd("clone /domains/citytest/probe")
+    w.cmd("drop probe")
+    got = wk.say(p, "get probe")
+    R.ok("probe" in got, "player: the character picks up the probe", f"got: {body(got)[:200]!r}")
+    out = wk.say(p, "tele " + VALE + "approach")
+    R.ok(ci.Source(VALE + "approach").short in lines_of(out), "player: the character is brought to the Southgate Approach", f"first lines: {lines_of(out)[:3]}")
 
     def step(direction, dest_short, label):
         out = wk.say(p, direction)
@@ -455,24 +468,10 @@ def player_walk(wk, rooms):
             out = out + wk.say(p, "look")
         return R.ok(dest_short in lines_of(out), f"player: {label}: '{dest_short}'", f"typed {direction}; first lines: {lines_of(out)[:3]}")
 
-    gate = ci.Source(HOLLOW + "village/gate")
-    road = ci.Source(HOLLOW + "village/north_road")
-    step("north", gate.short, "north from the Village Square")
-    step("north", road.short, "north to the North Road")
-    # The travel pass: the guild gives it for Clear the Cellar. Here the wizard lays one on the road, which is the nearest honest
-    # equivalent (class_test has the wizard earn the real one, and checks that the road is shut without it).
-    refused = wk.say(p, "north")
-    R.ok("travel pass" in refused, "player: without the pass the road north is shut", f"got: {body(refused)[:200]!r}")
-    w.cmd("goto " + HOLLOW + "village/north_road")
-    w.cmd("clone " + HOLLOW + "obj/travel_pass")
-    w.cmd("drop pass")
-    got = wk.say(p, "get pass")
-    R.ok("travel pass" in got, "player: the character picks up the travel pass", f"got: {body(got)[:200]!r}")
-    chain = [VALE + "road", VALE + "meadows", VALE + "river_bend", VALE + "rise", VALE + "approach",
-             OAK + "southgate/gate", OAK + "southgate/wayfarers_row", OAK + "southgate/stag_lane",
+    chain = [OAK + "southgate/gate", OAK + "southgate/wayfarers_row", OAK + "southgate/stag_lane",
              OAK + "market/south_rows", OAK + "market/north_rows", OAK + "founders/square",
              OAK + "guild/guild_row", OAK + "guild/hall_doors", OAK + "guild/hall_of_callings"]
-    here = HOLLOW + "village/north_road"
+    here = VALE + "approach"
     for nxt in chain:
         here_src = ci.Source(here)
         direction = next((d for d, t in here_src.exits.items() if t == nxt), None)

@@ -27,7 +27,7 @@ The mudlib project excludes `wiz/**` from `dotnet build`, so the rule that class
 1. **File name.** Lower-case `snake_case`, ending in `.cs`: `goblin_guard.cs`. The mudlib path is the file name without `.cs`: `/domains/hollow/mob/goblin_guard`. Use the folders of the area: `village/` and `cellars/` for rooms, `npc/` for peaceful people and shopkeepers, `mob/` for monsters, `obj/` for items.
 2. **One class per file.** One public class that derives (directly or through its base) from `MudObject`. Other helper types in the file must not.
 3. **Class names are unique across the whole mudlib** (the mudlib is also compiled as one project to check it). Prefix them with your area if in doubt: `HollowGoblinGuard`.
-4. **The `// @inherit` line.** The first line of the file names the base file: `// @inherit /std/room`, `/std/npc`, `/std/patrol`, `/std/node`, `/std/shopkeeper`, `/std/monster`, `/std/weapon`, `/std/armor`, `/std/consumable`, `/std/coins`, `/std/item` (keys and plain things). The class then derives from the class in that file: `public class GoblinGuard : Monster`.
+4. **The `// @inherit` line.** The first line of the file names the base file: `// @inherit /std/room`, `/std/npc`, `/std/patrol`, `/std/node`, `/std/find` (hidden treasure), `/std/shopkeeper`, `/std/monster`, `/std/weapon`, `/std/armor`, `/std/consumable`, `/std/coins`, `/std/item` (keys and plain things). The class then derives from the class in that file: `public class GoblinGuard : Monster`.
 5. **Set everything in `Create()`.** No constructors with arguments. Names of rooms, fields and helpers are all in the templates.
 6. **Sandbox limits.** Mudlib code may use `System`, `System.Collections.Generic`, `System.Linq`, `System.Text` and the mudlib's own types. It cannot use files, threads, reflection, `typeof`, `GetType()`, `async`, `goto`, `lock`, `Console`, `Environment`. An error shows up when the file loads. A runaway loop is stopped by the evaluation-cost limit.
 7. **Exits name rooms by path**, without `.cs`: `Exits["north"] = "/domains/hollow/village/gate";`. Any single word works as a direction (`up`, `down`, `west`); one-letter abbreviations are added automatically. If the destination file does not exist yet, players are told the way is not open yet.
@@ -98,7 +98,7 @@ public class ExampleHall : Room
 }
 ```
 
-Room fields and methods: `Safe`, `LogoutRoom` (players who quit here log in here), `ResetSeconds`, `Exits`, `AddDetail`, `AddReadable`, `AddSpawn`, `AddEncounter`, `LockExit`, `BlockExit`, `HiddenExit`, `DangerBand`, `AddNode`. Override `Reset()` (and call `base.Reset()`) for anything special.
+Treasure in a hidden place is a find, not coins (see "A find" under Items). Room fields and methods: `Safe`, `LogoutRoom` (players who quit here log in here), `ResetSeconds`, `Exits`, `AddDetail`, `AddReadable`, `AddSpawn`, `AddEncounter`, `LockExit`, `BlockExit`, `HiddenExit`, `DangerBand`, `AddNode`. Override `Reset()` (and call `base.Reset()`) for anything special.
 
 ### A room with a locked exit
 
@@ -542,6 +542,86 @@ public class ExamplePurse : Coins
     }
 }
 ```
+
+### A find: treasure in a hidden place
+
+**The rule: each character can take a find once and never again, and each new finder gets less than the one before, until nothing is left; it never refills.**
+
+Use a find, not coins, for any treasure that sits in a secret place: coins placed with `AddSpawn` come back at every reset, so anyone can farm them. A find lies in the room and cannot be picked up; a character takes what it holds with the ordinary words (`get purse`, `take purse`, `loot purse`). Put it in a room with `AddSpawn`: the find object comes back if it is lost, but the treasure never does, because who has taken it is kept in the register `/secure/finds`, not in the room or the object.
+
+Fields, all set in `Create()`:
+
+| Field | Meaning | Default |
+|---|---|---|
+| `Gold` | gold for the first finder; 0 with an `ItemPath` makes a keepsake (below) | 0 |
+| `FallOff` | percent of the one before's amount that each next finder gets, rounded down (0 to 99) | 60 (100, 60, 36, 21, 12, 7, 4, 2, 1) |
+| `MinimumGold` | when the next finder's amount would be below this, the find is empty for everyone after | 1 |
+| `ItemPath` | a file of an item that each finder receives, one each (a cloned item into the inventory; at their feet if they cannot carry it) | none |
+| `ItemFinders` | how many of the first finders receive the item; 0 means every finder while gold remains (every character, for a keepsake) | 0 |
+| `TakenShort`, `TakenLong` | what a character who has already taken it sees | the short description and "(taken by you)"; a plain line |
+| `EmptyShort`, `EmptyLong` | what a character who has not taken it sees, when nothing is left | the short description and "(picked clean)"; a plain line |
+| `GoldLine`, `ItemLine` | what the finder is told; `%gold%` and `%item%` stand for the amount and the item | "You take %gold% gold from the (name)." and "You also take %item%." |
+| `TakenLine`, `EmptyLine` | what a character is told who tries again, or who comes after it is empty | one plain line each |
+
+The words `{` and `}` are for colour tags, so the two placeholders are written between percent signs.
+
+**Descriptions follow the viewer.** `look` and the room's list call `Short()` and `Long()` with the looking character as `ThisPlayer()`, and the find asks the register what that character may take: a character who has not taken it, and for whom something is left, reads `ShortDesc` and `LongDesc`; one who has taken it reads the `Taken` pair; one who has not but would find it empty reads the `Empty` pair. So the description never promises coins that are gone. Write all three so that `Short()` reads in the room's list ("A mouldering purse is here.") and does not promise anything the other two states deny. Wizards see the full description while something is left, and take nothing.
+
+**One file is one stash.** The register keys a find by the program path of its file (`/domains/example/old_purse`), taken from the object itself, so a find cannot name another's record, and two stashes in one room are two files. Renaming or moving the file makes a new stash that nobody has taken from; move a find only before it goes live. Changing `Gold`, `FallOff` or `MinimumGold` later changes what the later finders get (the register keeps who, not how much), never who has already taken it.
+
+**Where it works.** The find must be a file in one of the trusted trees (`/std`, `/secure`, `/domains`, `/classes`, `/skills`, `/events`: the list of the event service), and its room too. A find under `/wiz` is refused: it pays nothing and records nothing. Wizards of any level may look but take nothing and are not recorded ("wizards make no history").
+
+```csharp
+// File: /domains/example/purse_room.cs
+// @inherit /std/room
+public class ExamplePurseRoom : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Example Purse Room";
+        LongDesc = "A cramped cellar behind a loose stone, bare but for the scraps of an old camp. Someone hid a purse here.";
+        Exits["north"] = "/domains/example/hall";
+        AddDetail("camp,scraps,stone", "A few charred sticks and a loose stone, pushed aside.");
+        AddSpawn("/domains/example/old_purse");
+    }
+}
+```
+
+```csharp
+// File: /domains/example/old_purse.cs
+// @inherit /std/find
+public class ExampleOldPurse : Find
+{
+    public override void Create()
+    {
+        Name = "Old Purse";
+        Ids.Add("purse");
+        Ids.Add("old purse");
+        ShortDesc = "a mouldering example purse";
+        LongDesc = "A small leather purse gone green with age. The coins inside are still good.";
+        TakenShort = "a mouldering example purse, emptied by you";
+        TakenLong = "The purse you emptied lies slack on the floor. There is nothing more in it for you.";
+        EmptyShort = "a mouldering example purse, slack and flat";
+        EmptyLong = "A small leather purse, flat and open. Someone has been here before you, and nothing is left.";
+        GoldLine = "You tip %gold% gold out of the purse into your hand.";
+        Gold = 20;          // the first finder: 20, then 12, 7, 4, 2, 1, and then nothing for anyone
+        FallOff = 60;       // the default
+        MinimumGold = 1;    // the default
+    }
+}
+```
+
+An item along with the gold (the Cold Larder's chest gives sixty gold, less each time, and a healing potion to each of the first five finders):
+
+```
+Gold = 60;
+ItemPath = "/domains/hollow/obj/healing_potion";
+ItemFinders = 5;
+```
+
+A **keepsake** has no gold and no end: set `ItemPath` and leave `Gold` at 0. Every character may take one, once, however many come (the grave token in the Barrow's Tomb of the Seven Bowls, worth 15 gold, is one). `ItemFinders` can still limit it to the first few.
+
+Behind the scenes (you do not call it): the find asks `/secure/finds` `Claim(character, Gold, FallOff, MinimumGold, hasItem, ItemFinders)`. The register checks the caller, works out the amount, records the character and saves its file, and only then answers with the gold, the item and a code; the find then pays and saves the character. See "Finds" in GAME_SYSTEMS.md for the order, and for what a crash can and cannot do.
 
 ### A key
 

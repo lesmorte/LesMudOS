@@ -6,7 +6,7 @@ public class VrApproach : Room
     {
         ShortDesc = "The Southgate Approach";
         LongDesc = "The road widens here to a broad, paved approach below the city wall, churned by wheels and crowded with wagons, drovers and travelers queuing for the gate. Hawkers call from the verge, selling ribbons, pins and last-chance charms for the road. The wall rises above you, sixty courses of weathered stone, and the Southgate arch yawns in its foot with a warm mutter of voices and horses coming from within. Dung and dust, woodsmoke and frying onions: the city smells like itself already.";
-        Exits["south"] = "/domains/greenvale/vale_road/rise";
+        Exits["south"] = "/domains/greenvale/corridor/approach/m11";
         Exits["north"] = "/domains/greenvale/oakenfell/southgate/gate";
         ResetSeconds = 120;
 

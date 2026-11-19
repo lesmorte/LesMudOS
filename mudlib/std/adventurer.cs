@@ -9,9 +9,8 @@ public abstract class Adventurer : Living
 {
     private const string RespawnRoom = "/domains/hollow/village/guest_rooms";
     private const string Registry = "/secure/classes";
-    // The levelling constants, all in one place. Experience to reach level n = XpScale x n x (n - 1) x modifier.
+    // The levelling constants, all in one place. Experience to reach a level is in the table and the power law of ExperienceFor.
     private const int MaxLevel = 100;
-    private const double XpScale = 50.0;
     private const int DefaultBaseHp = 30; // for a character that has no archetype yet (only between password and choice)
     private const int HpPerLevel = 8;
     private const int RegenBeats = 5; // one regeneration step per 10 seconds
@@ -116,12 +115,20 @@ public abstract class Adventurer : Living
         return true;
     }
 
+    // Experience to reach levels 0 to 10 (modifier 1.0). Levels 6 to 10 come from the corridor pace model (docs/CORRIDOR_BALANCE.md).
+    private static readonly int[] XpTable = { 0, 0, 100, 300, 600, 1000, 5400, 12000, 21700, 34100, 49300 };
+
     /// <summary>
-    /// The levelling formula, in one place: experience needed to reach level n is 50 x n x (n - 1) x the experience modifier.
-    /// Level 1 needs nothing.
+    /// The levelling table, in one place: experience needed to reach level n, times the experience modifier. Level 1 needs nothing.
+    /// Levels 2 to 5 are 50 n (n - 1); levels 6 to 10 are the table; beyond level 10 the curve is a provisional power law through
+    /// level 10 (49,300 x (n / 10)^3), to be re-fitted when there is content for those levels.
     /// </summary>
-    public static int ExperienceFor(int level, double modifier) =>
-        level <= 1 ? 0 : (int)Math.Round(XpScale * level * (level - 1) * modifier, MidpointRounding.AwayFromZero);
+    public static int ExperienceFor(int level, double modifier)
+    {
+        if (level <= 1) return 0;
+        double basis = level < XpTable.Length ? XpTable[level] : XpTable[10] * Math.Pow(level / 10.0, 3.0);
+        return (int)Math.Round(basis * modifier, MidpointRounding.AwayFromZero);
+    }
 
     /// <summary>Experience needed to reach a level with this character's classes (the largest experience modifier among them).</summary>
     public int QueryXpForLevel(int level) => ExperienceFor(level, expModifier);

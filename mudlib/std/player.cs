@@ -104,6 +104,18 @@ public class Player : Adventurer
         if (ready && caller is { IsClone: true, ProgramPath: "/std/player" } && caller != Self && caller == ThisPlayer()) Save();
     }
 
+    /// <summary>
+    /// Called by a find right after it paid this character (gold, and perhaps an item), so that the character reaches disk
+    /// straight after the register of finds did. The register is written first on purpose: a driver killed between the two
+    /// writes then loses the reward of one character rather than letting it be taken twice. Saving is harmless, so any object
+    /// may ask, but only from the character's own command and from the room the character stands in.
+    /// </summary>
+    public void SaveAfterFind()
+    {
+        var caller = PreviousObject();
+        if (ready && caller != null && Self == ThisPlayer() && Environment(caller) == Environment()) Save();
+    }
+
     private void Save()
     {
         PrepareSave();

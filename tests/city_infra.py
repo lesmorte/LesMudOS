@@ -199,18 +199,24 @@ def parse_build_document():
     return rooms
 
 
-def city_files():
-    """Every file under domains/greenvale: ({path: Source} for rooms, {path: Source} for everything else)."""
+def source_files(*subdirs):
+    """Every .cs file under the given directories of domains/greenvale: ({path: Source} for rooms, {path: Source} for everything else)."""
     rooms, others = {}, {}
-    base = os.path.join(MUDLIB, "domains", "greenvale")
-    for folder, _, names in os.walk(base):
-        for name in sorted(names):
-            if not name.endswith(".cs"):
-                continue
-            path = "/" + os.path.relpath(os.path.join(folder, name), MUDLIB)[:-3].replace(os.sep, "/")
-            src = Source(path)
-            (rooms if src.base == "/std/room" else others)[path] = src
+    for sub in subdirs:
+        base = os.path.join(MUDLIB, "domains", "greenvale", sub)
+        for folder, _, names in os.walk(base):
+            for name in sorted(names):
+                if not name.endswith(".cs"):
+                    continue
+                path = "/" + os.path.relpath(os.path.join(folder, name), MUDLIB)[:-3].replace(os.sep, "/")
+                src = Source(path)
+                (rooms if src.base == "/std/room" else others)[path] = src
     return rooms, others
+
+
+def city_files():
+    """The city: everything under oakenfell/ and the two Vale Road rooms that remain (the corridor has its own test)."""
+    return source_files("oakenfell", "vale_road")
 
 
 # ------------------------------------------------------------------ the running game
@@ -245,16 +251,37 @@ public class CityPit : Room
 '''
 
 
+TEST_PROBE = '''// @inherit /std/item
+public class CityProbe : Item
+{
+    public override void Create() { Name = "Probe"; Ids.Add("probe"); }
+    public override string? Short() => "a probe";
+    public override void Init() { base.Init(); AddAction("tele", Tele); }
+    // Carried by a character, it moves that character to any room: how the tests bring a non-wizard to a far place.
+    private bool Tele(string args)
+    {
+        var who = ThisPlayer()!;
+        MoveObject(who, LoadObject(args.Trim()));
+        who.Call("Look");
+        return true;
+    }
+}
+'''
+
+
 class Game:
     """A driver running on a copy of the real mudlib, with the test's own two files under /domains/citytest."""
 
-    def __init__(self):
+    def __init__(self, prepare=None):
         self.work = tempfile.mkdtemp(prefix="lesmudos-city-")
         self.mudlib = os.path.join(self.work, "mudlib")
         h.copy_mudlib(self.mudlib)
         os.makedirs(os.path.join(self.mudlib, "domains", "citytest"))
         h.write(self.mudlib, "/domains/citytest/biter", TEST_BITER)
         h.write(self.mudlib, "/domains/citytest/pit", TEST_PIT)
+        h.write(self.mudlib, "/domains/citytest/probe", TEST_PROBE)
+        if prepare:
+            prepare(self.mudlib)  # a test may change its own copy of the mudlib before the driver starts
         self.log_path = os.path.join(self.work, "driver.log")
         self.log = open(self.log_path, "w")
         dll = os.path.join(ROOT, "src", "LesMudOS.Driver", "bin", "Debug", "net10.0", "LesMudOS.Driver.dll")

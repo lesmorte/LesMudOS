@@ -11,7 +11,7 @@ public class RvSergeantCalla : Npc
         Ids.Add("duty sergeant");
         Ids.Add("ranger");
         ShortDesc = "Maren Stroud, the duty sergeant";
-        LongDesc = "A lean, sun-browned woman in a long green cloak, with a pale shield sewn on the breast and a scar across the back of one hand. Her eyes never quite settle on you; they keep returning to the door.";
+        LongDesc = "A lean, sun-browned woman in a long green cloak, with a silver eye sewn on the breast and a scar across the back of one hand. Her eyes never quite settle on you; they keep returning to the door.";
         Level = 4;
         MaxHp = 55;
 
