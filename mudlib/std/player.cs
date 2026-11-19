@@ -347,6 +347,8 @@ public class Player : Adventurer
 
     private bool CmdHelp(string args)
     {
+        // Crafting and gathering topics ("help crafting", "help skin"): answered by the crafting daemon.
+        if (args.Trim() != "" && CraftHelp(args) is { } craftTopic) { Write(craftTopic); return true; }
         Write(
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
             "          {cmd}who{/}, {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], and the exits of the room you are in.\n" +
@@ -358,6 +360,8 @@ public class Player : Adventurer
             "Gear:      {cmd}wield{/} THING, {cmd}unwield{/}, {cmd}wear{/} THING, {cmd}remove{/} THING, {cmd}eat{/}/{cmd}drink{/} THING\n" +
             "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING,\n" +
             "           {cmd}give{/} [N|all] THING {cmd}to{/} PLAYER, {cmd}search{/} (for hidden ways)\n" +
+            "Crafting:  {cmd}skin{/}, {cmd}bleed{/}, {cmd}harvest{/}, {cmd}craft{/}, {cmd}combine{/}, {cmd}recipes{/}, {cmd}recipe{/}, {cmd}proficiencies{/},\n" +
+            "           {cmd}apply{/} THING; with a trainer: {cmd}lessons{/}, {cmd}learn{/} NAME ({cmd}help crafting{/}, or help with one of those words)\n" +
             "Town:      {cmd}browse{/}, {cmd}buy{/} THING, {cmd}sell{/} THING, {cmd}value{/} THING (in a shop), {cmd}quests{/},\n" +
             "           {cmd}accept{/} QUEST and {cmd}report{/} (in the Adventurers Guild)\n" +
             "Colour:    command names like these are highlighted; {cmd}ansi off{/} turns colour off, {cmd}ansi on{/} turns it on.\n");

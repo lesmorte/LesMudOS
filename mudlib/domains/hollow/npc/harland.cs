@@ -1,6 +1,6 @@
-// @inherit /std/shopkeeper
+// @inherit /std/trainer
 
-public class Harland : Shopkeeper
+public class Harland : Trainer
 {
     public override void Create()
     {
@@ -20,12 +20,19 @@ public class Harland : Shopkeeper
         AddTopic("vincent,tunnels,tunnel,underground", "Vincent used to talk about tunnels under the village, always hungry to dig further. Nobody believed him, and I'm not sure I do yet.");
         AddTopic("bed,room,rest,sleep", "A bed for the night is five gold, and you'll wake up fit as a fiddle. Say the word and I'll show you upstairs myself. Just {cmd}buy bed{/}.");
         AddTopic("food,drink,ale,stew", "Hot stew, cold ale, and a warm corner by the fire. Browse my shelves and take your pick. Try {cmd}browse{/}, then {cmd}buy stew{/}.");
+        AddTopic("berry,berries,blackberries,blueberries,juice,flour,honey,water,work,craft,learn,teach,teaching,recipe,recipes,lessons,lesson,fire,cooking,kitchen", "The fire is free to anyone who can use it, so long as you stay out of my stew. I'll show you how to press berry juice if you like: {cmd}lessons{/} for the price, {cmd}learn berry juice{/} to be taught, then {cmd}craft berry juice{/} at the hearth. I sell blackberries, blueberries, flour, honey and clean water for it, along with the food and drink. {cmd}browse{/} will show you.");
         AddEmote("Harland polishes a mug with his apron and eyes the trapdoor.", 6);
         AddEmote("Harland calls out to the musicians to play something cheerier.", 4);
 
         AddStock("/domains/hollow/obj/stew", 4);
         AddStock("/domains/hollow/obj/ale", 2);
         AddStock("/domains/hollow/obj/tavern_bed", 5);
+        AddStock("/domains/hollow/obj/craft/blackberries", 2);
+        AddStock("/domains/hollow/obj/craft/blueberries", 2);
+        AddStock("/domains/hollow/obj/craft/flour", 1);
+        AddStock("/domains/hollow/obj/craft/honey", 3);
+        AddStock("/domains/hollow/obj/craft/clean_water", 1);
+        AddLesson("berry_juice", 3);
     }
 
     protected override bool OnBuy(ObjectRef buyer, string path)

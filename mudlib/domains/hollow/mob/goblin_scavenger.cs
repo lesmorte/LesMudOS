@@ -3,6 +3,12 @@
 /// <summary>A quick, fragile goblin that picks through the smugglers' storeroom and attacks anything it thinks it can rob.</summary>
 public class GoblinScavenger : Monster
 {
+    /// <summary>The kind of skin this creature yields to the crafting system (none), or empty. See docs/CRAFTING.md.</summary>
+    public string Skin { get; set; } = "";
+
+    /// <summary>The kind of blood this creature yields to the crafting system, or empty.</summary>
+    public string Blood { get; set; } = "goblin";
+
     public override void Create()
     {
         Name = "Goblin Scavenger";

@@ -8,6 +8,12 @@
 /// </summary>
 public class GoblinOverseer : Monster
 {
+    /// <summary>The kind of skin this creature yields to the crafting system (none), or empty. See docs/CRAFTING.md.</summary>
+    public string Skin { get; set; } = "";
+
+    /// <summary>The kind of blood this creature yields to the crafting system, or empty.</summary>
+    public string Blood { get; set; } = "goblin";
+
     private const string MinionPath = "/domains/hollow/mob/goblin_minion";
 
     private long cryUntil; // the Battle Cry bonus lasts until this time (ms)

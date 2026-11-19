@@ -6,7 +6,7 @@ public class GqCraftersCourt : Room
     public override void Create()
     {
         ShortDesc = "Crafters' Court";
-        LongDesc = "Crafters' Court is a wide, cobbled yard ringed by the workshops of the crafting guilds, where the din of hammers on iron mixes with the rattle of looms and the hiss of quenching water. Forges glow in open-fronted smithies on the north side, while racks of dyed cloth in every colour hang drying along the west wall. A tall guild house stands at the far end with its doors open and a notice board beside them. The air smells of coal-smoke, hot metal and wet wool, and nobody here is idle.";
+        LongDesc = "Crafters' Court is a wide, cobbled yard ringed by the workshops of the crafting guilds, where the din of hammers on iron mixes with the rattle of looms and the hiss of quenching water. Forges glow in open-fronted smithies on the north side, while racks of dyed cloth in every colour hang drying along the west wall. A tall guild house stands at the far end with its doors open and a notice board beside them. Under the guild awning stand a long workbench and, apart from the cloth, a tanner's rack, both free to any crafter who asks. The air smells of coal-smoke, hot metal and wet wool, and nobody here is idle.";
         Exits["east"] = "/domains/greenvale/oakenfell/guild/guild_row";
         Exits["south"] = "/domains/greenvale/oakenfell/guild/proving_yard";
 
@@ -20,6 +20,8 @@ public class GqCraftersCourt : Room
             "The guilds of Smiths, Weavers and the allied crafts hold their yard in common. Enrollment of new members is not open at this time. Apprentices already bound to a master continue their work as before. Visitors are welcome to watch, and are asked to keep clear of the forges. Further notice will be posted on this board.",
             "A board covered in neat notices. You could {cmd}read{/} it.");
 
+        AddSpawn("/domains/greenvale/oakenfell/guild/obj/court_workbench");
+        AddSpawn("/domains/greenvale/oakenfell/guild/obj/court_tanning_rack");
         AddSpawn("/domains/greenvale/oakenfell/guild/npc/smith");
         AddSpawn("/domains/greenvale/oakenfell/guild/npc/weaver");
         AddSpawn("/domains/greenvale/oakenfell/guild/npc/guild_clerk");

@@ -3,6 +3,12 @@
 /// <summary>The goblin guard who keeps the Rusty Key for the locked door in the Mushroom Cavern.</summary>
 public class GoblinGuardKeyholder : Monster
 {
+    /// <summary>The kind of skin this creature yields to the crafting system (none), or empty. See docs/CRAFTING.md.</summary>
+    public string Skin { get; set; } = "";
+
+    /// <summary>The kind of blood this creature yields to the crafting system, or empty.</summary>
+    public string Blood { get; set; } = "goblin";
+
     public override void Create()
     {
         Name = "Goblin Guard";

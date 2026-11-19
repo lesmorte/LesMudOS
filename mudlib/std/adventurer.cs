@@ -528,6 +528,7 @@ public abstract class Adventurer : Living
         AddAction("skills", CmdSkills);
         AddAction("quests", CmdQuests);
         AddAction("search", CmdSearch);
+        BindCraftCommands(); // crafting and gathering, below
         // Builder tools. Each handler checks the wizard level on every use and
         // declines below it, so to everyone else these verbs do not exist.
         AddAction("goto", CmdGoto);
@@ -1090,7 +1091,7 @@ public abstract class Adventurer : Living
         var item = args == "" ? null : Present(args);
         if (item == null) { NotifyFail($"{Cap(verb)} what?"); return false; }
         var kind = item.Call<string>("QueryUseVerb");
-        if (kind == null || (kind == "eat") != (verb == "eat")) { Write($"You can't {verb} that.\n"); return true; }
+        if (kind == null || (kind != "eat" && kind != "drink") || (kind == "eat") != (verb == "eat")) { Write($"You can't {verb} that.\n"); return true; }
         UseAsAction(item); // an action with its own Recovery: now if ready, else queued for the next Ready Time
         return true;
     }
@@ -1301,5 +1302,117 @@ public abstract class Adventurer : Living
         FillResources();
         Write($"You are now level {Level} with {xp} experience; the next level needs {(Level >= MaxLevel ? 0 : QueryXpForLevel(Level + 1))}.\n");
         return true;
+    }
+
+    // ---- Crafting and gathering (docs/CRAFTING.md) ----
+    // A self-contained block. The commands are run by the crafting daemon, /secure/crafting; this body binds the verbs, keeps
+    // the character's proficiencies and known recipes, and runs the timed part of each action on its own combat clock (the
+    // action's "skill" is the daemon, so the clock calls the daemon's Resolve). Only the daemon may change what is kept here.
+
+    private const string CraftDaemon = "/secure/crafting";
+    private static readonly string[] CraftVerbs = { "skin", "bleed", "harvest", "craft", "combine", "recipes", "recipe", "proficiencies" };
+
+    /// <summary>Proficiency id to its value in tenths of a point (0 to 1000). Ids are those of the crafting data.</summary>
+    [Saved] private Dictionary<string, int> craftProficiencies = new();
+    /// <summary>Recipe id to how it was learned: "taught" or "discovered".</summary>
+    [Saved] private Dictionary<string, string> craftRecipes = new();
+
+    /// <summary>A proficiency, 0 to 100 (whole points).</summary>
+    public int QueryProficiency(string id) => craftProficiencies.GetValueOrDefault(id ?? "") / 10;
+
+    /// <summary>A proficiency in tenths of a point, 0 to 1000.</summary>
+    public int QueryProficiencyTenths(string id) => craftProficiencies.GetValueOrDefault(id ?? "");
+
+    public Dictionary<string, int> QueryProficiencies() => new(craftProficiencies);
+
+    /// <summary>The recipes this character knows: id to "taught" or "discovered".</summary>
+    public Dictionary<string, string> QueryKnownRecipes() => new(craftRecipes);
+
+    public bool QueryKnowsRecipe(string id) => craftRecipes.ContainsKey(id ?? "");
+
+    private bool FromCraftDaemon()
+    {
+        var caller = PreviousObject();
+        return caller != null && !caller.IsClone && caller.ProgramPath == CraftDaemon;
+    }
+
+    /// <summary>Set a proficiency (tenths, 0 to 1000). Only the crafting daemon may; it does so for work the character has done.</summary>
+    public bool CraftSetProficiency(string id, int tenths)
+    {
+        if (!FromCraftDaemon() || string.IsNullOrEmpty(id) || id.Length > 40 || tenths < 0 || tenths > 1000) return false;
+        if (!craftProficiencies.ContainsKey(id) && craftProficiencies.Count >= 100) return false;
+        craftProficiencies[id] = tenths;
+        return true;
+    }
+
+    /// <summary>Learn a recipe ("taught" or "discovered"). Only the crafting daemon may: for a trainer, a book, a quest or an experiment.</summary>
+    public bool CraftLearn(string id, string how)
+    {
+        if (!FromCraftDaemon() || string.IsNullOrEmpty(id) || id.Length > 60 || craftRecipes.ContainsKey(id) || craftRecipes.Count >= 5000) return false;
+        craftRecipes[id] = how == "discovered" ? "discovered" : "taught";
+        return true;
+    }
+
+    /// <summary>Write the character to disk after a harvest, a craft or a lesson. Only the crafting daemon may ask.</summary>
+    public void CraftSave()
+    {
+        if (FromCraftDaemon()) PersistNow();
+    }
+
+    /// <summary>
+    /// The next step of a batch of crafting: queued for this character's next Ready Time, quietly. Only the crafting daemon may
+    /// ask, and not while the character is fighting. True if queued.
+    /// </summary>
+    public bool CraftContinue(string name, string windUp, double preparation, double recovery, double reactionMod)
+    {
+        if (!FromCraftDaemon() || QueryInCombat() || Dead) return false;
+        QueueAction(CraftAction(name, windUp, preparation, recovery, reactionMod));
+        return true;
+    }
+
+    private CombatAction CraftAction(string name, string windUp, double preparation, double recovery, double reactionMod)
+    {
+        ObjectRef? daemon;
+        try { daemon = LoadObject(CraftDaemon); }
+        catch (MudRuntimeException) { daemon = null; }
+        return new CombatAction { Id = "craft", Name = name, Kind = "skill", Skill = daemon, WindUp = windUp, Preparation = preparation, Recovery = recovery, ReactionMod = reactionMod };
+    }
+
+    private void BindCraftCommands()
+    {
+        foreach (var verb in CraftVerbs) AddAction(verb, CmdCraft);
+        AddAction("apply", CmdApply);
+    }
+
+    private bool CmdCraft(string args)
+    {
+        List<object>? reply;
+        try { reply = LoadObject(CraftDaemon).Call<List<object>>("Command", Self, QueryVerb(), args); }
+        catch (MudRuntimeException) { reply = null; }
+        if (reply == null || reply.Count == 0 || reply[0] is not string text) { Write("Nobody here knows how to do that yet.\n"); return true; }
+        if (text != "") Write(text.EndsWith("\n") ? text : text + "\n");
+        if (reply.Count >= 8 && reply[1] is "act" && reply[2] is string name && reply[3] is string windUp && reply[4] is double prep && reply[5] is double recovery && reply[6] is double mod && reply[7] is string waiting)
+        {
+            if (QueryInCombat()) { Write("You cannot do that while you are fighting.\n"); return true; }
+            ActAsAction(CraftAction(name, windUp, prep, recovery, mod), waiting);
+        }
+        return true;
+    }
+
+    /// <summary>"apply bandage": use a bandage or salve (a consumable whose use verb is "apply") on the combat clock, like a potion.</summary>
+    private bool CmdApply(string args)
+    {
+        var item = args == "" ? null : Present(args);
+        if (item == null) { NotifyFail("Apply what?"); return false; }
+        if (item.Call<string>("QueryUseVerb") != "apply") { Write("You can't apply that.\n"); return true; }
+        UseAsAction(item);
+        return true;
+    }
+
+    /// <summary>Help on crafting ("help crafting", "help skin", ...), or null for another topic. The player's help command asks.</summary>
+    protected string? CraftHelp(string topic)
+    {
+        try { return LoadObject(CraftDaemon).Call<string>("Help", topic); }
+        catch (MudRuntimeException) { return null; }
     }
 }

@@ -1105,6 +1105,17 @@ public abstract class Living : Thing
         Kick();
     }
 
+    /// <summary>
+    /// Queue an action for the next Ready Time, replacing any queued one, without a message: the next step of a batch of work
+    /// (crafting five salves). It begins when the current action's delay is over, like any queued action; stop clears it.
+    /// </summary>
+    protected void QueueAction(CombatAction action)
+    {
+        queued = action;
+        queuedTarget = null;
+        Kick();
+    }
+
     /// <summary>Clear the queued action. True if there was one.</summary>
     protected bool ClearQueued()
     {

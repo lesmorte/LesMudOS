@@ -688,6 +688,22 @@ var fine = CountIn(player, "/domains/test/wolf_skin").GetValueOrDefault(Item.Fin
 
 A file that uses `Item.Fine` and the other names needs `// @use /std/item` (an item file already has it through `@inherit`). A shopkeeper can sell a quality with `AddStock(path, price, quality)`; the price shown is the listed price times the multiplier.
 
+## Crafting
+
+The full reference, with every number and the launch recipes as data, is [CRAFTING.md](CRAFTING.md). The builder's part in brief:
+
+- **A material** is an item file (inherit `/std/material`: names, value, nothing else) and one line in a table under `/crafting`: `Material("honey", "/domains/hollow/obj/craft/honey", "sweetener")` (id, file, categories). Without the line it is not a material.
+- **A creature with a skin or blood** declares `public string Skin { get; set; } = "wolf";` and `public string Blood { get; set; } = "wolf";`, and its kind has a line in `/crafting/beasts.cs`: `Beast("wolf", "Wolf", 6, 4, 4)` (kind, name, skin value, blood value, difficulty). Skins and bloods are the generic `/std/skin` and `/std/blood`; no file per creature.
+- **A tool**: inherit `/std/tool`, set `ToolType` ("skinning knife", "bleeding kit", "harvest sickle"); its quality is the item quality.
+- **A station**: inherit `/std/station`, set `StationKind` ("herbalist table", "tanning rack", "workbench", "cooking fire"), place it with `AddSpawn`.
+- **A node's yield**: `Yield("berry bush", "blackberries", 1, 2)` in a table (node kind, material, weight, units).
+- **A recipe**: a chain in a `/recipes` file (inherit `/std/recipe_set`): `Recipe("id", "Name").Needs("healing_herb").NeedsAny("berry", 2).At("herbalist table").Skill("herbalism", "novice").Makes(path or material id).Discovery("known")`. At most three kinds of ingredient.
+- **A crafted consumable**: inherit `/std/crafted`, set `UseVerb` ("eat", "drink", "apply") and any of `RestoreVitality`, `RestoreStamina`, `HealPerTick` + `Ticks` + `TickSeconds`. Quality scales them.
+- **A trainer**: inherit `/std/trainer`, `AddLesson("recipe_id", price)`; it is also a shopkeeper, so `AddStock` lines make the same NPC a supplier. **A book**: inherit `/std/recipe_book`, `Teaches.Add("recipe_id")`. **A quest reward**: `LoadObject("/secure/crafting").Call<string>("Teach", player, "recipe_id")`.
+- **A vendor of materials**: `AddStock(path, price)`; generic skins and bloods by record: `AddStock("/std/skin?p.kind=rabbit", 3)`. Never below the material's value. Goblin Blood cannot be stocked.
+- **Pricing**: an output's value times its count at most about 60% of its ingredients' values. Run `python3 tests/craft_sim.py`.
+- Every class name in the mudlib must be unique. After editing a data or recipe file, `update` it; the daemon notices within five seconds and writes what it loaded, and any problem or clash, to the driver log.
+
 ## Areas, regions, skills and classes
 
 **Area and region names.** Put an `area.cs` in the directory of your rooms. Every room in that directory then belongs to the area it names, and `score` shows "Area ...   Region ...". Nothing is repeated in the rooms.
@@ -708,6 +724,8 @@ public class ExampleArea : Area
 **A class** is one file in `/classes` inheriting `/std/pclass`: tier, parent, `Require("level", "5")`, `ExpModifier`, `AttackRate`, `Skills`, `Traits`, `Weapons`, `ArmorTypes`, `Enabled`. Advanced classes are given with `player.Call<string>("ApplyClass", id)`. CLASS_SYSTEM.md section 12 has the full story.
 
 ## Corpses, in one paragraph
+
+(Crafting adds: a corpse remembers the creature's kind, level, skin and blood; each can be taken once, by `skin` and `bleed`, under the same 30-minute lock, and a corpse with a part still to take does not crumble when it is empty. See CRAFTING.md.)
 
 You do not build corpses; `Monster` and the player's death make them. For a builder it means: loot and gold are in the corpse (`loot`, `get X from corpse`, `look in corpse`), nothing falls to the floor, the killer has half an hour to themselves, an empty corpse is gone after two minutes, and a monster corpse still holding loot rots after an hour. Items you want a monster to always drop: `AddLoot(path, 100)`. Items lying on the floor of a room are done with `AddSpawn`.
 

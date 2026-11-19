@@ -6,6 +6,7 @@
 /// browse, buy, sell and value for players in the room. Stock is unlimited. Rare stock is rolled when the shopkeeper is
 /// made and again at each reset of its room. A stock entry may have a quality; its price is the listed price times the
 /// quality's multiplier (/std/item). Stackable stock can be bought by the number ("buy 5 skins") and arrives as one stack.
+/// A stock path may be a save record with properties, for generic items whose kind is a property: AddStock("/std/skin?p.kind=rabbit", 4).
 /// </summary>
 public class Shopkeeper : Npc
 {
@@ -44,7 +45,8 @@ public class Shopkeeper : Npc
         var wanted = entry.Percent >= 100 || Random(100) < entry.Percent;
         if (wanted && entry.Sample is not { IsAlive: true })
         {
-            entry.Sample = CloneObject(entry.Path);
+            entry.Sample = CloneStated(entry.Path); // a path, or a record with properties: "/std/skin?p.kind=rabbit"
+            if (entry.Sample == null) return; // the item refused that state (Goblin Blood cannot be stocked)
             if (entry.Quality != 1) entry.Sample.Call("SetQuality", entry.Quality);
             MoveObject(entry.Sample, Self);
         }
@@ -88,7 +90,7 @@ public class Shopkeeper : Npc
     protected override void Noticed(ObjectRef other)
     {
         base.Noticed(other);
-        if (!Interactive(other)) return;
+        if (!Interactive(other) || stock.Count == 0) return; // a trainer with nothing to sell is not a shop
         AddAction("browse", CmdBrowse);
         AddAction("buy", CmdBuy);
         AddAction("sell", CmdSell);

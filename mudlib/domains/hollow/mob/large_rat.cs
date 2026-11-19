@@ -3,6 +3,12 @@
 /// <summary>The simplest monster: just numbers in Create().</summary>
 public class LargeRat : Monster
 {
+    /// <summary>The kind of skin this creature yields to the crafting system ("rat"), or empty. See docs/CRAFTING.md.</summary>
+    public string Skin { get; set; } = "rat";
+
+    /// <summary>The kind of blood this creature yields to the crafting system, or empty.</summary>
+    public string Blood { get; set; } = "rat";
+
     public override void Create()
     {
         Name = "Large Rat";
