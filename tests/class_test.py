@@ -583,7 +583,7 @@ def run(work, mudlib):
     time.sleep(3)
     out = p.command("heal")
     out += a.quiet(p, 5)
-    check("Minor Heal restores 8 HP plus 25% (Divine Knowledge): 10", out, "restoring 10 hit points")
+    check("Minor Heal restores 8 HP plus 25% (Divine Knowledge) and 9% (Healing Power: Spirit 9, Insight 6): 11", out, "restoring 11 hit points")
     check("Minor Heal costs 25 Mana", str(res(p)[2] <= 90), "True")
     s0 = a.score_of(p)["text"]
     time.sleep(3)
