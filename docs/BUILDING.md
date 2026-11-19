@@ -699,7 +699,7 @@ The full reference, with every number and the launch recipes as data, is [CRAFTI
 - **A node's yield**: `Yield("berry bush", "blackberries", 1, 2)` in a table (node kind, material, weight, units).
 - **A recipe**: a chain in a `/recipes` file (inherit `/std/recipe_set`): `Recipe("id", "Name").Needs("healing_herb").NeedsAny("berry", 2).At("herbalist table").Skill("herbalism", "novice").Makes(path or material id).Discovery("known")`. At most three kinds of ingredient.
 - **A crafted consumable**: inherit `/std/crafted`, set `UseVerb` ("eat", "drink", "apply") and any of `RestoreVitality`, `RestoreStamina`, `HealPerTick` + `Ticks` + `TickSeconds`. Quality scales them.
-- **A trainer**: inherit `/std/trainer`, `AddLesson("recipe_id", price)`. **A book**: inherit `/std/recipe_book`, `Teaches.Add("recipe_id")`. **A quest reward**: `LoadObject("/secure/crafting").Call<string>("Teach", player, "recipe_id")`.
+- **A trainer**: inherit `/std/trainer`, `AddLesson("recipe_id", price)`; it is also a shopkeeper, so `AddStock` lines make the same NPC a supplier. **A book**: inherit `/std/recipe_book`, `Teaches.Add("recipe_id")`. **A quest reward**: `LoadObject("/secure/crafting").Call<string>("Teach", player, "recipe_id")`.
 - **A vendor of materials**: `AddStock(path, price)`; generic skins and bloods by record: `AddStock("/std/skin?p.kind=rabbit", 3)`. Never below the material's value. Goblin Blood cannot be stocked.
 - **Pricing**: an output's value times its count at most about 60% of its ingredients' values. Run `python3 tests/craft_sim.py`.
 - Every class name in the mudlib must be unique. After editing a data or recipe file, `update` it; the daemon notices within five seconds and writes what it loaded, and any problem or clash, to the driver log.

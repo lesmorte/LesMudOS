@@ -39,7 +39,7 @@ Help: `help crafting`, and `help skin` (or any of the command words).
 | `/std/station` | A crafting station with a `StationKind`. |
 | `/std/crafted` | A crafted consumable whose effects and their scaling with quality are data. |
 | `/std/recipe_book` | A readable item that teaches recipes. |
-| `/std/trainer` | An NPC that teaches recipes for gold (`lessons`, `learn`). |
+| `/std/trainer` | An NPC that teaches recipes for gold (`lessons`, `learn`). It is also a shopkeeper (`AddStock`), so one person can teach and sell. |
 | `/events/craft.cs` | The Chronicle event types `craft.discover_rare` and `craft.discover_secret`. |
 | `/std/adventurer` | A self-contained block at the end: the saved proficiencies and known recipes, their guarded setters, the command verbs. |
 | `/std/corpse` | Remembers the creature's kind, level, skin and blood; each part taken once. |
@@ -280,7 +280,7 @@ public class HcHerbalistTable : Station
 }
 ```
 
-**A trainer.** An NPC inheriting `/std/trainer`; it is an `Npc`, so `AddChat`, `AddTopic` work as usual. Players in the room get `lessons` and `learn NAME`.
+**A trainer.** An NPC inheriting `/std/trainer`; it is a `Shopkeeper` (and so an `Npc`): `AddChat`, `AddTopic` work as usual, and `AddStock` lines make it sell (`browse`, `buy`; with no stock it is not a shop). Players in the room get `lessons` and `learn NAME`.
 
 ```csharp
 // @inherit /std/trainer
@@ -359,11 +359,12 @@ The Hollow's creatures and the corridor's have them. A new beast is one `Beast` 
 
 - `tests/craft_test.py` (port 4829, about 4.5 minutes, 254 checks): every command and refusal, growth and its limits, harvest quality (exact odds against the simulator, 4,000-roll samples within 4.5 standard deviations, deterministic rolls), the corpse rules, node yields, the matcher and the clash rule, inheritance and the owner's example, stations, discovery by teaching, book and experiment, the Chronicle first and none for a wizard, effects, batches, quitting mid-queue, a crash right after a craft, persistence across a killed driver and a clean restart, the sandbox, shops, and 1,000 generated recipes (20 files, 300 materials) loaded and matched with timings.
 - `tests/craft_sim.py`: the economy and the odds, pure Python.
-- Test-only content: `tests/fixtures/crafting/samples` (six recipes, materials, tools, stations, book, trainer, nodes, creatures under `/domains/crafttest`) and `tests/fixtures/crafting/launch` (the appendix below).
+- Test-only content: `tests/fixtures/crafting/samples` (six recipes, materials, tools, stations, book, trainer, nodes, creatures under `/domains/crafttest`). It reuses the launch ids, so `craft_test.py` removes the real launch files from its copy of the mudlib and `craft_sim.py` leaves them out of its samples run.
+- `tests/craft_content_test.py` (port 4830) plays the real content: the notice, the stations, every supplier and teacher against the NPC files, the ten recipes at their stations, the refusals, the two experiments and the Chronicle first, gathering for oneself, and no Goblin Blood in any shop.
 
 ## 9. Appendix: the launch recipes and materials as data
 
-Ready to paste. The same files are `tests/fixtures/crafting/launch`, which `craft_sim.py` checks on every run (it passes; the closest recipe to a loop is still 0.14 gold short). Values are suggestions that pass the pricing rule; the content writer sets the vendor prices at or above them.
+These are the game's real files now: `/crafting/launch_materials.cs`, `/recipes/launch.cs` and `/domains/hollow/obj/craft/` (classes prefixed `Cr`), with the stations, tools, a recipe book and the vendors and teachers on top. `craft_sim.py` checks them on every run; the closest recipe to a loop is still 0.14 gold short. The listing below is the data as first written; two discovery levels differ in the files (Sweet Berry Juice `.Discovery("discovered")`, Blood Ink `.Discovery("rare")`) and the Herbal Bandage restores 12.
 
 **The sixteen materials.** Six come from `/crafting/beasts.cs` as shipped: Rabbit Skin (`rabbit_skin`, 3), Wolf Skin (`wolf_skin`, 6), Deer Skin (`deer_skin`, 6), Rabbit Blood (`rabbit_blood`, 2), Wolf Blood (`wolf_blood`, 4), Goblin Blood (`goblin_blood`, 8, scarce). The other ten, and three crafted intermediates, in `/crafting/launch_materials.cs`:
 
@@ -435,7 +436,7 @@ public class HcLaunchRecipes : RecipeSet
 | berry_juice | `/std/crafted`, drink | 1 | `RestoreVitality = 8` (minor Vitality) |
 | sweet_berry_juice | `/std/crafted`, drink | 2 | `RestoreVitality = 10; RestoreStamina = 10` |
 | simple_bandage | `/std/crafted`, apply | 1 | `RestoreVitality = 6` (minor healing) |
-| herbal_bandage | `/std/crafted`, apply | 3 | `RestoreVitality = 14` (moderate healing) |
+| herbal_bandage | `/std/crafted`, apply | 3 | `RestoreVitality = 12` (moderate healing) |
 | minor_healing_salve | `/std/crafted`, apply | 3 | `HealPerTick = 3; Ticks = 6; TickSeconds = 5` (18 over 30 s) |
 | minor_stamina_tonic | `/std/crafted`, drink | 3 | `RestoreStamina = 25` |
 | treated_leather | `/std/material` | 4 | a component; more than a rabbit skin (3) |

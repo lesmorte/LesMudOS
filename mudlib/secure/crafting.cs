@@ -1522,12 +1522,13 @@ public class CraftingDaemon : Thing
                 return "Crafting and gathering\n" +
                        "  Gather materials with {cmd}skin{/} and {cmd}bleed{/} (corpses) and {cmd}harvest{/} (bushes, patches, flowers). Each needs its tool,\n" +
                        "  carried, not wielded: a skinning knife, a bleeding kit, a harvest sickle. Better tools and more skill give better materials.\n" +
-                       "  A corpse can be skinned once and bled once; blood must be drawn within five minutes of the death. Nobody else may touch\n" +
-                       "  a fresh kill for half an hour except the one who made it.\n" +
+                       "  A corpse can be skinned once and bled once; blood must be drawn within five minutes of the death. For half an hour only the\n" +
+                       "  one who made the kill may touch it.\n" +
                        "  Make things with {cmd}craft{/} NAME [COUNT]. Some recipes need a station (a herbalist table, a tanning rack, a workbench,\n" +
                        "  a cooking fire); simple ones can be made anywhere. The quality of what you make follows the quality of what you put in,\n" +
                        "  raised or lowered by your skill against the recipe's difficulty. Crafting never fails and never wastes materials.\n" +
-                       "  Learn recipes from trainers and books, or find them: {cmd}combine{/} THING {cmd}and{/} THING [{cmd}and{/} THING].\n" +
+                       "  Learn recipes from trainers and books: where a trainer stands, {cmd}lessons{/} lists what they teach and {cmd}learn{/} NAME\n" +
+                       "  pays for it. Or find them yourself: {cmd}combine{/} THING {cmd}and{/} THING [{cmd}and{/} THING] at a station.\n" +
                        "  See also: help skin, bleed, harvest, craft, combine, recipes, recipe, proficiencies.\n";
             case "skin": return "skin [CORPSE]: take the skin of a dead beast. Needs a skinning knife. Once per corpse; a botched cut ruins the hide.\n";
             case "bleed": return "bleed [CORPSE]: draw the blood of a fresh kill into a vial. Needs a bleeding kit. Once per corpse, within five minutes of its death.\n";
