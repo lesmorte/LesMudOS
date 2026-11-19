@@ -12,14 +12,17 @@
 /// A corpse crumbles to dust at once when its last item or coin is taken, unless a skin or fresh blood can still be taken from
 /// it (then it crumbles when that is taken). A corpse that was empty from the start and has nothing to take vanishes after
 /// two minutes. A
-/// monster's corpse that still holds loot rots away after an hour and its
-/// contents with it; a player's corpse spills its contents on the floor.
+/// creature's corpse rots away LifetimeSeconds (600) after the death, whatever is still in or on it (loot, a skin), and its
+/// contents with it; a creature file may set its own with a public int CorpseSeconds. A player's corpse keeps an hour and then
+/// spills its contents on the floor.
 /// </summary>
 public class Corpse : Thing
 {
     private int lockSeconds = 1800;
     private int emptySeconds = 120;
-    private int fullSeconds = 3600;
+    private const int PlayerSeconds = 3600;
+    /// <summary>How long a creature's corpse lasts after the death, whatever it holds. A creature file may set its own (CorpseSeconds).</summary>
+    private int lifetimeSeconds = 600;
     private long diedAt;
     private string killerName = "";
     private string deceasedName = "";
@@ -77,6 +80,7 @@ public class Corpse : Thing
         killerName = NameOfPlayer(killer);
         deceasedName = NameOfPlayer(deceased);
         playerCorpse = deceasedName != "";
+        if (!playerCorpse) ReadLifetime(deceased);
         corpseId = Time() + "-" + Self.Name;
         var plain = Strip(deadLabel).ToLowerInvariant();
         Name = "corpse of " + plain;
@@ -110,6 +114,14 @@ public class Corpse : Thing
         creatureLevel = deceased.Call<int>("QueryLevel");
         skinKind = Clean(deceased.Call<string>("get_Skin"));
         bloodKind = Clean(deceased.Call<string>("get_Blood"));
+    }
+
+    /// <summary>A creature from a trusted tree, itself calling Setup, may say how long its corpse lasts (1 to 3600 seconds).</summary>
+    private void ReadLifetime(ObjectRef deceased)
+    {
+        if (deceased == null || !deceased.IsAlive || PreviousObject() != deceased || !InTrustedTree(deceased.ProgramPath)) return;
+        var own = deceased.Call<int>("get_CorpseSeconds");
+        if (own >= 1 && own <= PlayerSeconds) lifetimeSeconds = own;
     }
 
     private static string Clean(string? kind) => (kind ?? "").Trim().ToLowerInvariant();
@@ -201,14 +213,15 @@ public class Corpse : Thing
 
     private string Refusal() => $"The corpse of {Strip(label)} is not yours to {{cmd}}loot{{/}} yet.";
 
-    /// <summary>The timers, for tests and wizards: lock length, and decay times when empty and when full. Wizard level 10 only.</summary>
-    public void SetTimers(int lockSecs, int emptySecs, int fullSecs)
+    /// <summary>The timers, for tests and wizards: lock length, the decay time when empty, and the lifetime of a creature's corpse
+    /// (a player's corpse keeps its hour). Wizard level 10 only.</summary>
+    public void SetTimers(int lockSecs, int emptySecs, int lifetimeSecs)
     {
         var who = ThisPlayer();
         if (who == null || who.Call<int>("QueryWizLevel") < 10) return;
         lockSeconds = lockSecs;
         emptySeconds = emptySecs;
-        fullSeconds = fullSecs;
+        lifetimeSeconds = lifetimeSecs;
         fullGeneration++;
         emptyGeneration++;
         emptyArmed = false;
@@ -324,7 +337,9 @@ public class Corpse : Thing
             CallOut(() => { if (Contents().Count == 0 && !HasYields()) ArmEmpty(); }, cold);
         }
         var generation = ++fullGeneration;
-        CallOut(() => { if (generation == fullGeneration) RotAway(); }, fullSeconds);
+        // A creature's corpse rots a fixed time after the death (from now, if the timers were reset); a player's keeps its hour.
+        var left = playerCorpse ? PlayerSeconds : Math.Max(1, lifetimeSeconds - (int)(QueryAgeMs() / 1000));
+        CallOut(() => { if (generation == fullGeneration) RotAway(); }, left);
     }
 
     private void ArmEmpty()
@@ -353,6 +368,6 @@ public class Corpse : Thing
         Destruct();
     }
 
-    public override string Stat() => base.Stat() + $"  Corpse of {label}: killer '{killerName}', deceased '{deceasedName}', lock {Math.Max(0, lockSeconds - (Time() - diedAt))}s left, holds {Contents().Count}\n" +
+    public override string Stat() => base.Stat() + $"  Corpse of {label}: killer '{killerName}', deceased '{deceasedName}', lock {Math.Max(0, lockSeconds - (Time() - diedAt))}s left, holds {Contents().Count}, lifetime {(playerCorpse ? PlayerSeconds : lifetimeSeconds)}s\n" +
         $"  Creature '{creatureKind}' level {creatureLevel}, skin '{skinKind}'{(skinTaken ? " (taken)" : "")}, blood '{bloodKind}'{(bloodTaken ? " (taken)" : "")}, age {QueryAgeMs() / 1000}s\n";
 }
