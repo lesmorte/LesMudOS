@@ -354,7 +354,7 @@ public abstract class Living : Thing
         {
             "physical_power" => DamagePctPerMight * Above("might"),
             "precision" => Above("grace") / GracePerPrecision,
-            "evasion" => 0.0,                                   // nothing from Grace (section 8); equipment may add
+            "evasion" => QueryMod("evasion"),                   // nothing from Grace (section 8); effects, traits and equipment may add
             "crit" => CritPctPerGrace * Above("grace"),
             "spell_power" => SpellPctPerInsight * Above("insight") + SpellPctPerSpirit * Above("spirit"),
             "healing_power" => HealPctPerSpirit * Above("spirit") + HealPctPerInsight * Above("insight"),
@@ -415,11 +415,13 @@ public abstract class Living : Thing
     /// <summary>"his", "her", "its" or "their" for messages. Creatures say "its"; players override it.</summary>
     public virtual string QueryPossessive() => "its";
 
-    /// <summary>A percentage written without a needless ".0": 5, 5.5, 100.</summary>
+    /// <summary>A percentage to two decimals at most, without needless zeros: 5, 5.5, 5.25, 100.</summary>
     protected static string Pct(double value)
     {
-        var tenths = (long)Math.Round(value * 10, MidpointRounding.AwayFromZero);
-        return tenths % 10 == 0 ? (tenths / 10).ToString() : Num(value);
+        var text = Num2(value);
+        if (text.EndsWith("0")) text = text.Substring(0, text.Length - 1);
+        if (text.EndsWith("0")) text = text.Substring(0, text.Length - 1);
+        return text.EndsWith(".") ? text.Substring(0, text.Length - 1) : text;
     }
 
     // ---- Hit points ----

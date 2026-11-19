@@ -388,7 +388,7 @@ public class Player : Adventurer
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
             "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
-            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/}),\n" +
+            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "Names:     where a command takes a name you can say which one: {cmd}rat 2{/}, {cmd}2.rat{/}, {cmd}second rat{/}\n" +

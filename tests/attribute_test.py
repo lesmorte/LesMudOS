@@ -41,29 +41,30 @@ START = {
     "mage": (5, 5, 5, 9, 7, 5),
     "adventurer": (6, 6, 6, 6, 6, 6),
 }
-# Section 2: class base and per-level amount for Vitality, Endurance and Focus.
+# Sections 2 and 8: class base and per-level amount for Vitality, Endurance and Focus (section 8 changed the Vitality of
+# the Warrior, the Scout and the Mage).
 CLASS = {
-    "warrior": ((17, 9), (79, 2), (4, 1)),
-    "scout": ((8, 8), (81, 2), (2, 1)),
+    "warrior": ((13, 8), (79, 2), (4, 1)),
+    "scout": ((3, 7), (81, 2), (2, 1)),
     "priest": ((7, 7), (23, 1), (75, 4)),
-    "mage": ((8, 6), (14, 1), (71, 4)),
+    "mage": ((4, 6), (14, 1), (71, 4)),
     "adventurer": ((10, 8), (50, 2), (50, 2)),
 }
-# Section 2, the table "level 1 comes out exactly as today": Vitality at 1, 5, 10; Endurance at 1, 10; Focus at 1, 10.
+# The table of section 2 as section 8 revised it: Vitality at 1, 5, 10; Endurance at 1, 10; Focus at 1, 10.
 TABLE = {
-    "warrior": ((40, 76, 121), (100, 118), (20, 29)),
-    "scout": ((26, 58, 98), (100, 118), (20, 29)),
+    "warrior": ((35, 67, 107), (100, 118), (20, 29)),
+    "scout": ((20, 48, 83), (100, 118), (20, 29)),
     "priest": ((26, 54, 89), (40, 49), (100, 136)),
-    "mage": ((24, 48, 78), (30, 39), (100, 136)),
+    "mage": ((20, 44, 74), (30, 39), (100, 136)),
     "adventurer": ((30, 62, 102), (70, 88), (70, 88)),
 }
-# Section 2, regeneration per tick at the start (Vitality, Endurance, Focus).
+# Section 2, regeneration per tick at the start (Vitality, Endurance, Focus), with section 8's Focus rate (0.15% a point).
 REGEN = {
-    "warrior": (1.0, 9.9, 1.0),
-    "scout": (0.8, 9.3, 1.1),
-    "priest": (0.9, 3.7, 7.0),
-    "mage": (0.8, 2.7, 7.4),
-    "adventurer": (0.9, 6.7, 4.1),
+    "warrior": (1.0, 9.9, 0.5),
+    "scout": (0.8, 9.3, 0.53),
+    "priest": (0.9, 3.72, 3.25),
+    "mage": (0.8, 2.7, 3.4),
+    "adventurer": (0.9, 6.72, 1.96),
 }
 
 
@@ -77,7 +78,7 @@ def formula(calling, level, attrs):
 def regen(calling, attrs):
     m, g, v, i, s, r = attrs
     _, end, foc = formula(calling, 1, attrs)
-    return 0.3 + v / 10, end * (0.06 + (r + v) * 0.003), foc * (0.01 + (i + s) * 0.004)
+    return 0.3 + v / 10, end * (0.06 + (r + v) * 0.003), foc * (0.01 + (i + s) * 0.0015)
 
 
 # ---------------------------------------------------------------- test content
@@ -226,6 +227,19 @@ public class AtCharm : Armor
 }
 """
 
+# The Evasion hook: +50 Evasion while worn.
+VEIL = """// @inherit /std/armor
+public class AtVeil : Armor
+{
+    public override void Create()
+    {
+        Name = "Shadow Veil"; Ids.Add("veil"); ShortDesc = "a shadow veil"; LongDesc = "Blows slide off it.";
+        Slot = "head"; ArmorValue = 0; Value = 1;
+        StatBonus["evasion"] = 50;
+    }
+}
+"""
+
 # A wizard's sandbox object that tries every public door to a character's attributes.
 MEDDLER = r'''// @inherit /std/thing
 public class Meddler : Thing
@@ -260,6 +274,8 @@ def test_files():
     f[T + "probe"] = PROBE
     f[T + "flatblade"] = FLATBLADE
     f[T + "charm"] = CHARM
+    f[T + "veil"] = VEIL
+    f[T + "striker"] = creature("AtStriker", "Striker", "striker", 1, 50000, "        BaseReaction = 1.0;\n", tohit=10)
     # A creature no blow can miss, one no blow can reach, the level template, a mighty one and a stalwart one.
     f[T + "dummy"] = creature("AtDummy", "Dummy", "dummy", 1, 50000)
     f[T + "wisp"] = creature("AtWisp", "Wisp", "wisp", 1, 50000, '        Attributes["grace"] = 205;\n')
@@ -350,7 +366,7 @@ def run(work, mudlib):
         check(f"{calling}: starting attributes (decision 1)", s, attr_line(START[calling]))
         hp, mhp, st, mst, ma, mma = resources(c)
         (v1, _, _), (e1, _), (f1, _) = TABLE[calling]
-        check(f"{calling}: level 1 Vitality, Endurance and Focus are today's ({v1}, {e1}, {f1})", f"{mhp} {mst} {mma}", f"{v1} {e1} {f1}")
+        check(f"{calling}: level 1 Vitality, Endurance and Focus as the table says ({v1}, {e1}, {f1})", f"{mhp} {mst} {mma}", f"{v1} {e1} {f1}")
         check(f"{calling}: and the formula gives the same", str(formula(calling, 1, START[calling])), str((v1, e1, f1)))
         check(f"{calling}: score shows Carry Capacity (50 + Might x 5)", s, f"Carry Capacity {50 + 5 * START[calling][0]} lb")
         m, g, v, i, sp, r = START[calling]
@@ -362,9 +378,9 @@ def run(work, mudlib):
 
     # The level 1 derived effects that score shows: to hit, defense, critical, damage.
     s = plain["scout"].command("score")
-    check("scout: Grace 9 is +1 to hit, +1 defense and 7% critical (unarmed, level 1)", plain["scout"].command("unwield") + plain["scout"].command("score"),
-          "To hit +2", "Defense 1", "Critical 7%")
-    check("adventurer: Grace 6 is 5.5% critical", plain["adventurer"].command("score"), "Critical 5.5%", "Defense 0")
+    check("scout: Grace 9 is no Precision yet (8 points above 5 make one), no Evasion, and 6% critical (unarmed, level 1)",
+          plain["scout"].command("unwield") + plain["scout"].command("score"), "To hit +1", "Defense 0", "Critical 6%")
+    check("adventurer: Grace 6 is 5.25% critical", plain["adventurer"].command("score"), "Critical 5.25%", "Defense 0")
     check("warrior: Might 8 is +6% damage on the score's damage line", plain["warrior"].command("score"), "Damage 9-14 (+6%)", "Critical 5%")
     check("mage: no damage bonus, 5% critical", plain["mage"].command("score"), "Critical 5%", absent=("(+",))
 
@@ -381,7 +397,7 @@ def run(work, mudlib):
         st = astat(c)
         rv, re_, rf = REGEN[calling]
         check(f"{calling}: regeneration per tick at the start (Vitality, Endurance, Focus) as section 2 says",
-              f"{st['vregen'] / 1000:.1f} {st['eregen'] / 1000:.1f} {st['fregen'] / 1000:.1f}", f"{rv:.1f} {re_:.1f} {rf:.1f}")
+              f"{st['vregen'] / 1000:.2f} {st['eregen'] / 1000:.2f} {st['fregen'] / 1000:.2f}", f"{rv:.2f} {re_:.2f} {rf:.2f}")
         want = regen(calling, START[calling])
         check(f"{calling}: and exactly by the formulas", f"{st['vregen']} {st['eregen']} {st['fregen']}", " ".join(str(int(round(x * 1000))) for x in want))
         check(f"{calling}: stat shows the regeneration", c.command("stat me"), "Regeneration per 10 s: vitality")
@@ -431,7 +447,7 @@ def run(work, mudlib):
     time.sleep(20.5)
     _, _, st, _, ma, _ = resources(mg)
     t = time.time() - t0
-    check("mage Focus comes back at 7.4 per 10 s", str(int(7.4 * (t - 1.5) / 10) <= ma <= int(7.4 * (t + 1.5) / 10) + 1), "True")
+    check("mage Focus comes back at 3.4 per 10 s", str(int(3.4 * (t - 1.5) / 10) <= ma <= int(3.4 * (t + 1.5) / 10) + 1), "True")
     check("mage Endurance at 2.7 per 10 s", str(int(2.7 * (t - 1.5) / 10) <= st <= int(2.7 * (t + 1.5) / 10) + 1), "True")
     wr = wizzes["warrior"]
     wr.command("setlevel 1")
@@ -479,24 +495,31 @@ def run(work, mudlib):
     check("removed, the charm adds nothing", f"{st['grace']} {st['critchance']}", "5 5000")
     sc = wizzes["scout"]
     st = astat(sc)
-    check("scout: Critical Chance from Grace 9 is +2%: 7% in all", f"{st['crit']} {st['critchance']}", "2000 7000")
+    check("scout: Critical Chance from Grace 9 is +1% (0.25% a point): 6% in all", f"{st['crit']} {st['critchance']}", "1000 6000")
 
     # ===== 7. Precision and Evasion in the hit roll =====
     st = astat(sc)
-    check("scout level 10: Precision +1 and Evasion +1 enter attack and defense", f"{st['precision']} {st['evasion']} {st['defense']}", "1000 1000 10")
+    check("scout level 10: Grace 9 gives no Precision and no Evasion", f"{st['precision']} {st['evasion']} {st['defense']}", "0 0 9")
     sc.command("improve grace 8")
     st = astat(sc)
-    check("Grace 17: +3 to hit and +3 to be missed", f"{st['precision']} {st['evasion']} {st['defense']}", "3000 3000 12")
+    check("Grace 17: +1 to hit (12 points above 5), still no Evasion", f"{st['precision']} {st['evasion']} {st['defense']}", "1000 0 9")
     sc.command("atele " + T + "arena")
     sc.command("aspawn wisp")
     st = astat(sc, "wisp")
-    check("a creature with Grace 205 has Evasion 50 on its side of the hit roll", f"{st['evasion']} {st['defense']}", "50000 50")
+    check("a creature with Grace 205: Precision 25 enters its attack, Grace gives it no Evasion", f"{st['precision']} {st['attack']} {st['evasion']} {st['defense']}", "25000 -14 0 0")
+    sc.command("amk " + T + "veil 1 1")
+    sc.command("wear veil")
+    st = astat(sc)
+    check("a worn veil with +50 Evasion puts 50 on the scout's side of the hit roll", f"{st['evasion']} {st['defense']}", "50000 59")
+    sc.command("aspawn striker")
     sc.command("unwield")
-    data = fight_for(sc, "wisp", 36)
-    landed = len(re.findall(r"You (?:scratch|hit|smash)", data))
-    missed = data.count("You miss")
-    check("only a natural 20 reaches it (scout attack 13 against 60)", f"{landed + missed >= 5} {landed <= 2}", "True True")
-    end_fight(sc, chief, "wisp")
+    data = fight_for(sc, "striker", 36)
+    landed = len(re.findall(r"(?:scratches|hits|smashes) you", data))
+    missed = data.count("misses you")
+    check("so the striker reaches the scout only on a natural 20", f"{landed + missed >= 6} {landed <= 2}", "True True")
+    end_fight(sc, chief, "striker")
+    sc.command("remove veil")
+    chief.command("slay wisp")
 
     # ===== 8. Spell Power and Healing Power =====
     mg.command("setlevel 10")
@@ -561,11 +584,11 @@ def run(work, mudlib):
     wr.command("aspawn elder")
     st = astat(wr, "elder")
     check("a level 10 creature with no attributes of its own has 4 + 10 / 2 = 9 in each", " ".join(str(st[x]) for x in ATTRS), "9 9 9 9 9 9")
-    check("so its blows are 8% harder, it hits and dodges 1 better, crits 2% more, and resists 16%",
-          f"{st['physical_power']} {st['precision']} {st['evasion']} {st['crit']} {st['physical_resistance']}", "8000 1000 1000 2000 16000")
+    check("so its blows are 8% harder, its Grace gives no Precision or Evasion yet, it crits 1% more, and resists 16%",
+          f"{st['physical_power']} {st['precision']} {st['evasion']} {st['crit']} {st['physical_resistance']}", "8000 0 0 1000 16000")
     wr.command("aspawn brute")
     st = astat(wr, "brute")
-    check("a creature file may set its own: Might 15 is +20% damage, Grace 13 is +2 to hit", f"{st['might']} {st['physical_power']} {st['precision']}", "15 20000 2000")
+    check("a creature file may set its own: Might 15 is +20% damage, Grace 13 is +1 to hit", f"{st['might']} {st['physical_power']} {st['precision']}", "15 20000 1000")
     check("stat shows a creature's attributes", wr.command("stat brute"), "Attributes might 15, grace 13, vigor 9")
     out = wr.command("stat stalwart")
     check("stat shows the resistances", out, "physical resistance 75%")
