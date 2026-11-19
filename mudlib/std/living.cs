@@ -71,6 +71,10 @@ public abstract class Living : Thing
     private static readonly string[] HitYou = { "scratch", "hit", "hit", "smash" };
     private static readonly string[] HitThem = { "scratches", "hits", "hits", "smashes" };
     private static readonly string[] HitHow = { "", "", " hard", " brutally" };
+    // A bow does not smash: its own words, by the same four tiers of damage.
+    private static readonly string[] ShotYou = { "graze", "shoot", "shoot", "shoot" };
+    private static readonly string[] ShotThem = { "grazes", "shoots", "shoots", "shoots" };
+    private static readonly string[] ShotHow = { "", "", " squarely", " clean through" };
 
     [Saved] protected int Level = 1;
     protected int MaxHp = 10;
@@ -1079,9 +1083,11 @@ public abstract class Living : Thing
         var applied = Math.Max(0, target.Call<int>("ApplyDamage", damage, Self));
         var mine = DamageNote(applied, true);
         var theirNote = target.Call<string>("DamageNote", applied, false) ?? "";
-        Tell($"You {HitYou[tier]} {theirs}{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + mine + "\n");
-        TellObject(target, $"{label} {HitThem[tier]} you{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? " You block part of the blow." : "") + theirNote + "\n");
-        TellRoom(room, $"{label} {HitThem[tier]} {theirs}{HitHow[tier]}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n", Self, target);
+        var shot = QueryWeaponCategory() == "bow";
+        var (youWord, themWord, how) = shot ? (ShotYou[tier], ShotThem[tier], ShotHow[tier]) : (HitYou[tier], HitThem[tier], HitHow[tier]);
+        Tell($"You {youWord} {theirs}{how}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + mine + "\n");
+        TellObject(target, $"{label} {themWord} you{how}." + (critical ? " A critical hit!" : "") + (blocked ? " You block part of the blow." : "") + theirNote + "\n");
+        TellRoom(room, $"{label} {themWord} {theirs}{how}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n", Self, target);
         target.Call("FinishDamage", Self);
         action.Skill?.Call("OnHit", Self, target, damage);
     }

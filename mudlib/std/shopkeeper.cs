@@ -157,6 +157,10 @@ public class Shopkeeper : Npc
     /// <summary>What a shopkeeper pays for one of an item: half its value, quality included; 0 for quest items.</summary>
     private static int OfferFor(ObjectRef item) => item.Call<bool>("QueryQuestItem") ? 0 : item.Call<int>("QueryValue") / 2;
 
+    /// <summary>What a shopkeeper pays for n of a stack: half the value of the whole lot, rounded down. So eleven skins worth 1
+    /// gold each fetch 5 gold, though one alone fetches nothing. Never more than buying them costs, so there is no loop in it.</summary>
+    private static long StackOffer(ObjectRef item, int n) => item.Call<bool>("QueryQuestItem") ? 0 : (long)item.Call<int>("QueryValue") * Math.Max(0, n) / 2;
+
     private bool CmdSell(string args)
     {
         var seller = ThisPlayer();
@@ -166,7 +170,7 @@ public class Shopkeeper : Npc
         else found = Matching(seller, noun).Where(o => !(all && seller.Call<bool>("IsEquipped", o))).ToList();
         if (found.Count == 0) { NotifyFail("Sell what?"); return false; }
         if (found.Any(o => o.Call<bool>("QueryQuestItem")) && !all) { Write($"{Name} will not buy that; it is too important.\n"); return true; }
-        found = found.Where(o => !o.Call<bool>("QueryQuestItem") && OfferFor(o) >= 1).ToList();
+        found = found.Where(o => !o.Call<bool>("QueryQuestItem") && o.Call<int>("QueryValue") >= 1).ToList();
         if (found.Count == 0) { Write($"{Name} shrugs. \"That is not worth anything to me.\"\n"); return true; }
         var have = found.Sum(QuantityOf);
         if (!all && have < count) { Write($"You have only {have} that {Name} would buy.\n"); return true; }
@@ -181,7 +185,8 @@ public class Shopkeeper : Npc
             left -= n;
             var key = SameKey(item);
             var single = Single(item);
-            var price = (long)OfferFor(item) * n;
+            var price = StackOffer(item, n);
+            if (price < 1) { Write($"{Name} will not pay for {ListName(single, n)}: bring more and they are worth something by the lot.\n"); continue; }
             var part = n >= QuantityOf(item) ? item : item.Call<ObjectRef>("Split", n);
             if (part == null) continue;
             part.Call("Vanish");
@@ -201,11 +206,14 @@ public class Shopkeeper : Npc
         var item = args == "" || asker == null ? null : Present(args, asker);
         if (item != null)
         {
-            var price = OfferFor(item);
             var n = QuantityOf(item);
-            Write(price < 1 ? $"{Name} would not buy {Single(item)} at any number: it is worth nothing here.\n"
-                : n == 1 ? $"{Name} would pay {price} gold for {item.Call<string>("Short")}.\n"
-                : $"{Name} would pay {price} gold each for {item.Call<string>("Short")}, {(long)price * n} gold in all.\n");
+            var unit = item.Call<bool>("QueryQuestItem") ? 0 : item.Call<int>("QueryValue");
+            var total = StackOffer(item, n);
+            Write(unit < 1 ? $"{Name} would not buy {Single(item)} at any number: it is worth nothing here.\n"
+                : total < 1 ? $"{Name} would pay nothing for {Single(item)} alone, but 1 gold for every two.\n"
+                : n == 1 ? $"{Name} would pay {total} gold for {item.Call<string>("Short")}.\n"
+                : unit % 2 == 0 ? $"{Name} would pay {unit / 2} gold each for {item.Call<string>("Short")}, {total} gold in all.\n"
+                : $"{Name} would pay {total} gold for {item.Call<string>("Short")} as a lot.\n");
             return true;
         }
         var entry = args == "" ? null : Find(args);
