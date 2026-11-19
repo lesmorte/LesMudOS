@@ -193,6 +193,7 @@ def run(work, mudlib, box):
     wiz.command("goto " + TEST + "hub")
     run_numbers(wiz)
     run_lists(wiz)
+    run_corpses(wiz)
 
 
 # ===== 5. telling identical things apart =====
@@ -268,6 +269,42 @@ def run_lists(wiz):
     check("floor: a stack is told with its count too", (wiz.command("drop all"), wiz.command("look"))[1], "A rusty sword (x2) is here.")
     wiz.command("get all")
     wiz.command("drop all")
+
+
+# ===== 4. corpses crumble when looted =====
+
+def run_corpses(wiz):
+    wiz.command("goto " + TEST + "yard")
+    wiz.command("drop all")
+    # A creature with nothing to skin: its corpse crumbles when the last item is taken.
+    wiz.command("clone " + TEST + "mouse")
+    wiz.command("slay mouse")
+    check("corpse: a corpse holding loot is still there", wiz.command("look"), "corpse of a mouse is here")
+    text = wiz.command("loot corpse")
+    check("corpse: taking the last item crumbles it at once, with a line to the room", text, "You take a rusty sword from the corpse of a mouse.", "The corpse of mouse crumbles to dust.")
+    check("corpse: it is gone", wiz.command("look at corpse"), "You see no 'corpse' here.")
+    wiz.command("drop sword")
+    # A creature with a skin left: looting does not make it crumble.
+    wiz.command("clone " + TEST + "skinner")
+    wiz.command("slay skinner")
+    text = wiz.command("loot corpse")
+    check("corpse: a skin left, the loot is taken", text, "You take a rusty sword from the corpse of a skinner.", absent=("crumbles",))
+    text = wiz.command("look at corpse")
+    check("corpse: the empty corpse with a skin is still there, and says so", text, "It is empty.", "Its hide could still be taken")
+    time.sleep(1.5)
+    check("corpse: it is still there a moment later", wiz.command("look at corpse"), "It is empty.")
+    wiz.command("clone " + HOLLOW + "obj/craft/skinning_knife")
+    wiz.command("skin corpse")
+    text = wiz.read_until("crumbles to dust", timeout=30)
+    check("corpse: taking the last yield from an empty corpse crumbles it", text, "The corpse of skinner crumbles to dust.")
+    check("corpse: it is gone", wiz.command("look at corpse"), "You see no 'corpse' here.")
+    wiz.command("drop all")
+    # Coins count as items: a corpse with only gold crumbles when the gold is taken.
+    wiz.command("clone " + TEST + "bare")
+    wiz.command("slay bare")
+    text = wiz.command("loot corpse")
+    check("corpse: a corpse empty from the start is not looted into dust; it keeps its timer", text, "There is nothing in the corpse of a bare thing.")
+    check("corpse: it is still there", wiz.command("look at corpse"), "It is empty.")
 
 
 if __name__ == "__main__":

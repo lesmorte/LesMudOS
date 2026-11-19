@@ -9,7 +9,9 @@
 /// Things leave a corpse only through Take() and TakeAll(), which check who is
 /// asking. The ordinary "get" command only sees items lying directly in the room.
 ///
-/// A corpse that is empty vanishes two minutes after it became empty. A
+/// A corpse crumbles to dust at once when its last item or coin is taken, unless a skin or fresh blood can still be taken from
+/// it (then it crumbles when that is taken). A corpse that was empty from the start and has nothing to take vanishes after
+/// two minutes. A
 /// monster's corpse that still holds loot rots away after an hour and its
 /// contents with it; a player's corpse spills its contents on the floor.
 /// </summary>
@@ -122,7 +124,9 @@ public class Corpse : Thing
         var caller = PreviousObject();
         if (caller == null || caller.IsClone || caller.ProgramPath != "/secure/crafting" || !QueryYieldAvailable(verb)) return false;
         if (verb == "skin") skinTaken = true; else bloodTaken = true;
-        if (Contents().Count == 0 && !HasYields()) ArmEmpty();
+        // The last thing to take from an already empty corpse: it crumbles at once. A moment's delay, not a call from inside the
+        // crafting daemon's own action, which still has this corpse in hand.
+        if (Contents().Count == 0 && !HasYields()) CallOut(() => { if (Contents().Count == 0 && !HasYields()) RotAway(); }, 1);
         return true;
     }
 
@@ -284,7 +288,9 @@ public class Corpse : Thing
     private void AfterTaking()
     {
         Report(false);
-        if (Contents().Count == 0 && !HasYields()) ArmEmpty();
+        // Looting should leave nothing behind unless there is something still to extract: the last item or coin taken from a
+        // corpse with no skin or blood left makes it crumble to dust at once.
+        if (Contents().Count == 0 && !HasYields()) RotAway();
     }
 
     // ---- Decay ----
