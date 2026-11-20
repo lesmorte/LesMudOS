@@ -173,7 +173,7 @@ Chosen at character creation, after the password, from a short in-character pres
 | Warrior | Shield Bash (`bash`) | skill | 15 Stamina | 0 / 1.5 | Needs a shield. A normal hit roll; on a hit, three quarters of weapon damage, and the target is staggered: an action it is preparing is interrupted, otherwise its Ready Time is pushed back 2 seconds. |
 | Warrior | Defensive Training | trait | | | +2 armor. |
 | Warrior | Weapon Proficiency | trait | | | +2 to hit with any weapon. |
-| Scout | Evasion | trait | | | 8% dodge. |
+| Scout | Evasion | trait | | | 5% dodge (8% before docs/ATTRIBUTES.md section 8). |
 | Scout | Tracking (`track`) | skill | 5 Stamina | 0 / 0.5 | Lists the creatures in each adjacent room. |
 | Scout | Precision Strike (`strike`) | skill | 25 Stamina | 0.5 / 1.0 | An attack at +2 to hit with a 15% critical chance. |
 | Priest | Minor Heal (`heal`) | spell | 25 Mana | 0.5 / 1.0 | Restores 8 HP (10 with Divine Knowledge) to the caster or a target in the room. |

@@ -948,6 +948,7 @@ def run(work, mudlib):
     hero.command("drop forged orders")
     wiz.command("clone " + HOLLOW + "obj/overseers_orders")
     wiz.command("drop orders")
+    drain(hero, 0.5)  # the wizard's drop reaches the hero with a prompt of its own, which must not end the score read
     s_before = score_of(hero)
     drain(hero, 0.5)
     check("pick up the real orders", hero.command("get orders"), "You take the Overseer's Orders.")

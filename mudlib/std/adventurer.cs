@@ -11,8 +11,7 @@ public abstract class Adventurer : Living
     private const string Registry = "/secure/classes";
     // The levelling constants, all in one place. Experience to reach a level is in the table and the power law of ExperienceFor.
     private const int MaxLevel = 100;
-    private const int DefaultBaseHp = 30; // for a character that has no archetype yet (only between password and choice)
-    private const int HpPerLevel = 8;
+    private const int AttributePointsPerLevel = 2; // placed with "improve"; level 10 has 18, level 100 has 198
     private const int RegenBeats = 5; // one regeneration step per 10 seconds
     private const int LevelGoto = 1;
     private const int LevelStat = 1;
@@ -41,7 +40,7 @@ public abstract class Adventurer : Living
     private int regenBeats;
     private bool dying;
     private bool inventoryRestored;
-    private double hpCarry; // fractions of a hit point regenerated but not yet given
+    private double hpCarry; // fractions of a point of Vitality regenerated but not yet given
     private bool adventureBegun;
     private bool equipKit; // a new character's weapon and shield are put on when the kit is created
 
@@ -53,11 +52,11 @@ public abstract class Adventurer : Living
     private readonly HashSet<string> armorAccess = new();
     private bool shieldAccess;
     private bool unrestricted = true; // true until an archetype is chosen
-    private int startHp = DefaultBaseHp;
-    private int classMaxStamina = 70;
-    private int classMaxMana = 70;
-    private double classStaminaRegen = 6;
-    private double classManaRegen = 5;
+    // The resource numbers of docs/ATTRIBUTES.md section 2, from the class files: base and gain per level. Until a calling is
+    // chosen (only between the password and the choice) they are the Adventurer's.
+    private int vitalityBase = 10, vitalityPerLevel = 8;
+    private int enduranceBase = 50, endurancePerLevel = 2;
+    private int focusBase = 50, focusPerLevel = 2;
     private double classRate = 1.0;
     private double expModifier = 1.0;
     private string archetypeName = "";
@@ -73,15 +72,111 @@ public abstract class Adventurer : Living
         Gold = 25;
     }
 
-    public override int QueryMaxHp() => startHp + HpPerLevel * (Level - 1) + EquipmentHpBonus();
+    // ---- Resources from the class and the attributes (docs/ATTRIBUTES.md section 2) ----
+    // Maximum Vitality = class base + class per-level x Level + Vigor x 2; Endurance = base + per-level x Level + Resolve x 2 + Vigor;
+    // Focus = base + per-level x Level + Insight x 2 + Spirit. Class modifiers (percent) apply after. Regeneration per 10 seconds:
+    // Vitality 0.3 + Vigor / 10; Endurance Maximum x (6% + (Resolve + Vigor) x 0.3%); Focus Maximum x (1% + (Insight + Spirit) x 0.15%).
 
-    public override int QueryMaxStamina() => classMaxStamina;
+    private const double VitalityRegenBase = 0.3, VitalityRegenPerVigor = 0.1;
+    private const double EnduranceRegenBase = 0.06, EnduranceRegenPerPoint = 0.003;
+    private const double FocusRegenBase = 0.01, FocusRegenPerPoint = 0.0015; // 0.15% a point (docs/ATTRIBUTES.md section 8)
 
-    public override int QueryMaxMana() => classMaxMana;
+    private int Modified(double value, string key) => (int)Math.Round(value * (1 + ClassModifier(key) / 100.0), MidpointRounding.AwayFromZero);
 
-    public override double QueryStaminaRegen() => classStaminaRegen;
+    public override int QueryMaxHp() =>
+        Modified(vitalityBase + vitalityPerLevel * Level + 2 * QueryAttribute("vigor"), "vitality") + EquipmentHpBonus();
 
-    public override double QueryManaRegen() => classManaRegen;
+    public override int QueryMaxStamina() =>
+        Modified(enduranceBase + endurancePerLevel * Level + 2 * QueryAttribute("resolve") + QueryAttribute("vigor"), "endurance");
+
+    public override int QueryMaxMana() =>
+        Modified(focusBase + focusPerLevel * Level + 2 * QueryAttribute("insight") + QueryAttribute("spirit"), "focus");
+
+    public override double QueryStaminaRegen() =>
+        QueryMaxStamina() * (EnduranceRegenBase + (QueryAttribute("resolve") + QueryAttribute("vigor")) * EnduranceRegenPerPoint) * (1 + ClassModifier("endurance_regen") / 100.0);
+
+    public override double QueryManaRegen() =>
+        QueryMaxMana() * (FocusRegenBase + (QueryAttribute("insight") + QueryAttribute("spirit")) * FocusRegenPerPoint) * (1 + ClassModifier("focus_regen") / 100.0);
+
+    /// <summary>Vitality regained per 10 seconds out of combat, before the safe room and Survival Training.</summary>
+    public override double QueryVitalityRegen() =>
+        (VitalityRegenBase + QueryAttribute("vigor") * VitalityRegenPerVigor) * (1 + ClassModifier("vitality_regen") / 100.0);
+
+    protected override double ClassModifier(string key)
+    {
+        var total = 0.0;
+        foreach (var cls in classObjects) total += cls.Call<double>("QueryModifier", key);
+        return total;
+    }
+
+    public override string QueryPossessive() => "their";
+
+    // ---- Attributes (docs/ATTRIBUTES.md) ----
+    // The six values are saved with the character: the calling's starting values plus every point placed with "improve". Two
+    // points come with every level; the unspent ones are 2 x (level - 1) less those placed. Only the character's own "improve"
+    // command changes them: there is no public setter, so no other object (a wizard's, say) can set them or grant points.
+
+    [Saved] private Dictionary<string, int> attributeValues = new();
+    [Saved] private int attributePointsSpent;
+
+    public override int QueryBaseAttribute(string name) =>
+        !AttributeNames.Contains(name) ? 0 : attributeValues.TryGetValue(name, out var value) ? value : AttributeNeutral;
+
+    /// <summary>Attribute points earned and not yet placed.</summary>
+    public int QueryAttributePoints() => Math.Max(0, AttributePointsPerLevel * (Level - 1) - attributePointsSpent);
+
+    /// <summary>
+    /// A character with no attributes (a new one, or one saved before attributes existed) takes the calling's starting values;
+    /// every point of its levels is left to place. Runs when the classes are worked out, so at login and at the choice of a calling.
+    /// </summary>
+    private void EnsureAttributes(ObjectRef? archetypeClass)
+    {
+        if (attributeValues.Count > 0 || archetypeClass == null) return;
+        foreach (var name in AttributeNames) attributeValues[name] = archetypeClass.Call<int>("QueryStartAttribute", name);
+        attributePointsSpent = 0;
+    }
+
+    private static string AttributeTitle(string name) => Cap(name);
+
+    /// <summary>"improve" shows the attributes and the points to place; "improve ATTRIBUTE [N]" places one point (or N).</summary>
+    private bool CmdImprove(string args)
+    {
+        var words = args.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var points = QueryAttributePoints();
+        if (words.Length == 0)
+        {
+            Write(AttributeLine() + (points > 0 ? $"You have {PointsText(points)} to place: {{cmd}}improve{{/}} ATTRIBUTE [NUMBER].\n" : "You have no attribute points to place. Every level brings two.\n"));
+            return true;
+        }
+        var matches = AttributeNames.Where(a => words[0].Length >= 3 && a.StartsWith(words[0])).ToList();
+        if (matches.Count != 1) { Write("Improve which? Might, Grace, Vigor, Insight, Spirit or Resolve.\n"); return true; }
+        var count = 1;
+        if (words.Length > 2 || (words.Length == 2 && (!int.TryParse(words[1], out count) || count < 1))) { NotifyFail("Usage: {cmd}improve{/} ATTRIBUTE [NUMBER]"); return false; }
+        if (attributeValues.Count == 0) { Write("You have no calling yet.\n"); return true; }
+        if (points <= 0) { Write("You have no attribute points to place. Every level brings two.\n"); return true; }
+        if (count > points) { Write($"You have only {PointsText(points)} to place.\n"); return true; }
+        var name = matches[0];
+        attributeValues[name] = attributeValues.GetValueOrDefault(name, AttributeNeutral) + count;
+        attributePointsSpent += count;
+        Write($"You place {PointsText(count)} in {AttributeTitle(name)}. {AttributeTitle(name)} is now {QueryBaseAttribute(name)}" +
+              (QueryAttributePoints() > 0 ? $"; {PointsText(QueryAttributePoints())} left to place.\n" : ".\n"));
+        PersistNow();
+        return true;
+    }
+
+    private static string PointsText(int n) => n == 1 ? "1 point" : $"{n} points";
+
+    /// <summary>"Might 8  Grace 5  Vigor 7  Insight 5  Spirit 5  Resolve 6", with equipment shown where it adds.</summary>
+    private string AttributeLine()
+    {
+        var parts = AttributeNames.Select(a =>
+        {
+            var total = QueryAttribute(a);
+            var basis = QueryBaseAttribute(a);
+            return $"{AttributeTitle(a)} {total}" + (total != basis ? $" ({basis})" : "");
+        });
+        return string.Join("   ", parts) + "\n";
+    }
 
     public override double QueryAttackRate() => classRate;
 
@@ -272,7 +367,8 @@ public abstract class Adventurer : Living
         {
             Level++;
             Hp = QueryMaxHp();
-            Tell($"You have reached level {Level}! You feel stronger and fully healed. Maximum HP is now {QueryMaxHp()}.\n");
+            Tell($"You have reached level {Level}! You feel stronger and fully healed. Maximum HP is now {QueryMaxHp()}.\n" +
+                 $"You have {PointsText(QueryAttributePoints())} to place in your attributes: {{cmd}}improve{{/}} ATTRIBUTE.\n");
             if (Level is 10 or 25 or 50 or 75 or 100) ReportEvent("level.milestone", Level.ToString(), new Dictionary<string, string> { ["level"] = Level.ToString() });
         }
     }
@@ -346,6 +442,8 @@ public abstract class Adventurer : Living
         archetypeName = "";
         var rate = 0.0;
         var known = false;
+        ObjectRef? archetypeClass = null;
+        int vb = 10, vp = 8, eb = 50, ep = 2, fb = 50, fp = 2; // the Adventurer's, for an archetype that names none
         foreach (var id in QueryClassIds())
         {
             var cls = ClassFile(id);
@@ -354,6 +452,11 @@ public abstract class Adventurer : Living
             classTitle = cls.Call<string>("QueryTitle") ?? classTitle;
             expModifier = Math.Max(expModifier, cls.Call<double>("QueryExpModifier"));
             if (cls.Call<double>("QueryAttackRate") > 0) rate = cls.Call<double>("QueryAttackRate");
+            // Resource numbers: the archetype's, then any later class that names its own (-1 names none).
+            void Take(string query, ref int field) { var v = cls.Call<int>(query); if (v >= 0) field = v; }
+            Take("QueryVitalityBase", ref vb); Take("QueryVitalityPerLevel", ref vp);
+            Take("QueryEnduranceBase", ref eb); Take("QueryEndurancePerLevel", ref ep);
+            Take("QueryFocusBase", ref fb); Take("QueryFocusPerLevel", ref fp);
             foreach (var w in cls.Call<List<string>>("QueryWeapons") ?? new List<string>()) weaponAccess.Add(w);
             foreach (var a in cls.Call<List<string>>("QueryArmorTypes") ?? new List<string>()) armorAccess.Add(a);
             if (cls.Call<bool>("QueryShield")) shieldAccess = true;
@@ -365,24 +468,17 @@ public abstract class Adventurer : Living
             {
                 known = true;
                 archetypeName = cls.Call<string>("QueryClassName") ?? "";
-                startHp = cls.Call<int>("QueryStartHp");
                 BaseReaction = cls.Call<double>("QueryStartReaction");
-                classMaxStamina = cls.Call<int>("QueryMaxStamina");
-                classMaxMana = cls.Call<int>("QueryMaxMana");
-                classStaminaRegen = cls.Call<double>("QueryStaminaRegen");
-                classManaRegen = cls.Call<double>("QueryManaRegen");
+                archetypeClass = cls;
             }
         }
         unrestricted = !known;
         classRate = rate > 0 ? rate : 1.0;
-        if (!known)
-        {
-            startHp = DefaultBaseHp;
-            classMaxStamina = 70;
-            classMaxMana = 70;
-            classStaminaRegen = 6;
-            classManaRegen = 5;
-        }
+        if (!known) { vb = 10; vp = 8; eb = 50; ep = 2; fb = 50; fp = 2; }
+        vitalityBase = vb; vitalityPerLevel = vp;
+        enduranceBase = eb; endurancePerLevel = ep;
+        focusBase = fb; focusPerLevel = fp;
+        EnsureAttributes(archetypeClass);
         grantedAt = 0;
     }
 
@@ -400,6 +496,8 @@ public abstract class Adventurer : Living
         if (cls == null || cls.Call<string>("QueryTier") != "archetype" || !cls.Call<bool>("QueryEnabled")) return "There is no such calling.";
         var pristine = Level == 1 && xp == 0 && carried.Count == 0 && quests.Count == 0 && Gold == 25 && advancedClass == "";
         archetype = id;
+        // The attributes are the new calling's starting values, with every point of the character's levels left to place.
+        attributeValues.Clear();
         RefreshClasses();
         if (pristine)
         {
@@ -644,6 +742,7 @@ public abstract class Adventurer : Living
         AddAction("verbose", CmdVerbose);
         AddAction("prompt", CmdPrompt);
         AddAction("skills", CmdSkills);
+        AddAction("improve", CmdImprove);
         AddAction("quests", CmdQuests);
         AddAction("search", CmdSearch);
         BindCraftCommands(); // crafting and gathering, below
@@ -745,7 +844,7 @@ public abstract class Adventurer : Living
         regenBeats = 0;
         if (QueryInCombat() || Hp >= QueryMaxHp()) { hpCarry = 0; return; }
         var room = Environment();
-        hpCarry += (room != null && room.Call<bool>("QuerySafe") ? 3 : 1) * (1 + QueryMod("regen_out"));
+        hpCarry += QueryVitalityRegen() * (room != null && room.Call<bool>("QuerySafe") ? 3 : 1) * (1 + QueryMod("regen_out"));
         var whole = (int)Math.Floor(hpCarry + 1e-9);
         hpCarry -= whole;
         if (whole > 0) Heal(whole);
@@ -1307,7 +1406,14 @@ public abstract class Adventurer : Living
         try { text.Append(LoadObject("/secure/renown").Call<string>("TierLine", QueryName()) ?? ""); }
         catch (MudRuntimeException) { }
         text.Append($"HP {Hp}/{QueryMaxHp()}   Stamina {QueryStamina()}/{QueryMaxStamina()}   Mana {QueryMana()}/{QueryMaxMana()}   Gold {Gold}\n");
-        text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}   Dodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {QueryCrit()}%\n");
+        var power = QueryStat("physical_power");
+        text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}" + (power != 0 ? $" ({(power > 0 ? "+" : "")}{Pct(power)}%)" : "") +
+                    $"   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}   Dodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {Pct(QueryCrit())}%\n");
+        text.Append(AttributeLine());
+        var points = QueryAttributePoints();
+        if (points > 0) text.Append($"Attribute points to place: {points} ({{cmd}}improve{{/}} ATTRIBUTE)\n");
+        var shown = QueryStatDisplay().Select(s => $"{s.name} {s.value}").ToList();
+        text.Append(string.Join("   ", shown.Take(5)) + "\n" + string.Join("   ", shown.Skip(5)) + $"   Carry Capacity {QueryCarryCapacity()} lb\n");
         var effectLines = QueryEffectLines();
         if (effectLines.Count > 0) text.Append("Effects: " + string.Join(", ", effectLines) + "\n");
         var gear = new List<string>();
@@ -1431,7 +1537,9 @@ public abstract class Adventurer : Living
         var target = FindHere(words[0]);
         if (target == null || !target.Call<bool>("IsCreature")) { NotifyFail("Change the speed of whom?"); return false; }
         if (percent == 0) seconds = 0;
-        target.Call("AddSpeedEffect", "wizard", (100 - percent) / 100.0, seconds);
+        // AddEffect, not AddSpeedEffect: a wizard's slow is never resisted (Physical Resistance is for slows in a fight).
+        var factor = (100 - percent) / 100.0;
+        target.Call("AddEffect", "wizard", factor < 1.0 ? "Haste" : "Slow", seconds, "", factor, 0);
         var who = target == Self ? "You are" : $"{target.Call<string>("QueryLabel")} is";
         Write(percent == 0 ? $"{who} no longer hasted or slowed by you.\n"
             : $"{who} {(percent > 0 ? "hasted" : "slowed")} by {Math.Abs(percent)}% for {seconds} seconds.\n");

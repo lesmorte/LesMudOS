@@ -169,7 +169,7 @@ public class SentinelClass : PlayerClass
     public override void Create()
     {
         ClassName = "Sentinel"; Tier = "archetype"; SortOrder = 98; Tagline = "Test archetype with forced rolls."; Description = "Test.";
-        StartHp = 40; StartReaction = 2.5; MaxStamina = 60; MaxMana = 60; StaminaRegen = 5; ManaRegen = 5; AttackRate = 1.0; StartGold = 5;
+        StartReaction = 2.5; VitalityBase = 22; VitalityPerLevel = 8; EnduranceBase = 45; EndurancePerLevel = 0; FocusBase = 45; FocusPerLevel = 0; AttackRate = 1.0; StartGold = 5;
         Weapons.Add("*"); ArmorTypes.AddRange(new[] { "light", "medium", "heavy" }); Shield = true;
         Skills.AddRange(new[] { "test_stagger", "test_flash" }); Traits.Add("test_forced");
         Kit.Add("/domains/hollow/obj/small_shield");
@@ -363,11 +363,11 @@ def run(work, mudlib):
     c.read_until("Goodbye")
 
     # ===== the five archetypes: starting numbers and kit =====
-    expect = {
-        "warrior": ("40", "100", "20", "10", ["rusty sword", "small shield"], "weapon: a rusty sword", "shield: a small shield"),
-        "scout": ("26", "100", "20", "10", ["hunting bow", "iron dagger"], "weapon: a hunting bow", "Armor 0"),
+    expect = {  # HP as docs/ATTRIBUTES.md section 8 sets it (Warrior 35, Scout 20, Mage 20 at level 1)
+        "warrior": ("35", "100", "20", "10", ["rusty sword", "small shield"], "weapon: a rusty sword", "shield: a small shield"),
+        "scout": ("20", "100", "20", "10", ["hunting bow", "iron dagger"], "weapon: a hunting bow", "Armor 0"),
         "priest": ("26", "40", "100", "15", ["novice's mace", "minor healing potion"], "weapon: a novice's mace", "Armor 0"),
-        "mage": ("24", "30", "100", "15", ["apprentice's staff", "minor healing potion"], "weapon: an apprentice's staff", "Armor 0"),
+        "mage": ("20", "30", "100", "15", ["apprentice's staff", "minor healing potion"], "weapon: an apprentice's staff", "Armor 0"),
         "adventurer": ("30", "70", "70", "20", ["training spear", "trail ration"], "weapon: a training spear", "Armor 0"),
     }
     chars = {}
@@ -417,7 +417,7 @@ def run(work, mudlib):
     text = old.read_until("> ")
     s = a.score_of(old)
     check("the existing character keeps level and gold, gets the new HP and no kit",
-          f"{s['level']} {s['gold']} {s['max']}", "3 77 40")
+          f"{s['level']} {s['gold']} {s['max']}", "3 77 32")  # docs/ATTRIBUTES.md section 8: 4 + 6 x 3 + Vigor 5 x 2
     check("no second starting kit for an existing character", str(old.command("i").count("rusty sword")), "1")
     old.command("quit")
 
@@ -477,7 +477,7 @@ def run(work, mudlib):
     check("a spell that cannot be paid for is refused and not queued", out, "You do not have the mana for that.")
     time.sleep(10)
     hp, st, ma = res(mage)
-    check("mana regenerates (8 per 10 s for a mage; stamina 3)", str(5 <= ma <= 12 and 1 <= st <= 5), "True")
+    check("mana regenerates (3.4 per 10 s for a mage at level 1, docs/ATTRIBUTES.md section 8; stamina 2.7)", str(2 <= ma <= 7 and 1 <= st <= 5), "True")
     mage.command("goto") if False else None
     setroom(wiz, "twarrior")
     wiz.command("clone " + TEST + "dummy")
@@ -542,7 +542,7 @@ def run(work, mudlib):
     # ===== features: scout =====
     setroom(wiz, "tscout")
     sc = chars["scout"]
-    check("Evasion gives 8% dodge", a.score_of(sc)["text"], "Dodge 8%")
+    check("Evasion gives 5% dodge (docs/ATTRIBUTES.md section 8)", a.score_of(sc)["text"], "Dodge 5%")
     wiz.command("goto " + TEST + "lair")
     wiz.command("goto " + TEST + "lair")
     wiz.command("clone " + TEST + "dummy")
@@ -583,7 +583,7 @@ def run(work, mudlib):
     time.sleep(3)
     out = p.command("heal")
     out += a.quiet(p, 5)
-    check("Minor Heal restores 8 HP plus 25% (Divine Knowledge): 10", out, "restoring 10 hit points")
+    check("Minor Heal restores 8 HP plus 25% (Divine Knowledge) and 9% (Healing Power: Spirit 9, Insight 6): 11", out, "restoring 11 hit points")
     check("Minor Heal costs 25 Mana", str(res(p)[2] <= 90), "True")
     s0 = a.score_of(p)["text"]
     time.sleep(3)

@@ -537,9 +537,18 @@ public class CraftingDaemon : Thing
 
     private int ToolIndex(int toolQuality) => Math.Clamp(toolQuality, 0, 5);
 
-    /// <summary>Harvest Quality Score = proficiency + tool quality modifier - difficulty x factor + base + random variation.</summary>
-    private double HarvestScore(double prof, int toolQ, double work, int variation) =>
-        Num1("harvest.base", 30) + prof + NumAt("harvest.tool_quality", ToolIndex(toolQ), 0) - work * Num1("harvest.difficulty_factor", 0.5) + variation;
+    /// <summary>
+    /// Harvest Quality Score = proficiency + tool quality modifier - difficulty x factor + base + random variation + the gatherer's
+    /// Gathering Efficiency (docs/ATTRIBUTES.md: +1 a point of Grace and of Insight above 5).
+    /// </summary>
+    private double HarvestScore(double prof, int toolQ, double work, int variation, double efficiency) =>
+        Num1("harvest.base", 30) + prof + NumAt("harvest.tool_quality", ToolIndex(toolQ), 0) - work * Num1("harvest.difficulty_factor", 0.5) + variation + efficiency;
+
+    /// <summary>A character's Gathering Efficiency, the one place the daemon asks for it.</summary>
+    private static double Efficiency(ObjectRef who) => who.Call<double>("QueryStat", "gathering");
+
+    /// <summary>A character's Crafting Aptitude (added to the crafted quality shift), the one place the daemon asks for it.</summary>
+    private static double Aptitude(ObjectRef who) => who.Call<double>("QueryStat", "crafting");
 
     private int HarvestTier(double score)
     {
@@ -559,28 +568,35 @@ public class CraftingDaemon : Thing
     /// The exact odds of one harvest: [success %, bonus unit %, then % for Poor, Common, Fine, Excellent, Masterwork] for a
     /// proficiency (0 to 100), a tool quality (0 Poor to 5; -1 for none) and a work level (difficulty, 0 to 100). Pure.
     /// </summary>
-    public List<double> HarvestOdds(double prof, int toolQ, double work)
+    public List<double> HarvestOdds(double prof, int toolQ, double work) => HarvestOdds(prof, toolQ, work, 0);
+
+    /// <summary>The exact odds of one harvest for a gatherer with this Gathering Efficiency.</summary>
+    public List<double> HarvestOdds(double prof, int toolQ, double work, double efficiency)
     {
         EnsureLoaded();
         var v = (int)Num1("harvest.variation", 15);
         var tiers = new double[5];
         for (var a = 0; a <= v; a++)
             for (var b = 0; b <= v; b++)
-                tiers[HarvestTier(HarvestScore(prof, toolQ, work, a + b - v))] += 1;
+                tiers[HarvestTier(HarvestScore(prof, toolQ, work, a + b - v, efficiency))] += 1;
         var total = (double)(v + 1) * (v + 1);
         var result = new List<double> { SuccessChance(prof, toolQ, work), BonusChance(prof, toolQ) };
         result.AddRange(tiers.Select(t => 100.0 * t / total));
         return result;
     }
 
-    private double CraftShift(double prof, double work) =>
-        Clamp((prof - work) * Num1("craft.shift_per_point", 0.02), Num1("craft.shift_min", -1.5), Num1("craft.shift_max", 1.0));
+    /// <summary>
+    /// The quality shift: (proficiency - work) x 0.02, plus the crafter's Crafting Aptitude (docs/ATTRIBUTES.md: +0.02 a point of
+    /// Insight and of Resolve above 5), within the shift's limits.
+    /// </summary>
+    private double CraftShift(double prof, double work, double aptitude) =>
+        Clamp((prof - work) * Num1("craft.shift_per_point", 0.02) + aptitude, Num1("craft.shift_min", -1.5), Num1("craft.shift_max", 1.0));
 
-    private int CraftTier(double average, double prof, double work, int a, int b)
+    private int CraftTier(double average, double prof, double work, int a, int b, double aptitude)
     {
         var n = (int)Num1("craft.noise_steps", 20);
         var noise = (double)(a + b - n) / n * Num1("craft.noise", 0.75);
-        var tier = (int)Math.Floor(average + CraftShift(prof, work) + noise + 0.5);
+        var tier = (int)Math.Floor(average + CraftShift(prof, work, aptitude) + noise + 0.5);
         return Math.Clamp(tier, 0, (int)Num1("craft.max_quality", 4));
     }
 
@@ -594,14 +610,17 @@ public class CraftingDaemon : Thing
     /// The exact odds of one craft: % for Poor .. Legendary, then bonus output %, then ingredient returned %, for an average
     /// ingredient quality (weighted by count), a proficiency and the recipe's work level. Pure.
     /// </summary>
-    public List<double> CraftOdds(double average, double prof, double work)
+    public List<double> CraftOdds(double average, double prof, double work) => CraftOdds(average, prof, work, 0);
+
+    /// <summary>The exact odds of one craft for a crafter with this Crafting Aptitude.</summary>
+    public List<double> CraftOdds(double average, double prof, double work, double aptitude)
     {
         EnsureLoaded();
         var n = (int)Num1("craft.noise_steps", 20);
         var tiers = new double[6];
         for (var a = 0; a <= n; a++)
             for (var b = 0; b <= n; b++)
-                tiers[CraftTier(average, prof, work, a, b)] += 1;
+                tiers[CraftTier(average, prof, work, a, b, aptitude)] += 1;
         var total = (double)(n + 1) * (n + 1);
         var result = tiers.Select(t => 100.0 * t / total).ToList();
         result.Add(CraftBonusChance(prof, work));
@@ -644,7 +663,10 @@ public class CraftingDaemon : Thing
     /// Roll n harvests with the real random rolls and return how many came out at each quality (Poor .. Masterwork), then the
     /// successes and the bonus units. No side effects: it only exercises the same code as a real harvest, for statistical tests.
     /// </summary>
-    public List<int> RollHarvestSample(double prof, int toolQ, double work, int n)
+    public List<int> RollHarvestSample(double prof, int toolQ, double work, int n) => RollHarvestSample(prof, toolQ, work, n, 0);
+
+    /// <summary>RollHarvestSample for a gatherer with this Gathering Efficiency.</summary>
+    public List<int> RollHarvestSample(double prof, int toolQ, double work, int n, double efficiency)
     {
         EnsureLoaded();
         var counts = new int[7];
@@ -652,7 +674,7 @@ public class CraftingDaemon : Thing
         for (var i = 0; i < Math.Clamp(n, 0, 20000); i++)
         {
             var (a, b) = RollPair(v);
-            counts[HarvestTier(HarvestScore(prof, toolQ, work, a + b - v))]++;
+            counts[HarvestTier(HarvestScore(prof, toolQ, work, a + b - v, efficiency))]++;
             if (RollPercent(SuccessChance(prof, toolQ, work), true)) counts[5]++;
             if (RollPercent(BonusChance(prof, toolQ), false)) counts[6]++;
         }
@@ -660,7 +682,10 @@ public class CraftingDaemon : Thing
     }
 
     /// <summary>Roll n crafts with the real random rolls: counts per quality (Poor .. Legendary), then bonus outputs, then returns. No side effects.</summary>
-    public List<int> RollCraftSample(double average, double prof, double work, int n)
+    public List<int> RollCraftSample(double average, double prof, double work, int n) => RollCraftSample(average, prof, work, n, 0);
+
+    /// <summary>RollCraftSample for a crafter with this Crafting Aptitude.</summary>
+    public List<int> RollCraftSample(double average, double prof, double work, int n, double aptitude)
     {
         EnsureLoaded();
         var counts = new int[8];
@@ -668,7 +693,7 @@ public class CraftingDaemon : Thing
         for (var i = 0; i < Math.Clamp(n, 0, 20000); i++)
         {
             var (a, b) = RollPair(steps);
-            counts[CraftTier(average, prof, work, a, b)]++;
+            counts[CraftTier(average, prof, work, a, b, aptitude)]++;
             if (RollPercent(CraftBonusChance(prof, work), false)) counts[6]++;
             if (RollPercent(CraftReturnChance(prof, work), false)) counts[7]++;
         }
@@ -1237,7 +1262,7 @@ public class CraftingDaemon : Thing
         }
         var v = (int)Num1("harvest.variation", 15);
         var (a, b) = RollPair(v);
-        var quality = HarvestTier(HarvestScore(prof, toolQ, work, a + b - v));
+        var quality = HarvestTier(HarvestScore(prof, toolQ, work, a + b - v, Efficiency(who)));
         var bonus = RollPercent(BonusChance(prof, toolQ), false) ? 1 : 0;
         var made = CreateIn(mat.Record, units + bonus, quality, who);
         if (made == null) { TellObject(who, "Something went wrong; nothing was gathered.\n"); return; }
@@ -1466,7 +1491,7 @@ public class CraftingDaemon : Thing
         var prof = Tenths(who, r.Proficiency) / 10.0;
         var steps = (int)Num1("craft.noise_steps", 20);
         var (a, b) = RollPair(steps);
-        var quality = CraftTier(average, prof, r.Work, a, b);
+        var quality = CraftTier(average, prof, r.Work, a, b, Aptitude(who));
         var bonus = RollPercent(CraftBonusChance(prof, r.Work), false);
         var giveBack = RollPercent(CraftReturnChance(prof, r.Work), false);
         var count = r.Count + (bonus ? 1 : 0);

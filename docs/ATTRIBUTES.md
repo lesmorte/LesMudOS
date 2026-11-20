@@ -18,7 +18,7 @@ How the owner's brief ([specs/attributes.md](specs/attributes.md)) becomes part 
 
 The owner's brief gave formulas that roughly tripled Vitality and cut regeneration to a few points a minute. On seeing what that did to the present game, the owner asked instead for formulas that match the current system, which is working, with Vitality growing by a per-level amount that depends on the class (18 November 2026). These replace the formulas in the brief. Everything else in the brief stands: the six attributes, the three renamed resources, the derived statistics, two points a level, class modifiers applied after calculation.
 
-The principle: **a new character has exactly today's numbers**, and attributes move them from there.
+The principle: **a new character has exactly today's numbers**, and attributes move them from there. (Section 8, the owner's balance revision, departs from it for the Warrior, Scout and Mage, whose Vitality is now lower at level 1; the tables below are as revised.)
 
 ### Resources
 
@@ -30,23 +30,23 @@ The principle: **a new character has exactly today's numbers**, and attributes m
 
 | Class | Vitality base / per level | Endurance base / per level | Focus base / per level |
 |---|---|---|---|
-| Warrior | 17 / 9 | 79 / 2 | 4 / 1 |
-| Scout | 8 / 8 | 81 / 2 | 2 / 1 |
+| Warrior | 13 / 8 | 79 / 2 | 4 / 1 |
+| Scout | 3 / 7 | 81 / 2 | 2 / 1 |
 | Priest | 7 / 7 | 23 / 1 | 75 / 4 |
-| Mage | 8 / 6 | 14 / 1 | 71 / 4 |
+| Mage | 4 / 6 | 14 / 1 | 71 / 4 |
 | Adventurer | 10 / 8 | 50 / 2 | 50 / 2 |
 
-With the starting attributes of section 3, level 1 comes out exactly as today, for every class and every resource:
+With the starting attributes of section 3 and no points placed (today's figures in brackets; Endurance and Focus at level 1 are today's for every class, and so is Vitality for the Priest and the Adventurer):
 
 | Class | Vitality at 1 | at 5 (today) | at 10 (today) | Endurance at 1 | at 10 | Focus at 1 | at 10 |
 |---|---|---|---|---|---|---|---|
-| Warrior | 40 | 76 (72) | 121 (112) | 100 | 118 | 20 | 29 |
-| Scout | 26 | 58 (58) | 98 (98) | 100 | 118 | 20 | 29 |
+| Warrior | 35 (40) | 67 (72) | 107 (112) | 100 | 118 | 20 | 29 |
+| Scout | 20 (26) | 48 (58) | 83 (98) | 100 | 118 | 20 | 29 |
 | Priest | 26 | 54 (58) | 89 (98) | 40 | 49 | 100 | 136 |
-| Mage | 24 | 48 (56) | 78 (96) | 30 | 39 | 100 | 136 |
+| Mage | 20 (24) | 44 (56) | 74 (96) | 30 | 39 | 100 | 136 |
 | Adventurer | 30 | 62 (62) | 102 (102) | 70 | 88 | 70 | 88 |
 
-- **Vitality per level by class** is the owner's request. Today every class gains 8; here the Warrior gains 9, the Scout and Adventurer 8, the Priest 7 and the Mage 6. By level 10 the Warrior is 9 ahead of today and the Mage 18 behind. The numbers are data in each class file, and an advanced class may set its own (a Knight more than a Warrior).
+- **Vitality per level by class** is the owner's request. Today every class gains 8; here (as section 8 revised it) the Warrior and Adventurer gain 8, the Scout and Priest 7 and the Mage 6. By level 10 the Warrior is 5 behind today and the Mage 22 behind, before any point placed in Vigor. The numbers are data in each class file, and an advanced class may set its own (a Knight more than a Warrior).
 - **Vigor is worth 2 Vitality a point.** A level 10 character who put all 18 points into Vigor has 36 more Vitality than one who put in none, against 60 to 90 from level: level stays the largest contributor, as the brief requires.
 - **Endurance and Focus now grow with level**, a little, where today they are fixed. Ability costs do not change, so a higher-level character can do somewhat more before tiring.
 
@@ -58,9 +58,9 @@ The game regenerates every ten seconds, and that stays. The amount per tick:
 |---|---|---|
 | Vitality | 0.3 + Vigor ÷ 10 | Warrior 1.0, Adventurer 0.9, Priest 0.9, Scout 0.8, Mage 0.8 (today 1.0 for all) |
 | Endurance | Maximum × (6% + (Resolve + Vigor) × 0.3%) | Warrior 9.9 (10), Scout 9.3 (8), Adventurer 6.7 (6), Priest 3.7 (4), Mage 2.7 (3) |
-| Focus | Maximum × (1% + (Insight + Spirit) × 0.4%) | Mage 7.4 (8), Priest 7.0 (4), Adventurer 4.1 (5), Scout 1.1 (2), Warrior 1.0 (2) |
+| Focus | Maximum × (1% + (Insight + Spirit) × 0.15%) (section 8; was 0.4%) | Mage 3.4 (8), Priest 3.25 (4), Adventurer 1.96 (5), Scout 0.53 (2), Warrior 0.5 (2) |
 
-Every figure is within about a point of today's except one: **the Priest's Focus returns at 7.0 a tick against 4 today**, because the Priest's Spirit now counts. The Priest was the slowest class in the corridor's simulation by a wide margin, so this is left as a deliberate improvement to be checked in the rebalance; a class modifier of −40% Focus regeneration would restore today's figure exactly if the owner prefers.
+With the 0.4% of the first draft every figure was within about a point of today's except the Priest's Focus (7.0 a tick against 4), which the owner kept (decision 4). Section 8 then cut the rate to 0.15% a point, so Focus now returns more slowly than today for every class (the Mage at 3.4 against 8); the larger Focus maximum at higher levels makes up part of it.
 
 The Adventurer's Survival Training trait still multiplies Vitality regeneration by 1.5.
 
@@ -89,9 +89,9 @@ So that a new character plays as today, each statistic acts through how far the 
 | Statistic | Effect | A new character |
 |---|---|---|
 | Physical Power | Weapon and unarmed damage +2% for each point of Might above 5 | Warrior +6%, Adventurer +2%, others none |
-| Precision | +1 to hit for every 4 points of Grace above 5 | Scout +1 |
-| Evasion | +1 to the defender's side of the hit roll for every 4 points of Grace above 5 | Scout +1 |
-| Critical Chance | +0.5% for each point of Grace above 5, added to what traits and skills give | Scout +2% |
+| Precision | +1 to hit for every 8 points of Grace above 5 (section 8; was 4) | none |
+| Evasion | Nothing from Grace (section 8). Equipment, traits and effects may add to the defender's side of the hit roll | none |
+| Critical Chance | +0.25% for each point of Grace above 5 (section 8; was 0.5%), added to what traits and skills give | Scout +1%, Adventurer +0.25% |
 | Spell Power | Spell damage +2% for each point of Insight above 5 and +1% for each point of Spirit above 5 | Mage +10% |
 | Healing Power | Healing from spells +2% for each point of Spirit above 5 and +1% for each point of Insight above 5. Potions and food are not scaled. | Priest +9% |
 | Mental Resistance | 2% chance for each point of Spirit and Resolve above 5 to shake off fear, charm, confusion and other mind effects (at most 75%). No such effects exist yet; the statistic is computed and ready. | |
@@ -100,7 +100,7 @@ So that a new character plays as today, each statistic acts through how far the 
 | Gathering Efficiency | +1 to the harvest quality score for each point of Grace and Insight above 5 | Scout +5 |
 | Crafting Aptitude | +0.02 to the crafted quality shift for each point of Insight and Resolve above 5 | |
 
-A new character therefore differs from today's by a few percent at most, in the direction of their class. A level 10 character who has specialized differs by more: 18 points of Might is +36% weapon damage, 18 of Grace is +4 to hit, +4 to be missed and +9% critical chance. Whether those slopes are right is for the rebalance to confirm; they are easy to change.
+A new character therefore differs from today's by a few percent at most, in the direction of their class. A level 10 character who has specialized differs by more: 18 points of Might is +36% weapon damage, 18 of Grace (Grace 27 for a Scout) is +2 to hit and +5.5% critical chance. Whether those slopes are right is for the rebalance to confirm; they are easy to change.
 
 ### Class modifiers
 
@@ -153,7 +153,7 @@ Steps 2 and 3 are one after the other on purpose. Step 5 can run beside step 4.
 
 Because a new character has today's numbers, little needs redoing.
 
-- **Class stage A's balance** and **the corridor's balance** are re-checked in step 4, not rebuilt. The expected differences are small: the Warrior hits about 6% harder, the Mage's bolt about 10% harder, the Mage has less Vitality from level 2 on, the Priest's Focus returns faster.
+- **Class stage A's balance** and **the corridor's balance** are re-checked in step 4, not rebuilt. The expected differences are those of section 8: the Warrior hits about 6% harder, the Mage's bolt about 10% harder, the Warrior, Scout and Mage have less Vitality, Focus returns more slowly, and a character who places its points is about as strong against the Overseer as today's.
 - **The corridor's experience table** stands unless the re-check shows the 15 hours has moved by more than about an hour.
 - **Crafted consumables** and other healing keep their numbers.
 - **Advanced classes** (stage B) should be built on the new system, so stage B comes after this.

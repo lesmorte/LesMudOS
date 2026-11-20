@@ -48,13 +48,13 @@ h.DEFAULT_ARCHETYPE = ARCH
 # What the five archetypes start with (CLASS_SYSTEM.md section 7): HP, gold, Stamina, Mana, the kit (as `i` lists it), the weapon
 # and shield worn at the start, and the weapons the hero prefers, best first (word to wield, name in the inventory).
 ARCH_START = {
-    "warrior": dict(hp=40, gold=10, stamina=100, mana=20, kit=["a rusty sword", "a small shield"], shield=True,
+    "warrior": dict(hp=35, gold=10, stamina=100, mana=20, kit=["a rusty sword", "a small shield"], shield=True,
                     prefer=[("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("sword", "rusty sword")]),
-    "scout": dict(hp=26, gold=10, stamina=100, mana=20, kit=["a hunting bow", "an iron dagger"], shield=False,
+    "scout": dict(hp=20, gold=10, stamina=100, mana=20, kit=["a hunting bow", "an iron dagger"], shield=False,
                   prefer=[("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("bow", "hunting bow"), ("dagger", "iron dagger")]),
     "priest": dict(hp=26, gold=15, stamina=40, mana=100, kit=["a novice's mace", "a minor healing potion"], shield=False,
                    prefer=[("mace", "novice's mace"), ("staff", "apprentice's staff")]),
-    "mage": dict(hp=24, gold=15, stamina=30, mana=100, kit=["an apprentice's staff", "a minor healing potion"], shield=False,
+    "mage": dict(hp=20, gold=15, stamina=30, mana=100, kit=["an apprentice's staff", "a minor healing potion"], shield=False,
                  prefer=[("dagger", "enchanted dagger"), ("staff", "apprentice's staff"), ("dagger", "iron dagger")]),
     "adventurer": dict(hp=30, gold=20, stamina=70, mana=70, kit=["a training spear", "a trail ration"], shield=False,
                        prefer=[("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("spear", "training spear")]),
@@ -260,6 +260,19 @@ class Hero:
     def health(self):
         self.cmd("hp")
         return self.hp
+
+    # Where a player puts the 2 attribute points of every level (docs/ATTRIBUTES.md section 8; the same as tests/balance_sim.py).
+    PLACEMENT = {"warrior": ("might", "vigor"), "scout": ("grace",), "priest": ("spirit", "vigor"), "mage": ("insight",),
+                 "adventurer": ("might", "vigor")}
+
+    def place_points(self):
+        """Place every attribute point earned so far, as a sensible player of the calling does (a level brings 2)."""
+        placed = getattr(self, "placed_points", 0)
+        order = self.PLACEMENT[ARCH]
+        while placed < 2 * (self.level - 1):
+            self.cmd("improve " + order[placed % len(order)])
+            placed += 1
+        self.placed_points = placed
 
     def score(self):
         text = self.cmd("score")
@@ -737,6 +750,7 @@ class Run:
         hero = self.hero
         info = self.rooms[room]
         info["engagements"] += 1
+        hero.place_points()
         started = time.time()
         start_hp = hero.hp
         enemies = hero.enemies()
