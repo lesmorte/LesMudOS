@@ -195,9 +195,50 @@ public class PfWolf : Monster
 }
 '''
 
+# A creature that leaves a corpse holding a sword (nothing to skin), for the tests of the refill.
+HARE = '''// @inherit /std/monster
+public class PfHare : Monster
+{
+    public override void Create()
+    {
+        Name = "hare"; Ids.Add("hare");
+        ShortDesc = "a hare"; LongDesc = "A hare made for the refill tests.";
+        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Aggressive = false;
+        AddLoot("/domains/hollow/obj/rusty_sword", 100);
+    }
+}
+'''
+
+# A wizard's tool: "resetroom" runs this room's reset now, "timers A B C" sets the timers of every corpse here, "movecorpse PATH" moves a corpse to that room.
+PFTOOL = '''// @inherit /std/item
+public class PfTool : Item
+{
+    public override void Create() { Name = "pftool"; Ids.Add("pftool"); ShortDesc = "a refill tool"; }
+    public override void Init() { base.Init(); AddAction("resetroom", ResetRoom); AddAction("timers", Timers); AddAction("movecorpse", MoveCorpse); }
+    private bool ResetRoom(string args) { Environment(ThisPlayer()!)!.Call("Reset"); Write("Reset done.\\n"); return true; }
+    private bool Timers(string args)
+    {
+        var p = args.Split(' ');
+        foreach (var c in AllInventory(Environment(ThisPlayer()!)!).Where(o => o.Call<bool>("IsCorpse"))) c.Call("SetTimers", int.Parse(p[0]), int.Parse(p[1]), int.Parse(p[2]));
+        Write("Timers set.\\n");
+        return true;
+    }
+    private bool MoveCorpse(string args)
+    {
+        var corpse = AllInventory(Environment(ThisPlayer()!)!).FirstOrDefault(o => o.Call<bool>("IsCorpse"));
+        if (corpse == null) { Write("No corpse.\\n"); return true; }
+        MoveObject(corpse, LoadObject(args.Trim()));
+        Write("Moved.\\n");
+        return true;
+    }
+}
+'''
+
 
 def files():
-    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite", "den": TEST + "den", "twoden": TEST + "twoden", "calmden": TEST + "calmden", "mild": TEST + "mild"}
+    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite", "den": TEST + "den", "twoden": TEST + "twoden", "calmden": TEST + "calmden", "mild": TEST + "mild",
+                "burrow": TEST + "burrow", "burrow2": TEST + "burrow2", "warren": TEST + "warren", "trail": TEST + "trail"}
     out = {"out": TEST + "hub"}
     return {
         "hub": a.room("PfHub", "Play Hub", hub_exits, safe=True),
@@ -218,7 +259,11 @@ def files():
         "calmden": a.room("PfCalmDen", "Calm Den", {"out": TEST + "hub", "east": TEST + "den2"}, f'        AddSpawn("{TEST}wolf");\n', safe=True, reset=3000),
         "mild": a.room("PfMild", "Mild Den", {"out": TEST + "hub", "east": TEST + "den2"}, f'        AddSpawn("{TEST}dummy");\n', reset=3000),
         "den2": a.room("PfDen2", "Far Den", {"west": TEST + "den", "out": TEST + "hub"}, reset=3000),
-        "wolf": WOLF,
+        "burrow": a.room("PfBurrow", "Hare Burrow", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n', reset=3000),
+        "burrow2": a.room("PfBurrow2", "Second Burrow", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n', reset=3000),
+        "warren": a.room("PfWarren", "Hare Warren", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n        AddSpawn("{TEST}hare");\n', reset=3000),
+        "trail": a.room("PfTrail", "Hare Trail", {"out": TEST + "hub"}, f'        AddEncounter("{TEST}hare", 100);\n', reset=3000),
+        "wolf": WOLF, "hare": HARE, "pftool": PFTOOL,
         "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 40);\n', reset=3000),
         "zapper": ZAPPER,
         "pinata": pinata("Pinata", "pinata", 100), "pinata90": pinata("Pinata90", "pinata", 90),
@@ -293,6 +338,7 @@ def run(work, mudlib, box):
     run_corpses(wiz)
     run_fleeing(wiz)
     run_aggro(wiz)
+    run_refill(wiz)
     run_shared_xp(wiz)
     run_verbose(wiz)
     run_prompt(wiz)
@@ -558,6 +604,135 @@ def run_aggro(wiz):
     # The creature is gone before it can engage: a player who leaves at once is not attacked on the way.
     wiz.command("goto " + TEST + "hub")
     p.command("quit")
+
+
+# ===== 10. a room does not refill while the creature's corpse is there =====
+
+def look_hares(c):
+    """(hares alive, corpses of hares) in the room, from the room description ("A hare", "Two hares", "the corpse of a hare", "Two corpses of a hare")."""
+    text = ansi_free(c.command("look"))
+    words = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3}
+    corpses = 0
+    for m in re.finditer(r"(?i)\b(?:(a|one|two|three) corpses? of a hare|the corpse of a hare)", text):
+        corpses += words.get((m.group(1) or "a").lower(), 1)
+    rest = re.sub(r"(?i)\b(?:(a|one|two|three) corpses? of a hare|the corpse of a hare)", "", text)
+    alive = 0
+    for m in re.finditer(r"(?i)\b(a|one|two|three) hares?\b", rest):
+        alive += words[m.group(1).lower()]
+    return (alive, corpses)
+
+
+def run_refill(wiz):
+    wiz.command("goto " + TEST + "hub")
+    wiz.command("drop all")
+    wiz.command("clone " + TEST + "pftool")
+    wiz.command("get pftool")
+
+    # An encounter whose corpse is here: the throttle is a minute, so the wait is shared with the other checks.
+    text = wiz.command("trail")
+    check("refill: an encounter wanders in (it is there when the wizard arrives)", text, "Hare Trail", "A hare is here")
+    wiz.command("slay hare")
+    encounter_since = time.time()
+    check("refill: the encounter's corpse lies in the room", wiz.command("look"), "corpse of a hare is here")
+
+    # A killed spawn is not replaced while its corpse is there.
+    wiz.command("goto " + TEST + "burrow")
+    check("refill: the spawn is there to begin with", "ok" if look_hares(wiz) == (1, 0) else str(look_hares(wiz)), "ok")
+    wiz.command("slay hare")
+    check("refill: killed, it leaves a corpse", "ok" if look_hares(wiz) == (0, 1) else str(look_hares(wiz)), "ok")
+    check("refill: the reset runs", wiz.command("resetroom"), "Reset done.")
+    check("refill: with the corpse still there the reset does not replace it", "ok" if look_hares(wiz) == (0, 1) else str(look_hares(wiz)), "ok")
+    wiz.command("resetroom")
+    check("refill: nor at the reset after that", "ok" if look_hares(wiz) == (0, 1) else str(look_hares(wiz)), "ok")
+    # Looted to dust: the next reset replaces it.
+    check("refill: the corpse is looted to dust", wiz.command("loot corpse"), "crumbles to dust")
+    check("refill: the room has neither corpse nor creature", "ok" if look_hares(wiz) == (0, 0) else str(look_hares(wiz)), "ok")
+    wiz.command("resetroom")
+    check("refill: the next reset replaces the creature", "ok" if look_hares(wiz) == (1, 0) else str(look_hares(wiz)), "ok")
+    check("refill: and only one", "ok" if wiz.command("resetroom") and look_hares(wiz) == (1, 0) else str(look_hares(wiz)), "ok")
+
+    # Rotted away.
+    wiz.command("slay hare")
+    wiz.command("resetroom")
+    check("refill: the corpse blocks again", "ok" if look_hares(wiz) == (0, 1) else str(look_hares(wiz)), "ok")
+    text = wiz.command("stat corpse")
+    check("refill: a creature's corpse lasts ten minutes at most", text, "lifetime 600s")
+    wiz.command("timers 600 600 2")
+    text = wiz.read_until("crumbles to dust", timeout=15)
+    check("refill: the corpse rots away", text, "crumbles to dust")
+    wiz.command("resetroom")
+    check("refill: and the next reset replaces the creature", "ok" if look_hares(wiz) == (1, 0) else str(look_hares(wiz)), "ok")
+
+    # Carried away: the slot is free.
+    wiz.command("slay hare")
+    wiz.command("resetroom")
+    check("refill: (the corpse blocks)", "ok" if look_hares(wiz) == (0, 1) else str(look_hares(wiz)), "ok")
+    check("refill: the corpse is carried out", wiz.command("movecorpse " + TEST + "yard"), "Moved.")
+    wiz.command("resetroom")
+    check("refill: a corpse carried out of the room frees the slot", "ok" if look_hares(wiz) == (1, 0) else str(look_hares(wiz)), "ok")
+    wiz.command("goto " + TEST + "yard")
+    wiz.command("loot corpse")
+    wiz.command("goto " + TEST + "burrow")
+    wiz.command("slay hare")
+    wiz.command("loot corpse")
+
+    # The corpse of another hare, dragged in from elsewhere, blocks nothing: the link is to the spawn, not the name.
+    wiz.command("goto " + TEST + "burrow")
+    wiz.command("slay hare")
+    wiz.command("loot corpse")
+    check("refill: (the burrow has neither hare nor corpse)", "ok" if look_hares(wiz) == (0, 0) else str(look_hares(wiz)), "ok")
+    wiz.command("goto " + TEST + "burrow2")
+    wiz.command("slay hare")
+    wiz.command("movecorpse " + TEST + "burrow")
+    wiz.command("goto " + TEST + "burrow")
+    check("refill: another spawn's corpse lies here", "ok" if look_hares(wiz) == (0, 1) else str(look_hares(wiz)), "ok")
+    wiz.command("resetroom")
+    check("refill: it does not stop this spawn's refill", "ok" if look_hares(wiz) == (1, 1) else str(look_hares(wiz)), "ok")
+    wiz.command("slay hare")
+    wiz.command("loot corpse")
+    wiz.command("loot corpse")
+
+    # A spawn of two creatures: one killed, one corpse, one blocked slot.
+    wiz.command("goto " + TEST + "warren")
+    check("refill: two separate spawns of the same creature", "ok" if look_hares(wiz) == (2, 0) else str(look_hares(wiz)), "ok")
+    wiz.command("slay hare")
+    wiz.command("resetroom")
+    check("refill: one killed, its corpse blocks its own slot only", "ok" if look_hares(wiz) == (1, 1) else str(look_hares(wiz)), "ok")
+    wiz.command("slay hare")
+    wiz.command("resetroom")
+    check("refill: both killed, both corpses block", "ok" if look_hares(wiz) == (0, 2) else str(look_hares(wiz)), "ok")
+    wiz.command("loot corpse")
+    wiz.command("resetroom")
+    check("refill: one corpse gone, one creature back", "ok" if look_hares(wiz) == (1, 1) else str(look_hares(wiz)), "ok")
+
+    # A player's corpse never blocks anything.
+    wiz.command("goto " + TEST + "burrow")
+    wiz.command("loot corpse")
+    wiz.command("slay hare")
+    wiz.command("loot corpse")
+    check("refill: (the burrow is empty)", "ok" if look_hares(wiz) == (0, 0) else str(look_hares(wiz)), "ok")
+    vic = lab_player("harry")
+    vic.command("out")
+    vic.command("burrow")
+    vic.command("zap me 100000")
+    a.drain(vic, 0.7)
+    check("refill: a player's corpse lies in the burrow", wiz.command("look"), "corpse of Harry")
+    wiz.command("resetroom")
+    check("refill: and does not block the refill", "ok" if look_hares(wiz)[0] == 1 else str(look_hares(wiz)), "ok")
+
+    # The encounter: the corpse of this room's encounter still lies on the trail, a minute after it came.
+    time.sleep(max(0, encounter_since + 62 - time.time()))
+    wiz.command("goto " + TEST + "hub")
+    text = wiz.command("trail") + a.quiet(wiz, 0.5)
+    check("refill: no new encounter while the corpse of the last one lies here", text, "Hare Trail", absent=("A hare is here", "wanders in"))
+    check("refill: (the corpse is still there)", wiz.command("look"), "corpse of a hare is here")
+    wiz.command("loot corpse")
+    wiz.command("out")
+    text = wiz.command("trail") + a.quiet(wiz, 0.5)
+    check("refill: once it is gone a new encounter can come", text, "Hare Trail", "A hare is here")
+    wiz.command("slay hare")
+    wiz.command("loot corpse")
+    wiz.command("goto " + TEST + "hub")
 
 
 # ===== 8. shared experience =====

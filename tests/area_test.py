@@ -664,7 +664,15 @@ def run(work, mudlib):
     check("the rats left corpses, not rats", hero.command("look"), "Rat Pit", "Two corpses of a large rat are here.")
     hero.command("hp")
 
-    # ----- reset top-up: the rats come back, no more than two -----
+    # ----- reset top-up: a killed creature is not replaced while its corpse lies here; then the rats come back, no more than two -----
+    time.sleep(7)  # a reset passes (6 seconds)
+    check("the rats are not replaced while their corpses lie in the room", hero.command("look"), "Two corpses of a large rat are here.", absent=("large rats are here", "A large rat is here"))
+    wiz.command("goto " + TEST + "rats")
+    wiz.command("clone " + TEST + "timers")
+    for _ in range(2):  # the corpses rot after a second each (the tool sets the first one it finds)
+        wiz.command("timers 600 600 1")
+        time.sleep(2.2)
+    wiz.command("out")
     text = ""
     end = time.time() + 20
     while time.time() < end and "Two large rats are here." not in text:
@@ -1057,14 +1065,17 @@ def run(work, mudlib):
     inside_seen = False
     pending_power = False
     for t, chunk in chunks:
-        for token in re.findall(r"(POWER STRIKE|The Goblin Overseer (?:hits|misses|scratches|smashes) you[a-z ]*\.)", chunk):
+        # (a critical hit doubles the damage whatever the cry: it is told by the line "A critical hit!" after the blow, and left out)
+        for token in re.findall(r"(POWER STRIKE|The Goblin Overseer (?:hits|misses|scratches|smashes) you[a-z ]*\.(?: A critical hit!)?)", chunk):
+            if "A critical hit!" in token:
+                pending_power = False
+                continue
             if token == "POWER STRIKE":
                 pending_power = True
                 continue
             if "brutally" in token and not pending_power:
                 if t - cry_at > 31:
                     outside_ok = False
-                    print("      (brutal hit %.1f s after the cry, at %.1f s: %r)" % (t - cry_at, t, token))
                 else:
                     inside_seen = True
             pending_power = False
@@ -1135,6 +1146,10 @@ def run(work, mudlib):
     text = wiz.command("look")
     check("one rat left after a kill", text, "A large rat is here.", absent=("Two large rats",))
     wiz.command("slay rat")
+    check("the corpses hold their places: no rat comes while they lie here", (time.sleep(7), wiz.command("look"))[1], "Two corpses of a large rat are here.", absent=("A large rat is here",))
+    for _ in range(2):  # the corpses rot after a second each (the timers tool sets the first one it finds)
+        wiz.command("timers 600 600 1")
+        time.sleep(2.2)
     text = ""
     end = time.time() + 25
     while time.time() < end and "Two large rats are here." not in text:

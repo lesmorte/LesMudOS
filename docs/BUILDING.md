@@ -72,7 +72,7 @@ The first player-facing line of a room, its name, is tagged by `Room` itself; do
 
 ### A plain room: details, readables, spawns
 
-`AddDetail` gives scenery for `look at`. `AddReadable` gives text for `read` (the optional third argument is what `look at` shows). `AddSpawn` keeps a creature or item in the room: it is cloned in when the room loads and topped up every `ResetSeconds` (default 300). `Safe = true` forbids fighting.
+`AddDetail` gives scenery for `look at`. `AddReadable` gives text for `read` (the optional third argument is what `look at` shows). `AddSpawn` keeps a creature or item in the room: it is cloned in when the room loads and topped up every `ResetSeconds` (default 300). A killed creature is not replaced while its corpse still lies in the room: the corpse counts as the creature until it is looted to dust, rots (at most ten minutes) or is carried out, and the next reset after that replaces it. The corpse remembers the spawn (room and line) it came from, so a corpse brought in from elsewhere, or a player's corpse, blocks nothing. `Safe = true` forbids fighting.
 
 ```csharp
 // File: /domains/example/hall.cs
@@ -139,7 +139,7 @@ public class ExampleVault : Room
 
 ### A room with random encounters
 
-`AddEncounter(path, percent)`: each time a player walks in there is that chance that the creature wanders in, if none from this room is still alive and a minute has passed since the last. An encounter that is not fighting wanders off at the next reset.
+`AddEncounter(path, percent)`: each time a player walks in there is that chance that the creature wanders in, if none from this room is still alive and a minute has passed since the last. The same rule holds for corpses: no new encounter while the corpse of this room's previous one still lies here. An encounter that is not fighting wanders off at the next reset.
 
 ```csharp
 // File: /domains/example/trail.cs

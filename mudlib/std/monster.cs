@@ -48,6 +48,21 @@ public class Monster : Npc
         BeginFight(target, true); // the fight starts now; the creature's first action waits its Reaction Time (DelayFirstAction)
     }
 
+    private ObjectRef? spawnRoom;
+    private string spawnKey = "";
+
+    /// <summary>The room that cloned this creature for one of its spawns or encounters says which one ("s0", "e1"), once, while the creature is still in that room. The corpse remembers it (docs/BUILDING.md, refill).</summary>
+    public void SetSpawnSlot(ObjectRef room, string key)
+    {
+        if (spawnRoom != null || PreviousObject() != room || Environment() != room) return;
+        spawnRoom = room;
+        spawnKey = key;
+    }
+
+    public ObjectRef? QuerySpawnRoom() => spawnRoom;
+
+    public string QuerySpawnKey() => spawnKey;
+
     /// <summary>Called by a creature that has just started a fight in the room.</summary>
     public void JoinFight(ObjectRef attacker, ObjectRef victim)
     {
