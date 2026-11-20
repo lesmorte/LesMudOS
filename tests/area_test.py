@@ -1091,7 +1091,9 @@ def run(work, mudlib):
     check("bonus damage lasts only 30 seconds after the Battle Cry", str(outside_ok), "True")
     if not inside_seen:
         print("      (no brutal cry hit happened in this run; the window rule was only checked from the other side)")
-    drain(wiz, 1.0)
+    text += wiz.pending + quiet(wiz, 1.0)  # the experience line follows the death line a moment later, in a chunk of its own
+    wiz.pending = ""
+    drain(wiz, 0.3)
     check("the death line", text, "The Goblin Overseer staggers, drops to his knees, and falls dead among his maps.")
     check("the boss pays experience", text, "You gain 250 experience.")
     # The summoned minion may still be fighting: nothing can be picked up during a fight, so end it first.
