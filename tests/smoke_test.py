@@ -251,11 +251,62 @@ class Client:
         if data:
             self.pending += PROMPT_LINE.sub("", data)
 
-    def command(self, line, marker="> ", timeout=30.0):
-        if marker == "> ":
-            self.absorb()
-        self.send(line)
-        return self.read_until(marker, timeout)
+    sync_default = True  # class-wide: False puts every client back to reading until the prompt (the raw mode)
+    _sync_count = 0
+
+    def command(self, line, marker="> ", timeout=30.0, sync=None):
+        """Send a command and return its reply.
+
+        Waiting for the prompt (marker "> ") cannot tell the prompt that ends a reply from one that follows unprompted output (a combat
+        round, someone arriving), so by default the reply ends where the game answers a second line sent right behind the command:
+        `sync TOKEN` prints "[sync TOKEN]", the token unique to this call. Everything before that line is the reply, as before it ends with the
+        prompt the command itself earned. Pass sync=False (or set Client.sync_default = False) for the raw mode, which reads until the prompt:
+        for the checks of the prompt itself, the login sequence and anything that asks a question. Any other marker reads until that text."""
+        if marker != "> " or not (self.sync_default if sync is None else sync):
+            if marker == "> ":
+                self.absorb()
+            self.send(line)
+            return self.read_until(marker, timeout)
+        self.absorb()  # only tidiness (the prompts of earlier unprompted output leave the front of the reply); the token decides where the reply ends
+        Client._sync_count += 1
+        token = "q%dx%d" % (os.getpid() % 10000, Client._sync_count)
+        end = "[sync %s]" % token
+        data, self.pending = self.pending, ""
+        try:
+            self.sock.sendall((line + "\r\nsync " + token + "\r\n").encode())
+        except OSError:
+            return data
+        deadline = time.time() + timeout
+        while end not in data and time.time() < deadline:
+            try:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    return data
+                data += self.rx(chunk)
+            except socket.timeout:
+                pass
+            except OSError:
+                return data
+        cut = data.find(end)
+        if cut < 0:
+            return data
+        reply, rest = data[:cut], data[cut + len(end):].lstrip("\r\n")
+        # The prompt the game sends after the sync line comes straight behind it: take it in so it does not lead the next reply.
+        # (A custom prompt may not look like one: then a quiet moment ends the wait, and at worst it leads the next reply.)
+        stop = time.time() + 0.3
+        quiet = time.time() + 0.05
+        while time.time() < min(stop, quiet) and not PROMPT_LINE.match(rest):
+            try:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    break
+                rest += self.rx(chunk)
+                quiet = time.time() + 0.05
+            except (socket.timeout, OSError):
+                pass
+        prompt = PROMPT_LINE.match(rest)
+        self.pending = rest[prompt.end():].lstrip("\r\n") if prompt else rest
+        return reply
 
 
 def check(label, text, *expected, absent=()):

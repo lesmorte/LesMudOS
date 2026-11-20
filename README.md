@@ -237,6 +237,8 @@ LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
 python3 tests/balance_sim.py
 ```
 
+The test client (`Client` in `tests/smoke_test.py`, imported by the other suites) ends a reply at the game's answer to `sync TOKEN`, a second line it sends right behind every command, with a token unique to the call: reading to the prompt cannot tell the prompt that ends a reply from one that follows unprompted output (a combat line, another player's action), and on a busy machine that left every later reply one step late. `command(line, sync=False)`, or `Client.sync_default = False`, gives the raw mode that reads to the prompt; use it for checks of the prompt itself, the login sequence, and the idle timer (the sync line counts as input, so `playfeel_test` reads its idle checks raw).
+
 The smoke test starts the driver on port 4777 (or `LESMUDOS_TEST_PORT`) against a temporary copy of the mudlib, logs in two players, and checks account creation and passwords, movement, object-supplied verbs, heartbeats, call-outs, wizard levels and promotion, live update of a room and of a base class, compile-error handling, the sandbox, the evaluation-cost limit, the recursion guard, unloading of old program versions, and save/restore.
 
 ## Deploying to a Linux VM

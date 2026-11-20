@@ -230,6 +230,7 @@ public class Player : Adventurer
         AddAction("ansi", CmdAnsi);
         AddAction("color", CmdAnsi);
         AddAction("colour", CmdAnsi);
+        AddAction("sync", CmdSync);
         // Wizard commands. Each handler checks the caller's level on every use
         // and declines below it, so to a non-wizard these verbs do not exist.
         AddAction("promote", CmdPromote);
@@ -265,6 +266,14 @@ public class Player : Adventurer
     // ---- Player commands ----
 
     private bool CmdSay(string args) => ToComm("DoSay", args);
+
+    /// <summary>A client aid: "sync TOKEN" answers with one line "[sync TOKEN]" (letters and digits only, 16 at most), so a client can tell where the reply to its earlier commands ends. It takes no game time.</summary>
+    private bool CmdSync(string args)
+    {
+        var token = new string(args.Where(char.IsLetterOrDigit).Take(16).ToArray());
+        Write($"[sync {token}]\n");
+        return true;
+    }
 
     // ---- Idle and timeout (server settings: see docs/DEPLOY.md) ----
 
@@ -386,7 +395,7 @@ public class Player : Adventurer
         if (args.Trim() != "" && CraftHelp(args) is { } craftTopic) { Write(craftTopic); return true; }
         Write(
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
-            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], and the exits of the room you are in.\n" +
+            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
             "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/}),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +

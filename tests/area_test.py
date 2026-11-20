@@ -678,9 +678,12 @@ def run(work, mudlib):
     # ----- non-aggressive creatures that assist each other -----
     text = hero.command("den")
     check("gnawers sleep until attacked", text, "Two gnawers are here.")
-    check("kill: start a fight", hero.command("kill gnawer"), "You attack a gnawer.")
+    started = hero.command("kill gnawer")
+    check("kill: start a fight", started, "You attack a gnawer.")
     text = fight_until(hero, "dies.", timeout=90)
-    check("the other creature joined the fight", "joined" if re.search(r"A gnawer (misses|scratches|hits)", text) else text, "joined")
+    # The other one is drawn in at once ("A gnawer attacks you!", in the reply to kill); its first blow waits its Reaction Time, so
+    # it may never land if the hero kills the first at once: the join line is the sure sign.
+    check("the other creature joined the fight", "joined" if re.search(r"A gnawer (attacks you|misses|scratches|hits)", started + text) else started + text, "joined")
     check("a gnawer died", text, "A gnawer dies.")
     drain(hero, 1.5)
     leave(hero, "out")
@@ -1055,6 +1058,7 @@ def run(work, mudlib):
             if "brutally" in token and not pending_power:
                 if t - cry_at > 31:
                     outside_ok = False
+                    print("      (brutal hit %.1f s after the cry, at %.1f s: %r)" % (t - cry_at, t, token))
                 else:
                     inside_seen = True
             pending_power = False

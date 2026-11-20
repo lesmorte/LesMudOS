@@ -852,6 +852,15 @@ def who_line(wiz, name):
 
 
 def run_idle(wiz):
+    # The sync line counts as input for the idle timer, so the idle checks read in the raw mode (until the prompt).
+    sync_before, h.Client.sync_default = h.Client.sync_default, False
+    try:
+        run_idle_checks(wiz)
+    finally:
+        h.Client.sync_default = sync_before
+
+
+def run_idle_checks(wiz):
     dozer = login("dozer")
     dozer.command("title Dozer")
     sleepy = login("sleepy")
