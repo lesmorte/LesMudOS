@@ -261,6 +261,19 @@ class Hero:
         self.cmd("hp")
         return self.hp
 
+    # Where a player puts the 2 attribute points of every level (docs/ATTRIBUTES.md section 8; the same as tests/balance_sim.py).
+    PLACEMENT = {"warrior": ("might", "vigor"), "scout": ("grace",), "priest": ("spirit", "vigor"), "mage": ("insight",),
+                 "adventurer": ("might", "vigor")}
+
+    def place_points(self):
+        """Place every attribute point earned so far, as a sensible player of the calling does (a level brings 2)."""
+        placed = getattr(self, "placed_points", 0)
+        order = self.PLACEMENT[ARCH]
+        while placed < 2 * (self.level - 1):
+            self.cmd("improve " + order[placed % len(order)])
+            placed += 1
+        self.placed_points = placed
+
     def score(self):
         text = self.cmd("score")
         for key, pattern in (("gold", r"Gold (\d+)"), ("xp", r"Experience (\d+)"), ("level", r"Level (\d+)")):
@@ -737,6 +750,7 @@ class Run:
         hero = self.hero
         info = self.rooms[room]
         info["engagements"] += 1
+        hero.place_points()
         started = time.time()
         start_hp = hero.hp
         enemies = hero.enemies()
