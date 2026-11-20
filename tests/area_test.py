@@ -762,6 +762,10 @@ def run(work, mudlib):
     quiet(hero, 12)
     hp_hurt = hp_of(hero)[0]
     check("the biter wounded the hero", str(hp_hurt < 62), "True")
+    # The regeneration checks below need a real deficit (the biter's blows are random and the hero heals): let it bite until he is down to 50.
+    end_bite = time.time() + 90
+    while hp_of(hero)[0] > 50 and time.time() < end_bite:
+        quiet(hero, 4)
     flee_text = ""
     for _ in range(12):
         flee_text += hero.command("flee")
@@ -781,7 +785,12 @@ def run(work, mudlib):
     check("regeneration elsewhere: 1 HP per step", str(after - base in (1, 2)), "True")
     deficit = 62 - after
     text = hero.command("drink potion")
-    check("a potion heals 20", text, "You pull the stopper and drink the ruby-red potion.", f"You recover {min(20, deficit)} hit points.")
+    # (the biter's damage is random and the hero regenerates: a hero back at full health reads no "recover" line, and a regeneration step
+    # between the hp reading and the drink may have closed a little of the gap)
+    m = re.search(r"You recover (\d+) hit points\.", text)
+    got = int(m.group(1)) if m else 0
+    want = min(20, deficit)
+    check("a potion heals 20", text if 0 <= want - got <= 3 else f"recovered {got}, wanted about {want}: {text!r}", "You pull the stopper and drink the ruby-red potion.")
     # Using something is an action with a Recovery: wait for the Ready Time ((2.5 + axe 1.0 + shield 0.5 + 0.5) x 2 = 9 s) between uses.
     time.sleep(9.5)
     check("quaff is an alias of drink", hero.command("quaff potion"), "ruby-red potion")
