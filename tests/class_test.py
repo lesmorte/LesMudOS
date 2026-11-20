@@ -621,12 +621,16 @@ def run(work, mudlib):
         m.command("restore")
         for _ in range(8):
             out = m.command("bolt dodger")
-            out += a.quiet(m, 1.0)
+            # The bolt lands after its cast time: wait for the result, not for a fixed second (a busy machine is slower).
+            waited = time.time() + 10
+            while time.time() < waited and not re.search(r"dodges your bolt|strikes a dodger|for \d+ damage|enough mana|cannot", out):
+                out += a.quiet(m, 0.25)
+            out += a.quiet(m, 0.3)
             last_out = out
             dodged += count("dodges your bolt", out)
             hit += count(r"strikes a dodger|for \d+ damage", out)
         time.sleep(1)
-    check("Arcane Bolt can be dodged (a 50% dodge: some dodged, some hit)", str(dodged >= 1 and hit >= 1) or repr(last_out), "True")
+    check("Arcane Bolt can be dodged (a 50% dodge: some dodged, some hit)", str(dodged >= 1 and hit >= 1) if dodged >= 1 and hit >= 1 else f"dodged {dodged}, hit {hit}, last output {last_out!r}", "True")
     wiz.command("slay dodger")
     wiz.command("speed tmage 0")
     out = m.command("lore staff") if "staff" in m.command("i") else ""
