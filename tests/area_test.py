@@ -641,12 +641,18 @@ def run(work, mudlib):
     check("the merchant is unharmed", hero.command("consider merchant"), "It will not fight you.")
     go(hero, "down")
     text = hero.command("rats")
+    seen = text  # the rats attack as soon as the arrival is complete: their line may come in any of the replies that follow
     check("two identical creatures are merged in the room listing", text, "Rat Pit", "Two large rats are here.")
-    check("look at a creature", hero.command("look at rat"), "red, hungry eyes", "A large rat is unhurt.")
-    check("consider an easy opponent", hero.command("consider rat"), "A large rat looks like an even match")
-    text = hero.read_until("attacks you", timeout=15)
-    check("aggressive monsters attack after a pause", text, "A large rat attacks you!")
-    text = text + fight_until(hero, "dies.", timeout=120)
+    looked = hero.command("look at rat")
+    check("look at a creature", looked, "red, hungry eyes", "A large rat is unhurt.")
+    considered = hero.command("consider rat")
+    check("consider an easy opponent", considered, "A large rat looks like an even match")
+    seen += looked + considered
+    if "attacks you" not in seen:
+        seen += hero.read_until("attacks you", timeout=15)
+    check("aggressive monsters attack on arrival", seen, "A large rat attacks you!")
+    check("and the player is in the fight at once: walking on is refused", hero.command("out"), "cannot just walk away")
+    text = seen + fight_until(hero, "dies.", timeout=120)
     text += fight_until(hero, "dies.", timeout=120) if text.count("dies.") < 2 else ""
     check("a real fight to the death: messages, two kills", "yes" if re.search(r"You (scratch|hit|smash|miss) a large rat", text) else text, "yes")
     check("a real fight to the death: two kills", text, "A large rat dies.")
@@ -744,7 +750,7 @@ def run(work, mudlib):
 
     # ===== regeneration, fleeing, consumables =====
     text = hero.command("biter")
-    check("the biter attacks", hero.read_until("attacks you", timeout=15), "A biter attacks you!")
+    check("the biter attacks", text if "attacks you" in text else text + hero.read_until("attacks you", timeout=15), "A biter attacks you!")
     quiet(hero, 12)
     hp_hurt = hp_of(hero)[0]
     check("the biter wounded the hero", str(hp_hurt < 62), "True")

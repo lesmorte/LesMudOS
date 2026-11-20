@@ -181,8 +181,23 @@ public class BlueTrinket : Item
 '''
 
 
+# An aggressive creature that always hits for 1 and takes a long time to die. BaseReaction 3.0 makes its first action wait about 6 seconds.
+WOLF = '''// @inherit /std/monster
+public class PfWolf : Monster
+{
+    public override void Create()
+    {
+        Name = "wolf"; Ids.Add("wolf");
+        ShortDesc = "a grey wolf"; LongDesc = "A wolf made for the aggression tests.";
+        Level = 1; MaxHp = 100000; DamageMin = 1; DamageMax = 1; ToHit = 30; BaseReaction = 3.0;
+        Aggressive = true;
+    }
+}
+'''
+
+
 def files():
-    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite"}
+    hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite", "den": TEST + "den", "twoden": TEST + "twoden", "calmden": TEST + "calmden", "mild": TEST + "mild"}
     out = {"out": TEST + "hub"}
     return {
         "hub": a.room("PfHub", "Play Hub", hub_exits, safe=True),
@@ -198,6 +213,12 @@ def files():
         "dummy": DUMMY,
         "bite": a.room("PfBite", "Biting Room", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}biter");\n', reset=3000),
         "biter": BITER,
+        "den": a.room("PfDen", "Wolf Den", {"out": TEST + "hub", "east": TEST + "den2"}, f'        AddSpawn("{TEST}wolf");\n', reset=3000),
+        "twoden": a.room("PfTwoDen", "Twin Wolf Den", {"out": TEST + "hub", "east": TEST + "den2"}, f'        AddSpawn("{TEST}wolf", 2);\n', reset=3000),
+        "calmden": a.room("PfCalmDen", "Calm Den", {"out": TEST + "hub", "east": TEST + "den2"}, f'        AddSpawn("{TEST}wolf");\n', safe=True, reset=3000),
+        "mild": a.room("PfMild", "Mild Den", {"out": TEST + "hub", "east": TEST + "den2"}, f'        AddSpawn("{TEST}dummy");\n', reset=3000),
+        "den2": a.room("PfDen2", "Far Den", {"west": TEST + "den", "out": TEST + "hub"}, reset=3000),
+        "wolf": WOLF,
         "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 40);\n', reset=3000),
         "zapper": ZAPPER,
         "pinata": pinata("Pinata", "pinata", 100), "pinata90": pinata("Pinata90", "pinata", 90),
@@ -271,6 +292,7 @@ def run(work, mudlib, box):
     run_lists(wiz)
     run_corpses(wiz)
     run_fleeing(wiz)
+    run_aggro(wiz)
     run_shared_xp(wiz)
     run_verbose(wiz)
     run_prompt(wiz)
@@ -471,6 +493,71 @@ def run_fleeing(wiz):
     wiz.command("goto " + TEST + "yard")
     wiz.command("get all")
     wiz.command("drop all")
+
+
+# ===== 9. aggressive creatures engage on arrival =====
+
+WOLF_HIT = re.compile(r"(?im)^(?:The )?(?:a )?grey wolf (?!attacks you!)\w+ you")
+
+
+def player_at_hub(name):
+    c = login(name)
+    c.command("down")
+    return c
+
+
+def run_aggro(wiz):
+    # The player sees the room, then the attack line, is in combat at once, and the first blow waits the creature's Reaction Time (3.0 x 2 s).
+    p = player_at_hub("wanda")
+    t0 = time.time()
+    p.send("den")
+    text, hit_at, attack_at = "", None, None
+    while time.time() - t0 < 25 and hit_at is None:
+        text += a.quiet(p, 0.1)
+        if attack_at is None and "attacks you!" in text:
+            attack_at = time.time() - t0
+        if WOLF_HIT.search(ansi_free(text)):
+            hit_at = time.time() - t0
+    plain = ansi_free(text)
+    check("aggro: the player sees the room first", plain, "Wolf Den")
+    check("aggro: then the attack line", "ok" if "Wolf Den" in plain and "attacks you!" in plain and plain.index("Wolf Den") < plain.index("attacks you!") else repr(plain[:200]), "ok")
+    check("aggro: the attack line says who attacks", plain, "A grey wolf attacks you!")
+    check("aggro: the fight begins at once, not after the Reaction Time", "ok" if attack_at is not None and attack_at < 3.0 else str(attack_at), "ok")
+    check("aggro: the first blow waits the creature's Reaction Time", "ok" if hit_at is not None and hit_at >= 5.5 else str(hit_at), "ok")
+    check("aggro: but not much longer", "ok" if hit_at is not None and hit_at < 12 else str(hit_at), "ok")
+    check("aggro: walking on is refused", p.command("east"), "cannot just walk away", "flee")
+    check("aggro: still in the same room", p.command("look"), "Wolf Den")
+    text = flee_until(p, "flee east")
+    check("aggro: flee gets the player out", text, "You flee east!", "Far Den")
+    check("aggro: the fight is over for the player", p.command("flee"), "You are not fighting anyone.")
+    plain = ansi_free(p.command("west") + a.quiet(p, 1.0))
+    check("aggro: the player can walk again, and into the den again", plain, "Wolf Den")
+    check("aggro: the creature still hunting them has them in the fight at once", p.command("east"), "cannot just walk away", "flee")
+    flee_until(p, "flee east")
+    p.command("out")
+
+    # Several aggressive creatures: each one engages.
+    p.send("twoden")
+    text = ansi_free(a.quiet(p, 0.5) + a.quiet(p, 1.0))
+    check("aggro: with two aggressive creatures each one engages", "ok" if text.count("attacks you!") == 2 else f"{text.count('attacks you!')}: {text[:200]!r}", "ok")
+    flee_until(p, "flee east")
+    p.command("out")
+
+    # A creature that is not aggressive changes nothing.
+    text = ansi_free(p.command("mild") + a.quiet(p, 1.5))
+    check("aggro: a creature that is not aggressive does not attack", text, "Mild Den", absent=("attacks you",))
+    check("aggro: and the player walks on freely", p.command("east"), "Far Den", absent=("cannot just walk away",))
+    p.command("out")
+
+    # A safe room changes nothing.
+    text = ansi_free(p.command("calmden") + a.quiet(p, 1.5))
+    check("aggro: in a safe room an aggressive creature does not attack", text, "Calm Den", absent=("attacks you",))
+    check("aggro: and the player walks on freely", p.command("east"), "Far Den", absent=("cannot just walk away",))
+    p.command("out")
+
+    # The creature is gone before it can engage: a player who leaves at once is not attacked on the way.
+    wiz.command("goto " + TEST + "hub")
+    p.command("quit")
 
 
 # ===== 8. shared experience =====

@@ -145,7 +145,7 @@ The creature API is `BaseReaction` and `AddCombatAction(id, name, preparation, r
 
 | Field | Meaning |
 |---|---|
-| `Aggressive` | Attacks any player who enters, after its own Reaction Time x 2 seconds. |
+| `Aggressive` | Attacks any player who enters, as soon as the arrival is complete: the player sees the room, then "A wolf attacks you!", and is in combat (walking on is refused, `flee` is the way out). The creature's first action still waits its own Reaction Time x 2 seconds. Nothing changes where it could not attack before (it is dead, the player left, a safe room, `CanFight` refuses). |
 | `XpValue` | Experience for the kill. |
 | `GoldMin`, `GoldMax` | Coins given to the killer. |
 | `AddLoot(string path, int percent)` | Items that may be found in the corpse, each with this percent chance. |
