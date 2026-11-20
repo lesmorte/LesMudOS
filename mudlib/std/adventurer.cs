@@ -496,6 +496,8 @@ public abstract class Adventurer : Living
         if (cls == null || cls.Call<string>("QueryTier") != "archetype" || !cls.Call<bool>("QueryEnabled")) return "There is no such calling.";
         var pristine = Level == 1 && xp == 0 && carried.Count == 0 && quests.Count == 0 && Gold == 25 && advancedClass == "";
         archetype = id;
+        // The attributes are the new calling's starting values, with every point of the character's levels left to place.
+        attributeValues.Clear();
         RefreshClasses();
         if (pristine)
         {
