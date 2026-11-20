@@ -17,7 +17,7 @@ Arcane Bolt as the worked case: I 6-9 for 20 Focus, II 8-12 for 23, III 10-14 fo
 
 ## Trainers
 - Reuse `/std/trainer` (the crafting teachers already sell lessons through it). One trainer per calling.
-- Rank II is taught in Vincent's Hollow at the Adventurers Guild, so nobody must cross the corridor to keep pace at level 5. Rank III and above are taught in Oakenfell at the Hall of Legends.
+- (Superseded: rank II trainers live in the new village rooms of `docs/specs/hollow-expansion.md`, one per calling; Arcane Bolt II is taught at the Hedge-Scholar's Loft.) Rank II is taught in Vincent's Hollow, so nobody must cross the corridor to keep pace at level 5. Rank III and above are taught in Oakenfell at the Hall of Legends.
 - Prices are data beside the rank table. Starting values, to be settled by the balance simulator: rank II 40 gold, III 150, IV 400, V 900.
 
 ## Balance requirement
@@ -34,7 +34,7 @@ Some ranks need more than level and gold. The gold is always paid; the unlock on
 - `ranks` at a trainer shows each requirement with progress ("Goblins slain: 6 of 10") and never hides that a rank exists. A trainer may give a line of their own for each unmet requirement.
 - Advanced-class skills start at rank I when the class is taken.
 
-First use: **Arcane Bolt II**, taught at the Adventurers Guild in Vincent's Hollow: level 5, 40 gold, and 10 goblins slain. Most Mages will have it by the time they finish the cellars; it is there to teach the player that ranks can ask for deeds. The other callings' rank II skills there need level and gold only, unless the owner names unlocks for them.
+First use: **Arcane Bolt II**, taught at the Hedge-Scholar's Loft in Vincent's Hollow: level 5, 40 gold, and 10 goblins slain. Most Mages will have it by the time they finish the cellars; it is there to teach the player that ranks can ask for deeds. The other callings' rank II skills there need level and gold only, unless the owner names unlocks for them.
 
 ## Rank tables (owner-approved November 2026; numbers are starting values for the simulator)
 Skills not listed use the default (+30% effect, +15% cost per rank). Resource names are the attribute build's (Focus, Endurance, Vitality).

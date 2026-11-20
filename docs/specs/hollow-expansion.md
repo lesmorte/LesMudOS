@@ -11,7 +11,7 @@ Owner's requests (19 November 2026): "A scout should be able to play as a sniper
 - **Bows are ranged weapons.** When a character wielding a bow starts a fight, the target has to close the distance: its first action is delayed by a further 2 seconds on top of its Reaction Time. This applies to every calling that may wield a bow, once per fight, and not when the creature starts the fight.
 - **Aimed Shot (`aim`)**, a new Scout skill from level 1, bow only: 30 Endurance, Preparation 1.0, Recovery 1.0, +3 to hit, damage x1.75; as the action that starts the fight, damage x2.5. Being hit while preparing it spoils the shot (the Endurance is spent). Ranks follow `docs/specs/skill-ranks.md`: II at level 5 (x2.0 / x3.0), III at level 10 (x2.25 / x3.5).
 - **Precision Strike** stays as it is and works with any weapon, so the Scout has a melee line and an archery line. The Evasion and Tracking features are unchanged.
-- **Ammunition:** none. Arrows are not tracked (owner may reverse this; it would add a consumable and a crafting use for feathers and wood).
+- **Ammunition:** none. Arrows are not tracked.
 - **Shooting into the next room** (true sniping) is left for later: it needs line of sight, a rule for creatures that come after you, and protection for players in safe rooms.
 - The simulator gets an archer Scout and a melee Scout as separate lines; the two must come out within a few points of each other and of the other callings.
 
@@ -53,7 +53,7 @@ Six new rooms off the square and the north road, each with a reason to exist:
 | The Strung Yew (bowyer) | Bows; later the Scout's rank trainer; the Aimed Shot is taught and talked about here |
 | The Armourer's Shed (beside the Iron Oak) | The armour above; the smith keeps weapons |
 | The Shrine of the Quiet Hand | The Priest's rank trainer; the Shrine-Blessed Mace quest; a healer's blessing for coin |
-| The Hedge-Scholar's Loft | The Mage's rank trainer (Arcane Bolt II lives here, not at the guild, if the owner prefers); the Ironshod Staff and the robe |
+| The Hedge-Scholar's Loft | The Mage's rank trainer (Arcane Bolt II is taught here, not at the guild); the Ironshod Staff and the robe |
 | The Practice Yard | A training dummy (no experience, shows your damage: useful with `verbose`), archery butts, the Warrior's and Adventurer's rank trainer |
 
 - The general merchant keeps the starters; the specialists sell the improved step. This is also the first use of "what a merchant deals in" from `docs/specs/resale-economy.md`.
@@ -66,7 +66,7 @@ After the attribute build and the rename (the items carry attribute bonuses and 
 2. Sonnet: Aimed Shot and the ranged opening rule (engine change in the fight start), with tests.
 3. Balance re-check with the human-like player model, archer and melee Scouts as separate lines.
 
-## 6. Decisions for the owner
-1. Ammunition: none (recommended), or tracked arrows.
-2. Where rank trainers live: the new rooms (recommended) or the guild.
-3. Whether the improved weapons should need a level to wield, or only the gold.
+## 6. Owner's decisions (19 November 2026)
+1. Ammunition is not tracked.
+2. Rank trainers live in the new rooms. Arcane Bolt II moves from the Adventurers Guild to the Hedge-Scholar's Loft (this overrides the guild in `docs/specs/skill-ranks.md`).
+3. Improved weapons need gold only, no level.
