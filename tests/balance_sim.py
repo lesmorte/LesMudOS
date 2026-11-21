@@ -1640,20 +1640,31 @@ def check_classes(read_root, problems, num):
 
 
 @contextmanager
-def tweaked(kinds=None, summon=True):
-    """Temporarily change creatures (name -> fields of Kind, e.g. {"Goblin Minion": {"hp": 10}}) and the Overseer's Summon, for the
+def tweaked(kinds=None, summon=True, hall=None, potion_heal=None, archs=None):
+    """Temporarily change creatures (name -> fields of Kind, e.g. {"Goblin Minion": {"hp": 10}}), the Overseer's Summon, the creatures
+    of the Hall, the potion's strength and the callings (name -> fields of Arch, e.g. {"mage": {"vitality": (4, 7)}}), for the
     recommendations of docs/BALANCE_HUMAN.md. Nothing here is applied to the game."""
-    global SUMMON
-    saved, saved_summon = dict(KINDS), SUMMON
+    global SUMMON, POTION_HEAL
+    saved, saved_summon, saved_approach, saved_heal, saved_archs = dict(KINDS), SUMMON, list(APPROACH), POTION_HEAL, dict(ARCHS)
     try:
         for name, fields in (kinds or {}).items():
             KINDS[name] = replace(KINDS[name], **fields)
         SUMMON = summon
+        if hall is not None:   # the creatures of the Overseer Hall
+            APPROACH[[r for r, c in APPROACH].index("Overseer Hall")] = ("Overseer Hall", list(hall))
+        if potion_heal is not None:
+            POTION_HEAL = potion_heal
+        for name, fields in (archs or {}).items():
+            ARCHS[name] = replace(ARCHS[name], **fields)
         yield
     finally:
         KINDS.clear()
         KINDS.update(saved)
         SUMMON = saved_summon
+        APPROACH[:] = saved_approach
+        POTION_HEAL = saved_heal
+        ARCHS.clear()
+        ARCHS.update(saved_archs)
 
 
 def pct(x):
@@ -1716,7 +1727,6 @@ def calibrate_report(runs=3000):
         print("Sensitivity to where the 4 potions are carried (mid): in the pack from the first room instead of from the Hall's door:")
         print(head)
         row("mid, 4 from the entrance", HUMAN_MID, pack_at="entrance")
-        row("mid, 6 from the entrance", HUMAN_MID, pack_at="entrance") if False else None
     finally:
         LEGACY = False
 
@@ -1752,23 +1762,43 @@ def human_report(runs=3000):
 
 def recommend_report(runs=3000):
     """Changes that would bring a level 5 character in starting gear with 4 potions to about 70% against the Overseer under the middle
-    human, for each calling. Run through tweaked(); nothing is applied."""
-    base = "starting"
-    options = [("current game", {}, True, base)]
-    options += RECOMMENDATIONS
+    human, for each calling. Run through tweaked(); nothing is applied. The low and high humans get a third of the runs."""
     print("=" * 118)
-    print(f"R. Level 5, 4 potions at the Hall, starting gear, attributes placed, middle human: Overseer kill% by calling ({runs} runs a cell).")
+    print(f"R. Level 5, 4 potions at the Hall, starting gear, attributes placed, current game: Overseer kill% by calling, middle human")
+    print(f"   ({runs} runs a cell; the low and high human a third of that). Armour rows: +N armour from the planned village shop, one less for the Mage.")
     print("=" * 118)
-    print(f"{'option':<58}" + "".join(f"{c[:5]:>7}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}   low-human mean  high-human mean")
-    for label, kinds, summon, gear in options:
-        with tweaked(kinds, summon):
-            vals = [approach_stats(c, 5, 4, HUMAN_MID, runs, gear, True)["kill"] * 100 for c in ARCHS]
-            lows = [approach_stats(c, 5, 4, HUMAN_LOW, runs // 3, gear, True)["kill"] * 100 for c in ARCHS]
-            highs = [approach_stats(c, 5, 4, HUMAN_HIGH, runs // 3, gear, True)["kill"] * 100 for c in ARCHS]
-        print(f"{label:<58}" + "".join(f"{v:7.0f}" for v in vals) + f"{sum(vals) / 5:6.0f}{max(vals) - min(vals):7.0f}   {sum(lows) / 5:14.0f}  {sum(highs) / 5:15.0f}")
+    print(f"{'option':<62}" + "".join(f"{c[:5]:>6}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}{'low':>6}{'high':>6}")
+    for label, kw, armour in [("the game as it is", {}, 0)] + RECOMMENDATIONS:
+        rows = []
+        with tweaked(**kw):
+            for model, n in ((HUMAN_MID, runs), (HUMAN_LOW, runs // 3), (HUMAN_HIGH, runs // 3)):
+                vals = []
+                for c in ARCHS:
+                    w, sh, tr, _ = gear_for(c, "starting")
+                    a = armour if c != "mage" or not armour else armour - 1
+                    vals.append(approach_stats(c, 5, 4, model, n, (w, sh, tr, a), True)["kill"] * 100)
+                rows.append(vals)
+        v = rows[0]
+        print(f"{label:<62}" + "".join(f"{x:6.0f}" for x in v) + f"{sum(v) / 5:6.0f}{max(v) - min(v):7.0f}{sum(rows[1]) / 5:6.0f}{sum(rows[2]) / 5:6.0f}", flush=True)
 
 
-RECOMMENDATIONS = []   # (label, creature changes, Summon on, gear): filled in below from the study in docs/BALANCE_HUMAN.md
+_G, _O, _M = "Goblin Elite Guard", "Goblin Overseer", "Goblin Minion"
+MAGE_VIT = {"mage": dict(vitality=(4, 8))}     # the Mage's Vitality a level 6 -> 8
+# (label, tweaked() arguments, armour). Each is a candidate for the owner to choose from; none is applied.
+RECOMMENDATIONS = [
+    ("1a  the Overseer's Summon taken away", dict(summon=False), 0),
+    ("1b  Elite Guards 40 -> 32 Vitality, damage 3-5 -> 2-4", dict(kinds={_G: dict(hp=32, dmg=(2, 4))}), 0),
+    ("1c  one Elite Guard in the Hall instead of two", dict(hall=[_G]), 0),
+    ("2a  Minor Healing Potion heals 30 (was 20)", dict(potion_heal=30), 0),
+    ("2b  Minor Healing Potion heals 35", dict(potion_heal=35), 0),
+    ("2c  = 2b and the Mage's Vitality 4 + 8 a level (was 6)", dict(potion_heal=35, archs=MAGE_VIT), 0),
+    ("3a  armour sold: Leather Jerkin 2 + Leather Cap 1", {}, 3),
+    ("3b  = 3a and Overseer 100 Vitality, damage 3-6", dict(kinds={_O: dict(hp=100, dmg=(3, 6))}), 3),
+    ("3c  = 3b and the Mage's Vitality 4 + 8 a level", dict(kinds={_O: dict(hp=100, dmg=(3, 6))}, archs=MAGE_VIT), 3),
+    ("4a  Guards 32 / 2-4, Overseer 100 / 3-6, no Summon", dict(kinds={_G: dict(hp=32, dmg=(2, 4)), _O: dict(hp=100, dmg=(3, 6))}, summon=False), 0),
+    ("4b  = 4a and the Mage's Vitality 4 + 8 a level", dict(kinds={_G: dict(hp=32, dmg=(2, 4)), _O: dict(hp=100, dmg=(3, 6))}, summon=False, archs=MAGE_VIT), 0),
+    ("5   one Elite Guard, no Summon", dict(summon=False, hall=[_G]), 0),
+]
 
 
 def stage_weapon(arch, level):
