@@ -216,6 +216,7 @@ public class Lantern : Item
 | `tests/city_test.py` | Walk-through of Oakenfell (the city and the two Vale Road rooms that remain): the map against its build document, every detail, person and shop, a new character walking from the Southgate Approach to the Hall of Callings (about 7 minutes) |
 | `tests/corridor_test.py` | Walk-through of the Greenvale Transit Corridor (122 rooms): map, bands, areas, creatures per zone, hidden ways and the Chronicle, resource nodes, patrols, every detail, person and shop, and a new character walking from the Village Square to Oakenfell (port 4828, about 9 minutes; `corridor_test.py static` needs no game) |
 | `tests/playfeel_test.py` | Numbered targets, inventory and list format, corpses, combat restrictions and flee, aggressive creatures engaging on arrival, rooms not refilling while the corpse lies there, shared experience, verbose, prompt, idle and timeout (port 4831, about 8 minutes) |
+| `tests/rename_test.py` | Vitality, Endurance and Focus: the old prompt tokens, a save from before the rename, content written against the old names, and a scan that no player-visible text says HP, hit points, Mana or Stamina (port 4850, about 2 minutes) |
 | `tests/load_check.py` | Quick check that every area file compiles and loads (port 4821, under a minute) |
 | `tests/timing_test.py` | Measures real intervals between combat actions against the timing formula (port 4815, about 3 minutes) |
 | `tests/balance_sim.py` | Standalone combat balance simulation (event clock); `check` compares it with the mudlib numbers |
@@ -231,6 +232,7 @@ LESMUDOS_TEST_PORT=4812 python3 tests/area_test.py
 LESMUDOS_TEST_PORT=4813 python3 tests/playthrough_test.py
 LESMUDOS_TEST_PORT=4821 python3 tests/load_check.py
 LESMUDOS_TEST_PORT=4831 python3 tests/playfeel_test.py
+LESMUDOS_TEST_PORT=4850 python3 tests/rename_test.py
 LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
 LESMUDOS_TEST_PORT=4832 python3 tests/comm_test.py
 LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
