@@ -3,13 +3,13 @@ public class CtStaminaTonic : Crafted
 {
     public override void Create()
     {
-        Name = "Minor Stamina Tonic";
+        Name = "Minor Endurance Tonic";
         Ids.Add("tonic");
-        Ids.Add("stamina tonic");
-        ShortDesc = "a minor stamina tonic";
+        Ids.Add("endurance tonic");
+        ShortDesc = "a minor endurance tonic";
         LongDesc = "Made by hand, for the crafting test.";
         Value = 3;
         UseVerb = "drink";
-        RestoreStamina = 20;
+        RestoreEndurance = 20;
     }
 }
