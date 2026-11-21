@@ -29,8 +29,8 @@ public class VillageSquare : Room
             "  Dunstan the tanner, down the lane: treated leather. Tobin the craftsman: bandages and leather wraps.\n" +
             "  Harland at the Hollowman's Rest: berry juice, made at his hearth.\n" +
             "Each teaches for a few coins ({cmd}lessons{/}, then {cmd}learn{/} NAME) and sells what the work needs ({cmd}browse{/}).\n" +
-            "Then {cmd}craft{/} NAME at the right table, rack, bench or fire, and {cmd}recipes{/} lists what you know. Curious? Try {cmd}combine{/} THING {cmd}and{/} THING. {cmd}help crafting{/} says more.\n" +
-            "NEW: Fletcher's Lane ({cmd}lane{/}), bows, the Hedge-Scholar's staves and robes, a blessing at the shrine; armour at the shed by the Iron Oak; the Practice Yard past the lane. Better steel at Torren's.",
+            "Then {cmd}craft{/} NAME at the right table, rack, bench or fire, and {cmd}recipes{/} lists what you know. Curious? Try {cmd}combine{/} THING {cmd}and{/} THING. {cmd}help crafting{/} says more. " +
+            "NEW in the Hollow: Fletcher's Lane ({cmd}lane{/}), bows, the Hedge-Scholar's staves and robes, a blessing at the shrine; armour at the shed by the Iron Oak; the Practice Yard past the lane. Better steel at Torren's.",
             "A weathered post by the well carries a freshly painted placard. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/hollow/npc/benson");
