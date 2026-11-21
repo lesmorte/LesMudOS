@@ -18,5 +18,6 @@ public class MushroomCavern : Room
         AddDetail("door,stout door,rust-eaten door,iron door,north door", "A heavy door of rust-eaten iron is set into the north wall. Its hinges are sealed with rust, and a keyhole gapes below the handle.");
 
         AddSpawn("/domains/hollow/mob/spore_bat", 3);
+        AddSpawn("/domains/hollow/obj/oak_root");
     }
 }

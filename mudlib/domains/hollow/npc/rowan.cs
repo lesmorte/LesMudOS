@@ -28,6 +28,7 @@ public class Rowan : Npc
         AddChat("Every village has its legends. Ours is Vincent himself. Some believe he found something beneath these lands before he vanished.");
         AddChat("The board has work for anyone brave enough. Read it, then tell me which contract you want: {cmd}accept cellar{/}, or {cmd}accept orders{/}.");
         AddChat("When your work is done, come back and {cmd}report{/}. The guild pays its debts.");
+        AddChat("Before you go down there, mind your kit. There is a bowyer, a shrine and a scholar in Fletcher's Lane off the square, an armourer's shed beside the Iron Oak, and a practice yard by the north gate where you can try a weapon on a dummy before a goblin tries it on you.");
         AddTopic("quest,quests,work,job,contract,board", "Read the board. The cellar quest is the one the village needs. When you've done it, say {cmd}report{/}.");
         AddTopic("cellar,goblins,goblin,overseer", "Goblins have taken the old smugglers' tunnels beneath the Hollowman's Rest. Lately they've grown organized. There's an Overseer down there, and he's the one you want.");
         AddTopic("vincent,holloway,founder", "Vincent Holloway built this village. He vanished decades ago, looking for something under the earth. Nobody believed him then.");

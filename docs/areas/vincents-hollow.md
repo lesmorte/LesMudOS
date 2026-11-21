@@ -298,3 +298,70 @@ This area should act as the foundation of a larger campaign:
 | 15-20 | The Mystery of The Crow |
 
 The ending should leave players feeling they have solved the village's immediate goblin problem while uncovering the first clues in a much larger mystery surrounding Vincent Holloway's disappearance.
+
+## The village expansion (November 2026)
+
+The brief above is the original village. The expansion of [specs/hollow-expansion.md](../specs/hollow-expansion.md) adds six rooms, five people, eleven weapons, four pieces of armour, a quest and a training dummy. The files are in `mudlib/domains/hollow/` (`village/`, `npc/`, `obj/`, `mob/`); the test is `tests/hollow_expansion_test.py`.
+
+### Rooms
+
+| Room | File | Reached by | What is there |
+|---|---|---|---|
+| Fletcher's Lane | `village/fletchers_lane` | `lane` from the Village Square | The street that joins the new shops. Exits: `square`, `yew`, `loft`, `shrine`, `yard` |
+| The Strung Yew | `village/strung_yew` | `yew` from the lane (back: `out`) | Wenna Farrow, bowyer. Sells the Yew Longbow |
+| The Armourer's Shed | `village/armourers_shed` | `shed` from Ironoak Arms (back: `smithy`) | Oswy Thackett, armourer. Sells the three armour pieces |
+| The Shrine of the Quiet Hand | `village/shrine` | `shrine` from the lane (back: `out`) | Sister Merewyn. The blessing (6 gold, full restoration); the quest The Quiet Offering |
+| The Hedge-Scholar's Loft | `village/hedge_scholars_loft` | `loft` from the lane (back: `out`) | Halbert Quill, hedge-scholar. Sells the Ironshod Staff and the Scholar's Robe |
+| The Practice Yard | `village/practice_yard` | `yard` from the lane (back: `lane`) or `yard` from the North Road (back: `road`) | Brann Odell, yard master; the training dummy; archery butts. Not a safe room, so that the dummy can be attacked |
+
+The Practice Yard lies in the angle between the palisade and the North Road, with a postern door to the lane and a gate to the road. The square gained the exit `lane`, Ironoak Arms the exit `shed`, the North Road the exit `yard`, and the square's notice post a line that names the new places.
+
+### People
+
+| Name | Trade | Sells |
+|---|---|---|
+| Wenna Farrow | Bowyer | Yew Longbow 60 |
+| Oswy Thackett | Armourer | Padded Jerkin 20, Leather Jerkin 50, Leather Cap 25 |
+| Sister Merewyn | Shrine keeper | The Quiet Hand's blessing 6 (restores Vitality, Endurance and Focus at once; not an item) |
+| Halbert Quill | Hedge-scholar | Ironshod Staff 55, Scholar's Robe 40 |
+| Brann Odell | Yard master | nothing |
+
+Torren (the smith) keeps the starters and now also sells the other improved weapons: Felling Axe 65, Flanged Mace 55, Boar Spear 50, Steel Dirk 45 (and, as before, the Fine Iron Longsword at 60 as a rare stock). The Traveling Merchant sells what he did. Every person has topics for the trade, the village, the cellars, a rumour, and teaching; the rank trainers (the Scout's, the Priest's, the Mage's, the Warrior's and Adventurer's) only talk of teaching as coming "soon".
+
+### Weapons and armour
+
+Quality applies to every one of these as to any item. Reaction modifier (RM), recovery (Rec) and to-hit (Hit) are those of the existing weapon of the same line, so a line's steps differ in damage only.
+
+| Line | Step | Item | Damage | RM / Rec / Hit | Value | Got |
+|---|---|---|---|---|---|---|
+| Sword | improved | Fine Iron Longsword (existing) | 12-18 | 1.0 / 1.0 / 0 | 60 | Torren, rare stock |
+| Sword | fine | Captain's Sabre | 14-20 | 1.0 / 1.0 / 0 | 90 | Goblin Elite Guard, 10 percent |
+| Axe | improved | Felling Axe | 15-23 | 1.0 / 1.5 / 0 | 65 | Torren |
+| Axe | fine | Goblin Overseer's Axe (existing) | 17-25 | 1.5 / 1.5 / 0 | 70 | the Overseer |
+| Bow | improved | Yew Longbow | 11-16 | 0.5 / 1.0 / +1 | 60 | Wenna Farrow |
+| Bow | fine | Warden's Recurve | 13-19 | 0.5 / 1.0 / +1 | 80 | the Hidden Cache, once per character |
+| Mace | improved | Flanged Mace | 12-17 | 0.5 / 1.0 / 0 | 55 | Torren |
+| Mace | fine | Shrine-Blessed Mace, +1 Spirit | 13-18 | 0.5 / 1.0 / 0 | 75 | The Quiet Offering |
+| Staff | improved | Ironshod Staff, +1 Insight | 9-13 | 0.5 / 1.0 / +1 | 55 | Halbert Quill |
+| Staff | fine | Staff of the Hollow Oak, +2 Insight | 10-14 | 0.5 / 1.0 / +1 | 90 | the Mushroom Cavern, once per character |
+| Spear | improved | Boar Spear | 11-16 | 0.5 / 1.0 / +1 | 50 | Torren |
+| Spear | fine | Goblin War-Spear | 13-18 | 0.5 / 1.0 / +1 | 70 | Goblin Warrior, 6 percent |
+| Dagger | improved | Steel Dirk | 8-12 | 0.0 / 0.5 / +1 | 45 | Torren |
+| Dagger | fine | Enchanted Dagger (existing) | 7-11 | 0.0 / 0.5 / +2 | 80 | the Hidden Cache (existing) |
+
+| Armour | Armour | Slot | Value | Got |
+|---|---|---|---|---|
+| Padded Jerkin | 1 | body | 20 | Oswy Thackett |
+| Leather Jerkin | 2 | body | 50 | Oswy Thackett |
+| Leather Cap | 1 | head | 25 | Oswy Thackett |
+| Scholar's Robe, +1 Insight | 0 | body | 40 | Halbert Quill |
+
+Every price equals the item's Value, so selling a thing straight back (a merchant pays half the Value) is always a loss. Attribute bonuses use `AttributeBonus` of `/std/item`, which the attribute system reads for equipped items. All armour is `light`, which is the only wear rule `/std` has: it cannot say "all but the Mage" or "Mage and Priest", so those two restrictions are in the items' descriptions only.
+
+### The training dummy
+
+`mob/practice_dummy` is a `/std/monster` that cannot die. Its `Die` is overridden to make it whole again, so a blow of any size gives no experience, no kill credit, no gold, no corpse and no Chronicle entry; its one action (`kind: "sway"`) does nothing; it is made whole when a fight ends. With `verbose on` every blow of the player shows its damage. No change to `/std/monster` was needed.
+
+### The quest
+
+The Quiet Offering, from Sister Merewyn at the shrine (id `the-quiet-offering`): `accept offering`; bring a wildflower and a flask of clean water (Elspeth sells both) and have slain a goblin scavenger; `report`. The reward is 100 experience, 25 gold and the Shrine-Blessed Mace, and a `quest.local` Chronicle report, the generic event that Guildmaster Rowan's two quests are the specific forms of.
