@@ -5,7 +5,7 @@ public class VillageSquare : Room
     public override void Create()
     {
         ShortDesc = "Village Square";
-        LongDesc = "The center of Vincent's Hollow bustles with life. A large stone well marks the center of the square while merchants display goods from temporary stalls. Locals gather around benches exchanging news while children dart between travelers. Off the square stand the healer's cottage and the craftsman's workshop, and a lane leads downwind to the tannery. A notice post stands beside the well, hung with a fresh placard.";
+        LongDesc = "The center of Vincent's Hollow bustles with life. A large stone well marks the center of the square while merchants display goods from temporary stalls. Locals gather around benches exchanging news while children dart between travelers. Off the square stand the healer's cottage and the craftsman's workshop, and a lane leads downwind to the tannery. A notice post stands beside the well, hung with a fresh placard. A narrow lane runs off the corner of the square toward the sound of hammers and the thud of arrows: Fletcher's Lane, with the bowyer, the shrine and the scholar's loft.";
         Exits["north"] = "/domains/hollow/village/gate";
         Exits["west"] = "/domains/hollow/village/guild";
         Exits["east"] = "/domains/hollow/village/ironoak";
@@ -13,6 +13,7 @@ public class VillageSquare : Room
         Exits["healer"] = "/domains/hollow/village/healer";
         Exits["workshop"] = "/domains/hollow/village/workshop";
         Exits["tannery"] = "/domains/hollow/village/tannery";
+        Exits["lane"] = "/domains/hollow/village/fletchers_lane";
         Safe = true;
 
         AddDetail("well,stone well", "A broad well of fitted grey stone, its rim worn smooth by seventy years of hands and buckets. The water far below smells cold and clean. A small plaque is set into the stonework.");
@@ -28,7 +29,8 @@ public class VillageSquare : Room
             "  Dunstan the tanner, down the lane: treated leather. Tobin the craftsman: bandages and leather wraps.\n" +
             "  Harland at the Hollowman's Rest: berry juice, made at his hearth.\n" +
             "Each teaches for a few coins ({cmd}lessons{/}, then {cmd}learn{/} NAME) and sells what the work needs ({cmd}browse{/}).\n" +
-            "Then {cmd}craft{/} NAME at the right table, rack, bench or fire, and {cmd}recipes{/} lists what you know. Curious? Try {cmd}combine{/} THING {cmd}and{/} THING. {cmd}help crafting{/} says more.",
+            "Then {cmd}craft{/} NAME at the right table, rack, bench or fire, and {cmd}recipes{/} lists what you know. Curious? Try {cmd}combine{/} THING {cmd}and{/} THING. {cmd}help crafting{/} says more.\n" +
+            "NEW: Fletcher's Lane ({cmd}lane{/}), bows, the Hedge-Scholar's staves and robes, a blessing at the shrine; armour at the shed by the Iron Oak; the Practice Yard past the lane. Better steel at Torren's.",
             "A weathered post by the well carries a freshly painted placard. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/hollow/npc/benson");

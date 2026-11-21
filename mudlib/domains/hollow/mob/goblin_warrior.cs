@@ -28,5 +28,6 @@ public class GoblinWarrior : Monster
         GoldMin = 5;
         GoldMax = 14;
         Aggressive = true;
+        AddLoot("/domains/hollow/obj/goblin_war_spear", 6);
     }
 }

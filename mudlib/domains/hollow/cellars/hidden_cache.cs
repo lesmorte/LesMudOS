@@ -14,6 +14,7 @@ public class HiddenCache : Room
         AddDetail("dust,cobwebs,floor", "Decades of dust lie undisturbed across the floor, and the only tracks in it are the ones you have just made.");
         AddDetail("door,iron door,rust-eaten door", "The rust-eaten door you came through has been pulled shut behind you. Old scrape marks on its inner face show where it was forced open once and never properly repaired.");
 
+        AddSpawn("/domains/hollow/obj/cache_bundle");
         MoveObject(CloneObject("/domains/hollow/obj/cache_gold"), Self);
         MoveObject(CloneObject("/domains/hollow/obj/magical_trinket"), Self);
         if (Random(100) < 25) MoveObject(CloneObject("/domains/hollow/obj/enchanted_dagger"), Self);

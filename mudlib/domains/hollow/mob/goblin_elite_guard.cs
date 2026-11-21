@@ -32,6 +32,7 @@ public class GoblinEliteGuard : Monster
         Aggressive = true;
         BaseReaction = 3.5;
         AddCombatAction("slash", "Slash", preparation: 0, recovery: 1.0);
+        AddLoot("/domains/hollow/obj/captains_sabre", 10);
         AddCombatAction("bash", "Shield Bash", preparation: 0.5, recovery: 1.5, windUp: "drops a shoulder behind the shield", damageMultiplier: 2);
     }
 
