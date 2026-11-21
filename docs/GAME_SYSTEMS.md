@@ -145,7 +145,7 @@ The creature API is `BaseReaction` and `AddCombatAction(id, name, preparation, r
 
 | Field | Meaning |
 |---|---|
-| `Aggressive` | Attacks any player who enters, after its own Reaction Time x 2 seconds. |
+| `Aggressive` | Attacks any player who enters, as soon as the arrival is complete: the player sees the room, then "A wolf attacks you!", and is in combat (walking on is refused, `flee` is the way out). The creature's first action still waits its own Reaction Time x 2 seconds. Nothing changes where it could not attack before (it is dead, the player left, a safe room, `CanFight` refuses). |
 | `XpValue` | Experience for the kill. |
 | `GoldMin`, `GoldMax` | Coins given to the killer. |
 | `AddLoot(string path, int percent)` | Items that may be found in the corpse, each with this percent chance. |
@@ -264,6 +264,7 @@ Commands, available to every player:
 | `flee [direction]` | Leave the fight; fails 25% of the time. With no direction it goes back the way you came, else by a random usable exit, else "There is no way out!". A direction that is not a usable exit fails without spending the attempt |
 | `verbose [on\|off]` | Show `(+N damage)` in green for damage you deal, `(-N damage)` in red for damage you take, `(+N Vitality)` for healing. Off by default, saved with the character |
 | `prompt [text\|default\|off]` | Show or set the line printed after every command and after unprompted output. Tokens `{name} {hp} {maxhp} {stamina} {maxstamina} {mana} {maxmana}`; default `{name} ({hp}/{maxhp}) ({stamina}/{maxstamina}) ({mana}/{maxmana}) > `; `off` gives `> `. At most 80 characters, no colour tags or control characters from the player's text. Saved. The token table is `Adventurer.PromptTokens` |
+| `sync TOKEN` | A client aid. Answers to the sender only, in one line `[sync TOKEN]`; the token keeps letters and digits only, 16 at most. It takes no game time and is not an action on the combat clock. A client sends it right behind a command to know where the reply ends (the prompt cannot tell, since it also follows unprompted output). It counts as input for the idle timer. Help lists it |
 | `consider <target>` | Rough comparison of levels |
 | `search` | Look for a hidden exit; a short timed action; not while fighting (section 3a) |
 | `wield`, `unwield`, `wear`, `remove` | Equipment |

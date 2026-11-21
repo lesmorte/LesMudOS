@@ -72,7 +72,7 @@ The first player-facing line of a room, its name, is tagged by `Room` itself; do
 
 ### A plain room: details, readables, spawns
 
-`AddDetail` gives scenery for `look at`. `AddReadable` gives text for `read` (the optional third argument is what `look at` shows). `AddSpawn` keeps a creature or item in the room: it is cloned in when the room loads and topped up every `ResetSeconds` (default 300). `Safe = true` forbids fighting.
+`AddDetail` gives scenery for `look at`. `AddReadable` gives text for `read` (the optional third argument is what `look at` shows). `AddSpawn` keeps a creature or item in the room: it is cloned in when the room loads and topped up every `ResetSeconds` (default 300). A killed creature is not replaced while its corpse still lies in the room: the corpse counts as the creature until it is looted to dust, rots (at most ten minutes) or is carried out, and the next reset after that replaces it. The corpse remembers the spawn (room and line) it came from, so a corpse brought in from elsewhere, or a player's corpse, blocks nothing. `Safe = true` forbids fighting.
 
 ```csharp
 // File: /domains/example/hall.cs
@@ -139,7 +139,7 @@ public class ExampleVault : Room
 
 ### A room with random encounters
 
-`AddEncounter(path, percent)`: each time a player walks in there is that chance that the creature wanders in, if none from this room is still alive and a minute has passed since the last. An encounter that is not fighting wanders off at the next reset.
+`AddEncounter(path, percent)`: each time a player walks in there is that chance that the creature wanders in, if none from this room is still alive and a minute has passed since the last. The same rule holds for corpses: no new encounter while the corpse of this room's previous one still lies here. An encounter that is not fighting wanders off at the next reset.
 
 ```csharp
 // File: /domains/example/trail.cs
@@ -386,7 +386,7 @@ Combat has no rounds: every creature acts on the event clock of [COMBAT_TIMING.m
 
 - **A creature with one action** needs one line of data and no code: `AddCombatAction("bite", "Bite", preparation: 0, recovery: 0.5);`. A creature that declares no action at all uses the plain attack of its weapon, or its fists (recovery 0.5).
 - **A creature with several actions** declares them all and overrides `ChooseAction`, which is called whenever the creature is ready and has an enemy. `ActionsTaken()` counts the actions chosen so far in this fight (0 while choosing the first), so a fixed rhythm that players can learn is a one-liner. `windUp` is the verb phrase the room reads when the preparation begins ("The ogre rears back..."): always give a prepared action one, because it is how a player sees the blow coming. `damageMultiplier` scales an attack. Other kinds of action (a summons, a shout) use `kind:` with your own word and are done in an override of `Special(CombatAction action, ObjectRef? target)`; see `/domains/hollow/mob/goblin_overseer`.
-- The fight rules for everybody: the one who starts a fight acts at once; everyone drawn in (the one attacked, monsters that assist) waits their own Reaction Time x 2 seconds before the first action; an aggressive creature waits that long after a player arrives; an action aimed at someone who has died or left is wasted.
+- The fight rules for everybody: the one who starts a fight acts at once; everyone drawn in (the one attacked, monsters that assist) waits their own Reaction Time x 2 seconds before the first action; an aggressive creature starts the fight as soon as a player's arrival is complete (the room is described first, then "attacks you!"; the player cannot just walk on, only `flee`), and then waits that long before its first action; an action aimed at someone who has died or left is wasted.
 
 ```csharp
 // File: /domains/example/drake.cs

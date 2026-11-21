@@ -9,7 +9,7 @@
 /// </summary>
 public class Monster : Npc
 {
-    /// <summary>Attacks any player who enters, after its Reaction Time x 2 seconds (the player may strike first or leave).</summary>
+    /// <summary>Attacks any player who enters, as soon as the arrival is complete: the fight begins then (the player cannot walk on, only flee), and the creature's first action waits its Reaction Time.</summary>
     protected bool Aggressive;
     /// <summary>Joins a fight when another monster in the room is attacked.</summary>
     protected bool Assist = true;
@@ -39,14 +39,29 @@ public class Monster : Npc
     protected override void Noticed(ObjectRef other)
     {
         base.Noticed(other);
-        if (Aggressive && Interactive(other)) CallOut(() => Ambush(other), QueryReaction() * 2);
+        if (Aggressive && Interactive(other)) CallOut(() => Ambush(other), 0); // after the arrival has finished, so the room is described first
     }
 
     private void Ambush(ObjectRef target)
     {
-        if (Dead || !target.IsAlive || QueryFightingWith(target) || Environment(target) != Environment()) return;
-        StartFight(target);
+        if (Dead || !target.IsAlive || (QueryFightingWith(target) && target.Call<bool>("QueryFightingWith", Self)) || Environment(target) != Environment()) return; // (a creature still hunting a player who fled gets them back in the fight)
+        BeginFight(target, true); // the fight starts now; the creature's first action waits its Reaction Time (DelayFirstAction)
     }
+
+    private ObjectRef? spawnRoom;
+    private string spawnKey = "";
+
+    /// <summary>The room that cloned this creature for one of its spawns or encounters says which one ("s0", "e1"), once, while the creature is still in that room. The corpse remembers it (docs/BUILDING.md, refill).</summary>
+    public void SetSpawnSlot(ObjectRef room, string key)
+    {
+        if (spawnRoom != null || PreviousObject() != room || Environment() != room) return;
+        spawnRoom = room;
+        spawnKey = key;
+    }
+
+    public ObjectRef? QuerySpawnRoom() => spawnRoom;
+
+    public string QuerySpawnKey() => spawnKey;
 
     /// <summary>Called by a creature that has just started a fight in the room.</summary>
     public void JoinFight(ObjectRef attacker, ObjectRef victim)

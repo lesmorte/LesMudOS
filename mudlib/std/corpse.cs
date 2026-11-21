@@ -33,6 +33,9 @@ public class Corpse : Thing
     private int emptyGeneration;
     private bool emptyArmed;
     private string corpseId = "";
+    // Which spawn or encounter of which room the dead creature came from (the room's refill counts this corpse as the creature).
+    private ObjectRef? spawnRoom;
+    private string spawnKey = "";
 
     // What the creature was and what it yields to the crafting system (docs/CRAFTING.md): read from the dying creature in
     // Setup, only when the creature itself makes the call and its file lies in a trusted tree. Each part is taken once.
@@ -114,7 +117,15 @@ public class Corpse : Thing
         creatureLevel = deceased.Call<int>("QueryLevel");
         skinKind = Clean(deceased.Call<string>("get_Skin"));
         bloodKind = Clean(deceased.Call<string>("get_Blood"));
+        spawnRoom = deceased.Call<ObjectRef>("QuerySpawnRoom");
+        spawnKey = deceased.Call<string>("QuerySpawnKey") ?? "";
     }
+
+    /// <summary>The room whose spawn or encounter the dead creature was, or null; a player's corpse and a creature cloned by hand have none.</summary>
+    public ObjectRef? QuerySpawnRoom() => spawnRoom;
+
+    /// <summary>Which spawn ("s0") or encounter ("e0") of that room, or "".</summary>
+    public string QuerySpawnKey() => spawnKey;
 
     /// <summary>A creature from a trusted tree, itself calling Setup, may say how long its corpse lasts (1 to 3600 seconds).</summary>
     private void ReadLifetime(ObjectRef deceased)

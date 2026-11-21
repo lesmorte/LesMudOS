@@ -641,12 +641,18 @@ def run(work, mudlib):
     check("the merchant is unharmed", hero.command("consider merchant"), "It will not fight you.")
     go(hero, "down")
     text = hero.command("rats")
+    seen = text  # the rats attack as soon as the arrival is complete: their line may come in any of the replies that follow
     check("two identical creatures are merged in the room listing", text, "Rat Pit", "Two large rats are here.")
-    check("look at a creature", hero.command("look at rat"), "red, hungry eyes", "A large rat is unhurt.")
-    check("consider an easy opponent", hero.command("consider rat"), "A large rat looks like an even match")
-    text = hero.read_until("attacks you", timeout=15)
-    check("aggressive monsters attack after a pause", text, "A large rat attacks you!")
-    text = text + fight_until(hero, "dies.", timeout=120)
+    looked = hero.command("look at rat")
+    check("look at a creature", looked, "red, hungry eyes", "A large rat is unhurt.")
+    considered = hero.command("consider rat")
+    check("consider an easy opponent", considered, "A large rat looks like an even match")
+    seen += looked + considered
+    if "attacks you" not in seen:
+        seen += hero.read_until("attacks you", timeout=15)
+    check("aggressive monsters attack on arrival", seen, "A large rat attacks you!")
+    check("and the player is in the fight at once: walking on is refused", hero.command("out"), "cannot just walk away")
+    text = seen + fight_until(hero, "dies.", timeout=120)
     text += fight_until(hero, "dies.", timeout=120) if text.count("dies.") < 2 else ""
     check("a real fight to the death: messages, two kills", "yes" if re.search(r"You (scratch|hit|smash|miss) a large rat", text) else text, "yes")
     check("a real fight to the death: two kills", text, "A large rat dies.")
@@ -658,7 +664,15 @@ def run(work, mudlib):
     check("the rats left corpses, not rats", hero.command("look"), "Rat Pit", "Two corpses of a large rat are here.")
     hero.command("hp")
 
-    # ----- reset top-up: the rats come back, no more than two -----
+    # ----- reset top-up: a killed creature is not replaced while its corpse lies here; then the rats come back, no more than two -----
+    time.sleep(7)  # a reset passes (6 seconds)
+    check("the rats are not replaced while their corpses lie in the room", hero.command("look"), "Two corpses of a large rat are here.", absent=("large rats are here", "A large rat is here"))
+    wiz.command("goto " + TEST + "rats")
+    wiz.command("clone " + TEST + "timers")
+    for _ in range(2):  # the corpses rot after a second each (the tool sets the first one it finds)
+        wiz.command("timers 600 600 1")
+        time.sleep(2.2)
+    wiz.command("out")
     text = ""
     end = time.time() + 20
     while time.time() < end and "Two large rats are here." not in text:
@@ -678,9 +692,12 @@ def run(work, mudlib):
     # ----- non-aggressive creatures that assist each other -----
     text = hero.command("den")
     check("gnawers sleep until attacked", text, "Two gnawers are here.")
-    check("kill: start a fight", hero.command("kill gnawer"), "You attack a gnawer.")
+    started = hero.command("kill gnawer")
+    check("kill: start a fight", started, "You attack a gnawer.")
     text = fight_until(hero, "dies.", timeout=90)
-    check("the other creature joined the fight", "joined" if re.search(r"A gnawer (misses|scratches|hits)", text) else text, "joined")
+    # The other one is drawn in at once ("A gnawer attacks you!", in the reply to kill); its first blow waits its Reaction Time, so
+    # it may never land if the hero kills the first at once: the join line is the sure sign.
+    check("the other creature joined the fight", "joined" if re.search(r"A gnawer (attacks you|misses|scratches|hits)", started + text) else started + text, "joined")
     check("a gnawer died", text, "A gnawer dies.")
     drain(hero, 1.5)
     leave(hero, "out")
@@ -741,10 +758,14 @@ def run(work, mudlib):
 
     # ===== regeneration, fleeing, consumables =====
     text = hero.command("biter")
-    check("the biter attacks", hero.read_until("attacks you", timeout=15), "A biter attacks you!")
+    check("the biter attacks", text if "attacks you" in text else text + hero.read_until("attacks you", timeout=15), "A biter attacks you!")
     quiet(hero, 12)
     hp_hurt = hp_of(hero)[0]
     check("the biter wounded the hero", str(hp_hurt < 62), "True")
+    # The regeneration checks below need a real deficit (the biter's blows are random and the hero heals): let it bite until he is down to 50.
+    end_bite = time.time() + 90
+    while hp_of(hero)[0] > 50 and time.time() < end_bite:
+        quiet(hero, 4)
     flee_text = ""
     for _ in range(12):
         flee_text += hero.command("flee")
@@ -764,7 +785,12 @@ def run(work, mudlib):
     check("regeneration elsewhere: 1 HP per step", str(after - base in (1, 2)), "True")
     deficit = 62 - after
     text = hero.command("drink potion")
-    check("a potion heals 20", text, "You pull the stopper and drink the ruby-red potion.", f"You recover {min(20, deficit)} hit points.")
+    # (the biter's damage is random and the hero regenerates: a hero back at full health reads no "recover" line, and a regeneration step
+    # between the hp reading and the drink may have closed a little of the gap)
+    m = re.search(r"You recover (\d+) hit points\.", text)
+    got = int(m.group(1)) if m else 0
+    want = min(20, deficit)
+    check("a potion heals 20", text if 0 <= want - got <= 3 else f"recovered {got}, wanted about {want}: {text!r}", "You pull the stopper and drink the ruby-red potion.")
     # Using something is an action with a Recovery: wait for the Ready Time ((2.5 + axe 1.0 + shield 0.5 + 0.5) x 2 = 9 s) between uses.
     time.sleep(9.5)
     check("quaff is an alias of drink", hero.command("quaff potion"), "ruby-red potion")
@@ -1049,7 +1075,11 @@ def run(work, mudlib):
     inside_seen = False
     pending_power = False
     for t, chunk in chunks:
-        for token in re.findall(r"(POWER STRIKE|The Goblin Overseer (?:hits|misses|scratches|smashes) you[a-z ]*\.)", chunk):
+        # (a critical hit doubles the damage whatever the cry: it is told by the line "A critical hit!" after the blow, and left out)
+        for token in re.findall(r"(POWER STRIKE|The Goblin Overseer (?:hits|misses|scratches|smashes) you[a-z ]*\.(?: A critical hit!)?)", chunk):
+            if "A critical hit!" in token:
+                pending_power = False
+                continue
             if token == "POWER STRIKE":
                 pending_power = True
                 continue
@@ -1062,7 +1092,9 @@ def run(work, mudlib):
     check("bonus damage lasts only 30 seconds after the Battle Cry", str(outside_ok), "True")
     if not inside_seen:
         print("      (no brutal cry hit happened in this run; the window rule was only checked from the other side)")
-    drain(wiz, 1.0)
+    text += wiz.pending + quiet(wiz, 1.0)  # the experience line follows the death line a moment later, in a chunk of its own
+    wiz.pending = ""
+    drain(wiz, 0.3)
     check("the death line", text, "The Goblin Overseer staggers, drops to his knees, and falls dead among his maps.")
     check("the boss pays experience", text, "You gain 250 experience.")
     # The summoned minion may still be fighting: nothing can be picked up during a fight, so end it first.
@@ -1126,6 +1158,10 @@ def run(work, mudlib):
     text = wiz.command("look")
     check("one rat left after a kill", text, "A large rat is here.", absent=("Two large rats",))
     wiz.command("slay rat")
+    check("the corpses hold their places: no rat comes while they lie here", (time.sleep(7), wiz.command("look"))[1], "Two corpses of a large rat are here.", absent=("A large rat is here",))
+    for _ in range(2):  # the corpses rot after a second each (the timers tool sets the first one it finds)
+        wiz.command("timers 600 600 1")
+        time.sleep(2.2)
     text = ""
     end = time.time() + 25
     while time.time() < end and "Two large rats are here." not in text:

@@ -492,12 +492,16 @@ public abstract class Room : MudObject
     private void Fill(Spawn spawn, bool strict)
     {
         spawn.Handles.RemoveAll(h => !h.IsAlive || (!h.Call<bool>("IsCreature") && Environment(h) != Self));
-        while (spawn.Handles.Count < spawn.Count)
+        // A killed creature whose corpse still lies here still counts: it is not replaced until the corpse is gone.
+        var key = "s" + spawns.IndexOf(spawn);
+        var corpses = CorpsesHere(key);
+        while (spawn.Handles.Count + corpses < spawn.Count)
         {
             try
             {
                 var thing = CloneObject(spawn.Path);
                 MoveObject(thing, Self);
+                if (thing.Call<bool>("IsMonster")) thing.Call("SetSpawnSlot", Self, key);
                 spawn.Handles.Add(thing);
             }
             catch (MudRuntimeException) when (!strict)
@@ -507,6 +511,10 @@ public abstract class Room : MudObject
         }
     }
 
+    /// <summary>How many corpses of creatures from this spawn or encounter of this room lie in it (a player's corpse, a corpse from elsewhere or one carried out does not count).</summary>
+    private int CorpsesHere(string key) =>
+        AllInventory(Self).Count(o => o.Call<bool>("IsCorpse") && o.Call<ObjectRef>("QuerySpawnRoom") == Self && o.Call<string>("QuerySpawnKey") == key);
+
     private void MaybeEncounter()
     {
         if (encounters.Count == 0 || Time() - lastEncounter < 60) return;
@@ -514,10 +522,12 @@ public abstract class Room : MudObject
         foreach (var encounter in encounters)
         {
             if (Random(100) >= encounter.Percent) continue;
+            if (CorpsesHere("e" + encounters.IndexOf(encounter)) > 0) continue; // the last one's corpse still lies here
             try
             {
                 var creature = CloneObject(encounter.Path);
                 MoveObject(creature, Self);
+                if (creature.Call<bool>("IsMonster")) creature.Call("SetSpawnSlot", Self, "e" + encounters.IndexOf(encounter));
                 encounter.Current = creature;
                 lastEncounter = Time();
                 TellRoom(Self, $"{Cap(creature.Call<string>("Short") ?? "Something")} wanders in.\n");

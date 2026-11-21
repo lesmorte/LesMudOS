@@ -71,7 +71,7 @@ When it has no enemy present it does nothing and schedules nothing.
 
 - The one who starts the fight acts as soon as it is ready, which is usually at once.
 - Everyone drawn into the fight by someone else (the target, assisting monsters) cannot begin their first action until their own `Final Reaction Time × 2` seconds have passed. A fast creature reacts quickly; a slow one is caught flat-footed.
-- An aggressive creature that notices a player entering is the one starting the fight, but it too waits its `Final Reaction Time × 2` seconds before its first action. This replaces the old one-round pause and gives a player a chance to strike first or leave.
+- An aggressive creature that notices a player entering starts the fight at once (a call-out of zero seconds, so the room is described first), but it too waits its `Final Reaction Time × 2` seconds before its first action. The player is in combat from that moment: walking on is refused and `flee` is the way out, so a gauntlet of aggressive rooms is a risk, not a free walk. The player can still strike first within the creature's Reaction Time.
 
 ### Player commands and the queue
 
@@ -204,7 +204,7 @@ Skills and spells are ordinary actions on this clock (Preparation, Recovery, rea
 ## 7. Where the implementation differs from this design
 
 - **Action API.** `AddCombatAction`, not `AddAction` (see section 4). The helper types `CombatAction` and `SpeedEffect` are plain public classes in `/std/living`.
-- **Ambush.** An aggressive monster does not start the fight and then hold back: `Noticed` schedules the ambush call-out Reaction Time x 2 seconds ahead, and `StartFight` happens when it fires, if the player is still there. A player who leaves in that time is never attacked.
+- **Ambush.** An aggressive monster does not start the fight and then hold back: `Noticed` schedules the ambush call-out for zero seconds (after the arrival has finished), and `BeginFight(target, true)` happens when it fires, if the player is still there and the creature is alive: the creature then waits its Reaction Time x 2 seconds (`DelayFirstAction`) before its first action.
 - **Who waits.** The initiator of `StartFight` acts at once (if ready); the target, assisting monsters and the summoned minion (`JoinFight`) wait their own Reaction Time x 2 seconds. `AddEnemy` is the path for "drawn in", `AddEnemyCore` for the initiator.
 - **Multipliers.** Crushing Leap and Shield Bash do x2 damage (the design left them open). The Power Strike warning is the wind-up line printed when the action begins; with Preparation 1.0 it lands exactly 2 seconds later.
 - **Pattern details.** The Toad uses its leap as every third action (`ActionsTaken() % 3 == 2`), the Elite Guard its bash as every fourth, the Overseer: Battle Cry first, Summon once at half HP, then slash, slash, power. The cry bonus is a 30 second window from when the cry resolves.

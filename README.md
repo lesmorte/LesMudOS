@@ -215,7 +215,7 @@ public class Lantern : Item
 | `tests/find_test.py` | Finds: treasure in hidden places that each character takes once, for less each time; the register, wizards, the sandbox, restarts, and the five converted places (port 4827, about 1 minute) |
 | `tests/city_test.py` | Walk-through of Oakenfell (the city and the two Vale Road rooms that remain): the map against its build document, every detail, person and shop, a new character walking from the Southgate Approach to the Hall of Callings (about 7 minutes) |
 | `tests/corridor_test.py` | Walk-through of the Greenvale Transit Corridor (122 rooms): map, bands, areas, creatures per zone, hidden ways and the Chronicle, resource nodes, patrols, every detail, person and shop, and a new character walking from the Village Square to Oakenfell (port 4828, about 9 minutes; `corridor_test.py static` needs no game) |
-| `tests/playfeel_test.py` | Numbered targets, inventory and list format, corpses, combat restrictions and flee, shared experience, verbose, prompt, idle and timeout (port 4831, about 6 minutes) |
+| `tests/playfeel_test.py` | Numbered targets, inventory and list format, corpses, combat restrictions and flee, aggressive creatures engaging on arrival, rooms not refilling while the corpse lies there, shared experience, verbose, prompt, idle and timeout (port 4831, about 8 minutes) |
 | `tests/load_check.py` | Quick check that every area file compiles and loads (port 4821, under a minute) |
 | `tests/timing_test.py` | Measures real intervals between combat actions against the timing formula (port 4815, about 3 minutes) |
 | `tests/balance_sim.py` | Standalone combat balance simulation (event clock); `check` compares it with the mudlib numbers |
@@ -236,6 +236,8 @@ LESMUDOS_TEST_PORT=4832 python3 tests/comm_test.py
 LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
 python3 tests/balance_sim.py
 ```
+
+The test client (`Client` in `tests/smoke_test.py`, imported by the other suites) ends a reply at the game's answer to `sync TOKEN`, a second line it sends right behind every command, with a token unique to the call: reading to the prompt cannot tell the prompt that ends a reply from one that follows unprompted output (a combat line, another player's action), and on a busy machine that left every later reply one step late. `command(line, sync=False)`, or `Client.sync_default = False`, gives the raw mode that reads to the prompt; use it for checks of the prompt itself, the login sequence, and the idle timer (the sync line counts as input, so `playfeel_test` reads its idle checks raw).
 
 The smoke test starts the driver on port 4777 (or `LESMUDOS_TEST_PORT`) against a temporary copy of the mudlib, logs in two players, and checks account creation and passwords, movement, object-supplied verbs, heartbeats, call-outs, wizard levels and promotion, live update of a room and of a base class, compile-error handling, the sandbox, the evaluation-cost limit, the recursion guard, unloading of old program versions, and save/restore.
 
