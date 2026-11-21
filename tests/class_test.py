@@ -914,7 +914,20 @@ def run(work, mudlib):
     wiz.command("goto " + HOLLOW + "village/guild")
     check("no pass before the quest", wiz.command("i"), absent=("travel pass",))
     wiz.command("goto " + HOLLOW + "village/north_road")
-    out = wiz.command("north")
+
+    def go_north(client):
+        """Walk north. The North Road's random Wandering Wolf is aggressive and now engages on arrival; a character in a fight
+        cannot walk, so the wizard (who stands in the room) slays the wolf and the walk is tried again. Only the fight is cleared, the
+        check on the pass is the test's own."""
+        out = client.command("north")
+        for _ in range(4):
+            if "in the middle of a fight" not in out:
+                break
+            wiz.command("slay wolf")
+            out = client.command("north")
+        return out
+
+    out = go_north(wiz)
     check("the road north is closed without the pass", out, "need a travel pass", absent=("Vale Road",))
     pilgrim = h.Client("pilgrim", archetype="warrior")
     pilgrim.read_until("> ")
@@ -924,7 +937,7 @@ def run(work, mudlib):
         if "North Road" in text:
             break
     check("a new character walks to the North Road", text, "North Road")
-    check("a new character is refused too", pilgrim.command("north"), "need a travel pass")
+    check("a new character is refused too", go_north(pilgrim), "need a travel pass")
     wiz.command("goto " + HOLLOW + "cellars/overseer_chamber")
     wiz.command("restore")
     wiz.command("slay overseer")
@@ -933,14 +946,14 @@ def run(work, mudlib):
     check("Rowan gives the pass with the rewards of Clear the Cellar", text, "Quest complete: Clear the Cellar!", "Rowan gives you a travel pass.")
     check("the pass is in the inventory", wiz.command("i"), "a travel pass")
     wiz.command("goto " + HOLLOW + "village/north_road")
-    out = wiz.command("north")
+    out = go_north(wiz)
     check("with the pass the road north is open: the Vale Road", out, "The Vale Road", "Oakenfell")
     s = a.score_of(wiz)["text"]
     check("score shows the area and the region of the Vale Road", s, "Area The Vale Road   Region Greenvale")
     check("the road runs on north", wiz.command("look"), "north")
     wiz.command("south")
     wiz.command("drop pass")
-    check("the pass can be lost; the road closes again", wiz.command("north"), "need a travel pass")
+    check("the pass can be lost; the road closes again", go_north(wiz), "need a travel pass")
     wiz.command("goto " + HOLLOW + "village/guild")
     text = wiz.command("talk rowan")
     check("talking to Rowan re-issues a lost pass", text, "Rowan gives you a travel pass.")
