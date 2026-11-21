@@ -17,6 +17,7 @@ Facts about the game world that the owner has fixed. Area briefs and system desi
 - The world is divided into regions. A region contains areas: villages, cities, dungeons, roads.
 - Every room belongs to one area and, through it, to one region. Both names are data on the area, not text repeated in each room.
 - Greenvale is the first region. Its areas so far are The Village of Vincent's Hollow (levels 1-5) and The Forgotten Cellars beneath it (levels 2-5). See [areas/vincents-hollow.md](areas/vincents-hollow.md).
+- The village has six rooms more than its original twelve (November 2026): Fletcher's Lane, The Strung Yew, The Armourer's Shed, The Shrine of the Quiet Hand, The Hedge-Scholar's Loft and The Practice Yard, with Wenna Farrow, Oswy Thackett, Sister Merewyn, Halbert Quill and Brann Odell. Their rooms, shops, items and quest are in the last section of the village's area document.
 
 ## Leaving the village
 
