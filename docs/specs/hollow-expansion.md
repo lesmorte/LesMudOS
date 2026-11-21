@@ -44,6 +44,15 @@ Sold in the village, light enough for every calling that may wear it:
 
 The Leather Commander's Vest (3) stays the best body armour before the corridor. The simulator's Overseer table is rerun with "what a level 4 character can afford" as the gear assumption, replacing today's assumption of no body armour.
 
+### Armour by calling (owner's decision, 21 November 2026)
+The engine restricts armour only by weight (light, medium, heavy), so "all but Mage" and "Mage, Priest" in the table above are words in a description today. They become rules:
+- An armour file may name the callings that can wear it (`WornBy`, a list of calling ids) or the callings that cannot (`NotWornBy`). With neither, the weight category decides, as now. An advanced class counts as the calling it grew from.
+- `wear` refuses in words that say who the piece is for. The item's description line and a shop's `browse` show the restriction, so nobody buys what they cannot wear; `buy` warns before taking the gold.
+- A piece already worn when a rule arrives (old saves) stays worn until taken off.
+- Applied now: Leather Jerkin not worn by Mage; Scholar's Robe worn by Mage and Priest only. The same fields are available to weapons (a file may restrict a weapon the same way), but no weapon is changed in this step.
+- Tests: each calling against each restricted piece, the shop warning, an advanced class inheriting, an old save with a now-forbidden piece worn, and that a wizard-written object cannot dress a player in a forbidden piece through a public method.
+- Built together with the `rest` command, after the rename merges (both touch `std/adventurer.cs`).
+
 ## 4. A bigger village
 Six new rooms off the square and the north road, each with a reason to exist:
 
