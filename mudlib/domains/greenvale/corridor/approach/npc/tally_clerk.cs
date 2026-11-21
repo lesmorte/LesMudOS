@@ -15,7 +15,7 @@ public class OaTallyClerk : Npc
         ShortDesc = "Philippa Reeve, a Consortium tally clerk";
         LongDesc = "A neat young woman in a blue coat with a silver scale badge, carrying a slate, a satchel of tally-sticks and a cash box chained to her wrist. She counts wagons as she walks, lips moving, and her chalk never stops.";
         Level = 3;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Axles, bales, weight. Axles, bales, weight. Do not talk to me while I am counting.");
         AddChat("Everything that goes south passes my slate. If it is not on my slate, it was not carried.");

@@ -13,7 +13,7 @@ public class RvSergeantCalla : Npc
         ShortDesc = "Maren Stroud, the duty sergeant";
         LongDesc = "A lean, sun-browned woman in a long green cloak, with a silver eye sewn on the breast and a scar across the back of one hand. Her eyes never quite settle on you; they keep returning to the door.";
         Level = 4;
-        MaxHp = 55;
+        MaxVitality = 55;
 
         AddChat("Ever vigilant. That is the whole of the creed, friend. The rest is boots.");
         AddChat("We keep the roads, we guide travelers through, and we go where we are needed. If you have news from the road, I want it.");

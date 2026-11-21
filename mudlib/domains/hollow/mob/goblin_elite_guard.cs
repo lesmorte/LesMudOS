@@ -21,7 +21,7 @@ public class GoblinEliteGuard : Monster
         ShortDesc = "a goblin elite guard";
         LongDesc = "A goblin twice the size of its kin, wearing a helm of black iron and a breastplate studded with bone. It carries a long-hafted axe in both hands and stands between you and the Overseer's door as if it has been waiting all its life for you to try.";
         Level = 4;
-        MaxHp = 40;
+        MaxVitality = 40;
         DamageMin = 3;
         DamageMax = 5;
         ToHit = 2;

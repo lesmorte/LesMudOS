@@ -13,7 +13,7 @@ public class MkChangerLucan : Npc
         ShortDesc = "Lucan Teague, a money-changer";
         LongDesc = "A small, neat man with silver spectacles, a pointed beard and a fine brass scale on his table. His fingers move over his coins quickly, as if they were counting themselves.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("Coins changed, coins weighed, coins tested. Foreign silver, clipped gold, river scrip: all welcome, none trusted.");
         AddChat("A short coin is a shorter friend. I weigh everything.");

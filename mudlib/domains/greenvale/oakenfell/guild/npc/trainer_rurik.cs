@@ -12,7 +12,7 @@ public class GqTrainerRurik : Npc
         ShortDesc = "Rurik, a weapons trainer";
         LongDesc = "A heavy, balding man with a voice that carries across the whole yard and a limp that he pretends not to have. He wears a sweat-stained shirt and carries a wooden practice sword that is notched like an old saw.";
         Level = 25;
-        MaxHp = 160;
+        MaxVitality = 160;
 
         AddChat("Feet! Feet, I said! A fighter without feet is a statue with opinions.");
         AddChat("Practice is not what you do before the real thing. Practice is most of the real thing. The fighting is just the exam.");

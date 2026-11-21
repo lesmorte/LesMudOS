@@ -13,7 +13,7 @@ public class SrFishermanCuthbert : Npc
         ShortDesc = "Cuthbert, a fisherman";
         LongDesc = "A thin, patient man in a battered felt hat, sitting cross-legged on the parapet with a long rod and a basket of silver-sided fish at his feet. He watches the float with an expression of utter peace.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Shh. Not so loud. He's down there, the big one. I can feel him.");
         AddChat("Forty years I've fished this bridge. Forty years, and the big pike still hasn't taken the bait. He is a gentleman.");

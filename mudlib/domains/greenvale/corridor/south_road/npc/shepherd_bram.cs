@@ -12,7 +12,7 @@ public class SrShepherdBram : Npc
         ShortDesc = "Bram, a shepherd";
         LongDesc = "A lean, weathered man leaning on a crook, his coat patched with sheepskin and his boots mended with twine. A black-and-white dog sits at his heel and watches the sheep with an air of long-suffering responsibility.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Easy there, don't spook the ewes. They're thick, but they're mine.");
         AddChat("Fine grazing, the walk. It has always been grazing, since before the road.");

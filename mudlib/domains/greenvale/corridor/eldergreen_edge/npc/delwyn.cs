@@ -11,7 +11,7 @@ public class EeDelwyn : Npc
         ShortDesc = "Delwyn, a hunter";
         LongDesc = "A heavy-shouldered man with a bristling black beard, a skinning knife at his belt and a bow across his back. His hands are scarred and his boots are patched, and he moves quietly for such a big man.";
         Level = 5;
-        MaxHp = 65;
+        MaxVitality = 65;
 
         AddChat("Deer, boar, and the odd wolf. Nothing here you can't kill with enough arrows.");
         AddChat("Keep downwind. Everything in the wood has a better nose than you.");

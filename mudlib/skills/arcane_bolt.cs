@@ -9,7 +9,7 @@ public class ArcaneBoltSpell : Skill
         Command = "bolt";
         Kind = "spell";
         Summary = "6-9 damage that ignores armor. It needs no hit roll, but the target can dodge it.";
-        ManaCost = 20;
+        FocusCost = 20;
         Preparation = 0.5;
         Recovery = 1.0;
         WindUp = "gathers crackling energy";

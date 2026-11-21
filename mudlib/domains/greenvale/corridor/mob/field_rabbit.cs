@@ -22,7 +22,7 @@ public class CmFieldRabbit : Monster
         ShortDesc = "a field rabbit";
         LongDesc = "A plump brown rabbit sits bolt upright in the verge, nose working, one ear torn at the tip. It looks like an animal that has eaten well all summer and fears nothing larger than a hawk. If it is cornered it kicks and bites with surprising fury.";
         Level = 1;
-        MaxHp = 8;
+        MaxVitality = 8;
         DamageMin = 1;
         DamageMax = 2;
         ToHit = 0;

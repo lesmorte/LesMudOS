@@ -12,7 +12,7 @@ public class GqScholar : Npc
         ShortDesc = "a visiting scholar";
         LongDesc = "A thin, slightly stooped man in a dark, well-brushed coat, with a notebook open before him and a pair of brass dividers in his hand. His face is pleasant and forgettable, and his eyes are quick and attentive. He gives the impression of someone who takes in everything and gives out very little.";
         Level = 10;
-        MaxHp = 45;
+        MaxVitality = 45;
 
         AddChat("Forgive me. You have the look of someone who knows the city. Tell me: which part of the Founder's District would you say is the oldest?");
         AddChat("The books all agree the oak fell. None of them says what was done with it afterward. Does that seem strange to you?");

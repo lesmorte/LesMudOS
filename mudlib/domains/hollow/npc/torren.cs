@@ -11,7 +11,7 @@ public class Torren : Shopkeeper
         ShortDesc = "Blacksmith Torren";
         LongDesc = "A broad, soot-streaked man with forearms like anvils and a leather apron scorched by a thousand sparks. He eyes every blade you carry as if grading it.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Quality steel saves lives. Cheap steel fills graveyards.");
         AddChat("Buy, {cmd}sell{/} or just {cmd}browse{/}. I pay half what a blade is worth, no more, no less.");

@@ -1641,7 +1641,7 @@ public class CraftingDaemon : Thing
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Start healing over time on a creature: perTick hit points every seconds, ticks times. A character has one at a time; a new
+    /// Start healing over time on a creature: perTick Vitality every seconds, ticks times. A character has one at a time; a new
     /// one replaces the old. The caller must be code from a trusted tree (a crafted consumable). Returns true if started.
     /// </summary>
     public bool StartHeal(ObjectRef who, int perTick, int ticks, int seconds, string name)
@@ -1662,7 +1662,7 @@ public class CraftingDaemon : Thing
         if (!heals.TryGetValue(key, out var h) || h.Generation != generation) return;
         if (!h.Who.IsAlive || h.Who.Call<bool>("IsDead")) { heals.Remove(key); return; }
         var healed = h.Who.Call<int>("Heal", h.PerTick);
-        if (healed > 0) TellObject(h.Who, $"{h.Name} soothes you. (+{healed} hit points)" + (h.Who.Call<string>("HealNote", healed) ?? "") + "\n");
+        if (healed > 0) TellObject(h.Who, $"{h.Name} soothes you. (+{healed} Vitality)" + (h.Who.Call<string>("HealNote", healed) ?? "") + "\n");
         h.Left--;
         if (h.Left <= 0) { heals.Remove(key); return; }
         CallOut(() => HealTick(key, generation), h.Seconds);

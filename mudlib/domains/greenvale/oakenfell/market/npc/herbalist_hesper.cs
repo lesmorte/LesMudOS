@@ -13,7 +13,7 @@ public class MkHerbalistHesper : Shopkeeper
         ShortDesc = "Hesper Yarrow, an herbalist";
         LongDesc = "A quiet, weathered woman with grey-green eyes and a long plait, in a green shawl pinned with an oak-leaf brooch. Her fingers are stained with sap, and her stall smells of rosemary, thyme and bitter things.";
         Level = 2;
-        MaxHp = 20;
+        MaxVitality = 20;
 
         AddChat("Yarrow for wounds, comfrey for bones, willow-bark for fever. Honest herbs, honestly gathered.");
         AddChat("Mind where you step, dear. Some of those baskets are nettles, and some are worse.");

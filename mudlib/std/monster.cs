@@ -1,7 +1,7 @@
 // @inherit /std/npc
 
 /// <summary>
-/// A hostile creature. Set Level, MaxHp, DamageMin/Max, ToHit, Armor, XpValue,
+/// A hostile creature. Set Level, MaxVitality, DamageMin/Max, ToHit, Armor, XpValue,
 /// GoldMin/GoldMax and AddLoot() in Create(). Set BaseReaction (1.0 fast to 6.0 slow) and, for something other than
 /// a plain attack, AddCombatAction() calls. On death the killer receives the
 /// experience; a corpse holding the gold and loot is left in the room, and the room's reset brings a

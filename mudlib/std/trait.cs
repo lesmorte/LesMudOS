@@ -16,6 +16,6 @@ public abstract class Trait : Skill
         Kind = "trait";
     }
 
-    /// <summary>The value of one modifier for this owner right now. Override for a condition (heavy armor worn, below half HP).</summary>
+    /// <summary>The value of one modifier for this owner right now. Override for a condition (heavy armor worn, below half Vitality).</summary>
     public virtual double Modifier(string key, ObjectRef owner) => Mods.TryGetValue(key, out var value) ? value : 0;
 }

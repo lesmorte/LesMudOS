@@ -31,7 +31,7 @@ public class CmWoodlandSpider : Monster
         ShortDesc = "a woodland spider";
         LongDesc = "A dark, long-legged spider with mottled green markings clings to the underside of a branch, forelegs raised and trembling. Its body is the size of a ham and its legs could span the path. Strands of silk glisten around it and trail down into the gloom.";
         Level = 8;
-        MaxHp = 91;
+        MaxVitality = 91;
         DamageMin = 3;
         DamageMax = 5;
         ToHit = 3;
@@ -43,7 +43,7 @@ public class CmWoodlandSpider : Monster
         AddCombatAction("venom", "Slowing Bite", preparation: 0, recovery: 0.5);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

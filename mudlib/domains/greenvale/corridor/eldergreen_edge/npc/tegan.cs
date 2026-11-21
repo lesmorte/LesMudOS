@@ -12,7 +12,7 @@ public class EeTegan : Npc
         ShortDesc = "Tegan, the Outpost quartermaster";
         LongDesc = "A stout, brisk woman with her sleeves rolled to the elbow and a ledger tucked under one arm, a green cloak slung over a stool beside her. Her hair is pinned up with a quill, her fingers are ink-stained, and she counts everything twice.";
         Level = 5;
-        MaxHp = 65;
+        MaxVitality = 65;
 
         AddChat("Supplies are short. They are always short. Don't ask me what's in the store; it's whatever is left.");
         AddChat("If you've killed something off the board, bring me proof. I don't take stories.");

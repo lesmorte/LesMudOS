@@ -9,7 +9,7 @@ public class CmAncientWolf : Monster
 {
     private readonly string[] opening = new string[0];
     private readonly string[] cycle = { "bite" };
-    private readonly int[] triggerHp = { 60 };
+    private readonly int[] triggerVitality = { 60 };
     private readonly string[] triggerAction = { "howl" };
     private int step;
     private int fired;
@@ -29,7 +29,7 @@ public class CmAncientWolf : Monster
         ShortDesc = "an ancient wolf";
         LongDesc = "A huge wolf, grey to the point of white about the muzzle, lies in its dell as though the hollow had been shaped around it. One ear is gone and an old scar runs the length of its flank. It lifts its great head and meets your eyes as if it had been expecting you.";
         Level = 9;
-        MaxHp = 69;
+        MaxVitality = 69;
         DamageMin = 8;
         DamageMax = 13;
         ToHit = 3;
@@ -41,12 +41,12 @@ public class CmAncientWolf : Monster
         AddCombatAction("howl", "Howl", preparation: 0.5, recovery: 0.5, windUp: "throws back its great head", kind: "buff");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
-        for (var i = 0; i < triggerHp.Length; i++)
+        for (var i = 0; i < triggerVitality.Length; i++)
         {
-            if ((fired & (1 << i)) == 0 && Hp * 100 <= triggerHp[i] * QueryMaxHp())
+            if ((fired & (1 << i)) == 0 && Vitality * 100 <= triggerVitality[i] * QueryMaxVitality())
             {
                 fired |= 1 << i;
                 chosen = triggerAction[i];

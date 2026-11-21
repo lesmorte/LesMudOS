@@ -170,7 +170,7 @@ def hp(c):
 
 def hurt(c, n):
     text = c.command(f"hurt {n}")
-    m = re.search(r"HP (\d+)/(\d+)", text)
+    m = re.search(r"Vitality (\d+)/(\d+)", text)
     return int(m.group(1)), int(m.group(2))
 
 
@@ -342,7 +342,7 @@ def run(work, mudlib, box):
 
     # ===== 4. the teachers =====
     ann.command("tele " + V + "healer")
-    check("Elspeth teaches in her cottage: lessons lists the four", ann.command("lessons"), "Elspeth Wortley can teach you", "Herbal Bandage", "Minor Healing Salve", "Minor Stamina Tonic", "Hunter's Poultice")
+    check("Elspeth teaches in her cottage: lessons lists the four", ann.command("lessons"), "Elspeth Wortley can teach you", "Herbal Bandage", "Minor Healing Salve", "Minor Endurance Tonic", "Hunter's Poultice")
     check("her work topic says what she teaches and sells and how to ask", ann.command("ask elspeth about work"), "lessons", "learn herbal bandage", "browse")
     check("her goblin blood topic keeps the grumble and now says where it comes from",
           ann.command("ask elspeth about goblin blood"), "nobody in the Hollow can supply", "goblins", "bleeding kit", "fresh", "bleed corpse")
@@ -417,7 +417,7 @@ def run(work, mudlib, box):
     check("a tanning recipe at the herbalist table is refused", craft(ann, "treated leather"), "must be made at a tanning rack")
     made("Herbal Bandage", CRAFT + "herbal_bandage", craft(ann, "herbal bandage"))
     made("Minor Healing Salve", CRAFT + "minor_healing_salve", craft(ann, "minor healing salve"))
-    made("Minor Stamina Tonic", CRAFT + "minor_stamina_tonic", craft(ann, "minor stamina tonic"))
+    made("Minor Endurance Tonic", CRAFT + "minor_stamina_tonic", craft(ann, "minor endurance tonic"))
     made("Hunter's Poultice", CRAFT + "hunters_poultice", craft(ann, "hunters poultice"))
     ann.command("out")
     ann.command("tannery")
@@ -436,20 +436,20 @@ def run(work, mudlib, box):
     ann.command("tele " + T + "lab_ann")
     mx = hurt(ann, 0)[1]
     D = min(40, mx - 3)
-    truth("a new character has enough hit points to show the effects", D >= 20, mx)
+    truth("a new character has enough Vitality to show the effects", D >= 20, mx)
 
-    def effect(label, record, verb, noun, restore, stamina=0, over_time=None, q="common"):
+    def effect(label, record, verb, noun, restore, endurance=0, over_time=None, q="common"):
         src = source(record)
         vit = scaled(field(src, "RestoreVitality"), q)
-        sta = scaled(field(src, "RestoreStamina"), q)
+        sta = scaled(field(src, "RestoreEndurance"), q)
         hurt(ann, D)
         ann.command("tired 0")
         text = ct.act(ann, f"{verb} {noun}", "recover", "Warmth", "can't", timeout=15)
         if vit:
-            check(f"{label}: restores {vit} hit points", text, f"You recover {vit} hit points.")
-            truth(f"{label}: hit points rose by {vit}", hp(ann) >= mx - D + vit, (hp(ann), mx, vit))
+            check(f"{label}: restores {vit} Vitality", text, f"You recover {vit} Vitality.")
+            truth(f"{label}: Vitality rose by {vit}", hp(ann) >= mx - D + vit, (hp(ann), mx, vit))
         if sta:
-            check(f"{label}: restores {sta} Stamina", text, f"You recover {sta} Stamina.")
+            check(f"{label}: restores {sta} Endurance", text, f"You recover {sta} Endurance.")
         return text, vit, sta
 
     effect("Berry Juice", CRAFT + "berry_juice", "drink", "berry juice", 8)
@@ -458,7 +458,7 @@ def run(work, mudlib, box):
     a.quiet(ann, 1.2)
     effect("Herbal Bandage", CRAFT + "herbal_bandage", "apply", "herbal bandage", 12)
     a.quiet(ann, 1.2)
-    effect("Minor Stamina Tonic", CRAFT + "minor_stamina_tonic", "drink", "tonic", 0)
+    effect("Minor Endurance Tonic", CRAFT + "minor_stamina_tonic", "drink", "tonic", 0)
     a.quiet(ann, 1.2)
     # healing over time: the salve, then the poultice (a new one replaces the old; the poultice's total beats everything)
     for label, record, noun in (("Minor Healing Salve", CRAFT + "minor_healing_salve", "salve"), ("Hunter's Poultice", CRAFT + "hunters_poultice", "poultice")):
@@ -466,11 +466,11 @@ def run(work, mudlib, box):
         per, ticks, secs = field(src, "HealPerTick"), field(src, "Ticks"), field(src, "TickSeconds", 5)
         hurt(ann, D)
         text = ct.act(ann, "apply " + noun, "Warmth", "can't", timeout=15)
-        check(f"{label}: healing over time starts", text, f"you will recover {per} hit points every {secs} seconds, {ticks} times")
+        check(f"{label}: healing over time starts", text, f"you will recover {per} Vitality every {secs} seconds, {ticks} times")
         check(f"{label} shows in score", ann.command("score"), label)
         text = a.quiet(ann, secs * 3 + 1.5)
-        truth(f"{label}: three ticks arrived, {per} hit points each", text.count("soothes you") == 3 and f"(+{per} hit points)" in text, text)
-        truth(f"{label}: hit points rose by {3 * per}", hp(ann) >= mx - D + 3 * per, (hp(ann), mx, per))
+        truth(f"{label}: three ticks arrived, {per} Vitality each", text.count("soothes you") == 3 and f"(+{per} Vitality)" in text, text)
+        truth(f"{label}: Vitality rose by {3 * per}", hp(ann) >= mx - D + 3 * per, (hp(ann), mx, per))
         truth(f"{label} heals {per * ticks} in all", per * ticks > 0)
     heal = {rid: field(source(CRAFT + rid), "HealPerTick") * field(source(CRAFT + rid), "Ticks") for rid in ("hunters_poultice", "minor_healing_salve")}
     potion = field(source(HOLLOW + "obj/healing_potion"), "HealAmount")
@@ -503,7 +503,7 @@ def run(work, mudlib, box):
     bob.command("tired 0")
     text = ct.act(bob, "drink sweet juice", "recover", timeout=15)
     src = source(CRAFT + "sweet_berry_juice")
-    check("Sweet Berry Juice restores Vitality and Stamina", text, f"You recover {scaled(field(src, 'RestoreVitality'), 'common')} hit points.", f"You recover {scaled(field(src, 'RestoreStamina'), 'common')} Stamina.")
+    check("Sweet Berry Juice restores Vitality and Endurance", text, f"You recover {scaled(field(src, 'RestoreVitality'), 'common')} Vitality.", f"You recover {scaled(field(src, 'RestoreEndurance'), 'common')} Endurance.")
     bob.command("north")
     # Blood Ink
     bob.command("healer")

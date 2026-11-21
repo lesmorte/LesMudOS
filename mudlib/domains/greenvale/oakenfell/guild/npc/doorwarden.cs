@@ -12,7 +12,7 @@ public class GqDoorwarden : Npc
         ShortDesc = "Hild, the doorwarden of the Hall";
         LongDesc = "A tall, grey-braided woman in a long oak-green coat with the Hall's emblem stitched on the shoulder, standing beside the great doors with a staff she has never been seen to use. She has the unhurried courtesy of someone who has explained the Hall to a thousand newcomers and enjoyed it each time.";
         Level = 15;
-        MaxHp = 90;
+        MaxVitality = 90;
 
         AddChat("Welcome to the Hall of Legends, traveler. Come in, come in. Through these doors is the Hall of Callings, the heart of the place; to its east is the Chronicle Gallery, and to its west the Envoys' Gallery.");
         AddChat("If you have not yet reached your fifth level, you are no less welcome. Look at everything, listen to everyone. The hallmasters like nothing better than a visitor who is curious early.");

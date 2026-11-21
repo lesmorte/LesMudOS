@@ -9,7 +9,7 @@ public class CmBanditLeader : Monster
 {
     private readonly string[] opening = new string[0];
     private readonly string[] cycle = { "slash", "slash", "smash" };
-    private readonly int[] triggerHp = { 50 };
+    private readonly int[] triggerVitality = { 50 };
     private readonly string[] triggerAction = { "rally" };
     private int step;
     private int fired;
@@ -35,7 +35,7 @@ public class CmBanditLeader : Monster
         ShortDesc = "the Bandit Leader";
         LongDesc = "A tall, silver-bearded man in a dark coat trimmed with fox fur sits at the head of the camp like a lord at his own table, a curved sabre across his knees and a round shield at his side. The rings on his fingers were taken from other people's hands. His cool gaze takes your measure and finds it wanting.";
         Level = 10;
-        MaxHp = 100;
+        MaxVitality = 100;
         DamageMin = 6;
         DamageMax = 10;
         ToHit = 4;
@@ -55,12 +55,12 @@ public class CmBanditLeader : Monster
         AddLoot("/domains/hollow/obj/enchanted_dagger", 10);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
-        for (var i = 0; i < triggerHp.Length; i++)
+        for (var i = 0; i < triggerVitality.Length; i++)
         {
-            if ((fired & (1 << i)) == 0 && Hp * 100 <= triggerHp[i] * QueryMaxHp())
+            if ((fired & (1 << i)) == 0 && Vitality * 100 <= triggerVitality[i] * QueryMaxVitality())
             {
                 fired |= 1 << i;
                 chosen = triggerAction[i];

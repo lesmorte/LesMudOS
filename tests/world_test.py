@@ -56,7 +56,7 @@ public class {cls} : Patrol
         Ids.Add("{ident}");
         ShortDesc = "a {name.lower()}";
         LongDesc = "A patrol made for the world test.";
-        Level = 3; MaxHp = {hp}; DamageMin = {dmg[0]}; DamageMax = {dmg[1]};
+        Level = 3; MaxVitality = {hp}; DamageMin = {dmg[0]}; DamageMax = {dmg[1]};
         DefendPlayers = {str(defend).lower()}; ReturnSeconds = {ret}; TalkPauseSeconds = {pause}; PollSeconds = {poll};
         AddChat("Move along.");
         SetRoute(new[] {{ {paths} }}, {pace}, {str(loop).lower()});
@@ -74,7 +74,7 @@ public class WtBrute : Monster
         Ids.Add("brute");
         ShortDesc = "a brute";
         LongDesc = "An unmoving test creature.";
-        Level = 1; MaxHp = 100000; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 100000; DamageMin = 1; DamageMax = 1; ToHit = -30;
         Aggressive = false;
     }
 }
@@ -112,7 +112,7 @@ public class WtProbe : Thing
         {
             var ob = FindObject((name.StartsWith("/") ? "" : W) + name + "#" + i);
             if (ob == null || !ob.IsAlive) continue;
-            Write("PINFO state=" + ob.Call<string>("QueryPatrolState") + " room=" + (Environment(ob)?.Name ?? "none") + " steps=" + ob.Call<int>("QuerySteps") + " blocked=" + ob.Call<int>("QueryBlocked") + " hp=" + ob.Call<int>("QueryHp") + "\\n");
+            Write("PINFO state=" + ob.Call<string>("QueryPatrolState") + " room=" + (Environment(ob)?.Name ?? "none") + " steps=" + ob.Call<int>("QuerySteps") + " blocked=" + ob.Call<int>("QueryBlocked") + " hp=" + ob.Call<int>("QueryVitality") + "\\n");
             return true;
         }
         Write("PINFO none\\n");

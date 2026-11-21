@@ -9,7 +9,7 @@ public class VillageGuard : Npc
         ShortDesc = "the village guard";
         LongDesc = "A square-jawed man in a dented breastplate, with a spear leaning against one shoulder and a tired look in his eyes. He has stood at this gate through more nights than he cares to count.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("If you're lookin' for glory, ask old Harland at the tavern. The cellar's got troubles no one's managed to solve.");
         AddChat("Some folk say Vincent still watches over us. I just know strange things have been happening underground.");

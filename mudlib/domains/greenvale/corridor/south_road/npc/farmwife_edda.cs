@@ -13,7 +13,7 @@ public class SrFarmwifeEdda : Npc
         ShortDesc = "Edda, the miller's daughter";
         LongDesc = "A sturdy woman of thirty with her sleeves rolled to the elbow, a flour-dusted apron, and a basket of eggs on her hip. She has her father's pale eyes and a good deal more patience.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Eggs, if you want eggs. Not for sale; I'd sooner give you a dozen than haggle over them.");
         AddChat("Father says you can read the weather in the sails. I read it in his knees.");

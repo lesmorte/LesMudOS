@@ -32,7 +32,7 @@ public class CmRestlessSpirit : Monster
         ShortDesc = "a restless spirit";
         LongDesc = "A pale, ragged figure hangs in the air above the stones, its outline blurred as though seen through water. Its face is too indistinct to read, but the hollows where its eyes should be follow you. The air near it is cold enough to numb your fingers.";
         Level = 9;
-        MaxHp = 64;
+        MaxVitality = 64;
         DamageMin = 8;
         DamageMax = 13;
         ToHit = 3;
@@ -46,7 +46,7 @@ public class CmRestlessSpirit : Monster
         AddCombatAction("chill", "Chill of the Grave", preparation: 0, recovery: 1);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

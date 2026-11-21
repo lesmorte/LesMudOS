@@ -12,7 +12,7 @@ public class SgStablemasterGarrow : Npc
         ShortDesc = "Garrow Hale, the stablemaster";
         LongDesc = "A bow-legged, weathered man in a leather apron smelling of horse. He has a gentle touch with the animals and a sharp tongue for fools, and his eyes are the pale grey of old iron.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Gently there, Marigold. She bites, that one. Always did.");
         AddChat("I've nothing to rent you yet, friend. Mounts are for those the city knows better.");

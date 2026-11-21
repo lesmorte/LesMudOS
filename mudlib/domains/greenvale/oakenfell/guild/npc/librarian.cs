@@ -11,7 +11,7 @@ public class GqLibrarian : Npc
         ShortDesc = "Hester, the librarian";
         LongDesc = "A small, upright woman in a grey dress with a ring of keys at her belt and a pencil stuck through her bun. She has the gentle, unflinching manner of someone who has quieted a great many rooms, and a dry humour that appears so rarely that people treasure it.";
         Level = 12;
-        MaxHp = 50;
+        MaxVitality = 50;
 
         AddChat("Welcome to the Athenaeum. I am Hester, the librarian. Silence is requested; questions are welcome. They are not the same thing, though many visitors think so.");
         AddChat("There are four short works on the reading table by the door, for newcomers: the founding, the storm, the name and motto, and the five districts. They are the best place to begin. Each is only a few pages.");

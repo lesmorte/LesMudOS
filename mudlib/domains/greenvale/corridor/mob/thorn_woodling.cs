@@ -32,7 +32,7 @@ public class CmThornWoodling : Monster
         ShortDesc = "a thorn woodling";
         LongDesc = "A figure of knotted wood and thorny vine, roughly the height of a man, stands among the saplings so still that you do not notice the pale green light in its hollow eyes until you are close. Its branches are hung with red berries that are not berries. Thorns as long as daggers jut from its arms.";
         Level = 9;
-        MaxHp = 53;
+        MaxVitality = 53;
         DamageMin = 10;
         DamageMax = 16;
         ToHit = 2;
@@ -44,7 +44,7 @@ public class CmThornWoodling : Monster
         AddCombatAction("thorns", "Thorn Barrage", preparation: 0.5, recovery: 1.5, windUp: "draws its branches taut, thorns bristling", strike: "whips its barbed branches across the path!");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

@@ -13,7 +13,7 @@ public class GrMelisande : Npc
         ShortDesc = "Melisande, keeper of the Old Shrine";
         LongDesc = "A small, brown, weathered woman of sixty with a birch broom in one hand and a lamp-oil flask at her belt. Her grey braid hangs to her waist, and her hands are those of someone who has done a great deal of sweeping.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Keep the light. Keep the road. That is all there is to it, dear, and it is plenty.");
         AddChat("The lamp has not gone out in my mother's day, nor in her mother's. I only fill it.");

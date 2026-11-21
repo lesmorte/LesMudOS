@@ -27,7 +27,7 @@ public class CmHeartwoodGoblin : Monster
         ShortDesc = "a goblin warrior";
         LongDesc = "A goblin in a rusted breastplate bound with bark twine, a spiked club in his fist and a dented round shield on his arm, keeps watch over the old way. The moss on his armor says he has stood in one place for days. His eyes are fixed on you and he is not afraid.";
         Level = 8;
-        MaxHp = 56;
+        MaxVitality = 56;
         DamageMin = 5;
         DamageMax = 8;
         ToHit = 3;
@@ -44,7 +44,7 @@ public class CmHeartwoodGoblin : Monster
         AddLoot("/domains/hollow/obj/healing_potion", 4);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

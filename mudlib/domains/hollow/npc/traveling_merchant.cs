@@ -10,7 +10,7 @@ public class TravelingMerchant : Shopkeeper
         ShortDesc = "a traveling merchant";
         LongDesc = "A cheerful, dusty man with a pack twice his size, hung with pots, coils of rope and bundles of dried herbs. He will sell you what you need for the road.";
         Level = 2;
-        MaxHp = 18;
+        MaxVitality = 18;
 
         AddChat("Potions for the brave and rations for the hungry! Buy, {cmd}sell{/}, or just {cmd}browse{/}, friend.");
         AddChat("I've traveled the northern road for twenty years. The wilds grow stranger every season.");

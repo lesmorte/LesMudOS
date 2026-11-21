@@ -23,7 +23,7 @@ public class CmBanditLookout : Monster
         ShortDesc = "a bandit lookout";
         LongDesc = "A wiry man in a patched green cloak, a short sword at his hip and a horn on his belt, watches the road from the brush with the patience of someone paid to count travelers. He is quick to decide that you are worth the trouble. His dirt-stained fingers rest easily on the sword hilt.";
         Level = 6;
-        MaxHp = 48;
+        MaxVitality = 48;
         DamageMin = 10;
         DamageMax = 15;
         ToHit = 2;

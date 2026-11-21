@@ -230,7 +230,7 @@ public class CityBiter : Monster
         Ids.Add("biter");
         ShortDesc = "a biter";
         LongDesc = "A creature made to wound the wizard so that a bed can be tried.";
-        Level = 5; MaxHp = 5000; DamageMin = 4; DamageMax = 6; ToHit = 30;
+        Level = 5; MaxVitality = 5000; DamageMin = 4; DamageMax = 6; ToHit = 30;
         XpValue = 0; Aggressive = true;
         BaseReaction = 1.5;
         AddCombatAction("bite", "Bite", preparation: 0, recovery: 0.5);

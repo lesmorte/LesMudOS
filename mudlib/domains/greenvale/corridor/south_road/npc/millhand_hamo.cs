@@ -14,7 +14,7 @@ public class SrMillhandHamo : Npc
         ShortDesc = "Hamo, the mill hand";
         LongDesc = "A young man white with flour, his hair a dusty cap and his eyelashes powdered like a baker's. His hands are quick on the brake rope, and he watches the sails the way a sailor watches the sea.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Careful by the sails. They cross the path every four breaths, and I've no wish to haul you down.");
         AddChat("There's the whole road from up here, all the way to the trees. I like it. I like the trees from here.");

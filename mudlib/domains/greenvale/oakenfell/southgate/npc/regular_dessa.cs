@@ -13,7 +13,7 @@ public class SgRegularDessa : Npc
         ShortDesc = "Dessa Rook, a former caravan guard";
         LongDesc = "A wiry woman with a sunburnt face, a missing front tooth and a cloak patched in six colours. She sits with her back to the wall and her boots on the bench, watching the door.";
         Level = 3;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Don't take the western road, not without a good reason and a better escort. Wagons have been turned back near the Elderwood.");
         AddChat("I guarded caravans for eleven years. The road teaches you who's lying.");

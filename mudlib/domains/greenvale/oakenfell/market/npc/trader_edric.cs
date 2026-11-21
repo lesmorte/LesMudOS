@@ -13,7 +13,7 @@ public class MkTraderEdric : Npc
         ShortDesc = "Edric Bale, an ironmonger";
         LongDesc = "A lean, sharp-faced man with a tape over one shoulder and a nail between his teeth. His stall is a clutter of pots, nails, hinges and hooks, each hung in perfect order.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Pots, pans, nails and hooks! The best iron in Greenvale, forged in the Guild Quarter!");
         AddChat("A good pot lasts a lifetime. A bad pot lasts till you cook with it.");

@@ -13,7 +13,7 @@ public class RvBritHalloran : Npc
         ShortDesc = "Brit Halloran, a dockhand";
         LongDesc = "A wiry young woman with her sleeves rolled to the shoulder and a coil of rope slung across her chest. She moves along the planks like a cat on a fence and laughs at the clumsy.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("Stand clear, if you please, or I will have to throw you in.");
         AddChat("I wanted to be a ranger once. Then I saw the pay and the weather, and chose barrels.");

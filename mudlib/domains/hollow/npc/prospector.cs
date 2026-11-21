@@ -10,7 +10,7 @@ public class DrunkenProspector : Npc
         ShortDesc = "a drunken prospector";
         LongDesc = "A grizzled old man with a sunburnt nose, a battered pick leaning against his stool, and a tankard that never seems to empty. His eyes are bloodshot but sharp when they settle on you.";
         Level = 1;
-        MaxHp = 10;
+        MaxVitality = 10;
 
         AddChat("*hic* Tunnels, I tell ya. Dug under these hills by somebody who knew exactly what they were doin'.");
         AddChat("There's somethin' old down there. I put my ear to the cellar wall last night and it knocked back at me.");

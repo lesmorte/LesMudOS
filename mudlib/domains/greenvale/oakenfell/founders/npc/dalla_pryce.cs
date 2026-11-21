@@ -12,7 +12,7 @@ public class FdDallaPryce : Npc
         ShortDesc = "Dalla Pryce, a cloth-seller";
         LongDesc = "A brisk woman of middle years in a patched blue cloak, a bolt of undyed linen under one arm and a measuring cord around her neck. She has the look of someone who knows the price of everything and the weather for tomorrow.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Mind the mosaic, dear, you are walking on the founders. Everyone does it. Everyone says sorry.");
         AddChat("I come to the square every morning for the notices. You learn more in an hour here than in a month at market.");

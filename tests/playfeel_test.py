@@ -36,7 +36,7 @@ public class Ratling : Monster
     {
         Name = "ratling"; Ids.Add("rat"); Ids.Add("ratling");
         ShortDesc = "a ratling"; LongDesc = "A very small rat made for the play-feel test.";
-        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
         Aggressive = false;
         AddLoot("/domains/hollow/obj/rusty_sword", 100);
     }
@@ -51,7 +51,7 @@ public class Mouse : Monster
     {
         Name = "mouse"; Ids.Add("mouse");
         ShortDesc = "a mouse"; LongDesc = "A very small mouse made for the play-feel test.";
-        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
         Aggressive = false;
         AddLoot("/domains/hollow/obj/rusty_sword", 100);
     }
@@ -67,7 +67,7 @@ public class Skinner : Monster
     {
         Name = "skinner"; Ids.Add("skinner");
         ShortDesc = "a skinner"; LongDesc = "A creature with a skin and nothing else.";
-        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
         Aggressive = false;
         AddLoot("/domains/hollow/obj/rusty_sword", 100);
     }
@@ -82,7 +82,7 @@ public class Bare : Monster
     {
         Name = "bare"; Ids.Add("bare");
         ShortDesc = "a bare thing"; LongDesc = "Nothing to it.";
-        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
         Aggressive = false;
     }
 }
@@ -95,7 +95,7 @@ public class Twin : Monster
     {
         Name = "twin"; Ids.Add("twin");
         ShortDesc = "a twin"; LongDesc = "Two swords in one.";
-        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
         Aggressive = false;
         AddLoot("/domains/hollow/obj/rusty_sword", 100);
         AddLoot("/domains/hollow/obj/rusty_sword", 100);
@@ -111,7 +111,7 @@ public class PfDummy : Monster
     {
         Name = "dummy"; Ids.Add("dummy");
         ShortDesc = "a sparring dummy"; LongDesc = "A sack of straw that hits back, a little.";
-        Level = 1; MaxHp = 100000; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 100000; DamageMin = 1; DamageMax = 1; ToHit = -30;
         Aggressive = false;
     }
 }
@@ -145,7 +145,7 @@ public class {cls} : Monster
     {{
         Name = "{name}"; Ids.Add("{name}");
         ShortDesc = "a pinata"; LongDesc = "A paper pinata full of experience.";
-        Level = 1; MaxHp = {hp}; DamageMin = 1; DamageMax = 1; ToHit = -30; XpValue = 100;
+        Level = 1; MaxVitality = {hp}; DamageMin = 1; DamageMax = 1; ToHit = -30; XpValue = 100;
         Aggressive = false;
         AddLoot("/domains/hollow/obj/rusty_sword", 100);
     }}
@@ -161,7 +161,7 @@ public class PfBiter : Monster
     {
         Name = "biter"; Ids.Add("biter");
         ShortDesc = "a biter"; LongDesc = "It bites.";
-        Level = 1; MaxHp = 5000; DamageMin = 1; DamageMax = 1; ToHit = 30;
+        Level = 1; MaxVitality = 5000; DamageMin = 1; DamageMax = 1; ToHit = 30;
         Aggressive = false;
     }
 }
@@ -189,7 +189,7 @@ public class PfWolf : Monster
     {
         Name = "wolf"; Ids.Add("wolf");
         ShortDesc = "a grey wolf"; LongDesc = "A wolf made for the aggression tests.";
-        Level = 1; MaxHp = 100000; DamageMin = 1; DamageMax = 1; ToHit = 30; BaseReaction = 3.0;
+        Level = 1; MaxVitality = 100000; DamageMin = 1; DamageMax = 1; ToHit = 30; BaseReaction = 3.0;
         Aggressive = true;
     }
 }
@@ -203,7 +203,7 @@ public class PfHare : Monster
     {
         Name = "hare"; Ids.Add("hare");
         ShortDesc = "a hare"; LongDesc = "A hare made for the refill tests.";
-        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
         Aggressive = false;
         AddLoot("/domains/hollow/obj/rusty_sword", 100);
     }
@@ -895,7 +895,7 @@ def run_verbose(wiz):
             break
     a.drain(vic, 0.3)
     wiz.command("restore vera")
-    base = int(re.search(r"HP (\d+)/5000", wiz.command("stat biter")).group(1))
+    base = int(re.search(r"Vitality (\d+)/5000", wiz.command("stat biter")).group(1))
     vic.command("bite")
     check("verbose: turn it on", vic.command("verbose on"), "Verbose is now on.")
     check("verbose: and the status says so", vic.command("verbose"), "Verbose is on")
@@ -913,7 +913,7 @@ def run_verbose(wiz):
     check("verbose: out of the fight again", vic.command("look"), "Play Hub")
     dealt = sum(int(n) for n in re.findall(r"\(\+(\d+) damage\)", text))
     taken = sum(int(n) for n in re.findall(r"\(-(\d+) damage\)", text))
-    lost_by_biter = base - int(re.search(r"HP (\d+)/5000", wiz.command("stat biter")).group(1))
+    lost_by_biter = base - int(re.search(r"Vitality (\d+)/5000", wiz.command("stat biter")).group(1))
     check("verbose: the damage you deal is shown after the combat line", text, "(+")
     check("verbose: the damage you take is shown too", text, "(-")
     check("verbose: damage shown as dealt adds up to the Vitality the creature lost", "ok" if dealt == lost_by_biter + 0 and dealt > 0 else f"shown {dealt}, lost {lost_by_biter}", "ok")
@@ -952,7 +952,7 @@ def run_verbose(wiz):
     before = a.hp_of(vic)[0]
     text = vic.command("drink potion")
     text += fight_text(vic, until=lambda t: "Vitality)" in t, timeout=20)
-    m = re.search(r"You recover (\d+) hit points\. \(\+(\d+) Vitality\)", text)
+    m = re.search(r"You recover (\d+) Vitality\. \(\+(\d+) Vitality\)", text)
     gained = a.hp_of(vic)[0] - before
     check("verbose: healing shows (+N Vitality), the number it really healed", "ok" if m and m.group(1) == m.group(2) and gained in (int(m.group(1)), int(m.group(1)) + 1) else f"{text[-200:]!r} gained {gained}", "ok")
     raw = vic.raw_command("verbose")
@@ -973,7 +973,7 @@ def last_line(text):
 
 
 def stat3(prompt):
-    """((hp, max), (stamina, max), (mana, max)) from a default prompt, or None."""
+    """((hp, max), (endurance, max), (focus, max)) from a default prompt, or None."""
     m = re.match(r"^\w+ \((\d+)/(\d+)\) \((\d+)/(\d+)\) \((\d+)/(\d+)\) > $", prompt)
     return tuple(int(x) for x in m.groups()) if m else None
 
@@ -983,7 +983,7 @@ def poll_prompt(c, wanted, timeout=25):
     end = time.time() + timeout
     got = None
     while time.time() < end:
-        got = stat3(last_line(c.command("hp")))
+        got = stat3(last_line(c.command("vitality")))
         if got and wanted(got):
             break
         time.sleep(0.5)
@@ -994,10 +994,11 @@ def run_prompt(wiz):
     pat = h.Client("prue")
     pat.read_until("> ")
     text = pat.command("look")
-    check("prompt: the default shows name, Vitality, Stamina and Mana after a command", "ok" if stat3(last_line(text)) == (30, 30, 70, 70, 70, 70) else last_line(text), "ok")
+    check("prompt: the default shows name, Vitality, Endurance and Focus after a command", "ok" if stat3(last_line(text)) == (30, 30, 70, 70, 70, 70) else last_line(text), "ok")
     check("prompt: it begins with the character's name", last_line(text), "Prue (30/30) (70/70) (70/70) > ")
     text = pat.command("prompt")
-    check("prompt: alone it shows the prompt and the tokens", text, "Your prompt is:", "{name}", "{hp}", "{maxhp}", "{stamina}", "{maxstamina}", "{mana}", "{maxmana}", "prompt default", "prompt off")
+    check("prompt: alone it shows the prompt and the tokens", text, "Your prompt is:", "{name}", "{vitality}", "{maxvitality}", "{endurance}", "{maxendurance}", "{focus}", "{maxfocus}", "prompt default", "prompt off",
+          absent=("{hp}", "{maxhp}", "{stamina}", "{maxstamina}", "{mana}", "{maxmana}", "HP", "Mana", "Stamina"))
     # Live values.
     pat.command("down")
     pat.command("lab")
@@ -1006,7 +1007,7 @@ def run_prompt(wiz):
     text = pat.command("zap me 5")
     check("prompt: Vitality is live", "ok" if stat3(last_line(text)) and stat3(last_line(text))[0] == 25 else repr(text), "ok")
     wiz.command("goto " + TEST + "hub")
-    # Stamina and Mana are spent by a warrior's bash and a mage's bolt.
+    # Endurance and Focus are spent by a warrior's bash and a mage's bolt.
     wiz.command("goto " + TEST + "lab")
     wiz.command("clone " + TEST + "dummy")
     wizard_dummy_room = True
@@ -1018,7 +1019,7 @@ def run_prompt(wiz):
     a.drain(war, 0.3)
     war.command("bash dummy")
     war_prompt = poll_prompt(war, lambda p: p[2] < p[3])
-    check("prompt: Stamina is live (a bash costs some)", "ok" if war_prompt and war_prompt[2] < war_prompt[3] else str(war_prompt), "ok")
+    check("prompt: Endurance is live (a bash costs some)", "ok" if war_prompt and war_prompt[2] < war_prompt[3] else str(war_prompt), "ok")
     mag = h.Client("mags", archetype="mage")
     mag.read_until("> ")
     mag.command("down")
@@ -1027,7 +1028,7 @@ def run_prompt(wiz):
     a.drain(mag, 0.3)
     mag.command("bolt dummy")
     mag_prompt = poll_prompt(mag, lambda p: p[4] < p[5])
-    check("prompt: Mana is live (a bolt costs some)", "ok" if mag_prompt and mag_prompt[4] < mag_prompt[5] else str(mag_prompt), "ok")
+    check("prompt: Focus is live (a bolt costs some)", "ok" if mag_prompt and mag_prompt[4] < mag_prompt[5] else str(mag_prompt), "ok")
     for _ in range(40):
         if "You flee" in war.command("flee"):
             break
@@ -1038,12 +1039,17 @@ def run_prompt(wiz):
     wiz.command("goto " + TEST + "hub")
 
     # Setting it.
-    check("prompt: set to your own text with tokens", pat.command("prompt [{hp}/{maxhp}] {name}> "), "Your prompt is now:")
+    check("prompt: set to your own text with tokens", pat.command("prompt [{vitality}/{maxvitality}] {name}> "), "Your prompt is now:")
     text = pat.command("look")
     check("prompt: the tokens are expanded live (Vitality 25 and regenerating)", "ok" if re.match(r"^\[(2[5-9]|30)/30\] Prue> $", last_line(text)) else last_line(text), "ok")
-    pat.command("prompt {mana} mana,{stamina} sta")
-    check("prompt: a space is added when the text does not end in one", last_line(pat.command("look")), "70 mana,70 sta ")
-    pat.command("prompt {red}[{maxhp}]{/}\t{{name}}{bogus} {name")
+    pat.command("prompt {focus} focus,{endurance} end")
+    check("prompt: a space is added when the text does not end in one", last_line(pat.command("look")), "70 focus,70 end ")
+    # The old token names still work, silently: a prompt saved before the rename keeps showing its numbers.
+    check("prompt: the old tokens are accepted", pat.command("prompt [{hp}/{maxhp}] ({stamina}/{maxstamina}) ({mana}/{maxmana}) {name}> "), "Your prompt is now:")
+    text = last_line(pat.command("look"))
+    check("prompt: the old tokens expand to the same numbers", "ok" if re.match(r"^\[(2[5-9]|30)/30\] \(70/70\) \(70/70\) Prue> $", text) else text, "ok")
+    check("prompt: the old tokens are not listed", pat.command("prompt"), "Your prompt is:", absent=("{hp}", "{maxhp}", "{stamina}", "{maxstamina}", "{mana}", "{maxmana}"))
+    pat.command("prompt {red}[{maxvitality}]{/}\t{{name}}{bogus} {name")
     text = pat.raw_command("look")
     check("prompt: colour tags, control characters, unknown and unclosed tokens are removed from the player's text", last_line(ansi_free(text)), "[30] name ")
     check("prompt: and no escape sequence, tab or tag reaches the screen from it", last_line(text), absent=("\x1b", "\t", "{red}"))
@@ -1086,11 +1092,11 @@ def run_prompt(wiz):
     a.drain(wiz, 0.5)
     wiz.command("goto " + TEST + "hub")
     # Saved with the character.
-    pat.command("prompt <{hp}> ")
+    pat.command("prompt <{vitality}> ")
     pat.command("quit")
     pat.closed(3)
     again = login("prue")
-    check("prompt: saved with the character", again.command("prompt"), "Your prompt is: <{hp}>")
+    check("prompt: saved with the character", again.command("prompt"), "Your prompt is: <{vitality}>")
     check("prompt: and used after login", "ok" if re.match(r"^<(2\d|30)> $", last_line(again.command("look"))) else "no", "ok")
 
 

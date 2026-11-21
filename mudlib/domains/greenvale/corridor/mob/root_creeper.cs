@@ -32,7 +32,7 @@ public class CmRootCreeper : Monster
         ShortDesc = "a root creeper";
         LongDesc = "A mass of pale roots the thickness of a man's thigh heaves itself along the tunnel floor, a tangle of fibres with a dark hollow at its centre like a mouth. Little white tendrils reach and curl toward anything warm. It leaves a trail of sticky sap.";
         Level = 8;
-        MaxHp = 58;
+        MaxVitality = 58;
         DamageMin = 8;
         DamageMax = 13;
         ToHit = 2;
@@ -44,7 +44,7 @@ public class CmRootCreeper : Monster
         AddCombatAction("grasp", "Clinging Grasp", preparation: 0, recovery: 1.5);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

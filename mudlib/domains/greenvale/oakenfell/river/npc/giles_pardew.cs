@@ -12,7 +12,7 @@ public class RvHughPardew : Npc
         ShortDesc = "Giles Pardew, a senior clerk";
         LongDesc = "A heavy, balding man with a drooping moustache, sleeves protectors on his forearms and a large brass key on a chain at his belt. He sighs often and always at the paperwork.";
         Level = 1;
-        MaxHp = 18;
+        MaxVitality = 18;
 
         AddChat("Come back in a season, if it is passage you want. For freight, wait in the line.");
         AddChat("Thirty years at this desk. I have seen the river rise, I have seen it fall, and I have seen the forms change four times, and not once for the better.");

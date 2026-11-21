@@ -43,7 +43,7 @@ public class {cls} : Monster
         Name = "{name}";
 {id_lines}        ShortDesc = "{short}";
         LongDesc = "A creature made for the area test.";
-        Level = {level}; MaxHp = {hp}; DamageMin = {dmin}; DamageMax = {dmax}; ToHit = {tohit}; Armor = {armor};
+        Level = {level}; MaxVitality = {hp}; DamageMin = {dmin}; DamageMax = {dmax}; ToHit = {tohit}; Armor = {armor};
         XpValue = {xp}; Aggressive = {str(aggressive).lower()};
     }}
 }}
@@ -75,7 +75,7 @@ public class Looter : Monster
         Ids.Add("looter");
         ShortDesc = "a looter";
         LongDesc = "A harmless looter.";
-        Level = 1; MaxHp = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 1; DamageMin = 1; DamageMax = 1; ToHit = -30;
         GoldMin = 7; GoldMax = 7;
         Aggressive = false;
         AddLoot("/domains/hollow/obj/rusty_sword", 100);
@@ -207,7 +207,7 @@ public class TestTrinket : Armor
         ShortDesc = "a test trinket";
         Slot = "trinket";
         ArmorValue = 0;
-        MaxHpBonus = 5;
+        MaxVitalityBonus = 5;
         Value = 40;
     }
 }
@@ -234,8 +234,8 @@ def number(pattern, text, default=None):
 
 
 def hp_of(c):
-    text = c.command("hp")
-    m = re.search(r"HP (\d+)/(\d+)", text)
+    text = c.command("vitality")
+    m = re.search(r"Vitality (\d+)/(\d+)", text)
     return (int(m.group(1)), int(m.group(2))) if m else (None, None)
 
 
@@ -244,8 +244,8 @@ def score_of(c):
     return {
         "level": number(r"Level (\d+)", text),
         "xp": number(r"Experience (\d+)", text),
-        "hp": number(r"HP (\d+)/", text),
-        "max": number(r"HP \d+/(\d+)", text),
+        "hp": number(r"Vitality (\d+)/", text),
+        "max": number(r"Vitality \d+/(\d+)", text),
         "gold": number(r"Gold (\d+)", text),
         "text": text,
     }
@@ -535,9 +535,9 @@ def run(work, mudlib):
 
     # ===== character sheet, help =====
     s = score_of(hero)
-    check("a new character: level 1, 30 HP, 25 gold, unarmed 2-5, Reaction Time 2.5", s["text"], "Level 1   Experience 0 (100 more for level 2)",
-          "HP 30/30", "Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
-    check("hp command", hero.command("hp"), "HP 30/30")
+    check("a new character: level 1, 30 Vitality, 25 gold, unarmed 2-5, Reaction Time 2.5", s["text"], "Level 1   Experience 0 (100 more for level 2)",
+          "Vitality 30/30", "Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
+    check("hp command", hero.command("vitality"), "Vitality 30/30")
     text = hero.command("help")
     check("help lists the new commands", text, "kill (or attack)", "flee", "consider", "wield", "wear", "browse", "buy", "accept", "report", "quests", "score",
           absent=("goto", "Wizard", "slay"))
@@ -662,7 +662,7 @@ def run(work, mudlib):
     check("experience was added", str(s["xp"]), "16")
     check("fight text shows both directions", text, "a large rat")
     check("the rats left corpses, not rats", hero.command("look"), "Rat Pit", "Two corpses of a large rat are here.")
-    hero.command("hp")
+    hero.command("vitality")
 
     # ----- reset top-up: a killed creature is not replaced while its corpse lies here; then the rats come back, no more than two -----
     time.sleep(7)  # a reset passes (6 seconds)
@@ -679,7 +679,7 @@ def run(work, mudlib):
         time.sleep(1)
         text = hero.command("look")
     check("reset tops up the missing creatures (exactly two again)", text, "Two large rats are here.", absent=("Three large",))
-    hero.command("hp")
+    hero.command("vitality")
     # leave quickly; the rats attack
     # (walking away from a fight is refused now: flee, which can fail, so try again)
     for _ in range(12):
@@ -722,19 +722,19 @@ def run(work, mudlib):
     check("consider a level 1 dummy", hero.command("consider dummy"), "looks like an even match")
     check("attack is an alias of kill", hero.command("attack dummy"), "You attack a training dummy.")
     text = fight_until(hero, "reached level", timeout=120)
-    check("100 experience reach level 2", text, "You gain 100 experience.", "You have reached level 2!", "Maximum HP is now 38")
+    check("100 experience reach level 2", text, "You gain 100 experience.", "You have reached level 2!", "Maximum Vitality is now 38")
     drain(hero)
     s = score_of(hero)
-    check("level 2: experience, the rest to level 3, full healed 38 HP", s["text"], f"Level 2   Experience {base + 100} ({200 - base} more for level 3)", "HP 38/38")
+    check("level 2: experience, the rest to level 3, full healed 38 Vitality", s["text"], f"Level 2   Experience {base + 100} ({200 - base} more for level 3)", "Vitality 38/38")
     levels = [("dummy_b", 200, "", 3, 46), ("dummy_c", 300, "", 4, 54), ("dummy_d", 400, "", 5, 62)]
     for dummy, xp, total, level, max_hp in levels:
         wiz.command("clone " + TEST + dummy)
         hero.command("kill dummy")
         text = fight_until(hero, "reached level", timeout=120)
-        check(f"level {level} is reached", text, f"You gain {xp} experience.", f"You have reached level {level}!", f"Maximum HP is now {max_hp}")
+        check(f"level {level} is reached", text, f"You gain {xp} experience.", f"You have reached level {level}!", f"Maximum Vitality is now {max_hp}")
         drain(hero)
     s = score_of(hero)
-    check("level 5 reached at 1000 experience; level 6 needs 5400", s["text"], f"Level 5   Experience {base + 1000} ({4400 - base} more for level 6)", "HP 62/62")
+    check("level 5 reached at 1000 experience; level 6 needs 5400", s["text"], f"Level 5   Experience {base + 1000} ({4400 - base} more for level 6)", "Vitality 62/62")
     wiz.command("clone " + TEST + "dummy_a")
     hero.command("kill dummy")
     text = fight_until(hero, "gain 100 experience", timeout=120)
@@ -746,13 +746,13 @@ def run(work, mudlib):
     hero.command("out")
     wiz.command("out")
 
-    # ===== a trinket raises maximum HP =====
+    # ===== a trinket raises maximum Vitality =====
     wiz.command("clone " + TEST + "trinket")
     wiz.command("drop trinket")
     hero.command("get trinket")
-    check("wearing a trinket raises maximum HP", str((hero.command("wear trinket"), hp_of(hero))[1][1]), "67")
+    check("wearing a trinket raises maximum Vitality", str((hero.command("wear trinket"), hp_of(hero))[1][1]), "67")
     hero.command("remove trinket")
-    check("removing it lowers maximum HP again", str(hp_of(hero)[1]), "62")
+    check("removing it lowers maximum Vitality again", str(hp_of(hero)[1]), "62")
     hero.command("drop trinket")
     wiz.command("get trinket")
 
@@ -777,17 +777,17 @@ def run(work, mudlib):
     time.sleep(13)
     drain(hero, 0.3)
     after = hp_of(hero)[0]
-    check("regeneration in a safe room: 3 HP per step", str(after - base in (3, 6)), "True")
+    check("regeneration in a safe room: 3 Vitality per step", str(after - base in (3, 6)), "True")
     hero.command("quiet")
     base = hp_of(hero)[0]
     time.sleep(13)
     after = hp_of(hero)[0]
-    check("regeneration elsewhere: 1 HP per step", str(after - base in (1, 2)), "True")
+    check("regeneration elsewhere: 1 Vitality per step", str(after - base in (1, 2)), "True")
     deficit = 62 - after
     text = hero.command("drink potion")
     # (the biter's damage is random and the hero regenerates: a hero back at full health reads no "recover" line, and a regeneration step
     # between the hp reading and the drink may have closed a little of the gap)
-    m = re.search(r"You recover (\d+) hit points\.", text)
+    m = re.search(r"You recover (\d+) Vitality\.", text)
     got = int(m.group(1)) if m else 0
     want = min(20, deficit)
     check("a potion heals 20", text if 0 <= want - got <= 3 else f"recovered {got}, wanted about {want}: {text!r}", "You pull the stopper and drink the ruby-red potion.")
@@ -893,7 +893,7 @@ def run(work, mudlib):
     drain(hero, 1.0)
     s = score_of(hero)
     check("death: 10% of the gold lost", str(s["gold"]), str(gold - fee))
-    check("death: full HP, experience and level kept", s["text"], f"Level 5   Experience {final_xp}", "HP 62/62")
+    check("death: full Vitality, experience and level kept", s["text"], f"Level 5   Experience {final_xp}", "Vitality 62/62")
     check("death: carried items went into the corpse", hero.command("i"), "You are empty-handed.")
     check("death: nothing is equipped", score_of(hero)["text"], "nothing equipped", "Damage 2-5")
     check("the guest rooms are safe: nothing fights here", hero.command("kill brute"), "Kill what?")
@@ -1008,8 +1008,8 @@ def run(work, mudlib):
     drain(low, 0.5)
     check("level 1: goto works", low.command("goto " + TEST + "den"), "Gnawer Den", "Two gnawers are here.")
     check("goto announces departure to the room", wiz.command("goto " + TEST + "den"), "Gnawer Den")
-    check("level 1: stat on a creature", low.command("stat gnawer"), "Gnawer", "Level 1, HP 3/3", "Damage 1-1", "Monster: aggressive False, assist True")
-    check("level 1: stat me", low.command("stat me"), "Level 1, HP 30/30, gold 25")
+    check("level 1: stat on a creature", low.command("stat gnawer"), "Gnawer", "Level 1, Vitality 3/3", "Damage 1-1", "Monster: aggressive False, assist True")
+    check("level 1: stat me", low.command("stat me"), "Level 1, Vitality 30/30, gold 25")
     check("level 1: stat here", low.command("stat here"), "Gnawer Den", "Spawn /domains/test/gnawer x2: 2 alive", "Exit out")
     check("level 1: goto a player", low.command("goto hero") + quiet(low, 1.0), "Village Square", "Hero the newcomer")
     check("level 1: goto a missing room", low.command("goto /domains/nowhere"), "No such file")
@@ -1019,9 +1019,9 @@ def run(work, mudlib):
     wiz.command("promote lowly 5")
     low.read_until("level is now")
     drain(low, 0.5)
-    check("level 5: heal yourself", low.command("restore"), "You are restored to full health.")
+    check("level 5: heal yourself", low.command("restore"), "You are restored to full Vitality.")
     low.command("goto " + TEST + "den")
-    check("level 5: heal another creature", low.command("restore gnawer"), "You restore a gnawer to full health.")
+    check("level 5: heal another creature", low.command("restore gnawer"), "You restore a gnawer to full Vitality.")
     check("level 5: slay does not exist", low.command("slay gnawer"), "What?")
     wiz.command("promote lowly 10")
     low.read_until("level is now")
@@ -1036,7 +1036,7 @@ def run(work, mudlib):
 
     # ===== the Goblin Overseer =====
     # Level the wizard to 5 with dummies, then fight the real boss with the Overseer's own axe (the fists of a wizard would need
-    # six minutes for his 114 HP) and a lot of healing.
+    # six minutes for his 114 Vitality) and a lot of healing.
     wiz.command("goto " + TEST + "dummy")
     for dummy in ("dummy_d", "dummy_c", "dummy_b", "dummy_a"):
         wiz.command("clone " + TEST + dummy)
@@ -1052,7 +1052,7 @@ def run(work, mudlib):
     text = wiz.command("look")
     check("the Overseer Chamber", text, "Overseer Chamber", "Unlike the rest of the dungeon, this room is surprisingly organized.", "The Goblin Overseer is here.")
     check("look at a detail of the chamber", wiz.command("look at crow"), "crude black crow")
-    check("stat on the boss", wiz.command("stat overseer"), "Level 5, HP 114/114", "Damage 4-7, attack 7", "defense 4, armor 3", "xp 250", "loot 4",
+    check("stat on the boss", wiz.command("stat overseer"), "Level 5, Vitality 114/114", "Damage 4-7, attack 7", "defense 4, armor 3", "xp 250", "loot 4",
           "Reaction Time: base 4.0", "Axe Slash: preparation 0.0, recovery 1.0", "delay 10.0 s", "Power Strike: preparation 1.0, recovery 2.0", "delay 12.0 s",
           "Battle Cry", "Summon Goblin Minion")
     wiz.command("clone " + HOLLOW + "obj/overseers_axe")

@@ -9,7 +9,7 @@ public class CmGoblinRaider : Monster
 {
     private readonly string[] opening = new string[0];
     private readonly string[] cycle = { "hack" };
-    private readonly int[] triggerHp = { 50 };
+    private readonly int[] triggerVitality = { 50 };
     private readonly string[] triggerAction = { "whoop" };
     private int step;
     private int fired;
@@ -30,7 +30,7 @@ public class CmGoblinRaider : Monster
         ShortDesc = "a goblin raider";
         LongDesc = "A heavy-browed goblin in a stolen carter's jerkin, his arms ringed with looted copper, swings a notched cleaver as he watches the forest road. Scars cross his forearms and his grin shows broken teeth. He has the swagger of one who has lived off other people's wagons for a long time.";
         Level = 7;
-        MaxHp = 53;
+        MaxVitality = 53;
         DamageMin = 7;
         DamageMax = 11;
         ToHit = 2;
@@ -47,12 +47,12 @@ public class CmGoblinRaider : Monster
         AddLoot("/domains/hollow/obj/healing_potion", 4);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
-        for (var i = 0; i < triggerHp.Length; i++)
+        for (var i = 0; i < triggerVitality.Length; i++)
         {
-            if ((fired & (1 << i)) == 0 && Hp * 100 <= triggerHp[i] * QueryMaxHp())
+            if ((fired & (1 << i)) == 0 && Vitality * 100 <= triggerVitality[i] * QueryMaxVitality())
             {
                 fired |= 1 << i;
                 chosen = triggerAction[i];

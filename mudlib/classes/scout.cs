@@ -10,7 +10,7 @@ public class ScoutClass : PlayerClass
         SortOrder = 2;
         Title = "Scout";
         Tagline = "Quick hands and quicker feet. Dodges, tracks and strikes where it counts.";
-        Description = "The scout is the fastest of the five (Reaction Time 2.0) and wears light armor. Weapons: dagger, sword, spear, bow. Starting HP 20, 100 Stamina. Skills: Tracking, Precision Strike. Trait: Evasion.";
+        Description = "The scout is the fastest of the five (Reaction Time 2.0) and wears light armor. Weapons: dagger, sword, spear, bow. Starting Vitality 20, 100 Endurance. Skills: Tracking, Precision Strike. Trait: Evasion.";
         StartReaction = 2.0;
         VitalityBase = 3;
         VitalityPerLevel = 7;

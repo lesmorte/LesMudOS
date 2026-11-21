@@ -45,18 +45,18 @@ import area_test as a  # noqa: E402
 # The archetype the hero chooses at creation (LESMUDOS_ARCHETYPE; the default is the warrior).
 ARCH = os.environ.get("LESMUDOS_ARCHETYPE", "warrior")
 h.DEFAULT_ARCHETYPE = ARCH
-# What the five archetypes start with (CLASS_SYSTEM.md section 7): HP, gold, Stamina, Mana, the kit (as `i` lists it), the weapon
+# What the five archetypes start with (CLASS_SYSTEM.md section 7): Vitality, gold, Endurance, Focus, the kit (as `i` lists it), the weapon
 # and shield worn at the start, and the weapons the hero prefers, best first (word to wield, name in the inventory).
 ARCH_START = {
-    "warrior": dict(hp=35, gold=10, stamina=100, mana=20, kit=["a rusty sword", "a small shield"], shield=True,
+    "warrior": dict(hp=35, gold=10, endurance=100, focus=20, kit=["a rusty sword", "a small shield"], shield=True,
                     prefer=[("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("sword", "rusty sword")]),
-    "scout": dict(hp=20, gold=10, stamina=100, mana=20, kit=["a hunting bow", "an iron dagger"], shield=False,
+    "scout": dict(hp=20, gold=10, endurance=100, focus=20, kit=["a hunting bow", "an iron dagger"], shield=False,
                   prefer=[("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("bow", "hunting bow"), ("dagger", "iron dagger")]),
-    "priest": dict(hp=26, gold=15, stamina=40, mana=100, kit=["a novice's mace", "a minor healing potion"], shield=False,
+    "priest": dict(hp=26, gold=15, endurance=40, focus=100, kit=["a novice's mace", "a minor healing potion"], shield=False,
                    prefer=[("mace", "novice's mace"), ("staff", "apprentice's staff")]),
-    "mage": dict(hp=20, gold=15, stamina=30, mana=100, kit=["an apprentice's staff", "a minor healing potion"], shield=False,
+    "mage": dict(hp=20, gold=15, endurance=30, focus=100, kit=["an apprentice's staff", "a minor healing potion"], shield=False,
                  prefer=[("dagger", "enchanted dagger"), ("staff", "apprentice's staff"), ("dagger", "iron dagger")]),
-    "adventurer": dict(hp=30, gold=20, stamina=70, mana=70, kit=["a training spear", "a trail ration"], shield=False,
+    "adventurer": dict(hp=30, gold=20, endurance=70, focus=70, kit=["a training spear", "a trail ration"], shield=False,
                        prefer=[("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("spear", "training spear")]),
 }
 SPEC = ARCH_START[ARCH]
@@ -186,8 +186,8 @@ class Hero:
         self.c = h.Client(name)
         self.welcome = self.c.read_until("> ")
         self.hp, self.max_hp, self.level, self.gold, self.xp = SPEC["hp"], SPEC["hp"], 1, SPEC["gold"], 0
-        self.stamina = self.mana = 0
-        self.max_stamina, self.max_mana = SPEC["stamina"], SPEC["mana"]
+        self.endurance = self.focus = 0
+        self.max_stamina, self.max_mana = SPEC["endurance"], SPEC["focus"]
         self.pos = None
         self.entered = {}
         self.died = False
@@ -221,10 +221,10 @@ class Hero:
         if room:
             self.pos = room
             self.entered[room] = time.time()
-        for m in re.finditer(r"HP (\d+)/(\d+)", text):
+        for m in re.finditer(r"Vitality (\d+)/(\d+)", text):
             self.hp, self.max_hp = int(m.group(1)), int(m.group(2))
-        for m in re.finditer(r"Stamina (\d+)/(\d+)   Mana (\d+)/(\d+)", text):
-            self.stamina, self.max_stamina, self.mana, self.max_mana = (int(m.group(i)) for i in range(1, 5))
+        for m in re.finditer(r"Endurance (\d+)/(\d+)   Focus (\d+)/(\d+)", text):
+            self.endurance, self.max_stamina, self.focus, self.max_mana = (int(m.group(i)) for i in range(1, 5))
         return text
 
     def cmd(self, line, timeout=30):
@@ -258,7 +258,7 @@ class Hero:
     # ---- state ----
 
     def health(self):
-        self.cmd("hp")
+        self.cmd("vitality")
         return self.hp
 
     # Where a player puts the 2 attribute points of every level (docs/ATTRIBUTES.md section 8; the same as tests/balance_sim.py).
@@ -402,7 +402,7 @@ class Run:
         hero = self.hero = Hero("hero", self.stats, deadline=self.t_hard)
         check("a new character arrives in the Village Square", hero.welcome, "Welcome, Hero.", "Village Square", ROOMS["Village Square"]["desc"])
         check("score of a new character", hero.score(), "Level 1   Experience 0 (100 more for level 2)", f"Calling {ARCH.capitalize()}",
-              f"HP {SPEC['hp']}/{SPEC['hp']}   Stamina {SPEC['stamina']}/{SPEC['stamina']}   Mana {SPEC['mana']}/{SPEC['mana']}   Gold {SPEC['gold']}", "You have no quests.")
+              f"Vitality {SPEC['hp']}/{SPEC['hp']}   Endurance {SPEC['endurance']}/{SPEC['endurance']}   Focus {SPEC['focus']}/{SPEC['focus']}   Gold {SPEC['gold']}", "You have no quests.")
         check("quests of a new character", hero.cmd("quests"), "You have no quests.")
         check("a new character carries the starting kit of the calling", hero.cmd("i"), *SPEC["kit"])
         check("the calling's skills are listed", hero.cmd("skills"), "Skills" if ARCH != "adventurer" else "Appraise")
@@ -576,7 +576,7 @@ class Run:
         hero.died = False
         check("the dead character wakes in the Guest Rooms", hero.pos, GUEST)
         check("the belongings stayed with the corpse", hero.cmd("i"), "You are empty-handed.")
-        check("score after the death", hero.score(), f"HP {SPEC['hp']}/{SPEC['hp']}", "Gold %d" % (SPEC["gold"] - max(1, SPEC["gold"] // 10)), "nothing equipped", "Active quests: Clear the Cellar")
+        check("score after the death", hero.score(), f"Vitality {SPEC['hp']}/{SPEC['hp']}", "Gold %d" % (SPEC["gold"] - max(1, SPEC["gold"] // 10)), "nothing equipped", "Active quests: Clear the Cellar")
         self.stats["notes"].append("deliberate death in the Overseer Hall at level 1 (2 elite guards)")
 
     def second_player_sees_locked_corpse(self):
@@ -653,19 +653,19 @@ class Run:
             hero.health()
             if self.stats["beds"] == 1:
                 check("buying the bed heals fully and moves to the Guest Rooms", text, "Harland shows you upstairs. You sleep soundly and wake fully rested.", "Guest Rooms")
-                check("rested to full HP", "%d/%d" % (hero.health(), hero.max_hp), "%d/%d" % (hero.max_hp, hero.max_hp))
+                check("rested to full Vitality", "%d/%d" % (hero.health(), hero.max_hp), "%d/%d" % (hero.max_hp, hero.max_hp))
             return True
         return False
 
     def rest(self, want_fraction=0.9, limit=240):
-        """Rest in the Guest Rooms (safe: 3 HP per 10 seconds) until healthy."""
+        """Rest in the Guest Rooms (safe: 3 Vitality per 10 seconds) until healthy."""
         hero = self.hero
         hero.go(GUEST)
         t0 = time.time()
         start = hero.health()
         while hero.hp < hero.max_hp * want_fraction and time.time() - t0 < limit:
             time.sleep(4)
-            hero.cmd("hp")
+            hero.cmd("vitality")
             if self.fallback:
                 hero.cmd("restore")
         self.stats["rest_hp"] = self.stats.get("rest_hp", 0) + max(0, hero.hp - start)
@@ -764,7 +764,7 @@ class Run:
         skill_state = {"t": 0.0, "blessed": False}
         while True:
             time.sleep(0.45)
-            out = hero.cmd("hp")
+            out = hero.cmd("vitality")
             self.skill_step(word, skill_state, boss, enemies)
             if boss:
                 self.boss_text += text + out
@@ -792,7 +792,7 @@ class Run:
                 continue
             if hero.potion_log and "potion_checked" not in self.stats:
                 self.stats["potion_checked"] = True
-                check("a healing potion heals up to 20 in the fight", hero.potion_log, "You pull the stopper and drink the ruby-red potion.", " hit points.")
+                check("a healing potion heals up to 20 in the fight", hero.potion_log, "You pull the stopper and drink the ruby-red potion.", " Vitality.")
             if hero.hp <= worst + 3:
                 # A drink is an action: it happens at the next Ready Time (at most about 11 seconds away), so it is only worth
                 # waiting for while there is still room for what the creatures can do until then.
@@ -828,23 +828,23 @@ class Run:
 
     def skill_step(self, word, state, boss, enemies):
         """What a player of this calling does besides the basic attack: the mage bolts, the scout strikes, the priest heals and
-        blesses, the warrior bashes when Stamina is plentiful. A skill typed while not ready is queued for the next ready moment."""
+        blesses, the warrior bashes when Endurance is plentiful. A skill typed while not ready is queued for the next ready moment."""
         hero = self.hero
         now = time.time()
         if now - state["t"] < 3.0 or hero.died:
             return
         line = None
-        if ARCH == "mage" and hero.mana >= 16:
+        if ARCH == "mage" and hero.focus >= 16:
             line = "bolt " + word
-        elif ARCH == "scout" and hero.stamina >= 25:
+        elif ARCH == "scout" and hero.endurance >= 25:
             line = "strike " + word
         elif ARCH == "priest":
-            if hero.hp <= hero.max_hp * 0.5 and hero.mana >= 25:
+            if hero.hp <= hero.max_hp * 0.5 and hero.focus >= 25:
                 line = "heal"
-            elif boss and not state["blessed"] and hero.mana >= 50:
+            elif boss and not state["blessed"] and hero.focus >= 50:
                 state["blessed"] = True
                 line = "bless"
-        elif ARCH == "warrior" and hero.stamina >= 60:
+        elif ARCH == "warrior" and hero.endurance >= 60:
             line = "bash " + word
         if line:
             state["t"] = now
@@ -1004,7 +1004,7 @@ class Run:
             self.clear_room("North Road") if "North Road" in self.rooms else None
         hero.go(GUEST)
         time.sleep(8)
-        hero.cmd("hp")
+        hero.cmd("vitality")
 
     def grind(self):
         hero = self.hero
@@ -1072,8 +1072,8 @@ class Run:
             check("take the dagger", hero.cmd("get dagger"), "You take an enchanted dagger.")
         before = hero.max_hp
         t = hero.cmd("wear trinket")
-        check("the trinket raises maximum HP by 5", t + "%d" % hero.health(), "You put on a magical trinket.")
-        check("max HP +5", str(hero.max_hp - before), "5")
+        check("the trinket raises maximum Vitality by 5", t + "%d" % hero.health(), "You put on a magical trinket.")
+        check("max Vitality +5", str(hero.max_hp - before), "5")
         back = hero.move("south")
         check("the cache's only exit leads back to the Mushroom Cavern", room_of(back), "Mushroom Cavern")
         hero.score()
@@ -1106,7 +1106,7 @@ class Run:
         self.rooms[CHAMBER]["kills"] += 0
         text = self.boss_text
         check("the Overseer's Battle Cry", text, "BATTLE CRY")
-        check("the Overseer summons a Goblin Minion once his HP falls to half", text, "snarls an order, and a goblin minion scrambles out of the shadows!")
+        check("the Overseer summons a Goblin Minion once his Vitality falls to half", text, "snarls an order, and a goblin minion scrambles out of the shadows!")
         if "POWER STRIKE" in text:
             self.stats["notes"].append("saw the Overseer's Power Strike")
             check("the Power Strike was announced first", text, "The Goblin Overseer draws his axe far back...")
@@ -1246,12 +1246,12 @@ class Run:
         print(f"Final level {hero.level} with {hero.xp} XP, {hero.gold} gold; level at the Overseer: {s.get('level_at_boss')}; level-ups (level, seconds): {s['level_log']}")
         print(f"Fights {s['fights']}, retreats {s['retreats']}, beds bought {s['beds']}, potions drunk {s['potions']}, farming fights {s['farm']}, corpse recoveries {s.get('recoveries', 0)}")
         if s.get("rest_s"):
-            print(f"Resting in the Guest Rooms: {s['rest_hp']} HP in {s['rest_s']:.0f} s ({s['rest_hp'] / s['rest_s'] * 10:.1f} HP per 10 s; the rules say 3 in a safe room)")
+            print(f"Resting in the Guest Rooms: {s['rest_hp']} Vitality in {s['rest_s']:.0f} s ({s['rest_hp'] / s['rest_s'] * 10:.1f} Vitality per 10 s; the rules say 3 in a safe room)")
         print(f"Fled with the flee command: {s.get('flees', 0)} times")
         print(f"Wizard help used: {'YES, from the finding below' if self.fallback else 'no'}")
         for note in s["notes"]:
             print("  note:", note)
-        print(f"{'Room':<19}{'Engagements':>12}{'Retreats':>9}{'Deaths':>7}{'Kills':>6}{'Seconds':>8}{'HP lost':>8}")
+        print(f"{'Room':<19}{'Engagements':>12}{'Retreats':>9}{'Deaths':>7}{'Kills':>6}{'Seconds':>8}{'Vitality lost':>8}")
         for room, info in self.rooms.items():
             print(f"{room:<19}{info['engagements']:>12}{info['retreats']:>9}{info['deaths']:>7}{info['kills']:>6}{info['seconds']:>8.0f}{info['lost']:>8}")
         print("=" * 100)

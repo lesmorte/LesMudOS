@@ -19,7 +19,7 @@ public class GoblinGuardKeyholder : Monster
         BaseReaction = 3.5;
         AddCombatAction("jab", "Spear Jab", preparation: 0, recovery: 1.0);
         Level = 2;
-        MaxHp = 26;
+        MaxVitality = 26;
         DamageMin = 2;
         DamageMax = 4;
         ToHit = 0;

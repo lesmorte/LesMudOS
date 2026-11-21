@@ -2,7 +2,7 @@
 """Timing test for the combat clock (docs/COMBAT_TIMING.md section 6).
 
 Starts the driver on a temporary copy of the mudlib, adds a small arena with controlled creatures (harmless:
-they hit only on a natural 20 for 1 damage, and have 100000 HP, so luck cannot change the rhythm), logs players
+they hit only on a natural 20 for 1 damage, and have 100000 Vitality, so luck cannot change the rhythm), logs players
 in, and measures the REAL intervals between combat messages from the time they arrive over the network.
 Every expected interval is computed from the formula
 
@@ -55,7 +55,7 @@ public class {cls} : Monster
         Ids.Add("{ident}");
         ShortDesc = "a {name.lower()}";
         LongDesc = "An unmoving test creature.";
-        Level = 1; MaxHp = 100000; DamageMin = 1; DamageMax = 1; ToHit = -30;
+        Level = 1; MaxVitality = 100000; DamageMin = 1; DamageMax = 1; ToHit = -30;
         XpValue = 0; Aggressive = {str(aggressive).lower()}; Assist = {str(assist).lower()};
         BaseReaction = {rt};
 {action}{equip_lines}    }}
@@ -534,7 +534,7 @@ def run():
     wiz.command("hurt overseer 60", 0.3)  # below half
     summon_wind = hero.wait_for(r"draws a deep breath to call for help", m, 14)
     summoned = hero.wait_for(r"snarls an order, and a goblin minion", m, 4)
-    check_near("with his HP at half the next action is the Summon: the call comes 1 s after the warning (0.5 x 2)", summoned - summon_wind if summoned and summon_wind else None, 1.0, 0.3)
+    check_near("with his Vitality at half the next action is the Summon: the call comes 1 s after the warning (0.5 x 2)", summoned - summon_wind if summoned and summon_wind else None, 1.0, 0.3)
     check_near("the Summon follows the Battle Cry's delay ((4.0 + 0.5) x 2)", summon_wind - cry if summon_wind and cry else None, 9.0)
     minion_hit = hero.wait_for(r"Goblin minion (scratches|hits|misses|smashes) you|A goblin minion (scratches|hits|misses|smashes) you", m, 9)
     check_near("the minion, drawn in, waits its Reaction Time (2.5 x 2 s) before the first blow", minion_hit - summoned if minion_hit and summoned else None, 5.0, 0.6)
@@ -557,7 +557,7 @@ def run():
     time.sleep(1)
     check("and nobody else is struck by it", "ok" if "crushing POWER STRIKE" not in obs.text(om) else "struck", "ok")
     clean_arena(wiz)
-    check("the observer is still in a working game", obs.command("hp", 0.5), "HP ")
+    check("the observer is still in a working game", obs.command("vitality", 0.5), "Vitality ")
     stop_healing(obs)
     return wiz
 

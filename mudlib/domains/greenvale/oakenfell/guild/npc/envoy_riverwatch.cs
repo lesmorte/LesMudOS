@@ -14,7 +14,7 @@ public class GqEnvoyRiverwatch : Npc
         ShortDesc = "Sorrel, Envoy of the Riverwatch Rangers";
         LongDesc = "A sun-browned, stiff-backed woman in a worn green-and-grey coat, with a ranger's badge on her breast and a map case across her knees. She sits at a desk as though it were a saddle: capable, but not at home. Her eyes keep drifting to the window and the roads beyond.";
         Level = 25;
-        MaxHp = 110;
+        MaxVitality = 110;
 
         AddChat("Sorrel, Riverwatch Rangers. We are an office of the Rangers in this city. Ever Vigilant is our motto. Ask what you like. I will answer short.");
         AddChat("The roads are safer than they were. They are not safe. Do not confuse the two.");

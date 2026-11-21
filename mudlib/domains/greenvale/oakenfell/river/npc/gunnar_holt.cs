@@ -12,7 +12,7 @@ public class RvOsricFenn : Npc
         ShortDesc = "Gunnar Holt, the shipwright";
         LongDesc = "A burly, sawdust-covered man with arms like tree limbs and an adze in his belt. A pencil lives behind each ear, and his eyes, when he studies the hull on the slip, are the eyes of a man looking at his own child.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("She'll float, if I have my way. She usually does.");
         AddChat("Oak for the keel, elm for the planks, pitch for the seams. Any fool can build a boat. It takes a good one to build one that stays built.");

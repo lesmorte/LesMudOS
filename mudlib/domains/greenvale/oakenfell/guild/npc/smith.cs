@@ -12,7 +12,7 @@ public class GqSmith : Npc
         ShortDesc = "Brenna, a master smith";
         LongDesc = "A broad-shouldered woman with forearms like hams, a scorched leather apron and a face red from the forge. She holds a hammer as lightly as a pen, and has the cheerful bluntness of someone whose work speaks louder than she does.";
         Level = 15;
-        MaxHp = 100;
+        MaxVitality = 100;
 
         AddChat("Stand back from the sparks, friend. They do not care who you are.");
         AddChat("Iron is honest. You do right by it and it does right by you. Do wrong and it tells you at once.");

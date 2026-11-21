@@ -22,7 +22,7 @@ public class CmTunnelRat : Monster
         ShortDesc = "a tunnel rat";
         LongDesc = "A rat as long as a forearm scrabbles along the tunnel wall, its tail hairless and glistening with the damp of the roots. Its fur is pale from a life away from daylight and its eyes are small and red. It chitters shrilly when it sees you.";
         Level = 7;
-        MaxHp = 40;
+        MaxVitality = 40;
         DamageMin = 3;
         DamageMax = 6;
         ToHit = 3;

@@ -14,7 +14,7 @@ public class OaOldFarmer : Npc
         ShortDesc = "Florian Thatch, an old farmer";
         LongDesc = "A very old man seated on a bench by the well, with a stick across his knees, a hat full of holes and hands like tree-roots. He has the contented look of someone who has done his share of the work and is now supervising.";
         Level = 1;
-        MaxHp = 20;
+        MaxVitality = 20;
 
         AddChat("Sit yourself down. Everyone goes by in a hurry, and no one sits.");
         AddChat("I've sat on this bench for sixty years. The road has gone by me the whole time.");

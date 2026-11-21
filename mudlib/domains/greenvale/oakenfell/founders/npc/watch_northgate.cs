@@ -13,7 +13,7 @@ public class FdWatchNorthgate : Npc
         ShortDesc = "Halvard Pike, a city watchman";
         LongDesc = "A lean, long-faced watchman in a green surcoat marked with a white oak, a long spear in his hand and an old horn at his belt. His eyes are never still, and he has the habit of looking at the horizon when speaking to you.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Northgate is open from dawn bell to dusk bell. Keep to the right with your carts.");
         AddChat("What lies beyond the gate is the Northern Road. I would walk it in daylight, and I would not walk it alone.");

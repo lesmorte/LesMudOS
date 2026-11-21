@@ -12,7 +12,7 @@ public class SrDroverIves : Npc
         ShortDesc = "Ives, a drover";
         LongDesc = "A broad, sun-browned man with a drover's long coat, a stick as tall as himself, and the habit of looking at every animal in the yard and estimating its weight. He sits on the bench under the ash with a bowl of stew and a mug beside him.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Sit, sit. I've been on the road a week and I'd talk to a post if it nodded.");
         AddChat("Cattle to the Hollow, empty home. The easy way round. It's all the rest I'd not do again.");

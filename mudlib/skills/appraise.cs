@@ -8,7 +8,7 @@ public class AppraiseSkill : Skill
         Title = "Appraise";
         Command = "appraise";
         Summary = "Shows an item's exact numbers and what shops pay for it. {cmd}appraise{/} ITEM.";
-        StaminaCost = 5;
+        EnduranceCost = 5;
         Recovery = 0.5;
         Target = "item";
     }

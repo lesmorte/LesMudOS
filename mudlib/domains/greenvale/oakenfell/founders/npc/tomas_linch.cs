@@ -12,7 +12,7 @@ public class FdTomasWick : Npc
         ShortDesc = "Tomas Linch, the lamplighter";
         LongDesc = "A stooped old man in a long grey coat, with a pole over his shoulder topped by a little brass hook and a pouch of tapers at his belt. His hands are stained with oil and his eyes are the pale blue of old lamplight.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Seventy-one lamps from here to the river. I know each one by its smell.");
         AddChat("Forty years I have lit the square, and it has not once been dark in it that I did not know why.");

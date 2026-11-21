@@ -386,20 +386,20 @@ class Walker:
         hp = max_hp = 0
         while time.time() < end:
             time.sleep(1.0)
-            m = re.search(r"HP (\d+)/(\d+)", w.cmd("hp"))
+            m = re.search(r"Vitality (\d+)/(\d+)", w.cmd("vitality"))
             if m:
                 hp, max_hp = int(m.group(1)), int(m.group(2))
             if max_hp and hp <= max_hp - 8:
                 break
-        R.ok(0 < hp < max_hp, "bed: the buyer was wounded before sleeping (setup)", f"HP {hp}/{max_hp}")
+        R.ok(0 < hp < max_hp, "bed: the buyer was wounded before sleeping (setup)", f"Vitality {hp}/{max_hp}")
         out = self.say(w, "goto " + OAK + "southgate/silver_stag")
-        wounded = re.search(r"HP (\d+)/(\d+)", w.cmd("hp"))
+        wounded = re.search(r"Vitality (\d+)/(\d+)", w.cmd("vitality"))
         self.ensure_gold(30)
         before = self.gold()
         out = self.say(w, "buy bed")
         R.ok("Orla shows you upstairs" in out, "bed: buy bed gives Orla's line", f"got: {body(out)[:300]!r}")
         R.ok("The Silver Stag Inn, Guest Rooms" in lines_of(out), "bed: the buyer arrives in the guest rooms", f"got lines: {lines_of(out)[:12]}")
-        hp_after = re.search(r"HP (\d+)/(\d+)", w.cmd("hp"))
+        hp_after = re.search(r"Vitality (\d+)/(\d+)", w.cmd("vitality"))
         R.ok(bool(hp_after) and hp_after.group(1) == hp_after.group(2), "bed: the buyer is fully healed",
              f"before {wounded.group(0) if wounded else '?'}, after {hp_after.group(0) if hp_after else '?'}")
         R.ok(before - self.gold() == 8, "bed: the bed costs 8 gold, as browse says")

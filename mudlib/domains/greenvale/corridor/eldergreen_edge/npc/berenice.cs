@@ -11,7 +11,7 @@ public class EeBerenice : Npc
         ShortDesc = "Berenice, a charcoal burner";
         LongDesc = "A broad, black-streaked woman with a scarf tied over her hair and a rake in her hands. Soot has worked into every line of her face, so that only her eyes and teeth are clean, and she smells strongly of woodsmoke.";
         Level = 3;
-        MaxHp = 45;
+        MaxVitality = 45;
 
         AddChat("A clamp can't be hurried. Three days of watching, and one lapse spoils the lot.");
         AddChat("Don't touch anything black unless I say. It's hotter than it looks.");

@@ -24,10 +24,10 @@ public class CombatAction
     public string Strike = "";
     /// <summary>Damage multiplier of an attack action.</summary>
     public int DamageMultiplier = 1;
-    /// <summary>Stamina paid when the action begins.</summary>
-    public int StaminaCost;
-    /// <summary>Mana paid when the action begins.</summary>
-    public int ManaCost;
+    /// <summary>Endurance paid when the action begins.</summary>
+    public int EnduranceCost;
+    /// <summary>Focus paid when the action begins.</summary>
+    public int FocusCost;
     /// <summary>"attack" (a to-hit roll and damage), "use" (a consumable), "skill" (a skill or spell file resolves it), or a builder's own kind handled in Special().</summary>
     public string Kind = "attack";
     /// <summary>Added to the attack roll of an attack action (Precision Strike: +5).</summary>
@@ -58,11 +58,11 @@ public class TimedEffect
 }
 
 /// <summary>
-/// Anything that has hit points and can fight: players, villagers, monsters.
+/// Anything that has Vitality and can fight: players, villagers, monsters.
 /// Holds the numbers, the equipment slots and the combat engine, which runs on the
 /// event clock of docs/COMBAT_TIMING.md: every combatant has a Reaction Time, every
 /// action a Preparation and a Recovery, and a combatant's next step is one driver
-/// call-out. Set the numbers in Create(); Hp starts full by itself.
+/// call-out. Set the numbers in Create(); Vitality starts full by itself.
 /// </summary>
 public abstract class Living : Thing
 {
@@ -77,8 +77,10 @@ public abstract class Living : Thing
     private static readonly string[] ShotHow = { "", "", " squarely", " clean through" };
 
     [Saved] protected int Level = 1;
-    protected int MaxHp = 10;
-    [Saved] private int hp = -1; // -1: not yet set, meaning full
+    protected int MaxVitality = 10;
+    // The three saved resource fields keep their old names, hp, stamina and mana: the names are the keys in the character files,
+    // and every saved character must still load. They are private; nothing else sees them.
+    [Saved] private int hp = -1; // current Vitality. -1: not yet set, meaning full
     protected int DamageMin = 1;
     protected int DamageMax = 2;
     protected int ToHit;
@@ -88,22 +90,22 @@ public abstract class Living : Thing
     protected double BaseReaction = 2.5;
 
     // Resources (docs/CLASS_SYSTEM.md section 3). Creatures set these in Create(); players get them from their class.
-    /// <summary>Maximum Stamina. Spent by physical skills.</summary>
-    protected int MaxStamina = 50;
-    /// <summary>Maximum Mana. Spent by spells. Creatures default to none.</summary>
-    protected int MaxMana;
-    /// <summary>Stamina regained per 10 seconds.</summary>
-    protected double StaminaRegen = 5;
-    /// <summary>Mana regained per 10 seconds.</summary>
-    protected double ManaRegen = 2;
+    /// <summary>Maximum Endurance. Spent by physical skills.</summary>
+    protected int MaxEndurance = 50;
+    /// <summary>Maximum Focus. Spent by spells. Creatures default to none.</summary>
+    protected int MaxFocus;
+    /// <summary>Endurance regained per 10 seconds.</summary>
+    protected double EnduranceRegen = 5;
+    /// <summary>Focus regained per 10 seconds.</summary>
+    protected double FocusRegen = 2;
     /// <summary>Natural chance in percent to dodge an attack (before any effect or trait).</summary>
     protected int Dodge;
     /// <summary>Natural chance in percent to block a hit with a shield the creature has by nature. Shield-bearers use the shield rule instead.</summary>
     protected int BlockNatural;
     /// <summary>Attack gained per level (Attack = round(AttackRate x Level) + bonuses). Creatures have 1.0 unless they say otherwise.</summary>
     protected double AttackRate = 1.0;
-    [Saved] private double stamina = -1; // -1: not yet set, meaning full
-    [Saved] private double mana = -1;
+    [Saved] private double stamina = -1; // current Endurance. -1: not yet set, meaning full
+    [Saved] private double mana = -1; // current Focus
     private long resourceTime;
 
     /// <summary>True once Die has run for a creature that does not come back.</summary>
@@ -125,8 +127,8 @@ public abstract class Living : Thing
     private ObjectRef? currentTarget;
     private CombatAction? queued;
     private ObjectRef? queuedTarget;
-    private int paidStamina; // what the current action cost when it began (half comes back if it is interrupted)
-    private int paidMana;
+    private int paidEndurance; // what the current action cost when it began (half comes back if it is interrupted)
+    private int paidFocus;
     private long actionStart;
     private long resolveAt;
     private long readyAt;
@@ -135,15 +137,15 @@ public abstract class Living : Thing
     private int chain;
     private int actionsTaken;
 
-    protected int Hp
+    protected int Vitality
     {
         get
         {
-            var max = QueryMaxHp();
+            var max = QueryMaxVitality();
             if (hp < 0 || hp > max) hp = max;
             return hp;
         }
-        set => hp = Math.Max(0, Math.Min(value, QueryMaxHp()));
+        set => hp = Math.Max(0, Math.Min(value, QueryMaxVitality()));
     }
 
     // ---- Queries other objects use ----
@@ -157,9 +159,37 @@ public abstract class Living : Thing
 
     public int QueryLevel() => Level;
 
-    public int QueryHp() => Hp;
+    public int QueryVitality() => Vitality;
 
-    public virtual int QueryMaxHp() => MaxHp + EquipmentHpBonus();
+    // ---- Obsolete names ----
+    // The resources were called Hp, Stamina and Mana. Content written against the old public names still loads: these forward to the
+    // new ones. OBSOLETE: do not use in new content; they will go when no content file uses them.
+    /// <summary>OBSOLETE name of MaxVitality.</summary>
+    protected int MaxHp { get => MaxVitality; set => MaxVitality = value; }
+    /// <summary>OBSOLETE name of Vitality.</summary>
+    protected int Hp { get => Vitality; set => Vitality = value; }
+    /// <summary>OBSOLETE name of MaxEndurance.</summary>
+    protected int MaxStamina { get => MaxEndurance; set => MaxEndurance = value; }
+    /// <summary>OBSOLETE name of MaxFocus.</summary>
+    protected int MaxMana { get => MaxFocus; set => MaxFocus = value; }
+    /// <summary>OBSOLETE name of EnduranceRegen.</summary>
+    protected double StaminaRegen { get => EnduranceRegen; set => EnduranceRegen = value; }
+    /// <summary>OBSOLETE name of FocusRegen.</summary>
+    protected double ManaRegen { get => FocusRegen; set => FocusRegen = value; }
+    /// <summary>OBSOLETE name of QueryVitality.</summary>
+    public int QueryHp() => QueryVitality();
+    /// <summary>OBSOLETE name of QueryMaxVitality.</summary>
+    public int QueryMaxHp() => QueryMaxVitality();
+    /// <summary>OBSOLETE name of QueryEndurance.</summary>
+    public int QueryStamina() => QueryEndurance();
+    /// <summary>OBSOLETE name of QueryMaxEndurance.</summary>
+    public int QueryMaxStamina() => QueryMaxEndurance();
+    /// <summary>OBSOLETE name of QueryFocus.</summary>
+    public int QueryMana() => QueryFocus();
+    /// <summary>OBSOLETE name of QueryMaxFocus.</summary>
+    public int QueryMaxMana() => QueryMaxFocus();
+
+    public virtual int QueryMaxVitality() => MaxVitality + EquipmentVitalityBonus();
 
     public int QueryGold() => Gold;
 
@@ -252,17 +282,17 @@ public abstract class Living : Thing
     /// </summary>
     public int ScalePhysicalDamage(int amount) => Math.Max(1, (int)Math.Round(amount * (1 + QueryStat("physical_power") / 100.0), MidpointRounding.AwayFromZero));
 
-    protected int EquipmentHpBonus()
+    protected int EquipmentVitalityBonus()
     {
         var total = 0;
-        foreach (var item in QueryEquipment()) total += item.Call<int>("QueryMaxHpBonus");
+        foreach (var item in QueryEquipment()) total += item.Call<int>("QueryMaxVitalityBonus");
         return total;
     }
 
     /// <summary>One line on how hurt this creature looks.</summary>
     public string HealthLine()
     {
-        var percent = Hp * 100 / Math.Max(1, QueryMaxHp());
+        var percent = Vitality * 100 / Math.Max(1, QueryMaxVitality());
         var state = percent >= 100 ? "is unhurt"
             : percent >= 70 ? "has a few scratches"
             : percent >= 40 ? "is wounded"
@@ -275,9 +305,9 @@ public abstract class Living : Thing
 
     public override string Stat() =>
         base.Stat() +
-        $"  Level {Level}, HP {Hp}/{QueryMaxHp()}, gold {Gold}\n" +
-        $"  Stamina {QueryStamina()}/{QueryMaxStamina()}, Mana {QueryMana()}/{QueryMaxMana()}\n" +
-        $"  Regeneration per 10 s: vitality {Num2(QueryVitalityRegen())}, stamina {Num2(QueryStaminaRegen())}, mana {Num2(QueryManaRegen())}\n" +
+        $"  Level {Level}, Vitality {Vitality}/{QueryMaxVitality()}, gold {Gold}\n" +
+        $"  Endurance {QueryEndurance()}/{QueryMaxEndurance()}, Focus {QueryFocus()}/{QueryMaxFocus()}\n" +
+        $"  Regeneration per 10 s: Vitality {Num2(QueryVitalityRegen())}, Endurance {Num2(QueryEnduranceRegen())}, Focus {Num2(QueryFocusRegen())}\n" +
         $"  Damage {QueryDamageMin()}-{QueryDamageMax()}, attack {QueryAttack()} (rate {Num(QueryAttackRate())}), defense {QueryDefense()}, armor {QueryArmor()}, dodge {QueryDodge()}%, block {QueryBlock()}%, crit {Pct(QueryCrit())}%\n" +
         "  Attributes " + string.Join(", ", AttributeNames.Select(a => $"{a} {QueryAttribute(a)}")) + "\n" +
         $"  Effects of them: damage +{Pct(QueryStat("physical_power"))}%, to hit +{QueryPrecision()}, evasion +{QueryEvasion()}, crit +{Pct(StatRaw("crit"))}%, spell +{Pct(QueryStat("spell_power"))}%, healing +{Pct(QueryStat("healing_power"))}%, physical resistance {Pct(QueryStat("physical_resistance"))}%, mental resistance {Pct(QueryStat("mental_resistance"))}%\n" +
@@ -428,20 +458,20 @@ public abstract class Living : Thing
         return text.EndsWith(".") ? text.Substring(0, text.Length - 1) : text;
     }
 
-    // ---- Hit points ----
+    // ---- Vitality ----
 
-    /// <summary>Restore hit points, up to the maximum. Returns how many were restored.</summary>
+    /// <summary>Restore Vitality, up to the maximum. Returns how many were restored.</summary>
     public int Heal(int amount)
     {
         if (Dead || amount <= 0) return 0;
-        var before = Hp;
-        Hp = before + amount;
+        var before = Vitality;
+        Vitality = before + amount;
         ForgetDamageIfRecovered();
-        return Hp - before;
+        return Vitality - before;
     }
 
     /// <summary>
-    /// Lose hit points from a source that tells its own story (damage over time, say). A creature that reaches 0 dies. The attacker,
+    /// Lose Vitality from a source that tells its own story (damage over time, say). A creature that reaches 0 dies. The attacker,
     /// if any, becomes an enemy. A player with verbose on is shown the damage actually done: the one who dealt it "(+N damage)",
     /// the one who took it "(-N damage)", each on a line of its own, because the caller has no line to put it on.
     /// Attacks that have a combat line use ApplyDamage and FinishDamage and put DamageNote on that line instead.
@@ -460,7 +490,7 @@ public abstract class Living : Thing
     private readonly StringBuilder absorbed = new();
 
     /// <summary>
-    /// The first half of taking damage: the hit points are lost now and the result is returned, but a death waits for FinishDamage so
+    /// The first half of taking damage: the Vitality are lost now and the result is returned, but a death waits for FinishDamage so
     /// that the caller can first say what happened. Returns the damage actually applied (after absorption, and no more than the
     /// Vitality the creature had), or -1 if nothing could be done (already dead, or no damage).
     /// </summary>
@@ -471,15 +501,15 @@ public abstract class Living : Thing
         if (from != null && from.IsAlive && from != Self && Environment(from) == Environment()) AddEnemy(from);
         amount = Absorb(amount);
         if (amount <= 0) return 0;
-        var applied = Math.Min(amount, Hp);
+        var applied = Math.Min(amount, Vitality);
         // A player's damage is recorded as the Vitality actually lost, for the sharing of experience.
         if (from != null && from.IsAlive && from != Self && from.Call<bool>("IsPlayerCharacter"))
             damageDealt[from] = damageDealt.GetValueOrDefault(from) + applied;
-        Hp -= amount;
+        Vitality -= amount;
         return applied;
     }
 
-    /// <summary>The second half of taking damage: what absorbed damage has to say, then the death if the creature is out of hit points.</summary>
+    /// <summary>The second half of taking damage: what absorbed damage has to say, then the death if the creature is out of Vitality.</summary>
     public void FinishDamage(ObjectRef? from)
     {
         if (absorbed.Length > 0) { var text = absorbed.ToString(); absorbed.Clear(); Tell(text); }
@@ -510,7 +540,7 @@ public abstract class Living : Thing
 
     private void ForgetDamageIfRecovered()
     {
-        if (damageDealt.Count > 0 && enemies.Count == 0 && Hp >= QueryMaxHp()) damageDealt.Clear();
+        if (damageDealt.Count > 0 && enemies.Count == 0 && Vitality >= QueryMaxVitality()) damageDealt.Clear();
     }
 
     /// <summary>
@@ -529,7 +559,7 @@ public abstract class Living : Thing
     }
 
     private bool Eligible(ObjectRef who, ObjectRef room) =>
-        who.IsAlive && who.Call<bool>("IsPlayerCharacter") && !who.Call<bool>("IsDead") && who.Call<int>("QueryHp") > 0 && Environment(who) == room && !who.Call<bool>("QueryIdle");
+        who.IsAlive && who.Call<bool>("IsPlayerCharacter") && !who.Call<bool>("IsDead") && who.Call<int>("QueryVitality") > 0 && Environment(who) == room && !who.Call<bool>("QueryIdle");
 
     /// <summary>
     /// Divide experience among the eligible players by damage. The killing blow (if it came from an eligible player who dealt at least
@@ -742,13 +772,13 @@ public abstract class Living : Thing
 
     // ---- Resources ----
 
-    public virtual int QueryMaxStamina() => MaxStamina;
+    public virtual int QueryMaxEndurance() => MaxEndurance;
 
-    public virtual int QueryMaxMana() => MaxMana;
+    public virtual int QueryMaxFocus() => MaxFocus;
 
-    public virtual double QueryStaminaRegen() => StaminaRegen;
+    public virtual double QueryEnduranceRegen() => EnduranceRegen;
 
-    public virtual double QueryManaRegen() => ManaRegen;
+    public virtual double QueryFocusRegen() => FocusRegen;
 
     /// <summary>Vitality regained per 10 seconds out of combat. Creatures do not regenerate; players override it.</summary>
     public virtual double QueryVitalityRegen() => 0;
@@ -763,16 +793,16 @@ public abstract class Living : Thing
     }
 
     /// <summary>
-    /// Bring Stamina and Mana up to the present. Regeneration is lazy: nothing ticks, the amount regained since the last
+    /// Bring Endurance and Focus up to the present. Regeneration is lazy: nothing ticks, the amount regained since the last
     /// call is worked out here at the current rate (doubled in a safe room, faster out of combat for those with the trait).
     /// </summary>
     private void SettleResources()
     {
         var now = TimeMs();
-        var maxStamina = QueryMaxStamina();
-        var maxMana = QueryMaxMana();
-        if (stamina < 0 || stamina > maxStamina) stamina = stamina < 0 ? maxStamina : maxStamina;
-        if (mana < 0 || mana > maxMana) mana = mana < 0 ? maxMana : maxMana;
+        var maxEndurance = QueryMaxEndurance();
+        var maxFocus = QueryMaxFocus();
+        if (stamina < 0 || stamina > maxEndurance) stamina = stamina < 0 ? maxEndurance : maxEndurance;
+        if (mana < 0 || mana > maxFocus) mana = mana < 0 ? maxFocus : maxFocus;
         if (resourceTime == 0) resourceTime = now;
         var tens = (now - resourceTime) / 10000.0;
         resourceTime = now;
@@ -781,46 +811,46 @@ public abstract class Living : Thing
         var room = Environment();
         if (room != null && room.Call<bool>("QuerySafe")) factor *= 2;
         if (!QueryInCombat()) factor *= 1 + QueryMod("regen_out");
-        stamina = Math.Min(maxStamina, stamina + QueryStaminaRegen() * factor * tens);
-        mana = Math.Min(maxMana, mana + QueryManaRegen() * factor * tens);
+        stamina = Math.Min(maxEndurance, stamina + QueryEnduranceRegen() * factor * tens);
+        mana = Math.Min(maxFocus, mana + QueryFocusRegen() * factor * tens);
     }
 
-    public int QueryStamina() { SettleResources(); return (int)Math.Floor(stamina + 1e-9); }
+    public int QueryEndurance() { SettleResources(); return (int)Math.Floor(stamina + 1e-9); }
 
-    public int QueryMana() { SettleResources(); return (int)Math.Floor(mana + 1e-9); }
+    public int QueryFocus() { SettleResources(); return (int)Math.Floor(mana + 1e-9); }
 
-    /// <summary>Pay Stamina and Mana together. False, and nothing is paid, if either is short.</summary>
-    public bool SpendResources(int staminaCost, int manaCost)
+    /// <summary>Pay Endurance and Focus together. False, and nothing is paid, if either is short.</summary>
+    public bool SpendResources(int enduranceCost, int focusCost)
     {
         SettleResources();
-        if (stamina + 1e-9 < staminaCost || mana + 1e-9 < manaCost) return false;
-        stamina -= staminaCost;
-        mana -= manaCost;
+        if (stamina + 1e-9 < enduranceCost || mana + 1e-9 < focusCost) return false;
+        stamina -= enduranceCost;
+        mana -= focusCost;
         return true;
     }
 
     /// <summary>Give back resources (an interrupted action), up to the maximum.</summary>
-    public void RefundResources(int staminaAmount, int manaAmount)
+    public void RefundResources(int enduranceAmount, int focusAmount)
     {
         SettleResources();
-        stamina = Math.Min(QueryMaxStamina(), stamina + staminaAmount);
-        mana = Math.Min(QueryMaxMana(), mana + manaAmount);
+        stamina = Math.Min(QueryMaxEndurance(), stamina + enduranceAmount);
+        mana = Math.Min(QueryMaxFocus(), mana + focusAmount);
     }
 
-    /// <summary>Fill Stamina and Mana.</summary>
+    /// <summary>Fill Endurance and Focus.</summary>
     public void FillResources()
     {
-        stamina = QueryMaxStamina();
-        mana = QueryMaxMana();
+        stamina = QueryMaxEndurance();
+        mana = QueryMaxFocus();
         resourceTime = TimeMs();
     }
 
-    /// <summary>Set Stamina and Mana to exact values (wizard tools and tests).</summary>
-    public void SetResources(int staminaValue, int manaValue)
+    /// <summary>Set Endurance and Focus to exact values (wizard tools and tests).</summary>
+    public void SetResources(int enduranceValue, int focusValue)
     {
         SettleResources();
-        stamina = Clamp(staminaValue, 0, QueryMaxStamina());
-        mana = Clamp(manaValue, 0, QueryMaxMana());
+        stamina = Clamp(enduranceValue, 0, QueryMaxEndurance());
+        mana = Clamp(focusValue, 0, QueryMaxFocus());
     }
 
     /// <summary>The delay of an action in milliseconds: (final Reaction Time + action modifier + action Recovery) x 2 s.</summary>
@@ -1144,7 +1174,7 @@ public abstract class Living : Thing
         }
         if (action != null && !CanPay(action))
         {
-            Tell($"You no longer have the strength or the mana for {action.Name}.\n");
+            Tell($"You no longer have the strength or the focus for {action.Name}.\n");
             action = null;
         }
         if (action == null)
@@ -1164,13 +1194,13 @@ public abstract class Living : Thing
     /// <summary>Start an action now: announce the wind-up, resolve at once if there is none, and set the Ready Time.</summary>
     private void Begin(CombatAction action, ObjectRef? target)
     {
-        paidStamina = 0;
-        paidMana = 0;
-        if (action.StaminaCost > 0 || action.ManaCost > 0)
+        paidEndurance = 0;
+        paidFocus = 0;
+        if (action.EnduranceCost > 0 || action.FocusCost > 0)
         {
-            if (!SpendResources(action.StaminaCost, action.ManaCost)) { Tell($"You cannot pay for {action.Name}.\n"); return; }
-            paidStamina = action.StaminaCost;
-            paidMana = action.ManaCost;
+            if (!SpendResources(action.EnduranceCost, action.FocusCost)) { Tell($"You cannot pay for {action.Name}.\n"); return; }
+            paidEndurance = action.EnduranceCost;
+            paidFocus = action.FocusCost;
         }
         var now = TimeMs();
         var prep = PrepMs(action);
@@ -1298,9 +1328,9 @@ public abstract class Living : Thing
         {
             var name = current?.Name ?? "action";
             var halfRecovery = Math.Max(0, readyAt - resolveAt) / 2;
-            RefundResources(paidStamina / 2, paidMana / 2);
-            paidStamina = 0;
-            paidMana = 0;
+            RefundResources(paidEndurance / 2, paidFocus / 2);
+            paidEndurance = 0;
+            paidFocus = 0;
             phase = "recovering";
             current = null;
             currentTarget = null;
@@ -1321,8 +1351,8 @@ public abstract class Living : Thing
     /// <summary>Can this action be paid for right now?</summary>
     private bool CanPay(CombatAction action)
     {
-        if (action.StaminaCost <= 0 && action.ManaCost <= 0) return true;
-        return QueryStamina() >= action.StaminaCost && QueryMana() >= action.ManaCost;
+        if (action.EnduranceCost <= 0 && action.FocusCost <= 0) return true;
+        return QueryEndurance() >= action.EnduranceCost && QueryFocus() >= action.FocusCost;
     }
 
     /// <summary>
@@ -1334,22 +1364,22 @@ public abstract class Living : Thing
         if (Dead) return "You are in no state to do that.";
         var isSpell = skill.Call<string>("QueryKind") == "spell";
         if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
-        var stamina = skill.Call<int>("QueryStaminaCost");
-        var manaCost = skill.Call<int>("QueryManaCost");
-        if (isSpell && manaCost > 0) manaCost = Math.Max(1, (int)Math.Round(manaCost * (1 + QueryMod("spell_cost_pct") / 100.0), MidpointRounding.AwayFromZero));
+        var enduranceCost = skill.Call<int>("QueryEnduranceCost");
+        var focusCost = skill.Call<int>("QueryFocusCost");
+        if (isSpell && focusCost > 0) focusCost = Math.Max(1, (int)Math.Round(focusCost * (1 + QueryMod("spell_cost_pct") / 100.0), MidpointRounding.AwayFromZero));
         var isAttack = skill.Call<bool>("QueryIsAttack");
         var action = new CombatAction
         {
             Id = skill.Call<string>("QueryId") ?? "skill", Name = skill.Call<string>("QueryTitle") ?? "Skill",
             Preparation = skill.Call<double>("QueryPreparation"), Recovery = skill.Call<double>("QueryRecovery"),
             ReactionMod = skill.Call<double>("QueryReactionMod"), WindUp = skill.Call<string>("QueryWindUp") ?? "",
-            Kind = isAttack ? "attack" : "skill", StaminaCost = stamina, ManaCost = manaCost,
+            Kind = isAttack ? "attack" : "skill", EnduranceCost = enduranceCost, FocusCost = focusCost,
             ToHitBonus = skill.Call<int>("QueryToHitBonus"), CritChance = skill.Call<int>("QueryCritChance"),
             DamageFactor = skill.Call<double>("QueryDamageFactor"), DamageMultiplier = Math.Max(1, skill.Call<int>("QueryDamageMultiplier")),
             Skill = skill,
         };
         if (!CanPay(action))
-            return QueryStamina() < action.StaminaCost ? "You are too tired for that." : "You do not have the mana for that.";
+            return QueryEndurance() < action.EnduranceCost ? "You are too tired for that." : "You do not have the focus for that.";
         if (QueryReady())
         {
             queued = null;

@@ -14,7 +14,7 @@ public class SrRangerMildred : Npc
         ShortDesc = "Mildred, a Riverwatch ranger";
         LongDesc = "A tall, weathered woman in a green-grey cloak, a longbow slung over her shoulder and a quiver at her hip. A silver badge in the shape of an eye is pinned at her collar, and she watches the far bank the way another person watches a fire.";
         Level = 6;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Ever Vigilant. That's the word. Mostly it means standing here and watching the trees.");
         AddChat("The bridge is the last easy ground. Beyond, the wood starts. Mind how you go.");

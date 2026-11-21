@@ -26,7 +26,7 @@ public class CmAncientSkeleton : Monster
         ShortDesc = "an ancient skeleton";
         LongDesc = "A skeleton in the remnants of bronze scale armor shambles upright, its jaw hanging a little open and a corroded blade still held in bony fingers. A faint green light pools in its eye sockets. It makes a dry clicking sound as it moves, like old shells shifting.";
         Level = 9;
-        MaxHp = 54;
+        MaxVitality = 54;
         DamageMin = 8;
         DamageMax = 13;
         ToHit = 3;
@@ -41,7 +41,7 @@ public class CmAncientSkeleton : Monster
         AddCombatAction("crush", "Bone Crusher", preparation: 1, recovery: 1.5, windUp: "raises its blade high in both hands", damageMultiplier: 2, strike: "brings the blade down with bone-shattering force!");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

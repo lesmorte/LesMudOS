@@ -31,7 +31,7 @@ public class CmForestSpider : Monster
         ShortDesc = "a forest spider";
         LongDesc = "A spider the size of a hunting dog hangs from a rope of silk between two oaks, bristling with pale hairs and eight glittering eyes. Fresh webs cross the path at head height. Its fangs drip a clear fluid that stings wherever it falls.";
         Level = 5;
-        MaxHp = 57;
+        MaxVitality = 57;
         DamageMin = 4;
         DamageMax = 8;
         ToHit = 2;
@@ -43,7 +43,7 @@ public class CmForestSpider : Monster
         AddCombatAction("venom", "Slowing Bite", preparation: 0, recovery: 0.5);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

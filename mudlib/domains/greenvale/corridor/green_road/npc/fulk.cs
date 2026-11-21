@@ -14,7 +14,7 @@ public class GrFulk : Npc
         ShortDesc = "Fulk, a lone tinker";
         LongDesc = "A stooped, long-armed man with a pack frame piled with kettles and pans, a wiry grey beard and a battered hat that shades most of his face. He sits on the rim of the trough with a hammer across his knees, and a lame mule grazes by his side.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Waiting for a wagon heading north. I walk alone, but I do not like to walk alone here.");
         AddChat("Kettles mended, pans patched. Pay in coin, or in company.");

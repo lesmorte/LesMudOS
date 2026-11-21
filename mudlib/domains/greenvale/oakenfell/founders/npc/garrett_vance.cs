@@ -13,7 +13,7 @@ public class FdJoryVance : Npc
         ShortDesc = "Garrett Vance, a retired adventurer";
         LongDesc = "A weathered old man on the stone bench, with a scarred left hand, a stiff left knee and a walking stick he uses mostly to point at things. His cloak is travel-faded green; his boots have been resoled so many times they are more resole than boot.";
         Level = 3;
-        MaxHp = 35;
+        MaxVitality = 35;
 
         AddChat("Thirty years I walked the roads of Greenvale. Now I walk this street, and it is further than it looks.");
         AddChat("Sit a while, friend. The bench is free, and the city will not miss you for a minute.");

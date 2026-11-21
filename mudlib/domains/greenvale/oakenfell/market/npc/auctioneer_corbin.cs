@@ -11,7 +11,7 @@ public class MkAuctioneerCorbin : Npc
         ShortDesc = "Corbin Pyke, the auctioneer";
         LongDesc = "A stout, florid man in a plum coat with a lace cravat and a voice like a brass trumpet. He carries his gavel everywhere, tucked under his arm like a cane.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("Going once! Going twice! Ah, but no one's here. Habit, friend.");
         AddChat("Between sales, I practice. A good chant is worth a hundred bidders.");

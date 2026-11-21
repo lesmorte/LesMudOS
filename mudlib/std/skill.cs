@@ -3,7 +3,7 @@
 /// inherits this class (or /std/trait for a passive feature) and sets its numbers in Create(); the id of a skill is
 /// its file name. Adding a skill is adding one file. See docs/BUILDING.md for compiled templates.
 ///
-/// The user's own Stamina and Mana are paid when the action begins; Preparation and Recovery are in time units of
+/// The user's own Endurance and Focus are paid when the action begins; Preparation and Recovery are in time units of
 /// 2 seconds and go through the same formula as a basic attack. An attack skill (IsAttack) is resolved by the
 /// combat engine with the hit roll, dodge, block and critical rolls; the modifiers below shape that attack and
 /// OnHit / OnMiss add the rider. Any other skill does its work in Resolve.
@@ -14,12 +14,12 @@ public abstract class Skill : MudObject
     protected string Title = "";
     /// <summary>The word that uses it ("bash"). Empty for a trait.</summary>
     protected string Command = "";
-    /// <summary>"skill" (physical, Stamina), "spell" (Mana, subject to spell modifiers) or "trait".</summary>
+    /// <summary>"skill" (physical, Endurance), "spell" (Focus, subject to spell modifiers) or "trait".</summary>
     protected string Kind = "skill";
     /// <summary>One line for the skills list.</summary>
     protected string Summary = "";
-    protected int StaminaCost;
-    protected int ManaCost;
+    protected int EnduranceCost;
+    protected int FocusCost;
     protected double Preparation;
     protected double Recovery = 0.5;
     protected double ReactionMod;
@@ -49,8 +49,14 @@ public abstract class Skill : MudObject
     public string QueryCommand() => Command;
     public string QueryKind() => Kind;
     public string QuerySummary() => Summary;
-    public int QueryStaminaCost() => StaminaCost;
-    public int QueryManaCost() => ManaCost;
+    public int QueryEnduranceCost() => EnduranceCost;
+    public int QueryFocusCost() => FocusCost;
+
+    // OBSOLETE names, kept so that content written against them still loads: they forward to EnduranceCost and FocusCost.
+    protected int StaminaCost { get => EnduranceCost; set => EnduranceCost = value; }
+    protected int ManaCost { get => FocusCost; set => FocusCost = value; }
+    public int QueryStaminaCost() => EnduranceCost;
+    public int QueryManaCost() => FocusCost;
     public double QueryPreparation() => Preparation;
     public double QueryRecovery() => Recovery;
     public double QueryReactionMod() => ReactionMod;
@@ -92,8 +98,8 @@ public abstract class Skill : MudObject
     public string Line(double delaySeconds)
     {
         var cost = new List<string>();
-        if (StaminaCost > 0) cost.Add($"{StaminaCost} Stamina");
-        if (ManaCost > 0) cost.Add($"{ManaCost} Mana");
+        if (EnduranceCost > 0) cost.Add($"{EnduranceCost} Endurance");
+        if (FocusCost > 0) cost.Add($"{FocusCost} Focus");
         var timing = Kind == "trait" ? "" : $" [{(cost.Count == 0 ? "free" : string.Join(", ", cost))}; " +
             (Preparation > 0 ? $"wind-up {Num(Preparation * 2)} s, " : "") + $"{Num(delaySeconds)} s]";
         var name = Command == "" ? Title : $"{{cmd}}{Command}{{/}} ({Title})";

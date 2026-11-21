@@ -13,7 +13,7 @@ public class SgRegularFenn : Npc
         ShortDesc = "Fenn Alder, a clerk";
         LongDesc = "A thin young man with ink on his cuffs and a hopeful, tired look. He wears a clerk's grey coat, a quill behind his ear, and a stack of papers in a satchel he clutches in his sleep.";
         Level = 2;
-        MaxHp = 20;
+        MaxVitality = 20;
 
         AddChat("The Assembly meets, the Consortium nods, and somehow a bylaw appears. I write them all down.");
         AddChat("Keep your eyes open in the Market. Everything is for sale, including the gossip.");

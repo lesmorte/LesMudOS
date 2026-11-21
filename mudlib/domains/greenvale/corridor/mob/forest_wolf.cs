@@ -26,7 +26,7 @@ public class CmForestWolf : Monster
         ShortDesc = "a forest wolf";
         LongDesc = "A heavy-shouldered wolf with a coat the colour of wet bark and a pale ruff at its throat pads between the trunks. It moves with the unhurried confidence of an animal that knows these woods better than anyone. Its low growl rises and falls like breathing.";
         Level = 6;
-        MaxHp = 73;
+        MaxVitality = 73;
         DamageMin = 3;
         DamageMax = 6;
         ToHit = 2;
@@ -38,7 +38,7 @@ public class CmForestWolf : Monster
         AddCombatAction("savage", "Savage Bite", preparation: 0, recovery: 0.5, damageMultiplier: 2);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

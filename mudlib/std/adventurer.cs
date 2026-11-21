@@ -40,7 +40,7 @@ public abstract class Adventurer : Living
     private int regenBeats;
     private bool dying;
     private bool inventoryRestored;
-    private double hpCarry; // fractions of a point of Vitality regenerated but not yet given
+    private double vitalityCarry; // fractions of a point of Vitality regenerated but not yet given
     private bool adventureBegun;
     private bool equipKit; // a new character's weapon and shield are put on when the kit is created
 
@@ -83,20 +83,20 @@ public abstract class Adventurer : Living
 
     private int Modified(double value, string key) => (int)Math.Round(value * (1 + ClassModifier(key) / 100.0), MidpointRounding.AwayFromZero);
 
-    public override int QueryMaxHp() =>
-        Modified(vitalityBase + vitalityPerLevel * Level + 2 * QueryAttribute("vigor"), "vitality") + EquipmentHpBonus();
+    public override int QueryMaxVitality() =>
+        Modified(vitalityBase + vitalityPerLevel * Level + 2 * QueryAttribute("vigor"), "vitality") + EquipmentVitalityBonus();
 
-    public override int QueryMaxStamina() =>
+    public override int QueryMaxEndurance() =>
         Modified(enduranceBase + endurancePerLevel * Level + 2 * QueryAttribute("resolve") + QueryAttribute("vigor"), "endurance");
 
-    public override int QueryMaxMana() =>
+    public override int QueryMaxFocus() =>
         Modified(focusBase + focusPerLevel * Level + 2 * QueryAttribute("insight") + QueryAttribute("spirit"), "focus");
 
-    public override double QueryStaminaRegen() =>
-        QueryMaxStamina() * (EnduranceRegenBase + (QueryAttribute("resolve") + QueryAttribute("vigor")) * EnduranceRegenPerPoint) * (1 + ClassModifier("endurance_regen") / 100.0);
+    public override double QueryEnduranceRegen() =>
+        QueryMaxEndurance() * (EnduranceRegenBase + (QueryAttribute("resolve") + QueryAttribute("vigor")) * EnduranceRegenPerPoint) * (1 + ClassModifier("endurance_regen") / 100.0);
 
-    public override double QueryManaRegen() =>
-        QueryMaxMana() * (FocusRegenBase + (QueryAttribute("insight") + QueryAttribute("spirit")) * FocusRegenPerPoint) * (1 + ClassModifier("focus_regen") / 100.0);
+    public override double QueryFocusRegen() =>
+        QueryMaxFocus() * (FocusRegenBase + (QueryAttribute("insight") + QueryAttribute("spirit")) * FocusRegenPerPoint) * (1 + ClassModifier("focus_regen") / 100.0);
 
     /// <summary>Vitality regained per 10 seconds out of combat, before the safe room and Survival Training.</summary>
     public override double QueryVitalityRegen() =>
@@ -196,30 +196,44 @@ public abstract class Adventurer : Living
     // Shown by the driver after every command and after unprompted output. The player's text is untrusted input: it is cleaned of
     // control characters and of every {tag} but the listed tokens, limited in length, and only the listed tokens are expanded.
 
-    private const string DefaultPrompt = "{name} ({hp}/{maxhp}) ({stamina}/{maxstamina}) ({mana}/{maxmana}) > ";
+    private const string DefaultPrompt = "{name} ({vitality}/{maxvitality}) ({endurance}/{maxendurance}) ({focus}/{maxfocus}) > ";
+    private const string OldDefaultPrompt = "{name} ({hp}/{maxhp}) ({stamina}/{maxstamina}) ({mana}/{maxmana}) > ";
     private const int MaxPromptLength = 80;
 
     /// <summary>The prompt as the player wrote it (tokens unexpanded). Saved with the character; the plain "> " is "prompt off".</summary>
     [Saved] private string promptFormat = DefaultPrompt;
 
-    /// <summary>The prompt tokens and what each stands for: the one table. (The attribute build renames Vitality, Endurance and Focus here.)</summary>
+    /// <summary>The prompt tokens and what each stands for: the one table.</summary>
     private static readonly (string token, string meaning)[] PromptTokens =
     {
         ("name", "your name"),
-        ("hp", "your current Vitality"), ("maxhp", "your maximum Vitality"),
-        ("stamina", "your current Stamina"), ("maxstamina", "your maximum Stamina"),
-        ("mana", "your current Mana"), ("maxmana", "your maximum Mana"),
+        ("vitality", "your current Vitality"), ("maxvitality", "your maximum Vitality"),
+        ("endurance", "your current Endurance"), ("maxendurance", "your maximum Endurance"),
+        ("focus", "your current Focus"), ("maxfocus", "your maximum Focus"),
     };
+
+    /// <summary>
+    /// The old token names, from when the resources were called HP, Stamina and Mana. They still work, so prompts saved before the rename keep
+    /// showing their numbers, and they are not listed in `prompt`. OBSOLETE: new prompts use the names in PromptTokens.
+    /// </summary>
+    private static readonly Dictionary<string, string> OldPromptTokens = new()
+    {
+        ["hp"] = "vitality", ["maxhp"] = "maxvitality",
+        ["stamina"] = "endurance", ["maxstamina"] = "maxendurance",
+        ["mana"] = "focus", ["maxmana"] = "maxfocus",
+    };
+
+    private static string CurrentToken(string token) => OldPromptTokens.TryGetValue(token, out var now) ? now : token;
 
     private string PromptValue(string token) => token switch
     {
         "name" => Name,
-        "hp" => Hp.ToString(),
-        "maxhp" => QueryMaxHp().ToString(),
-        "stamina" => QueryStamina().ToString(),
-        "maxstamina" => QueryMaxStamina().ToString(),
-        "mana" => QueryMana().ToString(),
-        "maxmana" => QueryMaxMana().ToString(),
+        "vitality" => Vitality.ToString(),
+        "maxvitality" => QueryMaxVitality().ToString(),
+        "endurance" => QueryEndurance().ToString(),
+        "maxendurance" => QueryMaxEndurance().ToString(),
+        "focus" => QueryFocus().ToString(),
+        "maxfocus" => QueryMaxFocus().ToString(),
         _ => "",
     };
 
@@ -235,7 +249,7 @@ public abstract class Adventurer : Living
             var end = raw.IndexOf('}', i + 1);
             if (end < 0) continue;
             var inner = raw.Substring(i + 1, end - i - 1);
-            if (PromptTokens.Any(t => t.token == inner)) text.Append('{').Append(inner).Append('}');
+            if (PromptTokens.Any(t => t.token == inner) || OldPromptTokens.ContainsKey(inner)) text.Append('{').Append(inner).Append('}');
             i = end; // a tag that is not a token (a colour tag, say) is dropped whole
         }
         return text.ToString();
@@ -244,6 +258,7 @@ public abstract class Adventurer : Living
     /// <summary>The prompt with its tokens replaced by the live values. Always cleaned first, whatever is stored.</summary>
     private string ExpandPrompt()
     {
+        if (promptFormat == OldDefaultPrompt) promptFormat = DefaultPrompt; // a character saved with the old default gets the new one
         var clean = CleanPrompt(promptFormat);
         if (clean.Trim().Length == 0) return "> ";
         var text = new StringBuilder();
@@ -251,7 +266,7 @@ public abstract class Adventurer : Living
         {
             if (clean[i] != '{') { text.Append(clean[i]); continue; }
             var end = clean.IndexOf('}', i);
-            text.Append(PromptValue(clean.Substring(i + 1, end - i - 1)));
+            text.Append(PromptValue(CurrentToken(clean.Substring(i + 1, end - i - 1))));
             i = end;
         }
         return text.ToString();
@@ -265,6 +280,7 @@ public abstract class Adventurer : Living
     private bool CmdPrompt(string args)
     {
         var word = args.Trim();
+        if (promptFormat == OldDefaultPrompt) promptFormat = DefaultPrompt;
         if (word == "")
         {
             var tokens = string.Join("\n", PromptTokens.Select(t => $"  {{{{{t.token}}}}}  {t.meaning}"));
@@ -366,8 +382,8 @@ public abstract class Adventurer : Living
         while (Level < MaxLevel && xp >= QueryXpForLevel(Level + 1))
         {
             Level++;
-            Hp = QueryMaxHp();
-            Tell($"You have reached level {Level}! You feel stronger and fully healed. Maximum HP is now {QueryMaxHp()}.\n" +
+            Vitality = QueryMaxVitality();
+            Tell($"You have reached level {Level}! You feel stronger and fully healed. Maximum Vitality is now {QueryMaxVitality()}.\n" +
                  $"You have {PointsText(QueryAttributePoints())} to place in your attributes: {{cmd}}improve{{/}} ATTRIBUTE.\n");
             if (Level is 10 or 25 or 50 or 75 or 100) ReportEvent("level.milestone", Level.ToString(), new Dictionary<string, string> { ["level"] = Level.ToString() });
         }
@@ -425,7 +441,7 @@ public abstract class Adventurer : Living
     }
 
     /// <summary>
-    /// Work out everything the classes give from the class files: starting HP, resources, attack rate, experience modifier,
+    /// Work out everything the classes give from the class files: starting Vitality, resources, attack rate, experience modifier,
     /// equipment access, skills and traits. Nothing derived is saved, so this runs at login and whenever a class changes.
     /// A class file that is gone or disabled grants nothing.
     /// </summary>
@@ -507,7 +523,7 @@ public abstract class Adventurer : Living
             foreach (var path in cls.Call<List<string>>("QueryKit") ?? new List<string>()) carried.Add(path);
             equipKit = true;
         }
-        Hp = QueryMaxHp();
+        Vitality = QueryMaxVitality();
         FillResources();
         return null;
     }
@@ -659,10 +675,10 @@ public abstract class Adventurer : Living
     {
         var isSpell = skill.Call<string>("QueryKind") == "spell";
         if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
-        var mana = skill.Call<int>("QueryManaCost");
-        if (isSpell && mana > 0) mana = Math.Max(1, (int)Math.Round(mana * (1 + QueryMod("spell_cost_pct") / 100.0), MidpointRounding.AwayFromZero));
-        if (QueryStamina() < skill.Call<int>("QueryStaminaCost")) return "You are too tired for that.";
-        if (QueryMana() < mana) return "You do not have the mana for that.";
+        var focus = skill.Call<int>("QueryFocusCost");
+        if (isSpell && focus > 0) focus = Math.Max(1, (int)Math.Round(focus * (1 + QueryMod("spell_cost_pct") / 100.0), MidpointRounding.AwayFromZero));
+        if (QueryEndurance() < skill.Call<int>("QueryEnduranceCost")) return "You are too tired for that.";
+        if (QueryFocus() < focus) return "You do not have the focus for that.";
         return null;
     }
 
@@ -738,7 +754,8 @@ public abstract class Adventurer : Living
         AddAction("read", CmdRead);
         AddAction("score", CmdScore);
         AddAction("sc", CmdScore);
-        AddAction("hp", CmdHp);
+        AddAction("vitality", CmdVitality);
+        AddAction("hp", CmdVitality); // OBSOLETE name of the command, kept as an alias; help shows vitality
         AddAction("verbose", CmdVerbose);
         AddAction("prompt", CmdPrompt);
         AddAction("skills", CmdSkills);
@@ -842,11 +859,11 @@ public abstract class Adventurer : Living
         if (Dead || !Self.IsAlive) return;
         if (++regenBeats < RegenBeats) return;
         regenBeats = 0;
-        if (QueryInCombat() || Hp >= QueryMaxHp()) { hpCarry = 0; return; }
+        if (QueryInCombat() || Vitality >= QueryMaxVitality()) { vitalityCarry = 0; return; }
         var room = Environment();
-        hpCarry += QueryVitalityRegen() * (room != null && room.Call<bool>("QuerySafe") ? 3 : 1) * (1 + QueryMod("regen_out"));
-        var whole = (int)Math.Floor(hpCarry + 1e-9);
-        hpCarry -= whole;
+        vitalityCarry += QueryVitalityRegen() * (room != null && room.Call<bool>("QuerySafe") ? 3 : 1) * (1 + QueryMod("regen_out"));
+        var whole = (int)Math.Floor(vitalityCarry + 1e-9);
+        vitalityCarry -= whole;
         if (whole > 0) Heal(whole);
     }
 
@@ -855,7 +872,7 @@ public abstract class Adventurer : Living
     /// <summary>
     /// A player does not stay dead: a corpse in the room where they fell takes their
     /// belongings and a tenth of their gold, they forget
-    /// their enemies, and wake in the Guest Rooms at full health.
+    /// their enemies, and wake in the Guest Rooms at full Vitality.
     /// </summary>
     public override void Die(ObjectRef? killer)
     {
@@ -871,7 +888,7 @@ public abstract class Adventurer : Living
             LeaveCorpse(room, killer, lost);
             ClearEnemies();
             ResetCombat(); // a pending attack or potion must not fire after the death
-            Hp = QueryMaxHp();
+            Vitality = QueryMaxVitality();
             FillResources();
             MoveObject(LoadObject(RespawnRoom));
             TellRoom(Environment()!, $"{Name} appears, looking battered.\n", Self);
@@ -1405,7 +1422,7 @@ public abstract class Adventurer : Living
         if (area != "" || region != "") text.Append($"Area {area}   Region {region}\n");
         try { text.Append(LoadObject("/secure/renown").Call<string>("TierLine", QueryName()) ?? ""); }
         catch (MudRuntimeException) { }
-        text.Append($"HP {Hp}/{QueryMaxHp()}   Stamina {QueryStamina()}/{QueryMaxStamina()}   Mana {QueryMana()}/{QueryMaxMana()}   Gold {Gold}\n");
+        text.Append($"Vitality {Vitality}/{QueryMaxVitality()}   Endurance {QueryEndurance()}/{QueryMaxEndurance()}   Focus {QueryFocus()}/{QueryMaxFocus()}   Gold {Gold}\n");
         var power = QueryStat("physical_power");
         text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}" + (power != 0 ? $" ({(power > 0 ? "+" : "")}{Pct(power)}%)" : "") +
                     $"   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}   Dodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {Pct(QueryCrit())}%\n");
@@ -1441,9 +1458,9 @@ public abstract class Adventurer : Living
         return $"Reaction Time {Num(QueryReaction())} ({string.Join(", ", parts)}). Your attack takes {Num(delay)} seconds.\n";
     }
 
-    private bool CmdHp(string args)
+    private bool CmdVitality(string args)
     {
-        Write($"HP {Hp}/{QueryMaxHp()}   Stamina {QueryStamina()}/{QueryMaxStamina()}   Mana {QueryMana()}/{QueryMaxMana()}\n");
+        Write($"Vitality {Vitality}/{QueryMaxVitality()}   Endurance {QueryEndurance()}/{QueryMaxEndurance()}   Focus {QueryFocus()}/{QueryMaxFocus()}\n");
         return true;
     }
 
@@ -1514,11 +1531,11 @@ public abstract class Adventurer : Living
         if (target == null || !target.Call<bool>("IsCreature")) { NotifyFail("Restore whom?"); return false; }
         target.Call("Heal", 100000);
         target.Call("FillResources");
-        if (target == Self) Write("You are restored to full health.\n");
+        if (target == Self) Write("You are restored to full Vitality.\n");
         else
         {
-            Write($"You restore {target.Call<string>("QueryLabel")} to full health.\n");
-            TellObject(target, "A warm light restores you to full health.\n");
+            Write($"You restore {target.Call<string>("QueryLabel")} to full Vitality.\n");
+            TellObject(target, "A warm light restores you to full Vitality.\n");
         }
         return true;
     }
@@ -1562,7 +1579,7 @@ public abstract class Adventurer : Living
 
     /// <summary>
     /// A test and builder tool: set your level (1 to 100). Your experience is set to exactly what that level needs, your
-    /// HP and resources are filled. Level 10 wizards only.
+    /// Vitality and resources are filled. Level 10 wizards only.
     /// </summary>
     private bool CmdSetLevel(string args)
     {
@@ -1570,7 +1587,7 @@ public abstract class Adventurer : Living
         if (!int.TryParse(args.Trim(), out var level) || level < 1 || level > MaxLevel) { NotifyFail("Usage: {cmd}setlevel{/} 1-" + MaxLevel); return false; }
         Level = level;
         xp = QueryXpForLevel(level);
-        Hp = QueryMaxHp();
+        Vitality = QueryMaxVitality();
         FillResources();
         Write($"You are now level {Level} with {xp} experience; the next level needs {(Level >= MaxLevel ? 0 : QueryXpForLevel(Level + 1))}.\n");
         return true;

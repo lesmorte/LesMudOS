@@ -13,7 +13,7 @@ public class GqEnvoyConsortium : Npc
         ShortDesc = "Dorian, Envoy of the Merchant Consortium";
         LongDesc = "A round, well-fed man in a waistcoat of gold-threaded brown, with a set of small brass scales pinned to his lapel and an abacus within easy reach of his right hand. His smile is open and his eyes are busy, and you suspect he has priced your boots.";
         Level = 20;
-        MaxHp = 85;
+        MaxVitality = 85;
 
         AddChat("Ah, a visitor. I am Dorian, envoy of the Merchant Consortium. Our motto is Trade Builds Tomorrow. Do ask me anything. Information is the cheapest thing I sell, and sometimes I give it away.");
         AddChat("Caravans, shipping contracts, warehouses and banking: that is the Consortium. Behind every full market stall in Greenvale is one of our wagons.");

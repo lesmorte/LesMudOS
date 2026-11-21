@@ -100,8 +100,8 @@ public class CtProbe : Thing
             }
             case "spawn": { var ob = CloneObject("/domains/crafttest/mob/" + w[0]); MoveObject(ob, room); Write("SPAWNED " + ob.Name + "\n"); return true; }
             case "slaynow": { var ob = Present(w[0], room); if (ob == null) { Write("SLAY none\n"); return true; } ob.Call("Die", me); Write("SLAIN\n"); return true; }
-            case "hurt": me.Call("Heal", 9999); me.Call("TakeDamage", int.Parse(w[0]), null); Write("HP " + me.Call<int>("QueryHp") + "/" + me.Call<int>("QueryMaxHp") + "\n"); return true;
-            case "tired": me.Call("SetResources", int.Parse(w[0]), 0); Write("ST " + me.Call<int>("QueryStamina") + "\n"); return true;
+            case "hurt": me.Call("Heal", 9999); me.Call("TakeDamage", int.Parse(w[0]), null); Write("Vitality " + me.Call<int>("QueryVitality") + "/" + me.Call<int>("QueryMaxVitality") + "\n"); return true;
+            case "tired": me.Call("SetResources", int.Parse(w[0]), 0); Write("ST " + me.Call<int>("QueryEndurance") + "\n"); return true;
             case "ctimers":
             {
                 // Every corpse in the room; SetTimers itself checks that the current player is a wizard of level 10.
@@ -203,7 +203,7 @@ public class CtPost : Monster
     public override void Create()
     {
         Name = "Training Post"; Ids.Add("post"); ShortDesc = "a training post"; LongDesc = "It fights back, feebly.";
-        Level = 1; MaxHp = 5000; DamageMin = 1; DamageMax = 1; ToHit = -40;
+        Level = 1; MaxVitality = 5000; DamageMin = 1; DamageMax = 1; ToHit = -40;
     }
 }
 """
@@ -283,7 +283,7 @@ public class FakeGob : Monster
 {
     public string Skin { get; set; } = "wolf";
     public string Blood { get; set; } = "goblin";
-    public override void Create() { Name = "Fake Goblin"; Ids.Add("fakegob"); ShortDesc = "a fake goblin"; MaxHp = 1; }
+    public override void Create() { Name = "Fake Goblin"; Ids.Add("fakegob"); ShortDesc = "a fake goblin"; MaxVitality = 1; }
     public void Vanish() => Destruct();
 }
 """
@@ -727,14 +727,14 @@ def run(work, mudlib, box):
     # ===== H. stations, recipes by teaching, by book =====
     ann.command("tele " + T + "workshop")
     text = ann.command("lessons")
-    check("the trainer lists lessons with prices", text, "Old Marta can teach you", "Berry Juice", "5 gold", "Minor Stamina Tonic", "free")
+    check("the trainer lists lessons with prices", text, "Old Marta can teach you", "Berry Juice", "5 gold", "Minor Endurance Tonic", "free")
     _, _, gold_before = pinfo(w, "ann")
     text = ann.command("learn berry juice")
     check("learning from a trainer", text, "You learn how to make Berry Juice", "You pay Old Marta 5 gold.")
     _, known, gold_after = pinfo(w, "ann")
     truth("the price was paid and the recipe saved as taught", gold_after == gold_before - 5 and known.get("berry_juice") == "taught", (gold_before, gold_after, known))
     check("learning it again", ann.command("learn berry juice"), "You already know how to make Berry Juice.")
-    check("a secret recipe cannot be taught, and the gold comes back", ann.command("learn stamina tonic"), "cannot teach you that")
+    check("a secret recipe cannot be taught, and the gold comes back", ann.command("learn endurance tonic"), "cannot teach you that")
     _, known, gold = pinfo(w, "ann")
     truth("the secret was not learned", "stamina_tonic" not in known and gold == gold_after, (known, gold))
     ann.command(f"mk {O}salve_book 1 1")
@@ -824,7 +824,7 @@ def run(work, mudlib, box):
     # The secret: blueberries and honey. Cat has no blueberries left; give some.
     cat.command(f"mk {O}blueberries 1 1")
     text = act(cat, "combine honey and blueberries", *RESULT)
-    check("a Secret recipe is found by experiment", text, "You have discovered a recipe: Minor Stamina Tonic!")
+    check("a Secret recipe is found by experiment", text, "You have discovered a recipe: Minor Endurance Tonic!")
     check("the Chronicle records the first discovery of a secret", cat.command("chron craft.discover_secret|stamina_tonic"), "has=True")
     # The Rare recipe with three ingredients, one of them Goblin Blood. Even the trusted test probe cannot make Goblin Blood:
     check("not even trusted code can make Goblin Blood", cat.command("mk /std/blood?p.kind=goblin 1 1"), "MK null")
@@ -871,29 +871,29 @@ def run(work, mudlib, box):
     ann.command(f"mk {O}berry_juice 1 2")
     ann.command("hurt 20")
     text = act(ann, "drink juice", "recover", "drink")
-    check("Berry Juice restores Vitality now (8 at Common)", text, "You recover 8 hit points.")
+    check("Berry Juice restores Vitality now (8 at Common)", text, "You recover 8 Vitality.")
     a.quiet(ann, 3)
     ann.command("hurt 20")
     text = act(ann, "drink fine juice", "recover")
-    check("a Fine juice restores more (8 x 1.25 = 10)", text, "You recover 10 hit points.")
+    check("a Fine juice restores more (8 x 1.25 = 10)", text, "You recover 10 Vitality.")
     a.quiet(ann, 3)
     ann.command(f"mk {O}simple_bandage 1 1")
     ann.command("hurt 20")
     text = act(ann, "apply bandage", "recover")
-    check("apply uses a bandage", text, "You apply a simple bandage.", "You recover 6 hit points.")
+    check("apply uses a bandage", text, "You apply a simple bandage.", "You recover 6 Vitality.")
     a.quiet(ann, 3)
     check("drink does not apply a bandage", (ann.command(f"mk {O}simple_bandage 1 1"), ann.command("drink bandage"))[1], "You can't drink that.")
     check("apply does not drink a juice", (ann.command(f"mk {O}berry_juice 1 1"), ann.command("apply juice"))[1], "You can't apply that.")
     ann.command("hurt 29")
     text = act(ann, "apply salve", "Warmth")
-    check("a salve starts healing over time (a fine salve: 3 x 1.25, rounded, every 2 seconds)", text, "you will recover 4 hit points every 2 seconds, 6 times")
+    check("a salve starts healing over time (a fine salve: 3 x 1.25, rounded, every 2 seconds)", text, "you will recover 4 Vitality every 2 seconds, 6 times")
     check("score shows the effect", ann.command("score"), "Minor Healing Salve")
     text = a.quiet(ann, 13)
     truth("it heals six times", text.count("soothes you") == 6, text)
     ann.command("tired 0")
     ann.command(f"mk {O}stamina_tonic 1 1")
-    text = act(ann, "drink tonic", "Stamina", "drink")
-    check("a tonic restores Stamina", text, "You recover 20 Stamina.")
+    text = act(ann, "drink tonic", "Endurance", "drink")
+    check("a tonic restores Endurance", text, "You recover 20 Endurance.")
     ann.command(f"mk {O}leather_wrap 1 1")
     check("the wrap can be worn", ann.command("wear wrap"), "leather wrap")
     ann.command("remove wrap")
@@ -1018,7 +1018,7 @@ def run(work, mudlib, box):
                         ("healing_herb,goblin_blood,cloth_strip", "hunters_poultice"), ("cloth_strip,healing_herb,goblin_blood", "hunters_poultice"),
                         ("goblin_blood,cloth_strip,healing_herb", "hunters_poultice"), ("wolf_skin,cloth_strip", "leather_wrap"),
                         ("healing_herb", ""), ("healing_herb,wildflower,honey", ""), ("honey,clean_water", ""), ("rabbit_skin,cloth_strip", "")]:
-        check(f"the matcher: {offer} -> {want or 'nothing'}", dq(w, "match " + offer), f"match={want}" + ("" if want else ""), absent=() if want else ("match=minor", "match=berry", "match=stamina", "match=simple", "match=hunters", "match=leather"))
+        check(f"the matcher: {offer} -> {want or 'nothing'}", dq(w, "match " + offer), f"match={want}" + ("" if want else ""), absent=() if want else ("match=minor", "match=berry", "match=endurance", "match=simple", "match=hunters", "match=leather"))
     clash_src = """// @inherit /std/recipe_set
 public class CtClashRecipes : RecipeSet
 {

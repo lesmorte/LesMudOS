@@ -13,16 +13,16 @@ public class GqHallmasterScout : Npc
         ShortDesc = "Veyla, Hallmaster of the Scouts";
         LongDesc = "A lean, weathered woman in a long grey-green cloak, with a short bow slung across her back and a hawk-feather pinned at her collar. She stands at the bow-and-cloak-pin station so quietly that visitors often walk past her before noticing, and she seems to find this funny.";
         Level = 30;
-        MaxHp = 160;
+        MaxVitality = 160;
 
         AddChat("You walk loudly, but you will learn. I am Veyla, and I speak for the Scouts. Ask what you like.");
         AddChat("This is the whole of it. At the fifth level, a Scout may choose one of three paths: Rogue, Ranger or Bard. The choice is permanent. And nothing you already are is lost.");
         AddChat("Your evasion, your tracking, your precision: they travel with you. A path is a new road from the same pair of feet.");
         AddChat("The rite of pledging is not yet open. Come back when it is, and ask me again.");
 
-        AddTopic("rogue", "The Rogue: stealth and assassination. Backstab costs twenty-five Stamina; it can only be used on a target that is not yet fighting the Rogue, it rolls to hit at two better than usual, and does triple damage if it lands. It starts the fight, so choose your moment. Opportunist is a trait: ten percent more chance of a critical blow. It asks no more experience than the common measure.");
-        AddTopic("ranger", "The Ranger: ranged combat and survival. Power Shot costs twenty Stamina and needs a bow: a single attack, two better to hit, for double damage. Hunter's Mark costs ten Stamina; the target takes two more damage from every attack the Ranger makes for sixty seconds. It is a path for those who like to see the road ahead and what stands on it. It asks no more experience than the common measure.");
-        AddTopic("bard", "The Bard: support, inspiration and utility. Song of Courage costs twenty Stamina; the Bard and every other player in the room gain one to hit and one to damage for sixty seconds. Discordant Note also costs twenty Stamina, and slows its target by thirty percent for twenty seconds. A Bard fights by making others better at it. It asks no more experience than the common measure.");
+        AddTopic("rogue", "The Rogue: stealth and assassination. Backstab costs twenty-five Endurance; it can only be used on a target that is not yet fighting the Rogue, it rolls to hit at two better than usual, and does triple damage if it lands. It starts the fight, so choose your moment. Opportunist is a trait: ten percent more chance of a critical blow. It asks no more experience than the common measure.");
+        AddTopic("ranger", "The Ranger: ranged combat and survival. Power Shot costs twenty Endurance and needs a bow: a single attack, two better to hit, for double damage. Hunter's Mark costs ten Endurance; the target takes two more damage from every attack the Ranger makes for sixty seconds. It is a path for those who like to see the road ahead and what stands on it. It asks no more experience than the common measure.");
+        AddTopic("bard", "The Bard: support, inspiration and utility. Song of Courage costs twenty Endurance; the Bard and every other player in the room gain one to hit and one to damage for sixty seconds. Discordant Note also costs twenty Endurance, and slows its target by thirty percent for twenty seconds. A Bard fights by making others better at it. It asks no more experience than the common measure.");
         AddTopic("knight,berserker,monk,warrior,warriors", "That is a Warrior's road. Gorrim speaks for them, over by the shield station. He is louder than I am, and you will not miss him.");
         AddTopic("cleric,templar,oracle,priest,priests", "That is a Priest's path. Hallmaster Anselm, at the lamp station, will tell you.");
         AddTopic("mage,druid,necromancer,mages", "A Mage's path. Hallmaster Ilsabet, at the star station. Ask her something specific. She does not like vague.");

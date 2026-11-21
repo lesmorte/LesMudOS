@@ -11,7 +11,7 @@ public class EeGwenllian : Npc
         ShortDesc = "Commander Gwenllian of the Riverwatch";
         LongDesc = "A tall woman of fifty in a long green cloak, a silver eye-badge at her collar and a plain sword at her hip. Her hair is iron-grey and cropped short, her face is brown and creased from decades outdoors, and she stands the way a woman stands who has stood watch on a great many nights.";
         Level = 9;
-        MaxHp = 110;
+        MaxVitality = 110;
 
         AddChat("Ever Vigilant. It sounds grand. It means we don't get to sit down.");
         AddChat("The Edge Post is the Rangers' main station on this road. We hold the gate, we walk the road, and we send word to Watchfort Crossing.");

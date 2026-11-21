@@ -13,7 +13,7 @@ public class MkBankerAldous : Npc
         ShortDesc = "Aldous Venn, the banker";
         LongDesc = "A tall, stooping man in a grey coat with silver buttons, peering down a long nose at a ledger. His hands are thin and spotless, and his voice is dry and precise.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Welcome to the Oakenfell Bank. Please keep your voice low.");
         AddChat("Accounts and vaults are coming services. The books are not yet open to new arrivals.");

@@ -26,7 +26,7 @@ public class CmForestStalker : Monster
         ShortDesc = "a forest stalker";
         LongDesc = "A lean, long-limbed thing the colour of lichen and old bark crouches motionless on a fallen trunk, so well matched to the wood that only the faint movement of its breath betrays it. It has the gait of a hunting cat and the eyes of nothing you can name. Its claws flex slowly, like hooked twigs.";
         Level = 9;
-        MaxHp = 70;
+        MaxVitality = 70;
         DamageMin = 4;
         DamageMax = 7;
         ToHit = 4;
@@ -40,7 +40,7 @@ public class CmForestStalker : Monster
         FindAction("ambush")!.ToHitBonus = 4;
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

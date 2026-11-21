@@ -32,7 +32,7 @@ public class CmHighwayBandit : Monster
         ShortDesc = "a highway bandit";
         LongDesc = "A road-hardened man in a travel-stained cloak, a sabre at his belt and a crossbow slung across his back, leans against a milestone as though waiting for a friend. He makes no secret of what he wants. A brass-buckled belt marks him as one of the camp's regulars.";
         Level = 8;
-        MaxHp = 59;
+        MaxVitality = 59;
         DamageMin = 6;
         DamageMax = 9;
         ToHit = 3;
@@ -50,7 +50,7 @@ public class CmHighwayBandit : Monster
         AddLoot("/domains/hollow/obj/trail_ration", 20);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

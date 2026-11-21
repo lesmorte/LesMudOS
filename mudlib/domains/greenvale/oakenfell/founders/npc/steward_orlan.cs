@@ -12,7 +12,7 @@ public class FdStewardOrlan : Npc
         ShortDesc = "Orlan Hesk, the Assembly steward";
         LongDesc = "A spare, upright man in a plain green coat with a small oak pin at the collar, grey at the temples and perfectly composed. He sits behind the desk with his hands folded and sees everything that comes through the door without turning his head.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Welcome to the public gallery. Please sit where you like, and do not applaud.");
         AddChat("Prosperity Through Unity. It is our motto. It is also, if you attend long enough, a prayer.");

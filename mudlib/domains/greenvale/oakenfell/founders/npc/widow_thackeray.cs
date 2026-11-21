@@ -11,7 +11,7 @@ public class FdWidowPerrin : Npc
         ShortDesc = "Widow Thackeray, sweeping her step";
         LongDesc = "A small, upright old woman in a black dress and a white cap, a stiff-bristled broom in her hands. She sweeps the same three stones with great determination, whether or not they need it.";
         Level = 1;
-        MaxHp = 12;
+        MaxVitality = 12;
 
         AddChat("This step has been in my husband's family for nine generations. It has not once been clean.");
         AddChat("Mind the street, dear. It was here before you and it will be here after, whatever the Assembly says.");

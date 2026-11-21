@@ -13,7 +13,7 @@ public class RvWatchEastgate : Npc
         ShortDesc = "Edmund Rask, a city watchman";
         LongDesc = "A heavy, calm watchman in a green surcoat marked with a white oak, a halberd in the crook of his arm and a thumb hooked in his belt. He has seen every kind of wagon, and nothing surprises him any more.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Eastgate. Open dawn to dusk. Stay out of the way of the carts.");
         AddChat("That road runs east to the Crossing. Fine, flat, well-patrolled. A traveler could do worse.");

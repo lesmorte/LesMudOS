@@ -13,7 +13,7 @@ public class MkTraderWenna : Npc
         ShortDesc = "Wenna Cobb, a cheesemonger";
         LongDesc = "A large, ruddy woman with sleeves rolled above floury forearms and a cheese-wire looped through her belt. Her stall is stacked with wheels of cheese in every shade from cream to deep orange.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Cheese! Soft, hard, sharp, sweet! Taste before you buy, or go hungry!");
         AddChat("Three generations on this spot, and not one complaint we couldn't talk down!");

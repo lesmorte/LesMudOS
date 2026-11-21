@@ -13,7 +13,7 @@ public class GqEnvoyAssembly : Npc
         ShortDesc = "Marisol, Envoy of the Greenvale Assembly";
         LongDesc = "A composed, silver-haired woman in a plum-coloured gown with the Assembly's gathered hands worked in thread at the collar. She sits very straight at her desk, a stack of papers aligned to its edge, and smiles in a way that suggests she has listened to many arguments and settled most of them.";
         Level = 20;
-        MaxHp = 80;
+        MaxVitality = 80;
 
         AddChat("Welcome, traveler. I am Marisol, envoy of the Greenvale Assembly. Our motto is Prosperity Through Unity. Ask me anything about the Assembly, or about any of Greenvale's powers.");
         AddChat("The Assembly governs most of the settled lands of Greenvale. We were formed by village leaders and merchants who wanted to protect each other, and we have not found a better reason since.");

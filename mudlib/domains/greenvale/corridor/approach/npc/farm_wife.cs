@@ -17,7 +17,7 @@ public class OaFarmWife : Shopkeeper
         ShortDesc = "Griselda Hobday, a farm wife";
         LongDesc = "A sturdy, rosy woman of forty with floury forearms, a spotted apron and a cloth tied over her hair. She keeps a baby on her hip on market days, a ladle in her free hand, and her eye on the children on the green.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("Bread and cheese, still warm! Baked apples with honey! Come and {cmd}browse{/}, dear, there's plenty.");
         AddChat("You look as if you've walked a long way. Sit on the wall and have something hot.");

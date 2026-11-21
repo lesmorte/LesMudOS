@@ -12,7 +12,7 @@ public class GqJourneyman : Npc
         ShortDesc = "Ansel the journeyman mason";
         LongDesc = "A broad young man in a dusty leather apron, a mason's hammer swinging at his belt and a rolled drawing under one arm. He walks like someone who has just been promoted and has not got used to it.";
         Level = 5;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Mind your feet, friend. The Row is all apprentices before noon and all journeymen after, and neither of us looks down.");
         AddChat("Four years I carried stone for Master Dunmere. Last spring he handed me a hammer of my own, and now I carry stone for money.");

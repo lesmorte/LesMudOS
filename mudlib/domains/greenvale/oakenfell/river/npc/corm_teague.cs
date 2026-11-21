@@ -12,7 +12,7 @@ public class RvCormTeague : Npc
         ShortDesc = "Corm Teague, a dockhand";
         LongDesc = "A huge, slow-moving man in a leather vest, with a barrel on each shoulder and a rope belt hung with hooks. He has hands the size of shovels and a voice, when he uses it, as soft as a child's.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Mind the planks. They are slippery.");
         AddChat("Barrels, bales, crates. It is all the same weight by evening.");

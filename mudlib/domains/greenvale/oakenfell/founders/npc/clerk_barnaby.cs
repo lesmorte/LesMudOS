@@ -12,7 +12,7 @@ public class FdClerkAnsel : Npc
         ShortDesc = "Barnaby Verrick, a clerk";
         LongDesc = "A narrow, tidy man in black sleeves and ink-stained cuffs, his spectacles pushed up onto a high forehead. He writes without looking at the page, and he has a pen behind each ear in case of emergency.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Records of citizens, births, deaths, boundaries. If it can be written down, it is kept here.");
         AddChat("Please do not lean on the grille. It was a gift.");

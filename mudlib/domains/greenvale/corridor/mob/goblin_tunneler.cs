@@ -27,7 +27,7 @@ public class CmGoblinTunneler : Monster
         ShortDesc = "a goblin tunneler";
         LongDesc = "A squat, soot-black goblin in a miner's leather cap wields a short-hafted pick, his huge hands scarred by years of digging. He smells of damp earth and lamp-oil. He grips the pick like someone who has already decided to keep this tunnel.";
         Level = 8;
-        MaxHp = 60;
+        MaxVitality = 60;
         DamageMin = 5;
         DamageMax = 8;
         ToHit = 3;
@@ -44,7 +44,7 @@ public class CmGoblinTunneler : Monster
         AddLoot("/domains/hollow/obj/trail_ration", 20);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

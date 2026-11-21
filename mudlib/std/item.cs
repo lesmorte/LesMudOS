@@ -16,7 +16,7 @@ public class Item : Thing
     protected bool QuestItem;
     /// <summary>If set, "read <thing>" shows this text.</summary>
     protected string? ReadText;
-    /// <summary>A magical property, in words, that Magical Lore and Appraise reveal ("raises maximum HP by 5"). Empty for none.</summary>
+    /// <summary>A magical property, in words, that Magical Lore and Appraise reveal ("raises maximum Vitality by 5"). Empty for none.</summary>
     protected string Magic = "";
     /// <summary>A stackable item is one object with a quantity. Two stacks of the same file and quality merge when they come to rest together.</summary>
     protected bool Stackable;

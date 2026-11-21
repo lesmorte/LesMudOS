@@ -4,7 +4,7 @@
 Starts the driver against a temporary copy of the mudlib, with a safe test room and a fighting room under /domains/test, and
 plays a wizard over TCP:
 
-1. every creature file is cloned and `stat` must show the numbers the file says (level, hit points, damage, armor, dodge,
+1. every creature file is cloned and `stat` must show the numbers the file says (level, Vitality, damage, armor, dodge,
    experience, gold, loot, Reaction Time and every action with its preparation and recovery);
 2. one scripted fight against an ordinary creature (the Forest Spider) shows its Slowing Bite;
 3. one scripted fight against a boss (the Bandit Leader) shows Shield Smash staggering and the whistle that calls a lookout.
@@ -55,7 +55,7 @@ def expected(text):
         mult = re.search(r"damageMultiplier: (\d+)", m.group(5))
         acts.append((m.group(2), float(m.group(3)), float(m.group(4)), int(mult.group(1)) if mult else 1))
     return {
-        "level": int(num("Level")), "hp": int(num("MaxHp")), "dmin": int(num("DamageMin")), "dmax": int(num("DamageMax")),
+        "level": int(num("Level")), "hp": int(num("MaxVitality")), "dmin": int(num("DamageMin")), "dmax": int(num("DamageMax")),
         "armor": int(num("Armor")), "dodge": int(num("Dodge")), "xp": int(num("XpValue")), "gmin": int(num("GoldMin")),
         "gmax": int(num("GoldMax")), "react": num("BaseReaction", 2.5), "aggressive": "Aggressive = true;" in text,
         "loot": len(re.findall(r"AddLoot\(", text)), "acts": acts,
@@ -79,7 +79,7 @@ def run(work, mudlib):
         check(f"{name}: cloned", cloned, "Cloned")
         text = wiz.command("stat " + want["first_id"])
         a_lo, a_hi = want["dmin"], want["dmax"]
-        check(f"{name}: level, hit points, damage, armor, dodge", text, f"Level {want['level']}, HP {want['hp']}/{want['hp']}",
+        check(f"{name}: level, Vitality, damage, armor, dodge", text, f"Level {want['level']}, Vitality {want['hp']}/{want['hp']}",
               f"Damage {a_lo}-{a_hi}", f"armor {want['armor']}, dodge {want['dodge']}%")
         check(f"{name}: experience, gold, loot, aggression", text, f"aggressive {want['aggressive']}", f"xp {want['xp']}",
               f"gold {want['gmin']}-{want['gmax']}", f"loot {want['loot']}")

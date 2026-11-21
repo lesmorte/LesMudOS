@@ -15,7 +15,7 @@ public class OaTollKeeper : Npc
         ShortDesc = "Humphrey Cobb, the toll keeper";
         LongDesc = "A stooped, ink-fingered man of sixty in a green Assembly coat a size too large, with a pen behind each ear and a third in his hand. Brass spectacles slide down his nose as he counts wheels, and he seems to be doing sums even when he is speaking to you.";
         Level = 3;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Next! Axles, please, not names. Names come later and are less reliable.");
         AddChat("The toll is for wagons, friend. If you walk or ride, you owe the Assembly nothing but good manners.");

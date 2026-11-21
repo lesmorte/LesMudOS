@@ -12,7 +12,7 @@ public class RvNanHobb : Npc
         ShortDesc = "Agnes Pell, an angler";
         LongDesc = "A broad, weather-reddened woman sitting astride the parapet with a short rod, a flask and a basket full of silver perch. She looks inordinately pleased with herself.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Eleven so far today. Do not tell Wat.");
         AddChat("It is all in the wrist, and the bait, and the flask. Mostly the flask.");

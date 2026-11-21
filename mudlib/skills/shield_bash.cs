@@ -8,7 +8,7 @@ public class ShieldBashSkill : Skill
         Title = "Shield Bash";
         Command = "bash";
         Summary = "A shield blow for three quarters of weapon damage. A hit staggers the target: an action it is preparing is interrupted, otherwise its next action is pushed back 2 seconds. Needs a shield.";
-        StaminaCost = 15;
+        EnduranceCost = 15;
         Preparation = 0;
         Recovery = 1.5;
         IsAttack = true;

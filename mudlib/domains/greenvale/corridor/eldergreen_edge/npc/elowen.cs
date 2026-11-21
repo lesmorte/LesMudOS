@@ -12,7 +12,7 @@ public class EeElowen : Npc
         ShortDesc = "Elowen, a hunter";
         LongDesc = "A wiry woman in a doeskin tunic with a short bow, quick grey eyes and dark hair bound in a leather thong. A faded scar runs along her jaw, and she sits very still, as if listening for something far away.";
         Level = 5;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Hush. I almost had that one.");
         AddChat("Everything in the wood is hunting something. The trick is to hunt the hunter.");

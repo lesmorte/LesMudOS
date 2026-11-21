@@ -13,7 +13,7 @@ public class SrPedlarJocosa : Npc
         ShortDesc = "Jocosa, a pedlar";
         LongDesc = "A small, sharp-eyed woman in a bright shawl, with a pack bigger than herself leaning against the wall beside her. Needles, ribbons and tin whistles hang from straps across her chest, and she appears to be counting you.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Ribbons, needles, thread and gossip, and the gossip's the one I'll give away.");
         AddChat("Going north? You'll want a good cloak, good boots and better luck. I can sell you two of those.");

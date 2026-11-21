@@ -10,7 +10,7 @@ public class MageClass : PlayerClass
         SortOrder = 4;
         Title = "Mage";
         Tagline = "Raw arcane power, and little else. Fragile, and best at a distance.";
-        Description = "The mage fights with spells, wields dagger or staff and wears light armor only. Starting HP 20, 100 Mana but only 30 Stamina. Spell: Arcane Bolt. Skill: Magical Lore. Trait: Mana Efficiency.";
+        Description = "The mage fights with spells, wields dagger or staff and wears light armor only. Starting Vitality 20, 100 Focus but only 30 Endurance. Spell: Arcane Bolt. Skill: Magical Lore. Trait: Focus Efficiency.";
         StartReaction = 2.5;
         VitalityBase = 4;
         VitalityPerLevel = 6;
@@ -25,7 +25,7 @@ public class MageClass : PlayerClass
         ArmorTypes.AddRange(new[] { "light" });
         Shield = false;
         Skills.AddRange(new[] { "arcane_bolt", "magical_lore" });
-        Traits.AddRange(new[] { "mana_efficiency" });
+        Traits.AddRange(new[] { "focus_efficiency" });
         Kit.AddRange(new[] { "/domains/hollow/obj/apprentice_staff", "/domains/hollow/obj/healing_potion" });
     }
 }

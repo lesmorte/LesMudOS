@@ -27,7 +27,7 @@ public class CmYoungBlackBear : Monster
         ShortDesc = "a young black bear";
         LongDesc = "A young black bear, all legs and shoulders, ambles between the trees with its muzzle lifted to scent the air. Its shaggy coat is still a size too large for it. Young or not, it weighs more than three men and has claws like iron hooks.";
         Level = 8;
-        MaxHp = 57;
+        MaxVitality = 57;
         DamageMin = 8;
         DamageMax = 15;
         ToHit = 2;
@@ -39,7 +39,7 @@ public class CmYoungBlackBear : Monster
         AddCombatAction("maul", "Maul", preparation: 1, recovery: 2, windUp: "rears up on its hind legs, claws spread wide", damageMultiplier: 2, strike: "comes down in a crushing maul!");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

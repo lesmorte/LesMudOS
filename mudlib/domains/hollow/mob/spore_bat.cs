@@ -18,7 +18,7 @@ public class SporeBat : Monster
         BaseReaction = 1.5;
         AddCombatAction("swoop", "Swoop", preparation: 0, recovery: 0.5);
         Level = 2;
-        MaxHp = 9;
+        MaxVitality = 9;
         DamageMin = 1;
         DamageMax = 2;
         ToHit = 1;

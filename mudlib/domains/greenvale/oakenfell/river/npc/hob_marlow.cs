@@ -11,7 +11,7 @@ public class RvHobMarlow : Npc
         ShortDesc = "Hob Marlow, a carter";
         LongDesc = "A thick-armed carter in a leather apron, with a whip coiled at his belt and a straw between his teeth. His cart is piled with barrels and his horse, a patient bay mare, looks at the world with great weariness.";
         Level = 1;
-        MaxHp = 20;
+        MaxVitality = 20;
 
         AddChat("Mind the wheel, friend. She bites.");
         AddChat("Twenty years I have hauled from this quay to the market, and the market has never once been satisfied.");

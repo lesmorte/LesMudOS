@@ -14,7 +14,7 @@ public class OaCarter : Npc
         ShortDesc = "Jessamy Wick, a carter";
         LongDesc = "A square, freckled young woman in a flour-dusted leather jerkin and a wide straw hat, hefting sacks onto a tall farm cart with the ease of long practice. Her carthorse, a patient grey, wears a ribbon in its forelock.";
         Level = 3;
-        MaxHp = 35;
+        MaxVitality = 35;
 
         AddChat("Careful, there. These are the city's loaves you're leaning on.");
         AddChat("Flour for Oakenfell, every morning. If it rains, flour for Oakenfell, wet.");
