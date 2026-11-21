@@ -1640,12 +1640,13 @@ def check_classes(read_root, problems, num):
 
 
 @contextmanager
-def tweaked(kinds=None, summon=True, hall=None, potion_heal=None, archs=None):
+def tweaked(kinds=None, summon=True, hall=None, potion_heal=None, archs=None, heal_amount=None):
     """Temporarily change creatures (name -> fields of Kind, e.g. {"Goblin Minion": {"hp": 10}}), the Overseer's Summon, the creatures
     of the Hall, the potion's strength and the callings (name -> fields of Arch, e.g. {"mage": {"vitality": (4, 7)}}), for the
     recommendations of docs/BALANCE_HUMAN.md. Nothing here is applied to the game."""
-    global SUMMON, POTION_HEAL
+    global SUMMON, POTION_HEAL, HEAL_AMOUNT
     saved, saved_summon, saved_approach, saved_heal, saved_archs = dict(KINDS), SUMMON, list(APPROACH), POTION_HEAL, dict(ARCHS)
+    saved_minor = HEAL_AMOUNT
     try:
         for name, fields in (kinds or {}).items():
             KINDS[name] = replace(KINDS[name], **fields)
@@ -1656,6 +1657,8 @@ def tweaked(kinds=None, summon=True, hall=None, potion_heal=None, archs=None):
             POTION_HEAL = potion_heal
         for name, fields in (archs or {}).items():
             ARCHS[name] = replace(ARCHS[name], **fields)
+        if heal_amount is not None:   # the Priest's Minor Heal
+            HEAL_AMOUNT = heal_amount
         yield
     finally:
         KINDS.clear()
@@ -1665,6 +1668,7 @@ def tweaked(kinds=None, summon=True, hall=None, potion_heal=None, archs=None):
         POTION_HEAL = saved_heal
         ARCHS.clear()
         ARCHS.update(saved_archs)
+        HEAL_AMOUNT = saved_minor
 
 
 def pct(x):
@@ -1731,6 +1735,35 @@ def calibrate_report(runs=3000):
         LEGACY = False
 
 
+def ablate_report(runs=2000):
+    """The current game, level 5, 4 potions at the Hall, starting gear: what each human habit costs, by calling. The first row is the
+    perfect player of the other tables; the second is the same player run through the human engine (it must agree); the third gives it
+    the arrival ambush the perfect model ignores (aggressive creatures engage on arrival and the player waits his own Reaction Time x 2 s)."""
+    print("=" * 118)
+    print(f"A. The current game, level 5, 4 potions at the Hall, starting gear: Overseer kill% by calling as habits are added ({runs} runs a cell)")
+    print("=" * 118)
+    print(f"{'':<46}" + "".join(f"{c[:5]:>7}" for c in ARCHS) + f"{'mean':>6}")
+
+    def row(label, model, aggro=True, rest=None):
+        vals = [approach_stats(c, 5, 4, model, runs, "starting", aggro)["kill"] * 100 for c in ARCHS]
+        print(f"{label:<46}" + "".join(f"{v:7.0f}" for v in vals) + f"{sum(vals) / 5:6.0f}", flush=True)
+
+    row("perfect (the simulator's player)", None, False)
+    row("engine, every habit off", HUMAN_ZERO, False)
+    row("+ the arrival ambush (player waits own reaction)", HUMAN_ZERO, True)
+    steps = [("+ Vitality, Endurance, Focus carried over", dict(carry_over=True, pause_s=3.0)),
+             ("+ typing delays", dict(delay_median=1.5, delay_sigma=0.6, p_distract=0.05)),
+             ("+ skips the skill 15%", dict(p_skip_skill=0.15)),
+             ("+ potion at 25-35%", dict(drink_lo=0.25, drink_hi=0.35)),
+             ("+ never drinks 6%", dict(p_no_drink=0.06)),
+             ("+ flees when out of potions (= human, no resting)", dict(flee=True)),
+             ("+ rests to 50% before each door (= human-mid)", dict(rest_to=0.5))]
+    cum = HUMAN_ZERO
+    for label, kw in steps:
+        cum = replace(cum, **kw)
+        row(label, cum, True)
+
+
 def human_report(runs=3000):
     """The current game: kill percentage against the Overseer, by gear, calling, level and potions, for the perfect model and the three
     humans, then the potions used and where the runs end."""
@@ -1760,7 +1793,7 @@ def human_report(runs=3000):
         print()
 
 
-def recommend_report(runs=3000):
+def recommend_report(runs=3000, only=()):
     """Changes that would bring a level 5 character in starting gear with 4 potions to about 70% against the Overseer under the middle
     human, for each calling. Run through tweaked(); nothing is applied. The low and high humans get a third of the runs."""
     print("=" * 118)
@@ -1769,6 +1802,8 @@ def recommend_report(runs=3000):
     print("=" * 118)
     print(f"{'option':<62}" + "".join(f"{c[:5]:>6}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}{'low':>6}{'high':>6}")
     for label, kw, armour in [("the game as it is", {}, 0)] + RECOMMENDATIONS:
+        if only and not label.startswith(tuple(only)):
+            continue
         rows = []
         with tweaked(**kw):
             for model, n in ((HUMAN_MID, runs), (HUMAN_LOW, runs // 3), (HUMAN_HIGH, runs // 3)):
@@ -1797,6 +1832,7 @@ RECOMMENDATIONS = [
     ("3c  = 3b and the Mage's Vitality 4 + 8 a level", dict(kinds={_O: dict(hp=100, dmg=(3, 6))}, archs=MAGE_VIT), 3),
     ("4a  Guards 32 / 2-4, Overseer 100 / 3-6, no Summon", dict(kinds={_G: dict(hp=32, dmg=(2, 4)), _O: dict(hp=100, dmg=(3, 6))}, summon=False), 0),
     ("4b  = 4a and the Mage's Vitality 4 + 8 a level", dict(kinds={_G: dict(hp=32, dmg=(2, 4)), _O: dict(hp=100, dmg=(3, 6))}, summon=False, archs=MAGE_VIT), 0),
+    ("4c  = 4b and the Priest's Minor Heal heals 5 (was 8)", dict(kinds={_G: dict(hp=32, dmg=(2, 4)), _O: dict(hp=100, dmg=(3, 6))}, summon=False, archs=MAGE_VIT, heal_amount=5), 0),
     ("5   one Elite Guard, no Summon", dict(summon=False, hall=[_G]), 0),
 ]
 
@@ -1812,9 +1848,12 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "corridor":
         corridor_table(int(sys.argv[2]) if len(sys.argv) > 2 else 400, tuple(sys.argv[3:]))
         return
-    if len(sys.argv) > 1 and sys.argv[1] in ("calibrate", "human", "recommend"):
+    if len(sys.argv) > 1 and sys.argv[1] in ("calibrate", "human", "recommend", "ablate"):
         runs = int(sys.argv[2]) if len(sys.argv) > 2 else 3000
-        {"calibrate": calibrate_report, "human": human_report, "recommend": recommend_report}[sys.argv[1]](runs)
+        if sys.argv[1] == "recommend":
+            recommend_report(runs, tuple(a for a in sys.argv[3:]))
+        else:
+            {"calibrate": calibrate_report, "human": human_report, "ablate": ablate_report}[sys.argv[1]](runs)
         return
     if len(sys.argv) > 1 and sys.argv[1] == "pace":
         pace_report(int(sys.argv[2]) if len(sys.argv) > 2 else 250)
