@@ -21,3 +21,13 @@ One place, named: `RestFactor` and `RestSurprise`. The human player model in `te
 
 ## Order
 The simulator work can start at once (it touches only `tests/balance_sim.py` and docs). The game change waits for the Vitality / Endurance / Focus rename to merge, because both edit the regeneration code.
+
+## Simulator result (21 November 2026)
+
+Details in `docs/BALANCE_HUMAN.md` section 10. Numbers to use: **RestFactor 5, RestSurprise 2.** RestSurprise is not decisive: 0 to 10 seconds moves the kill rate by 4 points at most, and it is only ever tested if a rest outlasts a room's reset.
+
+- Rest alone (RestFactor 5): the middle human beats the Overseer 73% of the time at level 5 with starting gear and 4 potions (13% today), with the callings 64 to 84 apart (Mage and Scout lowest). RestFactor 3 gives 60%, 4 gives 69%, 8 gives 76%. The result depends mainly on how long people will sit (20 s: 40%, 60 s: 74%, 120 s: 76%).
+- To bring the callings together the smallest tested change is Mage Vitality 7 a level (6), Scout 8 (7) and Priest Minor Heal 7 (8): 81 / 71 / 78 / 73 / 74, mean 75, spread 10. Not applied.
+- The perfect player's quoted level 4, 2-potion table stays at 72 to 73 on average.
+- Safe places: every cellar room is safe to sit in for about 5 minutes after its fight (a creature cannot return before its corpse is gone, 420 to 600 s); Smuggler Hall has no spawn at all. If corpses are taken away at once (skinning, bleeding, looting), creatures return within 0 to 300 s and about one rest in four is interrupted; the game would need a rule (no refill while someone sits in the room, or corpses stay while someone sits) to keep resting safe.
+- The pace of levels 1 to 5 shortens by about 25% to 35% (87 to 94 minutes without, 62 to 69 with RestFactor 5, farming limited by respawns).

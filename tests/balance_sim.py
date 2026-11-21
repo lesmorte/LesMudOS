@@ -710,6 +710,18 @@ class HumanModel:
                                    # this share of the maximum; 0 = never waits, the strict "only the rest the room sequence allows"
     topup_below: float = 0.0       # before the next door, drink potions (out of combat, one at a time) while Vitality is below this
                                    # share; 0 = never. Counted as used in the room the player is about to enter
+    # The `rest` command (docs/specs/rest.md; python3 tests/balance_sim.py rest). Off unless rest_cmd: then rest_to is not used.
+    # PATIENCE RULE ("sit until content or bored"): after the loot, in the room just cleared, the player types `rest` and stays seated
+    # until Vitality is at least rest_target of the maximum (with rest_all: until all three resources are, the "You are fully rested"
+    # message), or rest_patience_s seconds have passed, whichever comes first. Then he walks on.
+    rest_cmd: bool = False
+    rest_factor: float = 1.0       # RestFactor: all three resources regenerate this many times faster while seated
+    rest_target: float = 0.0
+    rest_all: bool = False
+    rest_patience_s: float = 0.0
+    rest_surprise_s: float = 2.0   # RestSurprise: the extra delay of the first action of a character attacked while seated
+    p_linger: float = 0.0          # chance, at each rest, that the player stays seated long after he is done (away from the keyboard,
+    linger_s: tuple = (60.0, 600.0)  # chatting) for this many extra seconds (uniform): the only way a rest outlasts a cleared room's reset
 
 
 # Three versions of the human, calibrated in docs/BALANCE_HUMAN.md (low = a sharp player, high = a clumsy one).
@@ -830,15 +842,44 @@ def gear_for(arch_name, gear):
     return gear
 
 
-def rest(p, seconds):
-    """What a character regains standing about (no safe room): the out-of-combat rates of resources()."""
+SURVIVAL = False   # True: the Adventurer's Survival Training (x1.5 out of combat for all three, mudlib/skills/survival_training.cs). Off in every
+                   # table that is quoted elsewhere; `rest` prints one row with it on.
+
+
+def rest(p, seconds, factor=1.0):
+    """What a character regains standing about (no safe room): the out-of-combat rates of resources(); factor is RestFactor while seated."""
     _, _, _, st_rate, ma_rate, hp_rate = resources(p.arch, p.level)
-    p.hp = min(p.max_hp, p.hp + hp_rate * seconds / 10.0)
-    p.stamina = min(p.max_stamina, p.stamina + st_rate * seconds / 10.0)
-    p.mana = min(p.max_mana, p.mana + ma_rate * seconds / 10.0)
+    if SURVIVAL and p.arch.name == "adventurer":
+        factor = factor * 1.5
+    p.hp = min(p.max_hp, p.hp + hp_rate * factor * seconds / 10.0)
+    p.stamina = min(p.max_stamina, p.stamina + st_rate * factor * seconds / 10.0)
+    p.mana = min(p.max_mana, p.mana + ma_rate * factor * seconds / 10.0)
 
 
-def start_times(p, enemies, delay_ms, aggro):
+def seconds_to_rest(p, model):
+    """How long the patience rule keeps the player seated from where he is: until Vitality (or, with rest_all, all three) reaches
+    rest_target, at most rest_patience_s. Seconds."""
+    _, _, _, st_rate, ma_rate, hp_rate = resources(p.arch, p.level)
+    f = model.rest_factor * (1.5 if SURVIVAL and p.arch.name == "adventurer" else 1.0)
+    need = max(0.0, model.rest_target * p.max_hp - p.hp) / (hp_rate * f / 10.0)
+    if model.rest_all:
+        if st_rate > 0:
+            need = max(need, max(0.0, model.rest_target * p.max_stamina - p.stamina) / (st_rate * f / 10.0))
+        if ma_rate > 0:
+            need = max(need, max(0.0, model.rest_target * p.max_mana - p.mana) / (ma_rate * f / 10.0))
+    return min(need, model.rest_patience_s)
+
+
+# When a cleared room's creatures come back (mudlib/std/room.cs, corpse.cs; docs/BALANCE_HUMAN.md "Resting"): every cellar room resets every
+# 300 s (no file changes ResetSeconds), but a reset replaces a creature only when its corpse is gone, and a corpse that holds a skin (rats, toad) lasts
+# 600 s, one that holds fresh blood only (goblins, bats; the player does not bleed them) 300 s of fresh blood + 120 s empty = 420 s. The reset after that
+# time (uniformly 0 to 300 s later) brings the creature back, and it is Aggressive. Smuggler Hall has no spawn at all.
+CORPSE_SECONDS_BY_ROOM = {"Tavern Cellar": 600, "Collapsed Passage": 600, "Storage Chamber": 420, "Flooded Tunnel": 600, "Mushroom Cavern": 420,
+                          "Goblin Barracks": 420, "Overseer Hall": 420}
+RESET_SECONDS = 300
+
+
+def start_times(p, enemies, delay_ms, aggro, surprise_ms=0):
     """The first Ready Time of the player and of each creature, in ms from the player's arrival in the room.
     aggro (the current game): the creatures start the fight at once and wait their Reaction Time x 2 s; the player, drawn in,
     waits his own, and a command typed after that is later still. Old game: the first creature to notice calls out after its
@@ -847,7 +888,7 @@ def start_times(p, enemies, delay_ms, aggro):
     react = [round(e.reaction * UNIT_MS) for e in enemies]
     own = round(p.reaction * UNIT_MS)
     if aggro:
-        return max(delay_ms, own), react
+        return max(delay_ms, own + surprise_ms), react
     call = min(react)
     if delay_ms < call:
         return delay_ms, [delay_ms + r for r in react]
@@ -858,7 +899,8 @@ def start_times(p, enemies, delay_ms, aggro):
 def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=True, pack_at="hall"):
     """One run from the Tavern Cellar to the Overseer. model None is the perfect player: full Vitality, Endurance and Focus for
     every fight, no typing, the existing rules. Returns a dict: outcome ("kill", "died", "fled"), room of the end, potions used by
-    room, potions left, Vitality share at the Overseer's door.
+    room, potions left, Vitality share at the Overseer's door, and "t": seconds spent fighting, walking and looting, and resting (waiting
+    at the ordinary rate for rest_to, or seated with the `rest` command); "refills": rests cut short by creatures coming back.
     pack_at: "hall" = the player enters the Overseer Hall with `potions` in the pack (the rooms before it use a spare supply, which
     is reported as used "on the way" but does not count against the pack: a player restocks at the merchant); "entrance" = the
     pack is `potions` from the first room on and the rooms before the Hall draw on it."""
@@ -867,8 +909,10 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
     p = make_player(arch, level, weapon, shield, extra_hp, armor_extra=armor)
     left = potions if pack_at == "entrance" else 99
     used = {}
-    res = {"outcome": "kill", "room": "Overseer Chamber", "used": used, "door": None}
+    t = {"fight": 0.0, "walk": 0.0, "rest": 0.0}
+    res = {"outcome": "kill", "room": "Overseer Chamber", "used": used, "door": None, "t": t, "refills": 0}
     moves, looted = 0, 0
+    prev_room, prev_creatures, prev_ms = None, None, 0
     for room, creatures in APPROACH:
         moves += 1
         if not creatures:
@@ -878,10 +922,53 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
             left = potions
         if model is None or not model.carry_over:
             p.hp, p.stamina, p.mana = p.max_hp, float(p.max_stamina), float(p.max_mana)
+        elif room != ROOM_NAMES[0] and model.rest_cmd:
+            # the `rest` command: loot and look round (ordinary rate), sit in the room just cleared (RestFactor), then walk on (ordinary rate)
+            wait = looted * LOOT_SECONDS + model.pause_s
+            rest(p, wait)
+            t["walk"] += wait
+            seated = seconds_to_rest(p, model)
+            if model.p_linger and rng.random() < model.p_linger:
+                seated += rng.uniform(*model.linger_s)
+            safe = CORPSE_SECONDS_BY_ROOM.get(prev_room, 10 ** 9) - prev_ms / 1000.0   # earliest moment, after the fight, a creature can return
+            if wait + seated > safe:   # the rest may outlast the reset: the real moment is `safe` plus a uniform 0..300 s
+                back = safe + rng.random() * RESET_SECONDS
+                if wait + seated > back:
+                    before = max(0.0, back - wait)
+                    rest(p, before, model.rest_factor)
+                    t["rest"] += before
+                    res["refills"] += 1
+                    enemies = [make_monster(c) for c in prev_creatures]
+                    policy = HumanPolicy(model, rng)
+                    start = start_times(p, enemies, policy.delay(), aggro, round(model.rest_surprise_s * 1000))
+                    r = fight(p, enemies, left, boss=False, human=policy, start=start, stop_at_boss=True)
+                    p.regen(r["ms"])
+                    t["fight"] += r["ms"] / 1000.0
+                    used[prev_room] = used.get(prev_room, 0) + r.get("potions_used", 0)
+                    left = r["potions"]
+                    if r.get("fled") or not r["alive"]:
+                        res.update(outcome="fled" if r.get("fled") else "died", room=prev_room + " (back)")
+                        break
+                    seated = min(seconds_to_rest(p, model), max(0.0, model.rest_patience_s))   # he sits down again, by the same rule
+                    rest(p, seated, model.rest_factor)
+                    t["rest"] += seated
+                else:
+                    rest(p, seated, model.rest_factor)
+                    t["rest"] += seated
+            else:
+                rest(p, seated, model.rest_factor)
+                t["rest"] += seated
+            wait = moves * ROOM_SECONDS
+            rest(p, wait)
+            t["walk"] += wait
         elif room != ROOM_NAMES[0]:
-            rest(p, moves * ROOM_SECONDS + looted * LOOT_SECONDS + model.pause_s)
+            wait = moves * ROOM_SECONDS + looted * LOOT_SECONDS + model.pause_s
+            rest(p, wait)
+            t["walk"] += wait
             if p.hp < model.rest_to * p.max_hp:
-                rest(p, (model.rest_to * p.max_hp - p.hp) / (resources(arch, level)[5] / 10.0) + 0.01)
+                wait = (model.rest_to * p.max_hp - p.hp) / (resources(arch, level)[5] / 10.0) + 0.01
+                rest(p, wait)
+                t["rest"] += wait
         p.bless_until = p.cry_until = 0
         p.effects = {}
         topped = 0
@@ -899,9 +986,11 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
             start = start_times(p, enemies, policy.delay(), aggro)
         r = fight(p, enemies, left, boss=boss, human=policy, start=start, stop_at_boss=True)
         p.regen(r["ms"])
-        used[room] = r.get("potions_used", 0) + topped
+        t["fight"] += r["ms"] / 1000.0
+        used[room] = used.get(room, 0) + r.get("potions_used", 0) + topped
         left = r["potions"]
         moves, looted = 0, sum(1 for c in creatures if KINDS[c].gold[1])
+        prev_room, prev_creatures, prev_ms = room, creatures, r["ms"]
         if boss and r["lost_at_kill"] is not None:
             break
         if r.get("fled") or not r["alive"] or boss:
@@ -923,9 +1012,16 @@ def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting",
     before = hall = chamber = 0.0
     door = 0.0
     hall_hist = {}
+    tsum = {"fight": 0.0, "walk": 0.0, "rest": 0.0}   # seconds, over the runs that killed the Overseer
+    allpots = refills = 0.0
     for _ in range(runs):
         r = run_approach(arch_name, level, potions, model, rng, gear, aggro, pack_at)
         u = r["used"]
+        allpots += sum(u.values())
+        refills += r["refills"]
+        if r["outcome"] == "kill":
+            for k in tsum:
+                tsum[k] += r["t"][k]
         before += sum(v for k, v in u.items() if k not in ("Overseer Hall", "Overseer Chamber"))
         hall += u.get("Overseer Hall", 0)
         chamber += u.get("Overseer Chamber", 0) + 0
@@ -942,7 +1038,8 @@ def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting",
     random.setstate(saved)
     return dict(kill=kills / runs, reached=reached / runs, kill_if_reached=kills / reached if reached else 0.0, before=before / runs,
                 hall=hall / runs, chamber=chamber / runs, hall3=hall3 / runs, hall_hist=hall_hist, ends={k: v / runs for k, v in ends.items()},
-                door=door / reached if reached else 0.0, runs=runs)
+                door=door / reached if reached else 0.0, runs=runs, potions=allpots / runs, refills=refills / runs,
+                minutes={k: v / kills / 60.0 if kills else 0.0 for k, v in tsum.items()})
 
 
 REQUIRED_LEVEL = {"Tavern Cellar": 1, "Collapsed Passage": 1, "Storage Chamber": 2, "Guard Post": 2,
@@ -1824,6 +1921,410 @@ def recommend_report(runs=3000, only=()):
         print(f"{label:<62}" + "".join(f"{x:6.0f}" for x in v) + f"{sum(v) / 5:6.0f}{max(v) - min(v):7.0f}{sum(rows[1]) / 5:6.0f}{sum(rows[2]) / 5:6.0f}", flush=True)
 
 
+# ---- the `rest` command (docs/specs/rest.md, docs/BALANCE_HUMAN.md "Resting"): python3 tests/balance_sim.py rest [runs] [part ...]
+
+# The patience rule of each human: after the loot, in the room just cleared, he types `rest` and stays seated until Vitality reads full (the
+# sharp one: until the game says "You are fully rested", all three resources full) or until his patience runs out, whichever is first.
+# The times are what a person will stare at one prompt: two minutes, one minute, twenty seconds. For the middle human they are about the time
+# the old model had him wait (an average of 25 to 45 s at each door to reach 50%); p_linger is the share of rests in which he stays on his
+# seat long afterwards (away from the keyboard), the only way a rest outlasts the reset of the room.
+REST_HABITS = {"low": dict(rest_target=1.0, rest_all=True, rest_patience_s=120.0, p_linger=0.005),
+               "mid": dict(rest_target=1.0, rest_patience_s=60.0, p_linger=0.01),
+               "high": dict(rest_target=1.0, rest_patience_s=20.0, p_linger=0.02)}
+
+
+def rest_human(name, factor, **over):
+    """The human `name` (low, mid, high) with the rest command at RestFactor `factor`; over replaces any field."""
+    return replace(HUMAN_MODELS[name], rest_cmd=True, rest_factor=float(factor), rest_to=0.0, **{**REST_HABITS[name], **over})
+
+
+REST_FACTORS = (None, 3, 5, 8)      # None = no rest command: the models of docs/BALANCE_HUMAN.md, unchanged
+
+
+def rest_models(factor, runs, over=None):
+    """[(name, model, runs)] for the three humans at this RestFactor (None: the old ones). Low and high get half the runs."""
+    out = []
+    for name, n in (("low", runs // 2), ("mid", runs), ("high", runs // 2)):
+        out.append((name, HUMAN_MODELS[name] if factor is None else rest_human(name, factor, **(over or {})), n))
+    return out
+
+
+def factor_label(f):
+    return "no rest command" if f is None else f"RestFactor {f}"
+
+
+def dump_json(record):
+    path = os.environ.get("REST_JSON")
+    if path:
+        import json
+        with open(path, "a") as fh:
+            fh.write(json.dumps(record) + "\n")
+
+
+def ends_text(r, n=2):
+    ends = sorted(r["ends"].items(), key=lambda kv: -kv[1])[:n]
+    return ", ".join(f"{o} {room.replace('Overseer ', '')} {v * 100:.0f}%" for (o, room), v in ends) or "-"
+
+
+def rest_grid(runs=3000, factors=REST_FACTORS):
+    """The required grid: kill% by calling, level, potions and gear, for the three humans, at each RestFactor. Also mean potions used, the
+    minutes a successful run takes (fighting / walking and looting / resting) and where the runs end."""
+    for f in factors:
+        for gear in ("starting", "best"):
+            print("=" * 130)
+            print(f"RG. {factor_label(f)}; {gear} gear; Overseer kill% from the cellar entrance, current game. 'pots' = potions used in the whole run (the 4-potion pack at the Hall"
+                  f" plus the spare supply on the way); 'min f/w/r' = mean minutes of a SUCCESSFUL run: fighting / walking and looting / resting. {runs} runs mid, {runs // 2} low and high.")
+            print("=" * 130)
+            for c in ARCHS:
+                for lvl in (4, 5):
+                    for pot in (2, 4):
+                        cells, line = {}, f"{c:<11}{lvl:>2}{pot:>3}  "
+                        for name, m, n in rest_models(f, runs):
+                            r = approach_stats(c, lvl, pot, m, n, gear, True)
+                            cells[name] = r
+                            mm = r["minutes"]
+                            line += f"| {name:<4}{pct(r['kill']):>4}%  {r['potions']:.1f} pots  {mm['fight']:4.1f}/{mm['walk']:3.1f}/{mm['rest']:4.1f} "
+                            dump_json(dict(kind="grid", factor=f, gear=gear, calling=c, level=lvl, potions=pot, model=name, runs=n, kill=r["kill"],
+                                           pots=r["potions"], before=r["before"], hall=r["hall"], chamber=r["chamber"], door=r["door"], refills=r["refills"],
+                                           minutes=r["minutes"], ends={f"{o} {rm}": v for (o, rm), v in r["ends"].items()}))
+                        print(line + f"| mid ends: {ends_text(cells['mid'])}", flush=True)
+
+
+def rest_sens(runs=1500):
+    """Sensitivity of the middle human (level 5, 4 potions, starting gear) to the assumptions that decide the answer."""
+    print("=" * 130)
+    print(f"RS. Level 5, 4 potions at the Hall, starting gear, middle human: kill% by calling; {runs} runs a cell.")
+    print("=" * 130)
+    print(f"{'':<58}" + "".join(f"{c[:5]:>7}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}{'rest min':>9}{'refills':>8}")
+
+    def row(label, model, gear="starting", n=runs):
+        rs = [approach_stats(c, 5, 4, model, n, gear, True) for c in ARCHS]
+        v = [r["kill"] * 100 for r in rs]
+        print(f"{label:<58}" + "".join(f"{x:7.0f}" for x in v) + f"{sum(v) / 5:6.0f}{max(v) - min(v):7.0f}"
+              f"{sum(r['minutes']['rest'] for r in rs) / 5:9.1f}{sum(r['refills'] for r in rs) / 5:8.2f}", flush=True)
+        dump_json(dict(kind="sens", label=label, kills=v))
+
+    row("no rest command (the middle human of BALANCE_HUMAN.md)", HUMAN_MID)
+    print("-- patience (seconds seated at most), sits until Vitality is full")
+    for f in (3, 5, 8):
+        for pat in (20, 30, 60, 120, 240):
+            row(f"RestFactor {f}, patience {pat} s", rest_human("mid", f, rest_patience_s=float(pat)))
+    print("-- the target (Vitality share at which he gets up), RestFactor 5, patience 60 s")
+    for tgt in (0.5, 0.65, 0.8, 0.9, 1.0):
+        row(f"target {tgt:.0%}", rest_human("mid", 5, rest_target=tgt))
+    print("-- sitting on after he is done (p_linger), RestFactor 5; RestSurprise 2 s")
+    for pl in (0.0, 0.01, 0.05, 0.2):
+        row(f"p_linger {pl:.0%} (1 to 10 minutes extra)", rest_human("mid", 5, p_linger=pl))
+    print("-- RestSurprise (seconds added to the first action of the player attacked while seated), p_linger 20%, RestFactor 5")
+    for sp in (0.0, 2.0, 5.0, 10.0):
+        row(f"RestSurprise {sp:g} s", rest_human("mid", 5, p_linger=0.2, rest_surprise_s=sp))
+    print("-- the Adventurer's Survival Training (x1.5 out of combat; not in any other table)")
+    global SURVIVAL
+    SURVIVAL = True
+    try:
+        row("RestFactor 5, Survival Training on", rest_human("mid", 5))
+        row("no rest command, Survival Training on", HUMAN_MID)
+    finally:
+        SURVIVAL = False
+
+
+ARMOUR_ASSUMED = 3   # Leather Jerkin 2 (50 gold) + Leather Cap 1 (25 gold); the Mage, who cannot wear the jerkin, has Padded Jerkin 1 (20) + Cap 1 = 2.
+                     # Gold: 4 potions (60) + this (75, or 45) = 135 gold at most. A first pass through the cellars brings about 10 (Storage Chamber) + 16
+                     # (Guard Post) + 29 (Barracks) + 34 (Hall) + 45 (Hidden Cache) = 134 gold and the character starts with 10 to 20; the 1000 experience
+                     # of level 5 take more fights than one pass (812 experience), so about 190 to 230 gold are in hand by then: enough, with some left.
+
+
+def perfect_table2(runs=3000, seed=20260101):
+    """The table 2 of the simulator and of docs/ATTRIBUTES.md section 8: a level 4 character, best weapon, +5 Vitality trinket, 2 potions, the Overseer
+    alone from full Vitality. Returns the kill% of the five callings."""
+    saved = random.getstate()
+    random.seed(seed)
+    out = [boss_stats(n, 4, ARCHS[n].weapons[-1], 2, TRINKET_HP, runs)[0] * 100 for n in ARCHS]
+    random.setstate(saved)
+    return out
+
+
+def option_row(label, factor, tweaks, armour, runs, gear_kind="starting", level=5, potions=4, models=("mid", "low", "high"), surv=False):
+    """One row of the options tables: kill% by calling for the middle human (runs), and the means of the low and high human (half the runs).
+    Run through tweaked(); nothing is applied. armour: points from worn armour (the Mage one less)."""
+    rows = {}
+    with tweaked(**tweaks):
+        for name in models:
+            m = HUMAN_MODELS[name] if factor is None else rest_human(name, factor)
+            vals, mins = [], []
+            for c in ARCHS:
+                w, sh, tr, _ = gear_for(c, gear_kind)
+                a = armour if c != "mage" or not armour else armour - 1
+                r = approach_stats(c, level, potions, m, runs if name == "mid" else runs // 2, (w, sh, tr, a), True)
+                vals.append(r["kill"] * 100)
+                mins.append((r["minutes"]["fight"], r["minutes"]["walk"], r["minutes"]["rest"]))
+            rows[name] = (vals, mins)
+    v = rows["mid"][0]
+    mm = rows["mid"][1]
+    line = (f"{label:<64}" + "".join(f"{x:5.0f}" for x in v) + f"{sum(v) / 5:6.0f}{max(v) - min(v):7.0f}"
+            + "".join(f"{sum(rows[n][0]) / 5:6.0f}" if n in rows else f"{'':>6}" for n in ("low", "high"))
+            + f"   {sum(m[0] for m in mm) / 5:4.1f}/{sum(m[1] for m in mm) / 5:3.1f}/{sum(m[2] for m in mm) / 5:4.1f}")
+    print(line, flush=True)
+    dump_json(dict(kind="option", label=label, factor=factor, tweaks=str(tweaks), armour=armour, gear=gear_kind, level=level, potions=potions,
+                   mid=rows["mid"][0], low=rows.get("low", ([],))[0], high=rows.get("high", ([],))[0]))
+    return v
+
+
+def option_head(title, runs):
+    print("=" * 130)
+    print(title + f" ({runs} runs a cell for the middle human, half for low and high)")
+    print("=" * 130)
+    print(f"{'option':<64}" + "".join(f"{c[:5]:>5}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}{'low':>6}{'high':>6}   min f/w/r (mid)")
+
+
+def rest_harvest(runs=1500):
+    """The worst case for resting where creatures return: a player who skins and bleeds every corpse and takes its loot (the crafting game), so
+    that the corpses are gone at once and the next reset (a uniform 0 to 300 s later) brings the creatures back. Middle human, level 5,
+    4 potions, starting gear, RestFactor 5, by RestSurprise."""
+    print("=" * 130)
+    print(f"RH. The corpses are harvested at once (corpse time 10 s instead of 420 to 600 s), middle human, RestFactor 5, level 5, 4 potions, starting gear; {runs} runs a cell")
+    print("=" * 130)
+    print(f"{'':<46}" + "".join(f"{c[:5]:>7}" for c in ARCHS) + f"{'mean':>6}{'refills':>8}   (refills = fights per run started by creatures that came back while he sat)")
+    saved = dict(CORPSE_SECONDS_BY_ROOM)
+    try:
+        for label, corpse, sp in (("corpses stay (the game as built)", None, 2.0), ("harvested, RestSurprise 0 s", 10, 0.0), ("harvested, RestSurprise 2 s", 10, 2.0),
+                                  ("harvested, RestSurprise 5 s", 10, 5.0), ("harvested, RestSurprise 10 s", 10, 10.0)):
+            if corpse is not None:
+                for k in CORPSE_SECONDS_BY_ROOM:
+                    CORPSE_SECONDS_BY_ROOM[k] = corpse
+            rs = [approach_stats(c, 5, 4, rest_human("mid", 5, rest_surprise_s=sp), runs, "starting", True) for c in ARCHS]
+            v = [r["kill"] * 100 for r in rs]
+            print(f"{label:<46}" + "".join(f"{x:7.0f}" for x in v) + f"{sum(v) / 5:6.0f}{sum(r['refills'] for r in rs) / 5:8.2f}", flush=True)
+            dump_json(dict(kind="harvest", label=label, kills=v, refills=[r["refills"] for r in rs]))
+    finally:
+        CORPSE_SECONDS_BY_ROOM.clear()
+        CORPSE_SECONDS_BY_ROOM.update(saved)
+
+
+_M7, _M8 = dict(mage=dict(vitality=(4, 7))), dict(mage=dict(vitality=(4, 8)))          # the Mage's Vitality a level 6 -> 7, 8
+_S8, _S9 = dict(scout=dict(vitality=(3, 8))), dict(scout=dict(vitality=(3, 9)))          # the Scout's Vitality a level 7 -> 8, 9
+# (label, RestFactor, tweaked() arguments, armour). None is "no rest command". Each is a candidate for the owner to choose from; none is applied.
+REST_OPTIONS = [
+    ("no rest command (the game as it is)", None, {}, 0),
+    ("rest alone, RestFactor 3", 3, {}, 0),
+    ("rest alone, RestFactor 4", 4, {}, 0),
+    ("rest alone, RestFactor 5", 5, {}, 0),
+    ("rest alone, RestFactor 6", 6, {}, 0),
+    ("rest alone, RestFactor 8", 8, {}, 0),
+    ("A  RestFactor 5, Mage 4 + 7 a level, Scout 3 + 8 a level, Priest Minor Heal 7", 5, dict(archs={**_M7, **_S8}, heal_amount=7), 0),
+    ("A' = A with the Priest's Minor Heal 6", 5, dict(archs={**_M7, **_S8}, heal_amount=6), 0),
+    ("A- = A without the Priest's change (heal 8)", 5, dict(archs={**_M7, **_S8}), 0),
+    ("C  RestFactor 4, Mage 4 + 8, Scout 3 + 9, Priest heal 6", 4, dict(archs={**_M8, **_S9}, heal_amount=6), 0),
+    ("D  RestFactor 5, Minor Healing Potion heals 25 (was 20)", 5, dict(potion_heal=25), 0),
+    ("E  RestFactor 3, Mage 4 + 8, Scout 3 + 8, Priest heal 6", 3, dict(archs={**_M8, **_S8}, heal_amount=6), 0),
+    ("-- the same with armour bought: Leather Jerkin 2 + Cap 1 (Mage: Padded Jerkin 1 + Cap 1)", None, {}, 0),
+    ("no rest command + armour", None, {}, ARMOUR_ASSUMED),
+    ("rest alone, RestFactor 3 + armour", 3, {}, ARMOUR_ASSUMED),
+    ("rest alone, RestFactor 5 + armour", 5, {}, ARMOUR_ASSUMED),
+    ("A + armour", 5, dict(archs={**_M7, **_S8}, heal_amount=7), ARMOUR_ASSUMED),
+    ("C + armour", 4, dict(archs={**_M8, **_S9}, heal_amount=6), ARMOUR_ASSUMED),
+    ("E + armour", 3, dict(archs={**_M8, **_S8}, heal_amount=6), ARMOUR_ASSUMED),
+]
+
+
+def rest_options(runs=3000):
+    """Level 5, 4 potions at the Hall, starting gear (the calling's own weapon; armour only where the row says), attributes placed, middle human
+    (runs) and low and high (half): what the rest command does alone and with the smallest changes that bring the callings together."""
+    option_head("RO. Level 5, 4 potions, starting gear: Overseer kill% by calling, with the `rest` command and the changes tried", runs)
+    for label, f, tweaks, armour in REST_OPTIONS:
+        if label.startswith("--"):
+            print(label)
+            continue
+        option_row(label, f, tweaks, armour, runs)
+
+
+def rest_perfect(runs=3000):
+    """Does the rest command (and each option) make the Overseer trivial for the perfect player? Table 2 as docs/ATTRIBUTES.md section 8 quotes
+    it (level 4, best weapon, +5 Vitality trinket, 2 potions, the Overseer alone from full Vitality: resting cannot change it, he is full), and
+    the same character coming from the cellar entrance: the simulator's perfect player (rested before every fight), and a player with perfect
+    hands (no typing delay, never skips, drinks at 35%) who carries his resources from room to room, without the rest command and then resting by
+    the middle human's patience rule."""
+    print("=" * 130)
+    print(f"RF. The perfect player, level 4, best gear (best weapon, shield where carried, +5 Vitality trinket), 2 potions; {runs} runs a cell")
+    print("=" * 130)
+    print(f"{'':<76}" + "".join(f"{c[:5]:>7}" for c in ARCHS) + f"{'mean':>6}")
+    zero = replace(HUMAN_ZERO, carry_over=True, pause_s=3.0)       # perfect hands, resources carried over
+    rows = [("the game as it is", None, {}), ("A  RestFactor 5, Mage 7, Scout 8, Priest heal 7", 5, dict(archs={**_M7, **_S8}, heal_amount=7)),
+            ("C  RestFactor 4, Mage 8, Scout 9, Priest heal 6", 4, dict(archs={**_M8, **_S9}, heal_amount=6)),
+            ("potion 35 (the earlier recommendation 2c, for comparison)", None, dict(potion_heal=35, archs=dict(mage=dict(vitality=(4, 8)))))]
+    for label, f, tweaks in rows:
+        with tweaked(**tweaks):
+            t2 = perfect_table2(runs)
+            print(f"{'table 2, ' + label:<76}" + "".join(f"{x:7.0f}" for x in t2) + f"{sum(t2) / 5:6.0f}", flush=True)
+            dump_json(dict(kind="perfect", label="table 2, " + label, vals=t2))
+            for sub, model in (("perfect player from the entrance (rested before every fight)", None),
+                               ("perfect hands, resources carried, no rest command", zero),
+                               ("perfect hands, resources carried, rests by the middle human's rule", replace(zero, rest_cmd=True, rest_factor=float(f or 5), **{**REST_HABITS["mid"], "p_linger": 0.0}))):
+                vals, mins = [], []
+                for c in ARCHS:
+                    w, sh, tr, _ = gear_for(c, "best")
+                    r = approach_stats(c, 4, 2, model, runs // 2, (w, sh, tr, 0), True)
+                    vals.append(r["kill"] * 100)
+                    mins.append(r["minutes"])
+                tm = f"   {sum(m['fight'] for m in mins) / 5:.1f}/{sum(m['walk'] for m in mins) / 5:.1f}/{sum(m['rest'] for m in mins) / 5:.1f} min f/w/r" if model is not None else ""
+                print(f"{'    cellar, ' + sub:<76}" + "".join(f"{x:7.0f}" for x in vals) + f"{sum(vals) / 5:6.0f}{tm}", flush=True)
+                dump_json(dict(kind="perfect", label=f"{label}: {sub}", vals=vals))
+
+
+def level_pace(arch_name, factor=1.0, runs=100, seed=11):
+    """Minutes of play from level 1 to level 5 (1000 experience) for a player who goes through the cellars as full_run does (first pass in order,
+    then farms the hardest cleared room he beats 9 times in 10 until the next room's level), but with time kept. Between fights he sits (or
+    stands, factor 1) until all three resources are full, at `factor` times the ordinary rate: the perfect-knowledge pace, as the pace targets
+    are. Walking is 2 rooms for a first visit and ROOMS_BETWEEN_KILLS for a farmed room, looting LOOT_SECONDS a goblin. A death costs the way
+    back (CORPSE_SECONDS and the rooms from the village). Respawns: a room's creatures are back CORPSE_SECONDS_BY_ROOM plus 0 to 300 s after the
+    kill (docs/BALANCE_HUMAN.md "Resting"); a farm fight waits for it, sitting. Returns the mean minutes at which levels 2 to 5 were reached
+    (waits included), the mean minutes of fighting, walking, recovering and waiting for respawns to level 5, and the share of runs that got there."""
+    arch = ARCHS[arch_name]
+    saved = random.getstate()
+    random.seed(seed)
+    reach = {2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+    parts = {"fight": 0.0, "walk": 0.0, "recover": 0.0, "wait": 0.0}
+    done = 0
+    depth = {name: i + 1 for i, (name, _) in enumerate(ROOMS)}
+    for _ in range(runs):
+        xp, gold, level = 0, arch.gold, 1
+        stage, potions, trinket = 0, arch.potions, 0
+        shield = arch.shield and arch_name == "warrior"
+        buy_shield = arch.shield and arch_name != "warrior"
+        clock = 0.0
+        got = {}
+        tt = {"fight": 0.0, "walk": 0.0, "recover": 0.0, "wait": 0.0}
+        back = {}          # room -> the clock at which its creatures are back
+        cleared = []
+        farm = 0
+
+        def advance(kind, seconds):
+            nonlocal clock
+            tt[kind] += seconds
+            clock += seconds
+
+        def shop():
+            nonlocal gold, potions, stage, shield
+            if buy_shield and not shield and gold >= SHIELD_PRICE:
+                gold -= SHIELD_PRICE
+                shield = True
+            while stage + 1 < len(arch.weapons):
+                nxt = arch.weapons[stage + 1]
+                cost = PRICES[nxt] - PRICES[arch.weapons[stage]] // 2
+                if gold >= cost + (15 if arch_name != "mage" else 0) and (nxt != "fine longsword" or gold >= PRICES[nxt] - 5 + 15):
+                    gold -= cost
+                    stage += 1
+                else:
+                    break
+            while potions < 2 and gold >= 15:
+                gold -= 15
+                potions += 1
+
+        def on_kill(p, enemy):
+            nonlocal xp, gold, level
+            k = enemy.kind
+            xp += k.xp
+            if k.gold[1]:
+                gold += random.randint(*k.gold)
+            while level < 5 and xp >= xp_for_level(level + 1):
+                level += 1
+                p.level = level
+                p.max_hp = player_max_hp(arch, level, trinket)
+                p.hp = p.max_hp
+                set_level_resources(p, level)
+
+        def attempt(name, creatures, hard, first):
+            nonlocal gold, potions
+            for tries in range(10):
+                p = make_player(arch, level, arch.weapons[stage], shield, trinket)
+                use = potions if hard or tries > 0 else 0
+                r = fight(p, [make_monster(c) for c in creatures], use, on_kill=on_kill)
+                advance("fight", r["ms"] / 1000.0)
+                for lv in range(2, level + 1):
+                    got.setdefault(lv, clock)
+                potions = potions - use + r["potions"]
+                if not r["alive"]:
+                    gold = int(gold * 0.9)
+                    advance("walk", (depth[name] + 4) * ROOM_SECONDS + CORPSE_SECONDS)
+                    continue
+                advance("walk", (2 if first else ROOMS_BETWEEN_KILLS) * ROOM_SECONDS + LOOT_SECONDS * sum(1 for c in creatures if KINDS[c].gold[1]))
+                _, _, _, st_rate, ma_rate, hp_rate = resources(arch, p.level)
+                f = factor * (1.5 if SURVIVAL and arch_name == "adventurer" else 1.0)
+                need = max((p.max_hp - p.hp) / (hp_rate * f / 10.0),
+                           (p.max_stamina - p.stamina) / (st_rate * f / 10.0) if st_rate else 0.0,
+                           (p.max_mana - p.mana) / (ma_rate * f / 10.0) if ma_rate else 0.0)
+                advance("recover", max(0.0, need))
+                back[name] = clock + CORPSE_SECONDS_BY_ROOM.get(name, 420) + random.random() * RESET_SECONDS
+                return True
+            return False
+
+        def best_cleared():
+            ok = [(room, group) for room, group in cleared if room_stats(arch, group, level, arch.weapons[stage], trinket, runs=40, shield=shield)[0] >= 0.9]
+            if not ok:
+                return None
+            ready = [x for x in ok if back.get(x[0], 0) <= clock]
+            return ready[-1] if ready else min(ok, key=lambda x: back.get(x[0], 0))
+
+        failed = False
+        for name, creatures in ROOMS:
+            while level < min(5, REQUIRED_LEVEL[name]) and cleared and farm < 400:
+                best = best_cleared()
+                if best is None:
+                    break
+                farm += 1
+                shop()
+                if back.get(best[0], 0) > clock:
+                    advance("wait", back[best[0]] - clock)
+                attempt(best[0], best[1], False, False)
+            shop()
+            if not attempt(name, creatures, name in ("Goblin Barracks", "Overseer Hall"), True):
+                failed = True
+                break
+            cleared.append((name, creatures))
+            if name == "Storage Chamber":
+                potions += 1
+            if name == "Mushroom Cavern":
+                gold += random.randint(30, 60)
+                trinket = TRINKET_HP
+            if level >= 5:
+                break
+        while not failed and level < 5 and farm < 400:
+            best = best_cleared()
+            if best is None:
+                break
+            farm += 1
+            shop()
+            if back.get(best[0], 0) > clock:
+                advance("wait", back[best[0]] - clock)
+            attempt(best[0], best[1], False, False)
+        if failed or level < 5:
+            continue
+        done += 1
+        for lv in reach:
+            reach[lv] += got.get(lv, clock)
+        for k in parts:
+            parts[k] += tt[k]
+    random.setstate(saved)
+    n = max(1, done)
+    return dict(reach={lv: v / n / 60.0 for lv, v in reach.items()}, parts={k: v / n / 60.0 for k, v in parts.items()}, done=done / runs)
+
+
+def rest_pace(runs=100):
+    """Minutes from level 1 to level 5, by calling, without the rest command and at each RestFactor (full rest between fights)."""
+    print("=" * 130)
+    print(f"RP. Minutes of play to reach levels 2, 3, 4, 5 from the first step (full_run's route and farming, time kept; {runs} runs a cell). Between fights the player waits"
+          f" (factor 1) or sits (RestFactor) until all three resources are full.")
+    print("    'wait' = idle time until a farmed room's creatures are back (corpses last 420 to 600 s, reset every 300 s); it is the same with and without the rest command.")
+    print("=" * 130)
+    print(f"{'calling':<12}{'':<22}{'L2':>6}{'L3':>7}{'L4':>7}{'L5':>7}   {'to level 5: fight':>18}{'walk':>7}{'recover':>9}{'wait':>7}{'  done':>7}")
+    for c in ARCHS:
+        for f in (1, 3, 5, 8):
+            r = level_pace(c, f, runs)
+            pr, pt = r["reach"], r["parts"]
+            print(f"{c:<12}{'no rest command' if f == 1 else 'RestFactor ' + str(f):<22}{pr[2]:6.1f}{pr[3]:7.1f}{pr[4]:7.1f}{pr[5]:7.1f}   {pt['fight']:18.1f}{pt['walk']:7.1f}{pt['recover']:9.1f}{pt['wait']:7.1f}{r['done'] * 100:6.0f}%", flush=True)
+            dump_json(dict(kind="pace", calling=c, factor=f, reach=pr, parts=pt, done=r["done"]))
+
+
 _G, _O, _M = "Goblin Elite Guard", "Goblin Overseer", "Goblin Minion"
 MAGE_VIT = {"mage": dict(vitality=(4, 8))}     # the Mage's Vitality a level 6 -> 8
 # (label, tweaked() arguments, armour). Each is a candidate for the owner to choose from; none is applied.
@@ -1861,6 +2362,12 @@ def main():
             recommend_report(runs, tuple(a for a in sys.argv[3:]))
         else:
             {"calibrate": calibrate_report, "human": human_report, "ablate": ablate_report}[sys.argv[1]](runs)
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "rest":
+        runs = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 3000
+        parts = tuple(a for a in sys.argv[2:] if not a.isdigit()) or ("grid", "sens")
+        for part in parts:
+            {"grid": rest_grid, "sens": lambda r: rest_sens(r // 2), "pace": lambda r: rest_pace(max(40, r // 30)), "options": rest_options, "perfect": rest_perfect, "harvest": rest_harvest}[part](runs)
         return
     if len(sys.argv) > 1 and sys.argv[1] == "pace":
         pace_report(int(sys.argv[2]) if len(sys.argv) > 2 else 250)

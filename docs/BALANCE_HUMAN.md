@@ -240,3 +240,146 @@ The callings stay in the same order in every option: the Mage is the thinnest at
 | `python3 tests/balance_sim.py recommend [runs] [row prefix ...]` | section 7; a prefix such as `4c` runs one row | 700 s (12 min) |
 
 The human tables are off by default, behind those four words. The random numbers of the perfect model are never touched.
+
+## 10. Resting (the `rest` command, 21 November 2026)
+
+*`docs/specs/rest.md` adds a `rest` command that multiplies regeneration of Vitality, Endurance and Focus by RestFactor while the character sits. This section is what the simulator says. Nothing in the game has been changed. Run it with `python3 tests/balance_sim.py rest [runs] [grid|sens|options|perfect|harvest|pace]`; the tables below are from those runs.*
+
+### 10.1 The short version
+
+- **Rest alone nearly does the job.** At RestFactor 5 the middle human beats the Overseer 73% of the time (level 5, starting gear, 4 potions), up from 13%. That is the owner's target. What it does not do is bring the callings together: Priest 84, Warrior 81, Adventurer 74, Scout 64, Mage 64 (spread 20 points).
+- **RestFactor matters up to about 5, little after.** 3 gives 60%, 4 gives 69%, 5 gives 73%, 8 gives 76%. Past 5 the player is already getting up full inside his patience, so a faster rest only saves time.
+- **The big unknown is the player, not the number.** How long he is willing to sit decides everything (10.3). A person who sits only 20 seconds gets 40% at RestFactor 5; one who sits two minutes gets 76%. The three human models give 79% (low), 73% (middle) and 35% (high) at RestFactor 5.
+- **Recommendation: RestFactor 5, RestSurprise 2, plus three small calling numbers** (Mage Vitality 7 a level instead of 6, Scout 8 instead of 7, Priest's Minor Heal 7 instead of 8). That gives 81 / 71 / 78 / 73 / 74 (mean 75, spread 10). The perfect player's level 4, 2-potion table does not move (mean 72 today, 73 after).
+- **One real risk to the spec:** a cleared room's creatures come back after a reset only once their corpses are gone. With corpses as built that is 7 minutes at the earliest, so sitting is safe. A player who skins, bleeds and loots every corpse at once (the crafting game) makes the corpses vanish, and then about one rest in four is interrupted (10.4); the kill rate falls from 73% to 42%.
+
+### 10.2 What was modelled
+
+**Resting as the spec has it.** After a fight the human loots (3 s a goblin corpse), sits down in the room he has just cleared, and stays seated until the *patience rule* ends it; then he walks on (4 s a room). While seated all three resources regenerate at RestFactor times the ordinary rate (the rates of `resources()`); looting and walking are at the ordinary rate. Time is counted: fighting, walking and looting, resting.
+
+**The patience rule ("sit until content or bored")**: stand when Vitality reads full, or when the patience runs out, whichever comes first.
+
+| Human | Stands up when | Patience | Why it is believable |
+|---|---|---|---|
+| low (the careful one) | all three resources are full (the "You are fully rested" message) | 120 s | waits for the message, and a couple of minutes between fights is what a MUD player expects |
+| **middle** | Vitality is full | **60 s** | about as long as the old model had him wait (25 to 45 s at each door to reach 50%), stretched because the wait is now cheap |
+| high (the clumsy one) | Vitality is full | 20 s | types `rest`, gets bored, goes on |
+
+Each also has a small chance (low 0.5%, middle 1%, high 2%) per rest of staying seated for 1 to 10 minutes (away from the keyboard). This is the only way a rest outlasts a reset in the base tables. The old tables, with no rest command, are reproduced exactly (the baseline rows equal section 6 to the digit).
+
+**Rooms that reset (read from the files).** Every cellar room resets every 300 s (`ResetSeconds` is the default 300 in `mudlib/std/room.cs`; no cellar file changes it) and none has an encounter. But a reset only replaces a creature whose corpse is gone (`Fill` counts a corpse as the creature), and a corpse lasts 600 s while it holds a skin (rats, toad) or 300 s of fresh blood plus 120 s empty (goblins, bats), unless the player takes the skin or blood. So a creature can return no earlier than the first reset after about 420 s (goblins, bats; Storage Chamber, Mushroom Cavern, Barracks, Overseer Hall) or 600 s (rats and toad; Tavern Cellar, Collapsed Passage, Flooded Tunnel), counted from each kill, then 0 to 300 s more. **Every room on the route is therefore safe for a rest of up to about 5 minutes** after the fight with corpses left alone, and the **Smuggler Hall has no spawn and is safe for ever.** The Overseer Chamber does not refill until he is dead. The simulator resolves it this way: the human rests only in the room he has just cleared; a rest that outlasts that moment (the earliest return time minus the length of the fight, plus a uniform 0 to 300 s) is interrupted, the creatures come back aggressive, and the player's first action waits his own Reaction Time x 2 plus RestSurprise. The new creatures are fought with whatever he has, and he sits down again by the same rule. A returning creature that finds the player resting is how RestSurprise acts.
+
+**Not modelled:** the Adventurer's Survival Training (x1.5 out of combat) is not in any table in this document; with it on, the Adventurer at RestFactor 5 goes from 74% to 78% (1500 runs) and without the command from 11% to 14%. Resting at the Guard Post, in the village (the inn, 5 gold) or in a Safe room (regeneration doubled there) is not modelled either.
+
+### 10.3 Headline table
+
+Level 5, 4 potions at the Hall, starting gear, attributes placed, middle human; Overseer kill% from the cellar entrance. 3000 runs a cell (1500 for the low and high human). Plus or minus 1 to 2 points.
+
+| | warrior | scout | priest | mage | adv. | mean | spread | low human | high human |
+|---|---|---|---|---|---|---|---|---|---|
+| no rest command | 14 | 17 | 20 | 4 | 11 | 13 | 16 | 36 | 7 |
+| RestFactor 3 | 66 | 49 | 83 | 46 | 56 | 60 | 36 | 78 | 22 |
+| RestFactor 4 | 76 | 60 | 85 | 56 | 68 | 69 | 29 | 79 | 29 |
+| **RestFactor 5** | 81 | 64 | 84 | 64 | 74 | **73** | 20 | 79 | 35 |
+| RestFactor 6 | 83 | 66 | 84 | 66 | 77 | 75 | 19 | 79 | 40 |
+| RestFactor 8 | 84 | 68 | 85 | 66 | 78 | 76 | 19 | 79 | 48 |
+
+The full grid (three humans, level 4 and 5, starting and best gear, 2 and 4 potions, each RestFactor) is in the simulator output (`rest grid`, 3000 runs a cell for the middle human, 1500 for the others, about 50 minutes). Middle human, **best** gear, level 5, 4 potions: none 30 / 39 / 32 / 5 / 31; RestFactor 3: 83 / 74 / 91 / 52 / 81; 5: 92 / 85 / 92 / 73 / 90; 8: 94 / 88 / 93 / 78 / 91. Level 5 with 2 potions, starting gear, RestFactor 5: 51 / 26 / 60 / 22 / 42. Level 4, 4 potions, starting gear, RestFactor 5: 36 / 29 / 41 / 27 / 34. Level 4 is still hard (2 potions: 3% to 15%), which is as intended.
+
+**Potions, where runs end, minutes** (middle human, level 5, 4 potions, starting gear; potions are the whole run, including the spare supply on the way; minutes are for a *successful* run, fighting / walking and looting / resting):
+
+| | potions used | where the others end | minutes (fight / walk / rest) |
+|---|---|---|---|
+| no rest command | 4.3 to 6.1 | fled at the Overseer 56% to 68%, died in the Hall 6% to 18% | 8 to 13 / 1.2 / 0.5 to 3.8 |
+| RestFactor 3 | 2.2 to 3.4 | fled at the Overseer 11% to 35%, died there 4% to 16% | 8 to 13 / 1.2 / 3.1 to 5.9 |
+| RestFactor 5 | 2.0 to 3.1 | fled 10% to 18%, died at the Overseer 4% to 16% | 8 to 13 / 1.2 / 2.9 to 4.3 |
+| RestFactor 8 | 2.0 to 3.0 | fled 10% to 15%, died at the Overseer 3% to 18% | 8 to 13 / 1.2 / 2.1 to 3.0 |
+
+With rest the player arrives at the Overseer's door with 94% to 100% of his Vitality (51% to 56% before) and uses about half the potions. The run takes 12 to 18 minutes either way: resting adds 1 to 3 minutes, and the old model's unpaid waiting is already inside the baseline's minutes. The Mage and Scout fight 8 to 9 minutes, the Warrior and Priest 13 (their fights are longer, with slower weapons).
+
+**What the answer depends on** (middle human, level 5, 4 potions, starting gear, mean of the five callings, 1500 runs):
+
+| Assumption | 20 s | 30 s | 60 s | 120 s |
+|---|---|---|---|---|
+| RestFactor 3, patience | 26 | 36 | 60 | 76 |
+| RestFactor 5, patience | 40 | 54 | **74** | 76 |
+| RestFactor 8, patience | 55 | 69 | 76 | 76 |
+
+Sitting only until Vitality reaches 50 / 65 / 80 / 90 / 100% (RestFactor 5, 60 s): 13 / 30 / 54 / 66 / 74. So the question for the owner is **how long and how far a person rests**. The factor only decides how much he gets per second he is willing to give.
+
+### 10.4 Interruptions and RestSurprise
+
+With the corpses as built, an interrupted rest is rare (about 1 in 100 runs, only after a long linger) and RestSurprise changes nothing you can measure: with an exaggerated 20% of rests lingering, RestSurprise 0 / 2 / 5 / 10 s gives 74 / 72 / 72 / 72% (noise is plus or minus 2). **Keep RestSurprise at 2.**
+
+The harvest case (`rest harvest`: corpses gone at once, so a room refills within 0 to 300 s of the last kill; middle human, RestFactor 5): 73% becomes 43% (RestSurprise 0), 42% (2), 42% (5), 39% (10), with about two fights per run started by returning creatures; RestSurprise 0 to 10 moves it by 4 points at most. The danger is the returning creature itself and the time, not the delay. If this matters, the fix is in the game, not in the number: for example, a reset does not refill a room that holds a resting player, or corpses persist while anyone sits in the room.
+
+### 10.5 Recommendation and alternatives
+
+Rest alone gives the owner's mean but not the callings together. The smallest tested additions: the Mage is lifted by Vitality, the Scout by Vitality, and the Priest, who is then the highest, trimmed by the heal. Level 5, 4 potions, middle human (3000 runs a cell), starting gear, no armour:
+
+| Option | warrior | scout | priest | mage | adv. | mean | spread | low | high |
+|---|---|---|---|---|---|---|---|---|---|
+| rest alone, RestFactor 5 | 81 | 64 | 84 | 64 | 74 | 73 | 20 | 79 | 35 |
+| **A. RestFactor 5, RestSurprise 2, Mage 4 + 7 a level (was 6), Scout 3 + 8 (was 7), Priest Minor Heal 7 (was 8)** | 81 | 71 | 78 | 73 | 74 | **75** | **10** | 81 | 33 |
+| A'. as A with Minor Heal 6 | 81 | 71 | 72 | 73 | 74 | 74 | 10 | 80 | 31 |
+| A-. as A, the Priest unchanged | 81 | 71 | 84 | 73 | 74 | 77 | 13 | 82 | 36 |
+| C. RestFactor 4, Mage 8, Scout 9, Minor Heal 6 | 76 | 67 | 70 | 70 | 68 | 70 | 9 | 82 | 26 |
+| D. RestFactor 5, Minor Healing Potion heals 25, no calling changes | 90 | 76 | 91 | 75 | 85 | 83 | 16 | 88 | 51 |
+| E. RestFactor 3, Mage 8, Scout 8, Heal 6 | 66 | 52 | 66 | 56 | 56 | 59 | 14 | 79 | 19 |
+
+- **A (recommended)**: smallest set that reaches a mean of 75 and a spread of 10. The Priest's Minor Heal is very steep: 8 gives 84, 7 gives 78, 6 gives 72, 5 gives 50. Move it by single steps. If you will not touch the Priest, A- keeps the spread at 13.
+- **C** is nearest to 70 exactly, and has the narrowest spread, but changes four numbers and RestFactor 4; the Mage and Scout figures are +2 and +2 Vitality a level.
+- **D** (a stronger potion) needs no calling number but gives 83 and a 51% high human, and the potion is also the corridor's healing (not rerun here).
+- **E** shows a weak rest (3) does not work however the callings are corrected.
+
+**Armour (Padded Jerkin 1, Leather Jerkin 2, Leather Cap 1).** I assumed a level 5 character has spent 135 gold on armour and potions: 4 potions (60), Leather Jerkin (50) and Cap (25); the Mage, who cannot wear the Leather Jerkin, has Padded Jerkin and Cap (45 gold, armour 2). A first pass through the cellars brings about 134 gold (Storage Chamber 10, Guard Post 16, Barracks 29, Hall 34, Hidden Cache 45) and the character starts with 10 to 20; level 5 takes more than one pass, so about 190 to 230 gold is in hand. Armour is the strongest single lever in the game: it adds 20 or more points.
+
+| With armour bought | warrior | scout | priest | mage | adv. | mean | spread | low | high |
+|---|---|---|---|---|---|---|---|---|---|
+| no rest command | 65 | 50 | 78 | 16 | 43 | 50 | 62 | 74 | 38 |
+| RestFactor 3 | 97 | 82 | 98 | 74 | 91 | 88 | 24 | 95 | 63 |
+| RestFactor 5 | 98 | 87 | 99 | 83 | 95 | 93 | 16 | 95 | 71 |
+| A | 98 | 92 | 98 | 89 | 95 | 95 | 10 | 96 | 73 |
+| C | 98 | 92 | 96 | 89 | 94 | 94 | 9 | 97 | 70 |
+| E | 97 | 86 | 96 | 82 | 91 | 90 | 14 | 97 | 63 |
+
+So with option A an armoured character beats the Overseer 95% of the time (unarmoured 75%). If the owner wants the target to hold for a character *with* armour, RestFactor would have to be below 3 and the Mage would still lag (Mage 74 and the rest 91 to 98 at RestFactor 3): I would not choose that. I read "starting gear" as the unarmoured set used in every table here; armour is then the reward for shopping.
+
+### 10.6 The other end: is the Overseer trivial for a good player?
+
+Level 4, best gear (best weapon, shield where carried, +5 Vitality trinket), 2 potions, the Overseer alone from full Vitality (the table 2 of `ATTRIBUTES.md` section 8; 3000 fights a cell). Resting cannot change this row, because that player is full already; only the calling changes do.
+
+| | warrior | scout | priest | mage | adv. | mean |
+|---|---|---|---|---|---|---|
+| the game as it is | 73 | 75 | 69 | 73 | 71 | 72 |
+| option A | 73 | 80 | 61 | 79 | 71 | 73 |
+| option C | 73 | 83 | 44 | 85 | 72 | 71 |
+| (for comparison, the potion at 35, section 7 option 2c) | 93 | 93 | 89 | 99 | 92 | 93 |
+
+The same character from the cellar entrance (1500 runs a cell), mean of the five callings: the simulator's perfect player, rested before every fight, 55% (today), 56% (A). A player with perfect hands who carries his resources and has **no** rest command: 2%. The same player resting by the middle human's patience rule at RestFactor 5: 42% today, 43% (A). So resting gives a skilled player what he already had in theory, it does not make level 4 trivial, and options A and C leave the quoted table 2 at 72 to 73. (Option C moves the Priest to 44 there; A to 61.)
+
+### 10.7 What resting does to the pace of levels 1 to 5
+
+`rest pace` (100 runs a cell): the route and farming of the simulator's whole run (section 3 of the report), time kept, the player waiting (or sitting) until all three resources are full between fights, and waiting for farmed rooms' creatures to come back (corpses 420 to 600 s plus up to 300 s). Mean minutes from the first step to level 5 (1000 experience):
+
+| calling | no rest command | RestFactor 3 | RestFactor 5 | RestFactor 8 |
+|---|---|---|---|---|
+| warrior | 87 | 69 | 67 | 64 |
+| scout | 87 | 70 | 64 | 62 |
+| priest | 89 | 72 | 69 | 67 |
+| mage | 94 | 67 | 62 | 58 |
+| adventurer | 83 | 65 | 62 | 60 |
+
+Levels 2, 3, 4 come at about 29 / 44 / 57 minutes at RestFactor 5 (35 / 53 / 70 without). For the Warrior at level 5: 24 minutes of fighting, 4 of walking, 39 of recovering (8 with RestFactor 5) and 22 to 31 of waiting for respawns. **Resting cuts the recovering by about 80% and the whole climb by about 25% to 35%; what is left is the wait for the rooms to refill, which resting does not touch.** This is a perfect-knowledge climb in which the cellars alone supply the experience, so it is slower than the "16 to 30 minutes" of `PLAN-corridor-crafting.md` and should be read only as a comparison. The corridor's targets (hours for levels 5 to 10, `CORRIDOR_BALANCE.md`) were not rerun: the pace model there has natural regeneration as 'the thing that dominates recovery', so a RestFactor of 5 will shorten them noticeably unless the corridor's experience table is raised. That needs a rerun of `python3 tests/balance_sim.py pace` with RestFactor in `regen_hp`; I did not do it.
+
+### 10.8 What is still unknown
+
+- **How long people sit.** Everything above rests on 20 / 60 / 120 s and on getting up at full Vitality. The sensitivity table in 10.3 shows the range (40% to 76% at RestFactor 5). Watching a few evenings, or logging `rest` durations once the command exists, would settle it.
+- **Whether corpses will be cleared quickly.** The crafting game takes skins and blood; if most players do, rests are interrupted (10.4). The base tables assume corpses stay.
+- **The Adventurer's Survival Training** is not in the tables (about +4 points at RestFactor 5).
+- **The Priest, Warrior and Mage policies** are the simple ones of section 3; the Priest's steep sensitivity to Minor Heal in particular is a property of that simple policy and should be confirmed in play.
+- Aimed shots, stepping back a room, and drinking potions between rooms are still not modelled (a person with spare potions would drink them while sitting, which would raise the figures).
+
+### 10.9 Run times
+
+`rest grid` 3000: about 50 minutes (320 cells of 3000 / 1500 runs); `rest sens`: 10 minutes; `rest options`: 25 minutes; `rest perfect`: 8 minutes; `rest harvest`: 4 minutes; `rest pace`: 18 minutes. Everything printed before this section is unchanged (300-run default output compared byte for byte).
