@@ -7,7 +7,7 @@ namespace LesMudOS.Web.Tests;
 public class SiteTests
 {
     private static readonly string[] Fixed = { "/", "/chronicle", "/heroes", "/world", "/classes", "/factions", "/news", "/play", "/rules", "/support" };
-    private static readonly string[] VisibleMixedIds = { "1", "4", "5", "6", "7", "8", "13" };
+    private static readonly string[] VisibleMixedIds = { "1", "4", "6", "7", "8", "13" };
 
     public static IEnumerable<object[]> Sources()
     {
@@ -80,9 +80,9 @@ public class SiteTests
         var (_, home, _) = await site.Get("/");
         var section = Regex.Match(home, "<section class=\"band alt\" aria-labelledby=\"chronicle\">.*?</section>", RegexOptions.Singleline).Value;
         var titles = Regex.Matches(section, "<h3><a href=\"/chronicle/\\d+\">([^<]+)</a></h3>").Select(m => System.Net.WebUtility.HtmlDecode(m.Groups[1].Value)).ToList();
-        Assert.Equal(new[] { "The First to Reach Level 10", "The First Knight", "The Fall of the Gaunt Stag", "The Goblin Purge of Greenvale", "The Orders from the Dark" }, titles);
+        Assert.Equal(new[] { "The First to Reach Level 10", "The First Knight", "The Fall of the Gaunt Stag", "The Goblin Purge of Greenvale", "Mira Is Renowned" }, titles);
         var scores = Regex.Matches(section, "ESS (\\d+)").Select(m => int.Parse(m.Groups[1].Value)).ToList();
-        Assert.Equal(new[] { 4200, 4020, 2750, 1125, 1069 }, scores);
+        Assert.Equal(new[] { 4200, 4020, 2750, 1125, 300 }, scores);
     }
 
     [Fact]
@@ -93,12 +93,12 @@ public class SiteTests
         foreach (var (path, html) in pages)
         {
             var text = Html.Text(html);
-            foreach (var bad in new[] { "Root Warrens", "Hidden Grove", "99999", "50000", "Blood Ink", "A Quiet Marvel", "No Event Recorded", "Quieting of the Cellars", "Task at the Stump" })
+            foreach (var bad in new[] { "Root Warrens", "Orders from the Dark", "Hidden Grove", "99999", "50000", "Blood Ink", "A Quiet Marvel", "No Event Recorded", "Quieting of the Cellars", "Task at the Stump" })
                 Assert.DoesNotContain(bad, text);
         }
         var entryPaths = (await site.PublicPaths()).Where(p => p.StartsWith("/chronicle/")).Select(p => p[("/chronicle/".Length)..]).OrderBy(x => x).ToArray();
         Assert.Equal(VisibleMixedIds.OrderBy(x => x).ToArray(), entryPaths);
-        foreach (var hidden in new[] { 2, 3, 9, 10, 11, 12, 14, 15, 16 })
+        foreach (var hidden in new[] { 2, 3, 5, 9, 10, 11, 12, 14, 15, 16 })
             Assert.Equal(404, (await site.Get("/chronicle/" + hidden)).Status);
     }
 
@@ -149,7 +149,7 @@ public class SiteTests
         using var site = Open("mixed");
         var (_, home, _) = await site.Get("/");
         Assert.Matches(@"Characters created</dt><dd>6</dd>", home);   // eight files, two wizards
-        Assert.Matches(@"Chronicle entries</dt><dd>7</dd>", home);
+        Assert.Matches(@"Chronicle entries</dt><dd>6</dd>", home);
         Assert.Matches(@"Today in Hollowmere</dt><dd>the \d+(st|nd|rd|th) Day of", home);
         using var empty = Open("empty");
         var (_, home2, _) = await empty.Get("/");
@@ -336,11 +336,11 @@ public class SiteTests
         Assert.Equal("13", firstId);      // newest first
         var (_, top, _) = await site.Get("/chronicle?view=top");
         Assert.Equal("1", Regex.Match(top, "href=\"/chronicle/(\\d+)\"").Groups[1].Value);   // highest score first
-        var (s2, page3, _) = await site.Get("/chronicle?page=3");
+        var (s2, page2, _) = await site.Get("/chronicle?page=2");
         Assert.Equal(200, s2);
-        Assert.Contains("Page 3 of 3", page3);
+        Assert.Contains("Page 2 of 2", page2);
         var (_, silly, _) = await site.Get("/chronicle?page=999");
-        Assert.Contains("Page 3 of 3", silly);
+        Assert.Contains("Page 2 of 2", silly);
         var (_, entry, _) = await site.Get("/chronicle/1");
         Assert.Contains("The 3rd Day of Deepfrost, Year 1", entry);
         Assert.Contains("ESS 4200", entry);

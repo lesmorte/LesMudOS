@@ -74,7 +74,7 @@ The Chronicle records discoveries of hidden places and secret recipes, and their
 
 An entry with no event id is hidden. A place name is shown on an entry only if it is in `publicPlaces`. If the file is missing or unreadable, nothing is public.
 
-The default public list is `aggregate.goblin_purge`, `boss.dungeon`, `boss.goblin_overseer`, `boss.world`, `class.advanced`, `class.prestige`, `item.legendary`, `item.artifact`, `level.milestone`, `quest.local`, `quest.clear_the_cellar`, `quest.story`, `quest.overseers_orders`, `renown.*`, `travel.pass`. `discover.area` is deliberately not on it (an area's name can be a secret).
+The default public list is `aggregate.goblin_purge`, `boss.dungeon`, `boss.goblin_overseer`, `boss.world`, `class.advanced`, `class.prestige`, `item.legendary`, `item.artifact`, `level.milestone`, `quest.local`, `quest.clear_the_cellar`, `quest.story`, `renown.*`, `travel.pass`. `discover.area` is deliberately not on it (an area's name can be a secret).
 
 **Making a new event type public.** Add its id (or `prefix.*`) to `publicEvents` in `publicfilter.json` and restart the site. Check first that its headline and text name nothing the lore decisions ([areas/corridor-lore-decisions.md](areas/corridor-lore-decisions.md)) keep secret. If a type's text can mention a hidden place, add the place to `forbiddenTerms` instead: the entry is then hidden whatever its type.
 
