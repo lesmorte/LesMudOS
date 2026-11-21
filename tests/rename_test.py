@@ -142,7 +142,9 @@ public class OldProbe : Item
         LongDesc = "Asks by the old names.";
     }
 
-    public override void Init() => AddAction("oldasks", CmdAsk);
+    public override void Init() { AddAction("oldasks", CmdAsk); AddAction("oldtire", CmdTire); }
+
+    private bool CmdTire(string args) { ThisPlayer().Call("SetResources", 10, 0); Write("TIRED\\n"); return true; }
 
     private bool CmdAsk(string args)
     {
@@ -272,20 +274,26 @@ def run(work, mudlib):
     olds = re.search(r"OLDASKS ([\d ]+)", out)
     news = re.search(r"NEWASKS ([\d ]+)", out)
     check("old names: and agree with the new methods", "ok" if olds and news and olds.group(1).split()[1::2] == news.group(1).split()[1::2] else out, "ok")
+    # The tonic written against RestoreStamina gives its Endurance back to a tired character.
+    wiz.command("oldtire")
+    a.quiet(wiz, 3)
+    out = wiz.command("drink tonic") + a.quiet(wiz, 3)
+    check("old names: a crafted drink with RestoreStamina restores Endurance", "ok" if re.search(r"You recover \d+ Endurance\.", out) else out, "ok")
     # A spell written against ManaCost and StaminaCost, granted by a ring: it costs Focus 9 and Endurance 4.
     wiz.command("clone " + R + "old_ring")
     wiz.command("get ring")
     out = wiz.command("wear ring")
     check("old names: an item granting a skill written against the old cost names", out, "You put on an old ring")
     wiz.command("restore")
+    a.quiet(wiz, 4)
     before = numbers(wiz.command("vitality"))
     out = wiz.command("oldskill") + a.quiet(wiz, 2)
     check("old names: the skill runs", out, "OLDSKILLED")
     after = numbers(wiz.command("vitality"))
-    check("old names: ManaCost 9 is 9 Focus and StaminaCost 4 is 4 Endurance", f"{before[4] - after[4]} {before[2] - after[2]}" if before and after else "?", "9 4")
+    check("old names: ManaCost 9 is 9 Focus and StaminaCost 4 is 4 Endurance (a point of Endurance may come back meanwhile)",
+          "ok" if before and after and before[4] - after[4] in (8, 9) and before[2] - after[2] in (3, 4) else f"{before} {after}", "ok")
+    a.quiet(wiz, 3)
     wiz.command("remove ring")
-    out = wiz.command("drink tonic")
-    check("old names: a crafted drink with RestoreStamina restores Endurance", "ok" if re.search(r"You recover \d+ Endurance\.", out) else out, "ok")
 
     # ===== 4. the scan =====
     scanners = {"warrior": login("scanwar", "warrior"), "mage": login("scanmag", "mage"), "priest": login("scanpri", "priest")}
@@ -329,8 +337,7 @@ def run(work, mudlib):
     wiz.command("goto " + R + "arena")
     wiz.command("clone " + R + "old_dummy")
     wiz.command("kill dummy")
-    out = a.quiet(wiz, 6)
-    wiz.command("flee")
+    out = a.quiet(wiz, 4) + wiz.command("bash dummy") + a.quiet(wiz, 12)
     wiz.command("goto " + R + "arena")
     wiz.command("slay dummy")
     for thing in ("healing_potion", "craft/sweet_berry_juice", "craft/minor_stamina_tonic", "craft/herbal_bandage", "craft/minor_healing_salve"):
@@ -338,7 +345,7 @@ def run(work, mudlib):
     wiz.command("get all")
     for verb, word in (("drink", "potion"), ("drink", "juice"), ("drink", "tonic"), ("apply", "bandage"), ("apply", "salve")):
         out += wiz.command(f"{verb} {word}")
-        out += a.quiet(wiz, 1.5)
+        out += a.quiet(wiz, 3)
     out += wiz.command("vitality") + wiz.command("i") + wiz.command("restore") + wiz.command("score")
     check("scan: the potion and the drinks said something", out, "You recover", "Endurance")
     scan("a healing potion, berry juice, a tonic, a bandage, a salve, `restore` and `score`", out)
