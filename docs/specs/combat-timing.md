@@ -40,9 +40,9 @@ Combat should be event-driven rather than round-based.
 
 Every combatant has:
 
-- Vitality (Health)
-- Stamina (used for physical skills)
-- Mana (used for spells)
+- Vitality
+- Endurance (used for physical skills)
+- Focus (used for spells)
 - Reaction Time
 - Skills
 - Spells
@@ -185,7 +185,7 @@ Equipping a Spear grants:
 
 Triple Thrust
 
-Cost: 25 Stamina
+Cost: 25 Endurance
 
 Reaction Modifier: +1.0
 

@@ -270,7 +270,7 @@ public class ExampleVillager : Npc
         ShortDesc = "Maren the weaver";
         LongDesc = "A cheerful woman with ink-stained fingers and a shuttle in her belt.";
         Level = 1;
-        MaxHp = 12;
+        MaxVitality = 12;
         AddChat("Good day to you.");
         AddChat("The wool this year is the best I have seen.");
         AddTopic("wool,weaving", "Sheep, mostly. Then a great deal of patience.");
@@ -286,7 +286,7 @@ public class ExampleVillager : Npc
 
 - It walks only through **real exits**: an ordinary exit in the room it is in that leads to the next room of the route. A missing exit, a locked exit it has no key for, and a hidden exit all stop it (it stays where it is and tries again at the next step; `stat` counts the blocked steps).
 - It does not walk while it is **fighting**, and it stands still for `TalkPauseSeconds` (default 20) after a player uses `talk` or `ask` on it.
-- `DefendPlayers = true`: if a creature is fighting a player in the room the patrol is in (or the patrol arrives where one is), the patrol joins against the creature. A patrol is peaceful (it cannot be attacked) unless you set `Peaceful = false`; give it `Level`, `MaxHp`, damage and, if you like, combat actions as for any creature.
+- `DefendPlayers = true`: if a creature is fighting a player in the room the patrol is in (or the patrol arrives where one is), the patrol joins against the creature. A patrol is peaceful (it cannot be attacked) unless you set `Peaceful = false`; give it `Level`, `MaxVitality`, damage and, if you like, combat actions as for any creature.
 - If it **dies** it leaves the world and comes back after `ReturnSeconds` (default 300) in the first room of its route, at full health. It leaves no corpse.
 - **Cost.** A patrol with no player in any room of its route has no walking call-out and no heartbeat. All it does is look every `PollSeconds` (default 15) whether any player stands in one of its route's rooms, which is a comparison of room names for each player on the game, and it loads no room. The moment a player is on the route it walks, and when the last one leaves it stops again where it is. Patrols are therefore free in the quiet parts of a long road.
 - A patrol defined under `/wiz` walks only in its own wizard's home, and no other patrol enters `/wiz`.
@@ -304,7 +304,7 @@ public class ExampleRanger : Patrol
         ShortDesc = "Ranger Hale of the Riverwatch";
         LongDesc = "A weathered ranger in a green cloak, a longbow across her back, who walks the road as if she owned every stone of it.";
         Level = 5;
-        MaxHp = 120;
+        MaxVitality = 120;
         DamageMin = 4;
         DamageMax = 7;
         DefendPlayers = true;
@@ -336,7 +336,7 @@ public class ExampleShopkeeper : Shopkeeper
         ShortDesc = "Orrin the trader";
         LongDesc = "A round man behind a counter, who weighs everything twice.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
         AddChat("Everything is priced fairly. Mostly.");
         AddChat("Try {cmd}browse{/} to see what I have.");
         AddStock("/domains/example/sword", 10);
@@ -364,7 +364,7 @@ public class ExampleRat : Monster
         ShortDesc = "an example rat";
         LongDesc = "A rat that exists to be tested.";
         Level = 1;
-        MaxHp = 5;
+        MaxVitality = 5;
         DamageMin = 1;
         DamageMax = 2;
         ToHit = 0;
@@ -382,7 +382,7 @@ public class ExampleRat : Monster
 
 ### Timing: a creature with one action, and one with a pattern
 
-Combat has no rounds: every creature acts on the event clock of [COMBAT_TIMING.md](COMBAT_TIMING.md), exactly as a player does. A creature has a **base Reaction Time** (`BaseReaction`, 1.0 fast to 6.0 slow, steps of 0.5; default 2.5, the same as a player) and a list of **actions**. Each action has a `preparation` (a wind-up before it takes effect, 0 for a plain attack) and a `recovery`, both in time units of 2 seconds, and the time to its next action is `(Reaction Time + recovery) x 2` seconds. A rat with Reaction Time 2.0 and a bite with recovery 0.5 acts every `(2.0 + 0.5) x 2 = 5` seconds. The rest of the numbers (HP, damage, to hit, armor) work as before; because actions are several seconds apart, damage and HP are larger than they were when a round was 2 seconds (the table in GAME_SYSTEMS.md has the Hollow's).
+Combat has no rounds: every creature acts on the event clock of [COMBAT_TIMING.md](COMBAT_TIMING.md), exactly as a player does. A creature has a **base Reaction Time** (`BaseReaction`, 1.0 fast to 6.0 slow, steps of 0.5; default 2.5, the same as a player) and a list of **actions**. Each action has a `preparation` (a wind-up before it takes effect, 0 for a plain attack) and a `recovery`, both in time units of 2 seconds, and the time to its next action is `(Reaction Time + recovery) x 2` seconds. A rat with Reaction Time 2.0 and a bite with recovery 0.5 acts every `(2.0 + 0.5) x 2 = 5` seconds. The rest of the numbers (Vitality, damage, to hit, armor) work as before; because actions are several seconds apart, damage and Vitality are larger than they were when a round was 2 seconds (the table in GAME_SYSTEMS.md has the Hollow's).
 
 - **A creature with one action** needs one line of data and no code: `AddCombatAction("bite", "Bite", preparation: 0, recovery: 0.5);`. A creature that declares no action at all uses the plain attack of its weapon, or its fists (recovery 0.5).
 - **A creature with several actions** declares them all and overrides `ChooseAction`, which is called whenever the creature is ready and has an enemy. `ActionsTaken()` counts the actions chosen so far in this fight (0 while choosing the first), so a fixed rhythm that players can learn is a one-liner. `windUp` is the verb phrase the room reads when the preparation begins ("The ogre rears back..."): always give a prepared action one, because it is how a player sees the blow coming. `damageMultiplier` scales an attack. Other kinds of action (a summons, a shout) use `kind:` with your own word and are done in an override of `Special(CombatAction action, ObjectRef? target)`; see `/domains/hollow/mob/goblin_overseer`.
@@ -400,7 +400,7 @@ public class ExampleDrake : Monster
         ShortDesc = "an example drake";
         LongDesc = "A small drake that exists to be timed.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
         DamageMin = 3;
         DamageMax = 5;
         XpValue = 30;
@@ -475,7 +475,7 @@ public class ExampleSword : Weapon
 
 ### Armor
 
-`wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxHpBonus` (optional) adds to maximum HP while worn. `ReactionMod` (optional, default 0) is added to the wearer's Reaction Time while worn: a shield or heavy armor makes its wearer a little slower. `Category` is `light`, `medium` or `heavy` for body and head armor (it decides who may wear it; a shield or trinket needs none).
+`wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxVitalityBonus` (optional) adds to maximum Vitality while worn. `ReactionMod` (optional, default 0) is added to the wearer's Reaction Time while worn: a shield or heavy armor makes its wearer a little slower. `Category` is `light`, `medium` or `heavy` for body and head armor (it decides who may wear it; a shield or trinket needs none).
 
 ```csharp
 // File: /domains/example/helm.cs
@@ -491,7 +491,7 @@ public class ExampleHelm : Armor
         LongDesc = "A dented iron cap.";
         Slot = "head";
         ArmorValue = 1;
-        MaxHpBonus = 0;
+        MaxVitalityBonus = 0;
         ReactionMod = 0.0;
         Value = 15;
     }
@@ -698,7 +698,7 @@ The full reference, with every number and the launch recipes as data, is [CRAFTI
 - **A station**: inherit `/std/station`, set `StationKind` ("herbalist table", "tanning rack", "workbench", "cooking fire"), place it with `AddSpawn`.
 - **A node's yield**: `Yield("berry bush", "blackberries", 1, 2)` in a table (node kind, material, weight, units).
 - **A recipe**: a chain in a `/recipes` file (inherit `/std/recipe_set`): `Recipe("id", "Name").Needs("healing_herb").NeedsAny("berry", 2).At("herbalist table").Skill("herbalism", "novice").Makes(path or material id).Discovery("known")`. At most three kinds of ingredient.
-- **A crafted consumable**: inherit `/std/crafted`, set `UseVerb` ("eat", "drink", "apply") and any of `RestoreVitality`, `RestoreStamina`, `HealPerTick` + `Ticks` + `TickSeconds`. Quality scales them.
+- **A crafted consumable**: inherit `/std/crafted`, set `UseVerb` ("eat", "drink", "apply") and any of `RestoreVitality`, `RestoreEndurance`, `HealPerTick` + `Ticks` + `TickSeconds`. Quality scales them.
 - **A trainer**: inherit `/std/trainer`, `AddLesson("recipe_id", price)`; it is also a shopkeeper, so `AddStock` lines make the same NPC a supplier. **A book**: inherit `/std/recipe_book`, `Teaches.Add("recipe_id")`. **A quest reward**: `LoadObject("/secure/crafting").Call<string>("Teach", player, "recipe_id")`.
 - **A vendor of materials**: `AddStock(path, price)`; generic skins and bloods by record: `AddStock("/std/skin?p.kind=rabbit", 3)`. Never below the material's value. Goblin Blood cannot be stocked.
 - **Pricing**: an output's value times its count at most about 60% of its ingredients' values. Run `python3 tests/craft_sim.py`.
@@ -719,9 +719,24 @@ public class ExampleArea : Area
 
 **A locked exit that opens with an item.** Override `QueryExitPath(string direction)` in the room (see `/domains/hollow/village/north_road.cs`, which closes the road north without the travel pass).
 
-**A skill, spell or trait** is one file in `/skills`, found by the registry without any list to edit. It inherits `/std/skill` (a `Command` word, `StaminaCost` or `ManaCost`, `Preparation`, `Recovery`, `Target` of `enemy`, `friend` or `item`, and `Resolve(user, target)`) or `/std/trait` (`Mods["armor"] = 1;` and the other modifier keys listed in CLASS_SYSTEM.md section 12). Items grant skills by overriding `QueryGrantedSkills()`.
+**A skill, spell or trait** is one file in `/skills`, found by the registry without any list to edit. It inherits `/std/skill` (a `Command` word, `EnduranceCost` or `FocusCost`, `Preparation`, `Recovery`, `Target` of `enemy`, `friend` or `item`, and `Resolve(user, target)`) or `/std/trait` (`Mods["armor"] = 1;` and the other modifier keys listed in CLASS_SYSTEM.md section 12). Items grant skills by overriding `QueryGrantedSkills()`.
 
 **A class** is one file in `/classes` inheriting `/std/pclass`: tier, parent, `Require("level", "5")`, `ExpModifier`, `AttackRate`, `Skills`, `Traits`, `Weapons`, `ArmorTypes`, `Enabled`. Advanced classes are given with `player.Call<string>("ApplyClass", id)`. CLASS_SYSTEM.md section 12 has the full story.
+
+## Vitality, Endurance and Focus in content
+
+The three resources are called Vitality, Endurance and Focus (they were HP, Stamina and Mana), in every message and in the code. Write new content with the new names:
+
+| Use | Old name (still works, obsolete) |
+|---|---|
+| `MaxVitality`, `QueryVitality()`, `QueryMaxVitality()` | `MaxHp`, `Hp`, `QueryHp()`, `QueryMaxHp()` |
+| `MaxEndurance`, `EnduranceRegen`, `QueryEndurance()`, `QueryMaxEndurance()` | `MaxStamina`, `StaminaRegen`, `QueryStamina()`, `QueryMaxStamina()` |
+| `MaxFocus`, `FocusRegen`, `QueryFocus()`, `QueryMaxFocus()` | `MaxMana`, `ManaRegen`, `QueryMana()`, `QueryMaxMana()` |
+| skill `EnduranceCost`, `FocusCost` | `StaminaCost`, `ManaCost` |
+| armour `MaxVitalityBonus` | `MaxHpBonus` |
+| crafted item `RestoreVitality`, `RestoreEndurance` | `RestoreStamina` |
+
+The old names are thin forwarding aliases kept so that content written before the rename still loads; they will go when nothing uses them. In `prompt`, the tokens are `{vitality} {maxvitality} {endurance} {maxendurance} {focus} {maxfocus}`; the old tokens `{hp} {maxhp} {stamina} {maxstamina} {mana} {maxmana}` still expand. The keys `hp`, `stamina` and `mana` in a character's save file are unchanged.
 
 ## Corpses, in one paragraph
 
@@ -738,9 +753,9 @@ update /domains/example/hall      compile (or recompile) a room and put you back
 goto /domains/example/hall        walk into a room by path (or goto <player>)
 clone /domains/example/sword      put a new object in your inventory
 stat here                         the room: safe flag, spawns and how many are alive, exits, hidden exits, danger band
-stat rat                          a creature or item in the room: level, HP, damage, loot
+stat rat                          a creature or item in the room: level, Vitality, damage, loot
 stat me                           your own numbers
-restore                           restore your HP, Stamina and Mana (level 5); restore <creature> too
+restore                           restore your Vitality, Endurance and Focus (level 5); restore <creature> too
 slay rat                          kill something at once with normal death (level 10)
 ```
 

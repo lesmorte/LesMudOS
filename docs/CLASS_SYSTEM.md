@@ -1,6 +1,6 @@
 # Class system: implementation design
 
-The owner's brief is [specs/class-system.md](specs/class-system.md). This document says how it is built in LesMudOS. It follows combat timing pass 1 ([COMBAT_TIMING.md](COMBAT_TIMING.md)) and pulls in the parts of the timing brief that classes cannot work without: stamina, mana, skills and spells.
+The owner's brief is [specs/class-system.md](specs/class-system.md). This document says how it is built in LesMudOS. It follows combat timing pass 1 ([COMBAT_TIMING.md](COMBAT_TIMING.md)) and pulls in the parts of the timing brief that classes cannot work without: endurance, focus, skills and spells.
 
 Status: stage A (everything up to and including the five archetypes, the travel pass and the Vale Road) is implemented; sections 8 (the Hall of Legends) and 9 (advanced classes) are the design for stages B and C. Section 12 describes how stage A is built and how to extend it.
 
@@ -15,7 +15,7 @@ Status: stage A (everything up to and including the five archetypes, the travel 
 
 | Stage | Contents |
 |---|---|
-| A | Stamina and mana; the skill and spell mechanism on the combat clock; critical, dodge and block rolls; timed effects; equipment categories and access; the class framework and levelling formula, with level-scaled attack and defense; archetype choice at creation and for existing characters; the five archetypes with their starting features and equipment; the travel pass and the road out of the village; region and area names; balance and a play-through per archetype |
+| A | Endurance and focus; the skill and spell mechanism on the combat clock; critical, dodge and block rolls; timed effects; equipment categories and access; the class framework and levelling formula, with level-scaled attack and defense; archetype choice at creation and for existing characters; the five archetypes with their starting features and equipment; the travel pass and the road out of the village; region and area names; balance and a play-through per archetype |
 | B | Oakenfell, the first major city of Greenvale (needs an area brief), with the Hall of Legends and its five hallmasters; advancement at level 5; the 15 advanced classes with two signature abilities each, including allies (summons and companions) |
 | C | Balance simulation and tests for the advanced classes; a play-through that ends with travelling to the city and pledging a class |
 
@@ -25,9 +25,9 @@ Subclasses (level 10) and prestige classes exist in the framework from stage A b
 
 ## 3. Resources
 
-Every living thing, players and NPCs alike, has Vitality (the existing HP), Stamina and Mana.
+Every living thing, players and NPCs alike, has Vitality (the existing Vitality), Endurance and Focus.
 
-| | Max Stamina | Max Mana | Stamina regained per 10 s | Mana regained per 10 s |
+| | Max Endurance | Max Focus | Endurance regained per 10 s | Focus regained per 10 s |
 |---|---|---|---|---|
 | Warrior | 100 | 20 | 10 | 2 |
 | Scout | 100 | 20 | 8 | 2 |
@@ -38,11 +38,11 @@ Every living thing, players and NPCs alike, has Vitality (the existing HP), Stam
 
 Regeneration is the same in and out of combat (the Adventurer's Survival Training makes it 50% faster out of combat); resting in a safe room doubles it. Resources do not grow with level in this pass (class identity comes from skills, not from stat growth).
 
-`score` and the short `hp` line show all three. Costs are checked when an action begins; an action the character cannot pay for is refused and not queued.
+`score` and the short `vitality` line show all three. Costs are checked when an action begins; an action the character cannot pay for is refused and not queued.
 
 ## 4. Skills and spells
 
-A skill is an action in the sense of COMBAT_TIMING.md: it has a name, a command word, Preparation, Recovery, a reaction modifier, a Stamina and Mana cost, optional requirements (a weapon category, a shield, being unarmed, a target) and an effect. A spell is a skill whose cost is Mana. Both go through the same queue and the same formula as a basic attack. There is no separate cooldown mechanism.
+A skill is an action in the sense of COMBAT_TIMING.md: it has a name, a command word, Preparation, Recovery, a reaction modifier, a Endurance and Focus cost, optional requirements (a weapon category, a shield, being unarmed, a target) and an effect. A spell is a skill whose cost is Focus. Both go through the same queue and the same formula as a basic attack. There is no separate cooldown mechanism.
 
 A trait is a passive feature: it changes a number or unlocks something, and has no command.
 
@@ -119,7 +119,7 @@ Levels above 10: 49,300 × (n / 10)³ × experience modifier
 
 The first four levels are unchanged from the original design (it was 100, 250, 500, 900 before the five callings). Levels 6 to 10 are a table measured against the corridor's pace (about 15 hours from level 5 to level 10 for a character playing well; [CORRIDOR_BALANCE.md](CORRIDOR_BALANCE.md) section 4). **The curve beyond level 10 is provisional**: a power law through level 10 that continues the last step smoothly (level 11 needs 65,618, level 20 needs 394,400, level 100 needs 49,300,000). It is an order of magnitude and nothing more, and it is to be re-fitted when there is content for levels above 10. The result is rounded to a whole number. The table and the power law live in one place (`Adventurer.ExperienceFor`). The experience modifier is the largest modifier among the character's classes: 1.0 for standard classes, 1.25 for Spellblade as the brief gives it, higher for future prestige classes. A character who gains a modifier keeps their level and experience; only the experience needed for later levels changes.
 
-Per level: +8 maximum HP, as now.
+Per level: +8 maximum Vitality, as now.
 
 ### Attack and defense scaling
 
@@ -156,9 +156,9 @@ Consequence for the existing area: today the defender's level counts for nothing
 
 Chosen at character creation, after the password, from a short in-character presentation of the five with one line each; `help <archetype>` at that prompt shows the detail. Existing characters with no archetype get the same choice at their next login before they enter the game; they keep their level, items and gold, and do not receive a starting kit.
 
-"Avoid large stat differences" is taken literally: HP and Reaction Time differ a little, and the rest is skills, resources and equipment access.
+"Avoid large stat differences" is taken literally: Vitality and Reaction Time differ a little, and the rest is skills, resources and equipment access.
 
-| Archetype | Starting HP | Base Reaction Time | Attack rate | Starting kit | Gold |
+| Archetype | Starting Vitality | Base Reaction Time | Attack rate | Starting kit | Gold |
 |---|---|---|---|---|---|
 | Warrior | 40 | 3.0 | 1.00 | Rusty Sword, Small Shield | 10 |
 | Scout | 26 | 2.0 | 1.00 | Hunting Bow, Iron Dagger | 10 |
@@ -170,20 +170,20 @@ Chosen at character creation, after the password, from a short in-character pres
 
 | Archetype | Feature | Kind | Cost | Prep / Recovery | Effect |
 |---|---|---|---|---|---|
-| Warrior | Shield Bash (`bash`) | skill | 15 Stamina | 0 / 1.5 | Needs a shield. A normal hit roll; on a hit, three quarters of weapon damage, and the target is staggered: an action it is preparing is interrupted, otherwise its Ready Time is pushed back 2 seconds. |
+| Warrior | Shield Bash (`bash`) | skill | 15 Endurance | 0 / 1.5 | Needs a shield. A normal hit roll; on a hit, three quarters of weapon damage, and the target is staggered: an action it is preparing is interrupted, otherwise its Ready Time is pushed back 2 seconds. |
 | Warrior | Defensive Training | trait | | | +2 armor. |
 | Warrior | Weapon Proficiency | trait | | | +2 to hit with any weapon. |
 | Scout | Evasion | trait | | | 5% dodge (8% before docs/ATTRIBUTES.md section 8). |
-| Scout | Tracking (`track`) | skill | 5 Stamina | 0 / 0.5 | Lists the creatures in each adjacent room. |
-| Scout | Precision Strike (`strike`) | skill | 25 Stamina | 0.5 / 1.0 | An attack at +2 to hit with a 15% critical chance. |
-| Priest | Minor Heal (`heal`) | spell | 25 Mana | 0.5 / 1.0 | Restores 8 HP (10 with Divine Knowledge) to the caster or a target in the room. |
-| Priest | Blessing (`bless`) | spell | 25 Mana | 0.5 / 1.0 | +1 to hit and +1 armor for 60 seconds, on the caster or a target. |
+| Scout | Tracking (`track`) | skill | 5 Endurance | 0 / 0.5 | Lists the creatures in each adjacent room. |
+| Scout | Precision Strike (`strike`) | skill | 25 Endurance | 0.5 / 1.0 | An attack at +2 to hit with a 15% critical chance. |
+| Priest | Minor Heal (`heal`) | spell | 25 Focus | 0.5 / 1.0 | Restores 8 Vitality (10 with Divine Knowledge) to the caster or a target in the room. |
+| Priest | Blessing (`bless`) | spell | 25 Focus | 0.5 / 1.0 | +1 to hit and +1 armor for 60 seconds, on the caster or a target. |
 | Priest | Divine Knowledge | trait | | | Healing spells restore 25% more. |
-| Mage | Arcane Bolt (`bolt`) | spell | 20 Mana (16 with Mana Efficiency) | 0.5 / 1.0 | 6-9 damage that ignores armor; needs no hit roll, can be dodged. |
-| Mage | Mana Efficiency | trait | | | Spells cost 20% less Mana. |
-| Mage | Magical Lore (`lore`) | skill | 5 Mana | 0 / 0.5 | Shows an item's exact numbers and any magical property. |
-| Adventurer | Survival Training | trait | | | HP, Stamina and Mana regenerate 50% faster out of combat. |
-| Adventurer | Appraise (`appraise`) | skill | 5 Stamina | 0 / 0.5 | Shows an item's exact numbers and what shops pay for it. |
+| Mage | Arcane Bolt (`bolt`) | spell | 20 Focus (16 with Focus Efficiency) | 0.5 / 1.0 | 6-9 damage that ignores armor; needs no hit roll, can be dodged. |
+| Mage | Focus Efficiency | trait | | | Spells cost 20% less Focus. |
+| Mage | Magical Lore (`lore`) | skill | 5 Focus | 0 / 0.5 | Shows an item's exact numbers and any magical property. |
+| Adventurer | Survival Training | trait | | | Vitality, Endurance and Focus regenerate 50% faster out of combat. |
+| Adventurer | Appraise (`appraise`) | skill | 5 Endurance | 0 / 0.5 | Shows an item's exact numbers and what shops pay for it. |
 | Adventurer | Improvised Combat | trait | | | Unarmed damage 2-5, and weapons carry 0.5 less reaction modifier (never below 0). |
 | Adventurer | Traveler's Instinct | trait | | | The exits line of a room also shows where each exit leads, and marks locked ones. |
 
@@ -214,34 +214,34 @@ Standard experience modifier 1.0 unless stated. Each has two signature features.
 
 | Class | Adds | Feature | Kind | Cost | Prep / Recovery | Effect |
 |---|---|---|---|---|---|---|
-| Knight | | Shield Wall (`wall`) | skill | 20 Stamina | 0 / 1.5, reaction +1.5 | Needs a shield. Block chance +40% for 20 seconds. |
+| Knight | | Shield Wall (`wall`) | skill | 20 Endurance | 0 / 1.5, reaction +1.5 | Needs a shield. Block chance +40% for 20 seconds. |
 | Knight | | Guardian's Resolve | trait | | | +2 armor while wearing heavy armor; +1 otherwise. |
-| Berserker | | Reckless Blow (`reckless`) | skill | 25 Stamina | 0.5 / 2.0 | An attack for double damage; the Berserker's armor is −2 for 10 seconds. |
-| Berserker | | Battle Fury | trait | | | 15% haste while below half HP. |
-| Monk | | Flurry (`flurry`) | skill | 25 Stamina | 0 / 1.5 | Unarmed only. Three unarmed attacks, each rolled separately. |
+| Berserker | | Reckless Blow (`reckless`) | skill | 25 Endurance | 0.5 / 2.0 | An attack for double damage; the Berserker's armor is −2 for 10 seconds. |
+| Berserker | | Battle Fury | trait | | | 15% haste while below half Vitality. |
+| Monk | | Flurry (`flurry`) | skill | 25 Endurance | 0 / 1.5 | Unarmed only. Three unarmed attacks, each rolled separately. |
 | Monk | | Iron Body | trait | | | Unarmed damage 3-6; +2 armor while wearing no body armor and no shield. |
 
 ### Scout
 
 | Class | Adds | Feature | Kind | Cost | Prep / Recovery | Effect |
 |---|---|---|---|---|---|---|
-| Rogue | | Backstab (`backstab`) | skill | 25 Stamina | 0.5 / 1.5 | Only against a target that is not yet fighting the Rogue. A normal hit roll at +2; triple damage if it hits. Starts the fight. |
+| Rogue | | Backstab (`backstab`) | skill | 25 Endurance | 0.5 / 1.5 | Only against a target that is not yet fighting the Rogue. A normal hit roll at +2; triple damage if it hits. Starts the fight. |
 | Rogue | | Opportunist | trait | | | Critical chance +10%. |
-| Ranger | | Power Shot (`shot`) | skill | 20 Stamina | 1.0 / 2.5, reaction +1.0 | Needs a bow. A single attack at +2 to hit for double damage. |
-| Ranger | | Hunter's Mark (`mark`) | skill | 10 Stamina | 0 / 0.5 | The target takes +2 damage from the Ranger's attacks for 60 seconds. |
-| Bard | | Song of Courage (`sing`) | skill | 20 Stamina | 0.5 / 1.5 | The Bard and every other player in the room get +1 to hit and +1 damage for 60 seconds. |
-| Bard | | Discordant Note (`note`) | skill | 20 Stamina | 0 / 1.0 | The target is slowed 30% for 20 seconds. |
+| Ranger | | Power Shot (`shot`) | skill | 20 Endurance | 1.0 / 2.5, reaction +1.0 | Needs a bow. A single attack at +2 to hit for double damage. |
+| Ranger | | Hunter's Mark (`mark`) | skill | 10 Endurance | 0 / 0.5 | The target takes +2 damage from the Ranger's attacks for 60 seconds. |
+| Bard | | Song of Courage (`sing`) | skill | 20 Endurance | 0.5 / 1.5 | The Bard and every other player in the room get +1 to hit and +1 damage for 60 seconds. |
+| Bard | | Discordant Note (`note`) | skill | 20 Endurance | 0 / 1.0 | The target is slowed 30% for 20 seconds. |
 
 ### Priest
 
 | Class | Adds | Feature | Kind | Cost | Prep / Recovery | Effect |
 |---|---|---|---|---|---|---|
-| Cleric | | Greater Heal (`mend`) | spell | 35 Mana | 1.0 / 1.5 | Restores 35 HP to the caster or a target. |
-| Cleric | | Sanctuary (`sanctuary`) | spell | 25 Mana | 0.5 / 1.0 | The caster or a target absorbs the next 15 damage, for up to 60 seconds. |
-| Templar | Sword; heavy armor | Smite (`smite`) | spell | 20 Mana | 0 / 1.0 | A weapon attack that adds 6 damage ignoring armor if it hits. |
+| Cleric | | Greater Heal (`mend`) | spell | 35 Focus | 1.0 / 1.5 | Restores 35 Vitality to the caster or a target. |
+| Cleric | | Sanctuary (`sanctuary`) | spell | 25 Focus | 0.5 / 1.0 | The caster or a target absorbs the next 15 damage, for up to 60 seconds. |
+| Templar | Sword; heavy armor | Smite (`smite`) | spell | 20 Focus | 0 / 1.0 | A weapon attack that adds 6 damage ignoring armor if it hits. |
 | Templar | | Holy Armor | trait | | | +1 armor. |
-| Oracle | | Foresight (`foresight`) | spell | 25 Mana | 0.5 / 1.0 | Dodge +20% for 30 seconds, on the caster or a target. |
-| Oracle | | Read Fate (`fate`) | spell | 10 Mana | 0 / 0.5 | Shows a creature's exact HP, its actions with their timing, and how many seconds until its next action. |
+| Oracle | | Foresight (`foresight`) | spell | 25 Focus | 0.5 / 1.0 | Dodge +20% for 30 seconds, on the caster or a target. |
+| Oracle | | Read Fate (`fate`) | spell | 10 Focus | 0 / 0.5 | Shows a creature's exact Vitality, its actions with their timing, and how many seconds until its next action. |
 
 (The wizard-only `smite` command is renamed `slay` to free the word for the Templar.)
 
@@ -249,29 +249,29 @@ Standard experience modifier 1.0 unless stated. Each has two signature features.
 
 | Class | Adds | Feature | Kind | Cost | Prep / Recovery | Effect |
 |---|---|---|---|---|---|---|
-| Mage | | Fireball (`fireball`) | spell | 35 Mana | 1.0 / 1.5 | 9-14 damage ignoring armor to every enemy of the caster in the room. |
+| Mage | | Fireball (`fireball`) | spell | 35 Focus | 1.0 / 1.5 | 9-14 damage ignoring armor to every enemy of the caster in the room. |
 | Mage | | Arcane Mastery | trait | | | Spell damage +25%. |
-| Druid | Spear | Entangle (`entangle`) | spell | 25 Mana | 0.5 / 1.0 | 3-5 damage, and the target is slowed 40% for 20 seconds. |
-| Druid | | Bear Form (`bear`) | spell | 30 Mana | 1.0 / 1.0 | For 60 seconds: +15 maximum and current HP, unarmed damage 5-8 used in place of any weapon, +1 armor, and no spells can be cast. `bear` again ends it early. |
-| Necromancer | | Raise Skeleton (`raise`) | spell | 40 Mana | 1.0 / 2.0 | Summons a skeleton that fights for the caster for 120 seconds. One at a time. |
-| Necromancer | | Drain Life (`drain`) | spell | 20 Mana | 0.5 / 1.0 | 5-8 damage ignoring armor; the caster is healed by the damage done. |
+| Druid | Spear | Entangle (`entangle`) | spell | 25 Focus | 0.5 / 1.0 | 3-5 damage, and the target is slowed 40% for 20 seconds. |
+| Druid | | Bear Form (`bear`) | spell | 30 Focus | 1.0 / 1.0 | For 60 seconds: +15 maximum and current Vitality, unarmed damage 5-8 used in place of any weapon, +1 armor, and no spells can be cast. `bear` again ends it early. |
+| Necromancer | | Raise Skeleton (`raise`) | spell | 40 Focus | 1.0 / 2.0 | Summons a skeleton that fights for the caster for 120 seconds. One at a time. |
+| Necromancer | | Drain Life (`drain`) | spell | 20 Focus | 0.5 / 1.0 | 5-8 damage ignoring armor; the caster is healed by the damage done. |
 
 ### Adventurer
 
 | Class | Adds | Feature | Kind | Cost | Prep / Recovery | Effect |
 |---|---|---|---|---|---|---|
-| Spellblade (1.25× experience) | | Arcane Strike (`astrike`) | skill | 10 Stamina, 15 Mana | 0 / 1.0 | A weapon attack that adds 5 damage ignoring armor if it hits. |
-| Spellblade | | Weapon Infusion (`infuse`) | spell | 25 Mana | 0.5 / 1.0 | The wielded weapon does +2 damage for 60 seconds. |
-| Beastmaster | Bow | Call Companion (`call`) | skill | 30 Stamina | 1.0 / 1.0 | A wolf companion joins the Beastmaster and fights their enemies until it dies or is dismissed (`dismiss`). One at a time. It follows from room to room. |
+| Spellblade (1.25× experience) | | Arcane Strike (`astrike`) | skill | 10 Endurance, 15 Focus | 0 / 1.0 | A weapon attack that adds 5 damage ignoring armor if it hits. |
+| Spellblade | | Weapon Infusion (`infuse`) | spell | 25 Focus | 0.5 / 1.0 | The wielded weapon does +2 damage for 60 seconds. |
+| Beastmaster | Bow | Call Companion (`call`) | skill | 30 Endurance | 1.0 / 1.0 | A wolf companion joins the Beastmaster and fights their enemies until it dies or is dismissed (`dismiss`). One at a time. It follows from room to room. |
 | Beastmaster | | Pack Tactics | trait | | | +1 to hit while the companion is in the room. |
-| Artificer | | Deploy Turret (`turret`) | skill | 35 Stamina | 1.0 / 2.0 | A turret stands in the room for 60 seconds and shoots the Artificer's current enemy every 6 seconds for 3-5 damage. One at a time. It does not move. |
-| Artificer | | Gadget Toss (`toss`) | skill | 15 Stamina | 0 / 1.0 | 4-7 damage and the target is slowed 20% for 10 seconds. |
+| Artificer | | Deploy Turret (`turret`) | skill | 35 Endurance | 1.0 / 2.0 | A turret stands in the room for 60 seconds and shoots the Artificer's current enemy every 6 seconds for 3-5 damage. One at a time. It does not move. |
+| Artificer | | Gadget Toss (`toss`) | skill | 15 Endurance | 0 / 1.0 | 4-7 damage and the target is slowed 20% for 10 seconds. |
 
 ### Allies
 
 Skeletons, companions and turrets are living things under the same combat rules as everything else. An ally has an owner; it treats the owner's enemies as its own, cannot be attacked by its owner or by other players, gives its owner the experience and kill credit for what it kills (experience for a kill is otherwise shared by damage among the players who hurt the creature: see GAME_SYSTEMS.md, Shared experience), leaves no lootable corpse, and disappears when its time runs out, when its owner dies or logs out, or (for a companion) when dismissed. Monsters may target allies. Allies are not saved.
 
-| Ally | Level | HP | Damage | Reaction Time | Attack Recovery |
+| Ally | Level | Vitality | Damage | Reaction Time | Attack Recovery |
 |---|---|---|---|---|---|
 | Skeleton | owner's level − 1, at least 1 | 20 | 3-5 | 3.0 | 1.0 |
 | Wolf companion | owner's level − 1, at least 1 | 24 | 3-5 | 2.0 | 1.0 |
@@ -279,11 +279,11 @@ Skeletons, companions and turrets are living things under the same combat rules 
 
 ## 10. What must keep working
 
-Everything already built: the combat clock, corpses and lost property, quests, shops, colour, wizard tools, passwords, the area and its tests. Creatures gain Stamina and Mana but none in Vincent's Hollow uses a skill in this pass, so the area's balance changes only through what players can now do.
+Everything already built: the combat clock, corpses and lost property, quests, shops, colour, wizard tools, passwords, the area and its tests. Creatures gain Endurance and Focus but none in Vincent's Hollow uses a skill in this pass, so the area's balance changes only through what players can now do.
 
 ## 11. Balance and testing
 
-- The simulation gains archetypes and advanced classes. Target: each of the five archetypes can complete Vincent's Hollow solo by level 5, with win rates against the boss within the band already used (roughly 50-75% for a prepared level 4-5 character), and no archetype more than about 15 points better or worse than the average. Caster archetypes are expected to lean on their spells and run out of Mana in long fights; that is intended, and the numbers are tuned so they are not helpless when they do.
+- The simulation gains archetypes and advanced classes. Target: each of the five archetypes can complete Vincent's Hollow solo by level 5, with win rates against the boss within the band already used (roughly 50-75% for a prepared level 4-5 character), and no archetype more than about 15 points better or worse than the average. Caster archetypes are expected to lean on their spells and run out of Focus in long fights; that is intended, and the numbers are tuned so they are not helpless when they do.
 - Advanced classes cannot be fought with in the Hollow beyond repeating the dungeon at level 5, so their abilities are tested for correctness, not for balance against content that does not exist yet.
 - Tests: creation with each archetype; an existing character being asked at login; every starting feature; equipment access refusals; resources and regeneration; dodge, block and critical rolls with controlled test creatures; timed effects expiring; stagger; the travel pass from Rowan including re-issue; the closed road with and without the pass; (stage B and C:) each hallmaster; the two-step pledge and its refusals; every one of the 30 signature features; allies' lifetimes and credit; the experience formula and the Spellblade modifier; a class file added in the test's temporary mudlib being selectable without touching other files; persistence of all of it.
 - The play-through is run once per archetype. Each must complete both quests solo without wizard help, receive the travel pass and walk out onto the Vale Road. From stage C it continues to the city and pledges an advanced class.
@@ -294,7 +294,7 @@ Files:
 
 | Path | What |
 |---|---|
-| `/std/living.cs` | Stamina and Mana (lazy regeneration), timed effects, dodge/block/critical, `Stagger`, `UseSkill`, the level-scaled `Attack` |
+| `/std/living.cs` | Endurance and Focus (lazy regeneration), timed effects, dodge/block/critical, `Stagger`, `UseSkill`, the level-scaled `Attack` |
 | `/std/adventurer.cs` | The player's classes, skills, equipment access, `score`, `skills`, `restore`, `slay`, `setlevel` |
 | `/std/skill.cs`, `/std/trait.cs`, `/std/pclass.cs`, `/std/area.cs` | The small bases a skill, trait, class and area file inherit |
 | `/secure/classes.cs` | The registry. It lists the `/classes` and `/skills` directories on demand (the master grants this object, and only it, `get-dir` on those two paths), so a new file is found without a restart and without editing any list |

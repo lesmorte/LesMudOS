@@ -64,7 +64,7 @@ These follow from the briefs and the existing game. The owner's answers to the o
 - **Inheritance.** Output quality is drawn around the average ingredient quality, shifted by proficiency against the recipe's difficulty. Crafting never fails; low skill lowers quality, high skill can add a bonus output.
 - **Discovery.** A character knows a recipe after being taught (trainer, book, quest) or after combining its ingredients at the right station: `combine herb and wildflower`. A wrong combination consumes nothing and says so. Each recipe's discovery level (Known, Discovered, Rare, Secret) is data. The first character to discover a Rare or Secret recipe by experiment reports an event to the Chronicle.
 - **Commands.** `recipes`, `recipe <name>`, `craft <name> [count]`, `combine <a> and <b> [and <c>]`, `skin`, `bleed`, `harvest`, `proficiencies`.
-- **Effects.** Vitality is hit points. Healing over time, Stamina restoration and the carry bonus use stage A's timed effects and resources.
+- **Effects.** Healing over time, Endurance restoration and the carry bonus use stage A's timed effects and resources.
 
 ### The corridor
 
@@ -123,7 +123,7 @@ Model choice follows the standing rule: the cheapest that will do the job well. 
 
 | Id | Agent | Model | Builds | Depends on | Done when |
 |---|---|---|---|---|---|
-| K1 | Creatures and balance | Sonnet | All 30 corridor and dungeon creatures plus the deer, with level, HP, damage, timing, loot, skin and blood yields; the balance simulator extended to levels 5 to 10 for all five callings; an experience table that hits the agreed pace | Stage A; the build map | Simulator `check` mode clean; each creature beatable by its level band's callings at the simulator's target win rate |
+| K1 | Creatures and balance | Sonnet | All 30 corridor and dungeon creatures plus the deer, with level, Vitality, damage, timing, loot, skin and blood yields; the balance simulator extended to levels 5 to 10 for all five callings; an experience table that hits the agreed pace | Stage A; the build map | Simulator `check` mode clean; each creature beatable by its level band's callings at the simulator's target win rate |
 | K2 | Segment 1, the South Road | Sonnet | About 20 rooms with people, details, readables, nodes and encounters | F2; the build map | Load check clean; exits match the map |
 | K3 | Segment 2, Eldergreen Edge | Sonnet | The same, including the Riverwatch Outpost | as K2 | as K2 |
 | K4 | Segment 3, the Green Road | Sonnet | The same, including the Crossroads | as K2 | as K2 |

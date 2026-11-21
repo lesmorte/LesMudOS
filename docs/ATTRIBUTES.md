@@ -1,6 +1,6 @@
 # The Hollowmere attribute system: design and build plan
 
-How the owner's brief ([specs/attributes.md](specs/attributes.md)) becomes part of the game: what changes, the formulas (fitted to the game as it plays today, at the owner's direction), the choices the brief leaves open, and the order of work. Nothing here is built yet.
+How the owner's brief ([specs/attributes.md](specs/attributes.md)) becomes part of the game: what changes, the formulas (fitted to the game as it plays today, at the owner's direction), the choices the brief leaves open, and the order of work. The engine (section 5, step 2) and the rename (step 3, section 4) are built; steps 4 and 5 follow.
 
 ## 1. What changes
 
@@ -8,11 +8,11 @@ How the owner's brief ([specs/attributes.md](specs/attributes.md)) becomes part 
 |---|---|
 | A character has a level, a calling and its fixed numbers. There are no attributes. | Six attributes: Might, Grace, Vigor, Insight, Spirit, Resolve. Two points to place at every level. |
 | HP, Mana, Stamina | Vitality, Focus, Endurance, in every message, command, help text, document and in the code. |
-| Maximum HP is the calling's starting HP plus 8 a level. Mana and Stamina maximums are fixed by the calling (Warrior 100 Stamina and 20 Mana; Mage 30 and 100). | All three come from one formula each: a class base, a class amount per level, and attributes. |
+| Maximum Vitality (then HP) is the calling's starting Vitality plus 8 a level. Focus and Endurance maximums (then Mana and Stamina) are fixed by the calling (Warrior 100 Endurance and 20 Focus; Mage 30 and 100). | All three come from one formula each: a class base, a class amount per level, and attributes. |
 | To hit: d20 + level × the calling's attack rate against 10 + armor + (level − 1). Damage is the weapon's. Critical hits, dodge and block come only from traits. | Precision and Evasion enter the hit roll. Physical Power scales weapon damage. Grace gives a base critical chance. Spell Power and Healing Power scale spells. |
 | A calling's differences are fixed numbers. | A calling starts its members with different attributes and applies percentage modifiers after the formulas. |
 | Gathering and crafting use proficiency only. | Gathering Efficiency and Crafting Aptitude add to them. |
-| Creatures have hand-set HP, damage and armor. | Creatures also have attributes, generated from level and a template, so that resistances and powers work on them as on players. |
+| Creatures have hand-set Vitality, damage and armor. | Creatures also have attributes, generated from level and a template, so that resistances and powers work on them as on players. |
 
 ## 2. Formulas fitted to the game as it plays today
 
@@ -126,13 +126,14 @@ There are no live players. Saved test characters are converted at first login: a
 
 ## 4. The rename
 
-Vitality, Focus and Endurance replace HP, Mana and Stamina everywhere:
+Vitality, Focus and Endurance replace HP, Mana and Stamina everywhere a player, a builder or a reader of the documents can see them (done):
 
 - messages, `score`, prompts, help, shop and item text, NPC speech, room text;
-- the code: fields, methods and data keys (`QueryHp` becomes `QueryVitality`, `ManaCost` becomes `FocusCost`, and so on), with no aliases left behind;
+- the code: fields, methods and data keys (`QueryHp` became `QueryVitality`, `ManaCost` became `FocusCost`, and so on). Where content files written against the old public names might exist, the old names remain as thin forwarding aliases marked obsolete in a comment (the owner asked for this instead of "no aliases left behind"); the old `prompt` tokens `{hp} {maxhp} {stamina} {maxstamina} {mana} {maxmana}` still expand, silently, and the `hp` command still works as an alias of `vitality`;
+- the keys inside saved character files (`hp`, `stamina`, `mana`) are unchanged, so every existing save loads; `tests/attribute_test.py` loads a save written before the rename;
 - every document and every test.
 
-This touches several hundred files and most test expectations. It is mechanical, and it is done in one pass while no other branch is open, so that nothing has to be merged across it.
+It was mechanical, and was done in one pass while no other branch was open.
 
 ## 5. Order of work
 

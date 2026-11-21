@@ -11,9 +11,9 @@ The brief is large. It is built in passes so that each one leaves the game playa
 | Pass | Contents | Status |
 |---|---|---|
 | 1 | The clock: Reaction Time, per-action Recovery, Preparation, the timing formula, equipment reaction modifiers, haste and slow, an action queue per combatant, creatures and the boss defined as action lists, consumables as actions, the area rebalanced and retested | Implemented |
-| 2 | Stamina; item-granted skills (Triple Thrust and the other examples); a `skills` list; critical, dodge and block rolls | Stamina, the `skills` list, the item-granted-skill mechanism and the three rolls are implemented by the class system (stage A, [CLASS_SYSTEM.md](CLASS_SYSTEM.md)); the Triple Thrust style examples are not |
+| 2 | Endurance; item-granted skills (Triple Thrust and the other examples); a `skills` list; critical, dodge and block rolls | Endurance, the `skills` list, the item-granted-skill mechanism and the three rolls are implemented by the class system (stage A, [CLASS_SYSTEM.md](CLASS_SYSTEM.md)); the Triple Thrust style examples are not |
 | 3 | Interrupts during Preparation (stun, knockdown, silence, fear, disarm) and status effects | Later |
-| 4 | Mana and spells | Mana, spells and the first interrupt (stagger, which cancels an action in its Preparation) are implemented by the class system; the rest of pass 3 stays later |
+| 4 | Focus and spells | Focus, spells and the first interrupt (stagger, which cancels an action in its Preparation) are implemented by the class system; the rest of pass 3 stays later |
 | 5 | Item weight and encumbrance | Later |
 
 Pass 1 must not paint later passes into a corner: every field the brief names for an action (resource cost, preparation, recovery, reaction modifier) exists on the action type from the start, even where pass 1 does not use it.
@@ -89,7 +89,7 @@ When it has no enemy present it does nothing and schedules nothing.
 
 ## 3. Numbers
 
-The reaction and Recovery values below are the design's and were kept unchanged. HP and damage were tuned with `tests/balance_sim.py`; the final values are in section 3.1 and in GAME_SYSTEMS.md.
+The reaction and Recovery values below are the design's and were kept unchanged. Vitality and damage were tuned with `tests/balance_sim.py`; the final values are in section 3.1 and in GAME_SYSTEMS.md.
 
 ### Players
 
@@ -112,7 +112,7 @@ Base Reaction Time 2.5. Unarmed attack: Recovery 0.5.
 | Guild Initiate's Helm | 0.0 | | |
 | Magical Trinket | 0.0 | | |
 
-Slow weapons must hit correspondingly harder, or nobody would use them: damage per second should rise gently from dagger to axe, with the fast weapons better against low-HP, hard-to-hit targets and when a potion needs to be squeezed in.
+Slow weapons must hit correspondingly harder, or nobody would use them: damage per second should rise gently from dagger to axe, with the fast weapons better against low-Vitality, hard-to-hit targets and when a potion needs to be squeezed in.
 
 ### Creatures
 
@@ -137,11 +137,11 @@ Goblin Overseer, base Reaction Time 4.0. His abilities from the area brief becom
 | Battle Cry | 0 | 0.5 | 9 s | His first action in a fight. His damage is +2 for the next 30 seconds. |
 | Axe Slash | 0 | 1.0 | 10 s | Normal attack. |
 | Power Strike | 1.0 | 2.0 | 12 s | Double damage. Announced 2 seconds before it lands. Every third attack. |
-| Summon Goblin Minion | 0.5 | 1.0 | 10 s | Once, as his next action after his HP first falls to half. |
+| Summon Goblin Minion | 0.5 | 1.0 | 10 s | Once, as his next action after his Vitality first falls to half. |
 
 ### Rebalancing
 
-Actions are now several seconds apart where rounds were 2 seconds, so with unchanged numbers every fight would take three to five times as long. Damage is scaled up (and creature HP adjusted where needed) so that:
+Actions are now several seconds apart where rounds were 2 seconds, so with unchanged numbers every fight would take three to five times as long. Damage is scaled up (and creature Vitality adjusted where needed) so that:
 
 - an ordinary creature dies in about 3 to 5 player actions, a tough one in 6 to 8, the boss in roughly 12 to 18;
 - win rates per room and against the boss stay close to the current targets in GAME_SYSTEMS.md section 12;
@@ -163,11 +163,11 @@ Weapons (damage in the old rounds was 2-4 to 6-10; delays are for a base 2.5 pla
 | Woodcutter Axe | 14-21 (4-7) | 0 | 11 | 0.95 |
 | Goblin Overseer's Axe | 17-25 (6-10) | 0 | 12 | 1.05 |
 
-(The delay column in the equipment table assumes a player with no shield; the DPS column assumes a level 3 player with a small shield, which adds 1 s.) Damage per second rises gently from dagger to axe, with the fast daggers better against the evasive and low-HP creatures and when a potion has to be squeezed in. The Overseer's axe is the best weapon in the area.
+(The delay column in the equipment table assumes a player with no shield; the DPS column assumes a level 3 player with a small shield, which adds 1 s.) Damage per second rises gently from dagger to axe, with the fast daggers better against the evasive and low-Vitality creatures and when a potion has to be squeezed in. The Overseer's axe is the best weapon in the area.
 
-Creatures: base Reaction Time and actions are exactly the table above. HP (was) and damage (was): Large Rat 12 (6); Giant Rat 15 (8); Wolf 26 (16); Scavenger 13 (10), damage 1-3 (2-3); Spore Bat 9 (6), damage 1-2 (1-3); Guard 26 (16); Toad 66 (30), damage 2-4 (2-5); Warrior 28 (16); Minion 20 (12); Elite Guard 40 (22); Overseer 114 (54), damage 4-7 (4-6). The Crushing Leap and Shield Bash do double damage (the design left the multiplier open). Spawn counts per room are unchanged.
+Creatures: base Reaction Time and actions are exactly the table above. Vitality (was) and damage (was): Large Rat 12 (6); Giant Rat 15 (8); Wolf 26 (16); Scavenger 13 (10), damage 1-3 (2-3); Spore Bat 9 (6), damage 1-2 (1-3); Guard 26 (16); Toad 66 (30), damage 2-4 (2-5); Warrior 28 (16); Minion 20 (12); Elite Guard 40 (22); Overseer 114 (54), damage 4-7 (4-6). The Crushing Leap and Shield Bash do double damage (the design left the multiplier open). Spawn counts per room are unchanged.
 
-Why: a player action is now 6 to 12 seconds apart instead of 2, so damage per action had to roughly triple for a fight to take 5 to 9 actions; creature HP rose about 1.5 to 2.2 times (more for creatures that only appear alone), and creature damage per action stayed almost the same because creatures also act once every 4 to 12 seconds. The simulation (`python3 tests/balance_sim.py`) gives room win rates of 88 to 99 percent at the right level, and the Overseer 50 to 75 percent for a level 4 to 5 player with a longsword and two potions.
+Why: a player action is now 6 to 12 seconds apart instead of 2, so damage per action had to roughly triple for a fight to take 5 to 9 actions; creature Vitality rose about 1.5 to 2.2 times (more for creatures that only appear alone), and creature damage per action stayed almost the same because creatures also act once every 4 to 12 seconds. The simulation (`python3 tests/balance_sim.py`) gives room win rates of 88 to 99 percent at the right level, and the Overseer 50 to 75 percent for a level 4 to 5 player with a longsword and two potions.
 
 ### Haste and slow
 
@@ -190,7 +190,7 @@ Armor, levels, experience, death, corpses, lost property, loot, quests, shops, s
 
 ## 5a. What the class system added to the clock
 
-Skills and spells are ordinary actions on this clock (Preparation, Recovery, reaction modifier; a Stamina or Mana cost paid when the action begins). Level now matters on both sides of a hit: `d20 + Attack >= 10 + Armor + Defense`, with `Attack = round(attack rate x level) + bonuses` and `Defense = level - 1`. The defender's dodge is rolled first, a hit may be critical (x1.5), and a block halves the damage. Timed effects (haste and slow among them) carry the speed factor. Stagger interrupts an action in its Preparation (half its cost is lost, half its Recovery is still paid) or pushes a ready creature's next action back. See [CLASS_SYSTEM.md](CLASS_SYSTEM.md) and `tests/balance_sim.py`.
+Skills and spells are ordinary actions on this clock (Preparation, Recovery, reaction modifier; a Endurance or Focus cost paid when the action begins). Level now matters on both sides of a hit: `d20 + Attack >= 10 + Armor + Defense`, with `Attack = round(attack rate x level) + bonuses` and `Defense = level - 1`. The defender's dodge is rolled first, a hit may be critical (x1.5), and a block halves the damage. Timed effects (haste and slow among them) carry the speed factor. Stagger interrupts an action in its Preparation (half its cost is lost, half its Recovery is still paid) or pushes a ready creature's next action back. See [CLASS_SYSTEM.md](CLASS_SYSTEM.md) and `tests/balance_sim.py`.
 
 ## 6. Testing
 
@@ -207,11 +207,11 @@ Skills and spells are ordinary actions on this clock (Preparation, Recovery, rea
 - **Ambush.** An aggressive monster does not start the fight and then hold back: `Noticed` schedules the ambush call-out for zero seconds (after the arrival has finished), and `BeginFight(target, true)` happens when it fires, if the player is still there and the creature is alive: the creature then waits its Reaction Time x 2 seconds (`DelayFirstAction`) before its first action.
 - **Who waits.** The initiator of `StartFight` acts at once (if ready); the target, assisting monsters and the summoned minion (`JoinFight`) wait their own Reaction Time x 2 seconds. `AddEnemy` is the path for "drawn in", `AddEnemyCore` for the initiator.
 - **Multipliers.** Crushing Leap and Shield Bash do x2 damage (the design left them open). The Power Strike warning is the wind-up line printed when the action begins; with Preparation 1.0 it lands exactly 2 seconds later.
-- **Pattern details.** The Toad uses its leap as every third action (`ActionsTaken() % 3 == 2`), the Elite Guard its bash as every fourth, the Overseer: Battle Cry first, Summon once at half HP, then slash, slash, power. The cry bonus is a 30 second window from when the cry resolves.
+- **Pattern details.** The Toad uses its leap as every third action (`ActionsTaken() % 3 == 2`), the Elite Guard its bash as every fourth, the Overseer: Battle Cry first, Summon once at half Vitality, then slash, slash, power. The cry bonus is a 30 second window from when the cry resolves.
 - **Speed effects** are not retroactive: they change the delay of the next action begun, not one already in progress.
 - **Forgetting enemies.** An enemy who is not present is forgotten 30 seconds after the combatant first notices it is absent (a timer is scheduled when the combatant is idle with absent enemies).
 - **Queue.** An item used while not ready prints "You are not ready yet. You will ... as soon as you can. (stop cancels.)" and runs at the next Ready Time, whether or not the fight is still on; if the item is gone by then the player is told. Death (`ResetCombat`) drops the queue.
 - **Heartbeats.** `Living.HeartBeat` only calls the regeneration tick and turns itself off when it is not needed; combat never depends on it.
 - **score / stat.** `score` reports "Reaction Time X (base ..., item +mod)" and the delay of the basic attack; `stat` appends the timing block (current action, ready time, queue, every action with delay). `consider` adds a speed verdict.
-- **Numbers.** Section 3.1: HP and damage values changed as described, unarmed damage is 2-5, and the axe is 14-21 so that its damage per second does not fall behind the longsword.
+- **Numbers.** Section 3.1: Vitality and damage values changed as described, unarmed damage is 2-5, and the axe is 14-21 so that its damage per second does not fall behind the longsword.
 - **Driver.** One generic efun, `TimeMs()` (DRIVER_API.md). Fractional-second call-outs needed no fix: the game loop already waits in milliseconds, and the timing test measures them.

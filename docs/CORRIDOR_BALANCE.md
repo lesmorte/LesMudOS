@@ -7,7 +7,7 @@ the driver by `tests/corridor_mob_test.py` and `tests/load_check.py corridor/mob
 
 * 31 creature files in `mudlib/domains/greenvale/corridor/mob/` (class names `Cm...`, ids and levels from the build map).
 * A pace model and a Monte Carlo fight model for all five callings at levels 5 to 10 with village gear, in `tests/balance_sim.py`.
-* `python3 tests/balance_sim.py check` now also compares every number in the 31 files with the simulation (level, HP, damage, to-hit,
+* `python3 tests/balance_sim.py check` now also compares every number in the 31 files with the simulation (level, Vitality, damage, to-hit,
   armor, dodge, experience, coins, Reaction Time, aggression, every action's preparation, recovery, multiplier and kind, damage factor
   and to-hit bonus, the opening/cycle/trigger pattern, the on-hit effects, the loot list).
 
@@ -18,7 +18,7 @@ the driver by `tests/corridor_mob_test.py` and `tests/load_check.py corridor/mob
 * Village gear only (nothing in the corridor drops better weapons or armor; the corridor may drop only the items that already exist).
   Warrior and Adventurer: Overseer's axe (17-25, reaction mod 1.5, recovery 1.5) and Small Shield. Scout: Fine Iron Longsword (12-18).
   Priest: Novice's Mace (9-13) and Small Shield. Mage: Iron Dagger (6-9) as melee fallback, arcane bolt 6-9 flat. All: Commander's Vest
-  (armor 3), Guild Helm (armor 1), Trinket (+5 HP). Total armor 4 (plus 1 for a shield, 2 more for the warrior's training).
+  (armor 3), Guild Helm (armor 1), Trinket (+5 Vitality). Total armor 4 (plus 1 for a shield, 2 more for the warrior's training).
 * A perfect-knowledge player: picks the right action at the right time, drinks a potion when it pays, uses abilities when the model's
   chooser says so (`choose_corridor`), flees nothing, and always knows the best prey for his level.
 * Five potions in a boss fight (`CORRIDOR_POTIONS`); none in ordinary fights.
@@ -38,9 +38,9 @@ reaction part only), weaken (to-hit, damage, armor modifiers), buff and summon a
 | rooms between two kills | 3 | spawn density; at least 6 respawning points per creature type, ResetSeconds <= 300 |
 | looting a corpse | 3 s | |
 | drinking a potion outside a fight | 2 s | |
-| natural HP regeneration | 0.1 HP/s out of combat (Adventurer x1.5, Survival Training); 0.3 HP/s in a safe room | Adventurer.Tick |
-| Stamina and Mana regeneration | per calling, from the class files | |
-| bought healing | 15 gold per 20 HP; gold is the creature's own coins plus loot sold (a dropped potion is drunk) | prices in the Hollow shops |
+| natural Vitality regeneration | 0.1 Vitality/s out of combat (Adventurer x1.5, Survival Training); 0.3 Vitality/s in a safe room | Adventurer.Tick |
+| Endurance and Focus regeneration | per calling, from the class files | |
+| bought healing | 15 gold per 20 Vitality; gold is the creature's own coins plus loot sold (a dropped potion is drunk) | prices in the Hollow shops |
 | "haven" | a safe room within 6 rooms; share of the time one is at hand: 100% at levels 5 and 6, 80% at 7, 50% at 8, 25% at 9 and 10 | segments 1 to 3 of the build map |
 | resupply | 5% extra time (buying potions in bulk) | |
 | distance from the Guest Rooms to level-n prey | 14, 26, 40, 54, 68, 76 rooms at levels 5 to 10 | build map |
@@ -87,7 +87,7 @@ level    warrio    scout   priest     mage   advent   harmonic mean
     9      3141     3344     2366     3239     4150        3145
 ```
 
-Reading: natural regeneration (0.1 HP/s) dominates recovery, so a fight that costs 30 HP costs 5 minutes of waiting unless a potion or a haven
+Reading: natural regeneration (0.1 Vitality/s) dominates recovery, so a fight that costs 30 Vitality costs 5 minutes of waiting unless a potion or a haven
 shortens it. The Adventurer is the fastest (its regeneration is 1.5x, and its axe is the best in the village). The Priest is intrinsically the
 slowest: one third to one half slower in killing, so it pays back about 0.6 of the others' rate. The variants show what a careless player loses:
 "neither" is about 60% of "perfect" at level 5, rising to 83% at level 9, which matches the plan's "about 40 hours for an ordinary player"
@@ -172,7 +172,7 @@ and tests/class_test.py, whose `xp_for` helper re-implements 50 n (n-1) (lines 8
 All 31 numbers below are in the files and checked by `balance_sim.py check`. "react" is the base Reaction Time; actions are prep/recovery in
 time units of 2 s; "x2" is a damage multiplier; hit is the to-hit bonus; arm is armor. Dodge is a percentage.
 
-| id | name | L | HP | dmg | hit | arm | dodge | react | xp | coins | loot | aggr | actions (prep/rec) |
+| id | name | L | Vitality | dmg | hit | arm | dodge | react | xp | coins | loot | aggr | actions (prep/rec) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | field_rabbit | Field Rabbit | 1 | 8 | 1-2 | 0 | 0 | - | 1.5 | 12 | - | - | no | Bite 0/0.5 |
 | roe_deer | Roe Deer | 3 | 22 | 1-3 | 0 | 0 | - | 2.5 | 26 | - | - | no | Kick 0/1 |
@@ -232,7 +232,7 @@ Bosses are fixed at 3.5 times an ordinary level-9 kill (1,550), with the Barrow 
 
 Comparison with the starter village: Goblin Elite Guard 85, Overseer 250 (boss). The corridor's ordinary creatures from level 5 pay 135 to 550,
 all more than the Elite Guard; the bosses pay six times the Overseer. **Deliberate deviation from the brief:** the three low animals (Field Rabbit 12,
-Roe Deer 26, Grey Fox 65) pay token experience, below the village's top. If they paid more than 250 a character could farm rabbits (8 HP,
+Roe Deer 26, Grey Fox 65) pay token experience, below the village's top. If they paid more than 250 a character could farm rabbits (8 Vitality,
 nothing to fear) at several times the pace of the intended prey. The lead may overrule this; the cost is a pace distortion, not a code problem.
 
 ## 6. Win rates
@@ -338,9 +338,9 @@ Findings:
 ### The gear gap
 
 With village gear the fighters stand still: the best weapon (Overseer's axe 17-25) is reached in the Hollow and nothing in the corridor
-improves it, nor the 4 points of armor. Creature HP is therefore flat (40 to 90 for ordinary creatures, 80 to 155 for bosses) and difficulty
+improves it, nor the 4 points of armor. Creature Vitality is therefore flat (40 to 90 for ordinary creatures, 80 to 155 for bosses) and difficulty
 comes from armor (up to 5), to-hit, damage and specials instead. Casters differ in kind: the arcane bolt (6-9) ignores armor, so a Mage kills
-the armor-5 Goblin Veteran in 47 s against the Warrior's 104 s, (and the armor-1 Stray Wolf in 54 s against 65 s), but pays in Mana, which the model refills by resting. Fighters
+the armor-5 Goblin Veteran in 47 s against the Warrior's 104 s, (and the armor-1 Stray Wolf in 54 s against 65 s), but pays in Focus, which the model refills by resting. Fighters
 slow down against armored foes (their hit chance falls by 5 points per armor point), casters do not. The Priest, with the weakest weapon and the
 slowest cycle, takes about 1.5 to 2 times as long as the others to kill anything (91 s against 44 to 65 for a level-6 Stray Wolf). The
 caps on creature armor (5) and the damage tuning were chosen to keep the spread within 15 points on ordinary creatures; the same gap decides
@@ -369,7 +369,7 @@ more so that boss-camping stays slower than hunting. For comparison, the village
 
 ## 8. What is weak or unverified
 
-1. **Regeneration and potion economics decide the pace.** 0.1 HP/s was read from the code; the haven and distance tables (section 2.3) are my
+1. **Regeneration and potion economics decide the pace.** 0.1 Vitality/s was read from the code; the haven and distance tables (section 2.3) are my
    reading of the build map, not measured. A wrong haven share moves the pace by up to 40% ("no haven" versus "perfect"), and the table
    would be wrong by the same amount.
 2. **The perfect-knowledge player does not exist.** The model has no mistakes, no waiting for friends, no reading, no inventory, no shop
