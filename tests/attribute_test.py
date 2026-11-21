@@ -400,7 +400,7 @@ def run(work, mudlib):
               f"{st['vregen'] / 1000:.2f} {st['eregen'] / 1000:.2f} {st['fregen'] / 1000:.2f}", f"{rv:.2f} {re_:.2f} {rf:.2f}")
         want = regen(calling, START[calling])
         check(f"{calling}: and exactly by the formulas", f"{st['vregen']} {st['eregen']} {st['fregen']}", " ".join(str(int(round(x * 1000))) for x in want))
-        check(f"{calling}: stat shows the regeneration", c.command("stat me"), "Regeneration per 10 s: vitality")
+        check(f"{calling}: stat shows the regeneration", c.command("stat me"), "Regeneration per 10 s: Vitality")
         (v1, v5, v10), (e1, e10), (f1, f10) = TABLE[calling]
         c.command("setlevel 5")
         _, mhp, _, mst, _, mma = resources(c)

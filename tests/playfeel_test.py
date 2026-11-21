@@ -1048,6 +1048,7 @@ def run_prompt(wiz):
     check("prompt: the old tokens are accepted", pat.command("prompt [{hp}/{maxhp}] ({stamina}/{maxstamina}) ({mana}/{maxmana}) {name}> "), "Your prompt is now:")
     text = last_line(pat.command("look"))
     check("prompt: the old tokens expand to the same numbers", "ok" if re.match(r"^\[(2[5-9]|30)/30\] \(70/70\) \(70/70\) Prue> $", text) else text, "ok")
+    pat.command("prompt default")
     check("prompt: the old tokens are not listed", pat.command("prompt"), "Your prompt is:", absent=("{hp}", "{maxhp}", "{stamina}", "{maxstamina}", "{mana}", "{maxmana}"))
     pat.command("prompt {red}[{maxvitality}]{/}\t{{name}}{bogus} {name")
     text = pat.raw_command("look")
