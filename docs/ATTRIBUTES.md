@@ -130,7 +130,7 @@ Vitality, Focus and Endurance replace HP, Mana and Stamina everywhere a player, 
 
 - messages, `score`, prompts, help, shop and item text, NPC speech, room text;
 - the code: fields, methods and data keys (`QueryHp` became `QueryVitality`, `ManaCost` became `FocusCost`, and so on). Where content files written against the old public names might exist, the old names remain as thin forwarding aliases marked obsolete in a comment (the owner asked for this instead of "no aliases left behind"); the old `prompt` tokens `{hp} {maxhp} {stamina} {maxstamina} {mana} {maxmana}` still expand, silently, and the `hp` command still works as an alias of `vitality`;
-- the keys inside saved character files (`hp`, `stamina`, `mana`) are unchanged, so every existing save loads; `tests/attribute_test.py` loads a save written before the rename;
+- the keys inside saved character files (`hp`, `stamina`, `mana`) are unchanged, so every existing save loads; `tests/rename_test.py` loads a save written before the rename;
 - every document and every test.
 
 It was mechanical, and was done in one pass while no other branch was open.
