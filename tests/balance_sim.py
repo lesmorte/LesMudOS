@@ -2077,6 +2077,30 @@ def option_head(title, runs):
     print(f"{'option':<64}" + "".join(f"{c[:5]:>5}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}{'low':>6}{'high':>6}   min f/w/r (mid)")
 
 
+def rest_harvest(runs=1500):
+    """The worst case for resting where creatures return: a player who skins and bleeds every corpse and takes its loot (the crafting game), so
+    that the corpses are gone at once and the next reset (a uniform 0 to 300 s later) brings the creatures back. Middle human, level 5,
+    4 potions, starting gear, RestFactor 5, by RestSurprise."""
+    print("=" * 130)
+    print(f"RH. The corpses are harvested at once (corpse time 10 s instead of 420 to 600 s), middle human, RestFactor 5, level 5, 4 potions, starting gear; {runs} runs a cell")
+    print("=" * 130)
+    print(f"{'':<46}" + "".join(f"{c[:5]:>7}" for c in ARCHS) + f"{'mean':>6}{'refills':>8}   (refills = fights per run started by creatures that came back while he sat)")
+    saved = dict(CORPSE_SECONDS_BY_ROOM)
+    try:
+        for label, corpse, sp in (("corpses stay (the game as built)", None, 2.0), ("harvested, RestSurprise 0 s", 10, 0.0), ("harvested, RestSurprise 2 s", 10, 2.0),
+                                  ("harvested, RestSurprise 5 s", 10, 5.0), ("harvested, RestSurprise 10 s", 10, 10.0)):
+            if corpse is not None:
+                for k in CORPSE_SECONDS_BY_ROOM:
+                    CORPSE_SECONDS_BY_ROOM[k] = corpse
+            rs = [approach_stats(c, 5, 4, rest_human("mid", 5, rest_surprise_s=sp), runs, "starting", True) for c in ARCHS]
+            v = [r["kill"] * 100 for r in rs]
+            print(f"{label:<46}" + "".join(f"{x:7.0f}" for x in v) + f"{sum(v) / 5:6.0f}{sum(r['refills'] for r in rs) / 5:8.2f}", flush=True)
+            dump_json(dict(kind="harvest", label=label, kills=v, refills=[r["refills"] for r in rs]))
+    finally:
+        CORPSE_SECONDS_BY_ROOM.clear()
+        CORPSE_SECONDS_BY_ROOM.update(saved)
+
+
 _M7, _M8 = dict(mage=dict(vitality=(4, 7))), dict(mage=dict(vitality=(4, 8)))          # the Mage's Vitality a level 6 -> 7, 8
 _S8, _S9 = dict(scout=dict(vitality=(3, 8))), dict(scout=dict(vitality=(3, 9)))          # the Scout's Vitality a level 7 -> 8, 9
 # (label, RestFactor, tweaked() arguments, armour). None is "no rest command". Each is a candidate for the owner to choose from; none is applied.
@@ -2343,7 +2367,7 @@ def main():
         runs = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 3000
         parts = tuple(a for a in sys.argv[2:] if not a.isdigit()) or ("grid", "sens")
         for part in parts:
-            {"grid": rest_grid, "sens": lambda r: rest_sens(r // 2), "pace": lambda r: rest_pace(max(40, r // 30)), "options": rest_options, "perfect": rest_perfect}[part](runs)
+            {"grid": rest_grid, "sens": lambda r: rest_sens(r // 2), "pace": lambda r: rest_pace(max(40, r // 30)), "options": rest_options, "perfect": rest_perfect, "harvest": rest_harvest}[part](runs)
         return
     if len(sys.argv) > 1 and sys.argv[1] == "pace":
         pace_report(int(sys.argv[2]) if len(sys.argv) > 2 else 250)
