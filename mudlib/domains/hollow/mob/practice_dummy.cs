@@ -1,7 +1,7 @@
 // @inherit /std/monster
 
 /// <summary>
-/// The Practice Yard's training dummy. It can be attacked, so that a player sees what their blows do (with {cmd}verbose{/} on, every hit
+/// The Practice Yard's training dummy. It can be attacked, so that a player sees what their blows do (with {cmd}verbose on{/}, every hit
 /// shows its damage), and it cannot be hurt for good: Die is overridden so that it never leaves a corpse, pays no experience,
 /// gives no kill credit and makes no Chronicle entry, and it is made whole again the moment a fight is over. It never strikes back:
 /// its one action does nothing but sway on its post. Everything is done in this file; /std/monster is unchanged.
