@@ -35,6 +35,13 @@ Rules (identical to the code; `python3 tests/balance_sim.py check` compares the 
     Arcane Bolt whenever it can pay; priest Minor Heal at 50% HP, Blessing at the start of a hard fight.
 
 Usage: python3 tests/balance_sim.py [runs]      python3 tests/balance_sim.py check
+
+Everything above and every table the default run prints is the PERFECT player: he acts the instant he is able, drinks at exactly 35% and
+starts every fight at full strength. The human player (docs/BALANCE_HUMAN.md) is separate and off by default:
+  python3 tests/balance_sim.py calibrate [runs]   the old game's evening of the owner (level 5 Scout, Hunting Bow, 4 potions): fit, ablation
+  python3 tests/balance_sim.py ablate [runs]      the current game: what each human habit costs, by calling
+  python3 tests/balance_sim.py human [runs]       the current game: kill% from the cellar entrance for the perfect and three human models
+  python3 tests/balance_sim.py recommend [runs] [row prefix ...]   changes that would bring the middle human to about 70%
 """
 import heapq
 import os
@@ -42,7 +49,8 @@ import random
 import re
 import math
 import sys
-from dataclasses import dataclass
+from contextlib import contextmanager
+from dataclasses import dataclass, replace
 
 POTION_HEAL = 20
 POTION_RECOVERY = 0.5
@@ -168,6 +176,16 @@ TRINKET_HP = 5
 ATTR = ("might", "grace", "vigor", "insight", "spirit", "resolve")
 
 
+# The game before the attribute work (the simulator as of the commit before "Merge attributes"): the class numbers of
+# docs/CLASS_SYSTEM.md, no attribute effects, 8 Vitality a level. Only the human-model calibration (`python3 tests/balance_sim.py
+# calibrate`) switches it on; every other table is the current game. name: (Vitality at level 1, Endurance, Focus, Endurance
+# and Focus per 10 s, Focus per 10 s, dodge %).
+LEGACY = False
+LEGACY_VALUES = {"warrior": (40, 100, 20, 10, 2, 0), "scout": (26, 100, 20, 8, 2, 8), "priest": (26, 40, 100, 4, 4, 0),
+                 "mage": (24, 30, 100, 3, 8, 0), "adventurer": (30, 70, 70, 6, 5, 0)}
+LEGACY_HP_PER_LEVEL = 8
+
+
 def creature_attrs(level):
     """A creature's attributes when its file names none: 4 + level / 2 (whole levels). No creature file names any yet."""
     return (4 + level // 2,) * 6
@@ -179,6 +197,8 @@ def above(attrs, name):
 
 def stat(attrs, key):
     """Living.QueryStat for the statistics the combat rules use (no equipment bonus, no class modifier: the callings have none)."""
+    if LEGACY:
+        return 0
     if key == "physical_power":
         return 2 * above(attrs, "might")
     if key == "precision":
@@ -216,6 +236,9 @@ def attrs_at(arch, level):
 def resources(arch, level):
     """(max HP, max Stamina, max Mana, Stamina per 10 s, Mana per 10 s, HP per 10 s out of combat) by docs/ATTRIBUTES.md
     sections 2 and 8."""
+    if LEGACY:
+        hp0, end, foc, end_rate, foc_rate, _ = LEGACY_VALUES[arch.name]
+        return hp0 + LEGACY_HP_PER_LEVEL * (level - 1), end, foc, end_rate, foc_rate, 1.0
     m, g, v, i, s, r = attrs_at(arch, level)
     hp = arch.vitality[0] + arch.vitality[1] * level + 2 * v
     end = arch.endurance[0] + arch.endurance[1] * level + 2 * r + v
@@ -294,7 +317,7 @@ class Fighter:
 
     def dodge(self):
         if self.arch:
-            return self.arch.dodge
+            return LEGACY_VALUES[self.arch.name][5] if LEGACY else self.arch.dodge
         return self.kind.dodge if self.kind is not None and hasattr(self.kind, "dodge") else 0
 
     def block(self):
@@ -369,6 +392,9 @@ def player_acts(p):
     return a
 
 
+SUMMON = True   # False takes the Overseer's Summon away (only the recommendations of docs/BALANCE_HUMAN.md try that)
+
+
 def choose(e):
     """ChooseAction of the mudlib creature files."""
     a = {x.id: x for x in e.acts}
@@ -384,7 +410,7 @@ def choose(e):
     if n == "Goblin Overseer":
         if e.taken == 0:
             return a["cry"]
-        if not e.summoned and e.hp * 2 <= e.max_hp:
+        if SUMMON and not e.summoned and e.hp * 2 <= e.max_hp:
             e.summoned = True
             return a["summon"]
         e.attacks += 1
@@ -421,9 +447,13 @@ def player_choice(p, t, living, potions, hard, state):
     return "attack"
 
 
-def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
+def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human=None, start=None, stop_at_boss=False):
     """Fight until one side is dead. Mutates player and enemies. Returns a dict: alive, ms, actions, potions,
-    boss_ms and lost_at_kill."""
+    boss_ms and lost_at_kill.
+    The perfect player (human None) decides at every Ready Time. A HumanPolicy (see "the human player" below) types its
+    commands with a delay, which arrive as events of their own, and may flee (out["fled"]). start = (the player's first
+    Ready Time, [each enemy's first Ready Time]) in ms, or None for the perfect model's "the player starts at once, a creature
+    waits its Reaction Time x 2 s". stop_at_boss ends the fight the moment enemies[0] dies (what the human approach asks)."""
     heap = []
     seq = 0
     if hard is None:
@@ -440,11 +470,16 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
     acts = player_acts(player)
     player.last_t = 0
     player.ready_at = 0
-    push(0, "ready", player)
-    for e in enemies:
-        e.ready_at = round(e.reaction * UNIT_MS)
+    if start is None:
+        start = (0, [round(e.reaction * UNIT_MS) for e in enemies])
+    player.ready_at = start[0]
+    push(start[0], "ready", player)
+    for e, first in zip(enemies, start[1]):
+        e.ready_at = first
         push(e.ready_at, "ready", e)
     t = 0
+    if human is not None:
+        human.begin(player)
 
     def stagger(e, now, seconds=2.0):
         if e.resists():
@@ -463,7 +498,17 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
 
     out["stagger"] = stagger
     while heap and player.hp > 0 and any(e.hp > 0 for e in enemies):
+        if human is not None:
+            human.observe(t, player, potions, push)
         t, _, kind, ent, act, target, gen = heapq.heappop(heap)
+        if kind == "cmd":              # the human's typed command arrives: it waits in the queue for the next Ready Time
+            human.arrive(act)
+            continue
+        if kind == "flee":
+            if human.flee_attempt():
+                out["fled"] = True
+                break
+            continue
         if ent.hp <= 0 or gen != ent.gen:
             continue
         if kind == "ready":
@@ -471,7 +516,10 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
             if not living and not ent.is_player:
                 continue
             if ent.is_player:
-                choice = player_choice(ent, t, living, potions, hard, state)
+                if human is not None:
+                    choice = human.choose(ent, t, living, potions, hard, state, push)
+                else:
+                    choice = player_choice(ent, t, living, potions, hard, state)
                 act = acts[choice]
                 target = living[0]
                 out["actions"] += 1
@@ -517,6 +565,8 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None):
         if boss and out["boss_ms"] is None and enemies[0].hp <= 0:
             out["boss_ms"] = t
             out["lost_at_kill"] = start_hp - player.hp
+            if stop_at_boss:
+                break
     out.update(alive=player.hp > 0, ms=t, potions=potions)
     return out
 
@@ -618,6 +668,281 @@ def boss_stats(arch, level, weapon, potions, extra_hp=0, runs=1500, shield=None)
         survive += r["alive"]
     n = kills or 1
     return kills / runs, survive / runs, lost / n, ms / n / 1000.0, actions / n
+
+
+# ---------------------------------------------------------------- the human player (docs/BALANCE_HUMAN.md)
+#
+# Everything above plays perfectly: it acts the instant it is able, uses its best skill every time, drinks at exactly 35% and
+# starts every fight at full Vitality. A person does none of that. HumanModel names every way in which the human differs, each as
+# one documented number; HumanPolicy plays a fight with them (inside fight()); run_approach() plays the whole way from the
+# cellar to the Overseer with the resources carried from fight to fight. Nothing here touches the random stream of the perfect
+# model: a policy draws from its own random.Random.
+
+FLEE_SUCCESS = 0.75     # the game: `flee` fails one time in four (docs/GAME_SYSTEMS.md section 11, CmdFlee)
+STORAGE_POTION = False  # the Storage Chamber's potion (restocked by reset) is not counted in the potions a run starts with
+
+
+@dataclass(frozen=True)
+class HumanModel:
+    """One version of the human player. Times in seconds. Every field is a number a person could measure."""
+    name: str
+    # Typing. A command is typed `delay` seconds after the thing that prompted it (the start of the previous action, the hit that
+    # lowered Vitality, the arrival in the room), then waits in the queue for the next Ready Time (docs/COMBAT_TIMING.md).
+    delay_median: float = 1.5      # the median of the typing delay: see the text, read, decide, type
+    delay_sigma: float = 0.6       # spread of the delay (log-normal: 0.6 gives 1.5 s median, 3.7 s at the 90th percentile)
+    p_distract: float = 0.05       # chance that a command is also held up by a distraction (a chat, a second look at the map) ...
+    distract_s: tuple = (6.0, 20.0)  # ... of this many extra seconds (uniform)
+    # Skills.
+    p_skip_skill: float = 0.15     # chance, in each action slot, that the player types no skill and lets the auto-attack run
+    # Potions. Drawn afresh for every fight.
+    drink_lo: float = 0.25         # the player reaches for a potion when Vitality falls to this share of the maximum ...
+    drink_hi: float = 0.35         # ... somewhere in this range (perfect play: always 0.35)
+    p_no_drink: float = 0.06       # chance that in a fight the player never types the potion nor the flee (frozen, fascinated, away)
+    # Fleeing. When no potion is left and Vitality is at or below this share (drawn for each fight in the range), the player
+    # types `flee`. It succeeds 3 times in 4 (FLEE_SUCCESS) and a failure is retried after another typing delay.
+    flee_lo: float = 0.25
+    flee_hi: float = 0.35
+    flee: bool = True
+    # Resources between fights.
+    carry_over: bool = True        # Vitality, Endurance and Focus carry over, with only the rest the room sequence allows
+    pause_s: float = 3.0           # seconds spent reading the room and looting between the last blow and the next door
+    rest_to: float = 0.0           # before the next door the player waits (out-of-combat regeneration only) until Vitality is at least
+                                   # this share of the maximum; 0 = never waits, the strict "only the rest the room sequence allows"
+    topup_below: float = 0.0       # before the next door, drink potions (out of combat, one at a time) while Vitality is below this
+                                   # share; 0 = never. Counted as used in the room the player is about to enter
+
+
+# Three versions of the human, calibrated in docs/BALANCE_HUMAN.md (low = a sharp player, high = a clumsy one).
+HUMAN_LOW = HumanModel("human-low", delay_median=1.0, delay_sigma=0.5, p_distract=0.03, p_skip_skill=0.10, drink_lo=0.28,
+                       drink_hi=0.35, p_no_drink=0.03, rest_to=0.7)
+HUMAN_MID = HumanModel("human-mid", rest_to=0.5)
+HUMAN_HIGH = HumanModel("human-high", delay_median=2.0, delay_sigma=0.7, p_distract=0.08, p_skip_skill=0.25, drink_lo=0.20,
+                        drink_hi=0.32, p_no_drink=0.10, rest_to=0.0)
+# The perfect player's habits, run through the human engine: the zero point of the ablation table.
+HUMAN_ZERO = HumanModel("zero-delay", delay_median=0.0, delay_sigma=0.0, p_distract=0.0, p_skip_skill=0.0, drink_lo=0.35,
+                        drink_hi=0.35, p_no_drink=0.0, flee=False, carry_over=False, pause_s=0.0)
+HUMAN_MODELS = {"low": HUMAN_LOW, "mid": HUMAN_MID, "high": HUMAN_HIGH}
+
+
+class HumanPolicy:
+    """A human at the keyboard for one fight. fight() calls begin, observe (before every event), arrive (a typed command reaches
+    the queue), choose (the player's Ready Time) and flee_attempt."""
+
+    def __init__(self, model, rng):
+        self.m, self.rng = model, rng
+
+    def delay(self):
+        """One typing delay in ms."""
+        m = self.m
+        if m.delay_median <= 0:
+            return 0
+        d = m.delay_median * math.exp(m.delay_sigma * self.rng.gauss(0, 1))
+        if self.rng.random() < m.p_distract:
+            d += self.rng.uniform(*m.distract_s)
+        return round(min(d, 60.0) * 1000)
+
+    def begin(self, player):
+        m, rng = self.m, self.rng
+        self.queued = "skill" if rng.random() >= m.p_skip_skill else None   # the first command may already be a skill
+        self.thr = rng.uniform(m.drink_lo, m.drink_hi)
+        self.flee_thr = rng.uniform(m.flee_lo, m.flee_hi)
+        self.frozen = rng.random() < m.p_no_drink
+        self.skill_pending = self.potion_pending = self.flee_pending = False
+        self.token = 0
+
+    def observe(self, t, p, potions, push):
+        """The player reads the screen after every event: Vitality low and a potion left, or low and none left."""
+        if p.hp <= 0 or self.frozen:
+            return
+        frac = p.hp / p.max_hp
+        if potions > 0:
+            if frac <= self.thr and not self.potion_pending:
+                self.potion_pending = True
+                self.token += 1                      # a skill about to be typed is dropped: the potion comes first
+                push(t + self.delay(), "cmd", p, "potion")
+        elif self.m.flee and frac <= self.flee_thr and not self.flee_pending:
+            self.flee_pending = True
+            push(t + self.delay(), "flee", p)
+
+    def arrive(self, cmd):
+        if cmd == "potion":
+            self.queued = "potion"
+        else:
+            self.skill_pending = False
+            if cmd[1] == self.token and self.queued != "potion":
+                self.queued = "skill"
+
+    def flee_attempt(self):
+        self.flee_pending = False
+        return self.rng.random() < FLEE_SUCCESS
+
+    def skill(self, p, t, living, hard, state):
+        """The calling's skill, as typed; the game refuses it (and the slot goes to the auto-attack) if it cannot be paid."""
+        a = p.arch.name
+        if a == "priest":
+            if p.hp <= p.max_hp * 0.5 and p.mana >= HEAL_COST:
+                return "heal"
+            if hard and t >= p.bless_until and p.mana >= BLESS_COST + HEAL_COST and not state.get("blessed"):
+                state["blessed"] = True
+                return "bless"
+        elif a == "warrior" and p.shield and p.stamina >= BASH_COST:
+            return "bash"
+        elif a == "scout" and p.stamina >= STRIKE_COST:
+            return "strike"
+        elif a == "mage" and p.mana >= spell_cost(p, BOLT_COST):
+            return "bolt"
+        return "attack"
+
+    def choose(self, p, t, living, potions, hard, state, push):
+        p.regen(t)
+        cmd, self.queued = self.queued, None
+        choice = "attack"
+        if cmd == "potion":
+            self.potion_pending = False
+            if potions > 0:
+                choice = "potion"
+        elif cmd == "skill":
+            choice = self.skill(p, t, living, hard, state)
+        if not (self.potion_pending or self.skill_pending or self.queued) and self.rng.random() >= self.m.p_skip_skill:
+            self.skill_pending = True
+            push(t + self.delay(), "cmd", p, ("skill", self.token))
+        return choice
+
+
+# The cellars from the village to the Overseer: (room, creatures, aggressive). Smuggler Hall is empty; the Guard Post is a side branch
+# (the keyholder, for the Hidden Cache) and is not on the way. Every creature on the way is Aggressive in the mudlib.
+APPROACH = [("Tavern Cellar", ["Large Rat"] * 3), ("Collapsed Passage", ["Giant Rat"] * 2),
+            ("Storage Chamber", ["Goblin Scavenger"] * 2), ("Smuggler Hall", []), ("Flooded Tunnel", ["Giant Cave Toad"]),
+            ("Mushroom Cavern", ["Spore Bat"] * 3), ("Goblin Barracks", ["Goblin Warrior"] * 3),
+            ("Overseer Hall", ["Goblin Elite Guard"] * 2), ("Overseer Chamber", ["Goblin Overseer"])]
+ROOM_NAMES = [r for r, c in APPROACH if c]
+
+
+def gear_for(arch_name, gear):
+    """(weapon, shield, extra Vitality, armour from worn pieces). gear: "starting" (the calling's own kit: no armour, no trinket),
+    "best" (the best weapon and the shield the Hollow sells, with the trinket from the Hidden Cache; no body armour is sold), or a
+    tuple (weapon, shield, trinket, armour) as given, which is how the table of recommendations tries armour."""
+    a = ARCHS[arch_name]
+    if gear == "starting":
+        return a.weapons[0], a.shield and arch_name == "warrior", 0, 0
+    if gear == "best":
+        return a.weapons[-1], a.shield, TRINKET_HP, 0
+    return gear
+
+
+def rest(p, seconds):
+    """What a character regains standing about (no safe room): the out-of-combat rates of resources()."""
+    _, _, _, st_rate, ma_rate, hp_rate = resources(p.arch, p.level)
+    p.hp = min(p.max_hp, p.hp + hp_rate * seconds / 10.0)
+    p.stamina = min(p.max_stamina, p.stamina + st_rate * seconds / 10.0)
+    p.mana = min(p.max_mana, p.mana + ma_rate * seconds / 10.0)
+
+
+def start_times(p, enemies, delay_ms, aggro):
+    """The first Ready Time of the player and of each creature, in ms from the player's arrival in the room.
+    aggro (the current game): the creatures start the fight at once and wait their Reaction Time x 2 s; the player, drawn in,
+    waits his own, and a command typed after that is later still. Old game: the first creature to notice calls out after its
+    Reaction Time x 2 s; a player who has typed `kill` before that starts the fight (and acts at once), one who has not is
+    ambushed (the creature acts at once, the player waits his own Reaction Time)."""
+    react = [round(e.reaction * UNIT_MS) for e in enemies]
+    own = round(p.reaction * UNIT_MS)
+    if aggro:
+        return max(delay_ms, own), react
+    call = min(react)
+    if delay_ms < call:
+        return delay_ms, [delay_ms + r for r in react]
+    first = react.index(call)
+    return max(delay_ms, call + own), [call if i == first else call + r for i, r in enumerate(react)]
+
+
+def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=True, pack_at="hall"):
+    """One run from the Tavern Cellar to the Overseer. model None is the perfect player: full Vitality, Endurance and Focus for
+    every fight, no typing, the existing rules. Returns a dict: outcome ("kill", "died", "fled"), room of the end, potions used by
+    room, potions left, Vitality share at the Overseer's door.
+    pack_at: "hall" = the player enters the Overseer Hall with `potions` in the pack (the rooms before it use a spare supply, which
+    is reported as used "on the way" but does not count against the pack: a player restocks at the merchant); "entrance" = the
+    pack is `potions` from the first room on and the rooms before the Hall draw on it."""
+    arch = ARCHS[arch_name]
+    weapon, shield, extra_hp, armor = gear_for(arch_name, gear)
+    p = make_player(arch, level, weapon, shield, extra_hp, armor_extra=armor)
+    left = potions if pack_at == "entrance" else 99
+    used = {}
+    res = {"outcome": "kill", "room": "Overseer Chamber", "used": used, "door": None}
+    moves, looted = 0, 0
+    for room, creatures in APPROACH:
+        moves += 1
+        if not creatures:
+            continue
+        boss = room == "Overseer Chamber"
+        if room == "Overseer Hall" and pack_at == "hall":
+            left = potions
+        if model is None or not model.carry_over:
+            p.hp, p.stamina, p.mana = p.max_hp, float(p.max_stamina), float(p.max_mana)
+        elif room != ROOM_NAMES[0]:
+            rest(p, moves * ROOM_SECONDS + looted * LOOT_SECONDS + model.pause_s)
+            if p.hp < model.rest_to * p.max_hp:
+                rest(p, (model.rest_to * p.max_hp - p.hp) / (resources(arch, level)[5] / 10.0) + 0.01)
+        p.bless_until = p.cry_until = 0
+        p.effects = {}
+        topped = 0
+        if model is not None and model.carry_over and model.topup_below:
+            while left > 0 and p.hp < model.topup_below * p.max_hp:
+                p.hp = min(p.max_hp, p.hp + POTION_HEAL)
+                left -= 1
+                topped += 1
+        if boss:
+            res["door"] = p.hp / p.max_hp
+        enemies = [make_monster(c) for c in creatures]
+        policy = start = None
+        if model is not None:
+            policy = HumanPolicy(model, rng)
+            start = start_times(p, enemies, policy.delay(), aggro)
+        r = fight(p, enemies, left, boss=boss, human=policy, start=start, stop_at_boss=True)
+        p.regen(r["ms"])
+        used[room] = r.get("potions_used", 0) + topped
+        left = r["potions"]
+        moves, looted = 0, sum(1 for c in creatures if KINDS[c].gold[1])
+        if boss and r["lost_at_kill"] is not None:
+            break
+        if r.get("fled") or not r["alive"] or boss:
+            res.update(outcome="fled" if r.get("fled") else "died", room=room)
+            break
+    res["left"] = left
+    return res
+
+
+def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting", aggro=True, seed=1, pack_at="hall"):
+    """Many runs of run_approach. Returns kill share, outcomes by room, potions used before the Hall / in the Hall / at the
+    Overseer, the share that reached the Overseer, the kill share of those that did, the share that used three or more potions
+    on the guards, and the mean Vitality share at the Overseer's door."""
+    rng = random.Random(seed)
+    saved = random.getstate()
+    random.seed(seed * 7919 + level)
+    kills = reached = hall3 = 0
+    ends = {}
+    before = hall = chamber = 0.0
+    door = 0.0
+    hall_hist = {}
+    for _ in range(runs):
+        r = run_approach(arch_name, level, potions, model, rng, gear, aggro, pack_at)
+        u = r["used"]
+        before += sum(v for k, v in u.items() if k not in ("Overseer Hall", "Overseer Chamber"))
+        hall += u.get("Overseer Hall", 0)
+        chamber += u.get("Overseer Chamber", 0) + 0
+        hall_hist[u.get("Overseer Hall", 0)] = hall_hist.get(u.get("Overseer Hall", 0), 0) + 1
+        hall3 += u.get("Overseer Hall", 0) >= 3
+        if r["door"] is not None:
+            reached += 1
+            door += r["door"]
+        if r["outcome"] == "kill":
+            kills += 1
+        else:
+            key = (r["outcome"], r["room"])
+            ends[key] = ends.get(key, 0) + 1
+    random.setstate(saved)
+    return dict(kill=kills / runs, reached=reached / runs, kill_if_reached=kills / reached if reached else 0.0, before=before / runs,
+                hall=hall / runs, chamber=chamber / runs, hall3=hall3 / runs, hall_hist=hall_hist, ends={k: v / runs for k, v in ends.items()},
+                door=door / reached if reached else 0.0, runs=runs)
 
 
 REQUIRED_LEVEL = {"Tavern Cellar": 1, "Collapsed Passage": 1, "Storage Chamber": 2, "Guard Post": 2,
@@ -1318,6 +1643,207 @@ def check_classes(read_root, problems, num):
                 problems.append(f"class {name}: {field} is {have} in the mudlib, {value} in the simulation")
 
 
+# ---- the human tables (python3 tests/balance_sim.py calibrate | human | recommend [runs])
+
+
+@contextmanager
+def tweaked(kinds=None, summon=True, hall=None, potion_heal=None, archs=None, heal_amount=None):
+    """Temporarily change creatures (name -> fields of Kind, e.g. {"Goblin Minion": {"hp": 10}}), the Overseer's Summon, the creatures
+    of the Hall, the potion's strength and the callings (name -> fields of Arch, e.g. {"mage": {"vitality": (4, 7)}}), for the
+    recommendations of docs/BALANCE_HUMAN.md. Nothing here is applied to the game."""
+    global SUMMON, POTION_HEAL, HEAL_AMOUNT
+    saved, saved_summon, saved_approach, saved_heal, saved_archs = dict(KINDS), SUMMON, list(APPROACH), POTION_HEAL, dict(ARCHS)
+    saved_minor = HEAL_AMOUNT
+    try:
+        for name, fields in (kinds or {}).items():
+            KINDS[name] = replace(KINDS[name], **fields)
+        SUMMON = summon
+        if hall is not None:   # the creatures of the Overseer Hall
+            APPROACH[[r for r, c in APPROACH].index("Overseer Hall")] = ("Overseer Hall", list(hall))
+        if potion_heal is not None:
+            POTION_HEAL = potion_heal
+        for name, fields in (archs or {}).items():
+            ARCHS[name] = replace(ARCHS[name], **fields)
+        if heal_amount is not None:   # the Priest's Minor Heal
+            HEAL_AMOUNT = heal_amount
+        yield
+    finally:
+        KINDS.clear()
+        KINDS.update(saved)
+        SUMMON = saved_summon
+        APPROACH[:] = saved_approach
+        POTION_HEAL = saved_heal
+        ARCHS.clear()
+        ARCHS.update(saved_archs)
+        HEAL_AMOUNT = saved_minor
+
+
+def pct(x):
+    return f"{x * 100:3.0f}"
+
+
+def calibrate_report(runs=3000):
+    """The owner's evening in the old game: a level 5 Scout, Hunting Bow, no armour, 4 potions at the Hall. Prints the perfect model,
+    the engine with every human habit switched off, the three humans, the ablation and the sensitivity of the fit to resting."""
+    global LEGACY
+    LEGACY = True
+    try:
+        print("=" * 118)
+        print("CALIBRATION: the old game (before attributes), level 5 Scout, Hunting Bow, no armour, no trinket, 4 potions at the Overseer Hall.")
+        print(f"Target (the owner's evening): about 3 potions spent on the two Elite Guards, then the Overseer is lost or fled more often than not.")
+        print("=" * 118)
+        random.seed(5)
+        k = boss_stats("scout", 5, "hunting bow", 4, 0, runs)
+        print(f"Perfect model, the Overseer alone, full Vitality, 4 potions (the old claim): kill {k[0] * 100:.0f}%")
+        print()
+        head = f"{'model':<26}{'kill%':>6}{'fled%':>6}{'died%':>6}  {'guards: potions mean':>21}{'0':>5}{'1':>5}{'2':>5}{'3':>5}{'4':>5}{'':>3}{'door Vit%':>10}{'Overseer pots':>14}"
+        print(head)
+
+        def row(label, model, **kw):
+            r = approach_stats("scout", 5, 4, model, runs, "starting", False, **kw)
+            h, n = r["hall_hist"], r["runs"]
+            fled = sum(v for (o, room), v in r["ends"].items() if o == "fled")
+            died = sum(v for (o, room), v in r["ends"].items() if o == "died")
+            print(f"{label:<26}{pct(r['kill']):>6}{pct(fled):>6}{pct(died):>6}  {r['hall']:>21.2f}" + "".join(f"{pct(h.get(i, 0) / n):>5}" for i in range(5))
+                  + f"{'':>3}{pct(r['door']):>10}{r['chamber']:>14.2f}")
+            return r
+
+        row("perfect (no typing)", None)
+        row("engine, all habits off", HUMAN_ZERO)
+        for m in (HUMAN_LOW, HUMAN_MID, HUMAN_HIGH):
+            row(m.name, m)
+        print()
+        print("Ablation: from the engine with every habit off, add one human habit at a time (alone), then all in order (cumulative).")
+        base = HUMAN_ZERO
+        steps = [("carry Vitality/Endurance/Focus", dict(carry_over=True, pause_s=3.0)),
+                 ("typing delays", dict(delay_median=1.5, delay_sigma=0.6, p_distract=0.05)),
+                 ("skip the skill 15%", dict(p_skip_skill=0.15)),
+                 ("potion at 25-35%", dict(drink_lo=0.25, drink_hi=0.35)),
+                 ("never drinks 6%", dict(p_no_drink=0.06)),
+                 ("flees when out of potions", dict(flee=True)),
+                 ("rests to 50% between doors", dict(carry_over=True, pause_s=3.0, rest_to=0.5))]
+        print(head)
+        for label, kw in steps:
+            row("only: " + label, replace(base, **kw))
+        cum = base
+        for label, kw in steps[:-1]:
+            cum = replace(cum, **kw)
+            row("all up to: " + label[:14], cum)
+        print()
+        print("Sensitivity of the fit to resting (the middle human with rest_to varied):")
+        print(head)
+        for rt in (0.0, 0.3, 0.5, 0.6, 0.7, 0.8):
+            row(f"mid, rest to {rt:.0%}", replace(HUMAN_MID, rest_to=rt))
+        print()
+        print("Sensitivity to where the 4 potions are carried (mid): in the pack from the first room instead of from the Hall's door:")
+        print(head)
+        row("mid, 4 from the entrance", HUMAN_MID, pack_at="entrance")
+    finally:
+        LEGACY = False
+
+
+def ablate_report(runs=2000):
+    """The current game, level 5, 4 potions at the Hall, starting gear: what each human habit costs, by calling. The first row is the
+    perfect player of the other tables; the second is the same player run through the human engine (it must agree); the third gives it
+    the arrival ambush the perfect model ignores (aggressive creatures engage on arrival and the player waits his own Reaction Time x 2 s)."""
+    print("=" * 118)
+    print(f"A. The current game, level 5, 4 potions at the Hall, starting gear: Overseer kill% by calling as habits are added ({runs} runs a cell)")
+    print("=" * 118)
+    print(f"{'':<46}" + "".join(f"{c[:5]:>7}" for c in ARCHS) + f"{'mean':>6}")
+
+    def row(label, model, aggro=True, rest=None):
+        vals = [approach_stats(c, 5, 4, model, runs, "starting", aggro)["kill"] * 100 for c in ARCHS]
+        print(f"{label:<46}" + "".join(f"{v:7.0f}" for v in vals) + f"{sum(vals) / 5:6.0f}", flush=True)
+
+    row("perfect (the simulator's player)", None, False)
+    row("engine, every habit off", HUMAN_ZERO, False)
+    row("+ the arrival ambush (player waits own reaction)", HUMAN_ZERO, True)
+    steps = [("+ Vitality, Endurance, Focus carried over", dict(carry_over=True, pause_s=3.0)),
+             ("+ typing delays", dict(delay_median=1.5, delay_sigma=0.6, p_distract=0.05)),
+             ("+ skips the skill 15%", dict(p_skip_skill=0.15)),
+             ("+ potion at 25-35%", dict(drink_lo=0.25, drink_hi=0.35)),
+             ("+ never drinks 6%", dict(p_no_drink=0.06)),
+             ("+ flees when out of potions (= human, no resting)", dict(flee=True)),
+             ("+ rests to 50% before each door (= human-mid)", dict(rest_to=0.5))]
+    cum = HUMAN_ZERO
+    for label, kw in steps:
+        cum = replace(cum, **kw)
+        row(label, cum, True)
+
+
+def human_report(runs=3000):
+    """The current game: kill percentage against the Overseer, by gear, calling, level and potions, for the perfect model and the three
+    humans, then the potions used and where the runs end."""
+    models = (("perfect", None), ("low", HUMAN_LOW), ("mid", HUMAN_MID), ("high", HUMAN_HIGH))
+    for gear, label in (("starting", "starting gear (the calling's own weapon, no armour, no trinket)"),
+                        ("best", "best gear the Hollow sells at that level (best weapon, shield where the calling carries one, +5 Vitality trinket; no armour is sold)")):
+        print("=" * 118)
+        print(f"H1. Overseer kill% from the cellar entrance, the current game (attributes placed, aggressive creatures engage on arrival), {label}.")
+        print(f"    Potions in the pack at the Overseer Hall's door; {runs} runs a cell. Perfect = the simulator's own player (acts at once, rested before every fight).")
+        print("=" * 118)
+        print(f"{'calling':<12}{'lvl':>4}{'potions':>8}" + "".join(f"{n:>9}" for n, _ in models) + f"{'':>4}low/mid/high: guards pots, Overseer pots, reached%")
+        for c in ARCHS:
+            for lvl in (4, 5):
+                for pot in (2, 4):
+                    rs = [approach_stats(c, lvl, pot, m, runs, gear, True) for _, m in models]
+                    extra = "  ".join(f"{r['hall']:.1f}/{r['chamber']:.1f}/{pct(r['reached'])}" for r in rs[1:])
+                    print(f"{c:<12}{lvl:>4}{pot:>8}" + "".join(f"{pct(r['kill']):>9}" for r in rs) + f"{'':>4}{extra}")
+        print()
+        print(f"H2. Where the runs end and what the potions go on, level 5, 4 potions, {gear} gear (percent of runs; 'died'/'fled' in the room named).")
+        for name, m in models:
+            print(f"  {name}:")
+            for c in ARCHS:
+                r = approach_stats(c, 5, 4, m, runs, gear, True)
+                ends = sorted(r["ends"].items(), key=lambda kv: -kv[1])[:4]
+                where = ", ".join(f"{o} in {room} {v * 100:.0f}%" for (o, room), v in ends) or "-"
+                print(f"    {c:<11} kill {pct(r['kill'])}%  potions on the way {r['before']:.2f}, guards {r['hall']:.2f}, Overseer {r['chamber']:.2f};  Vitality at the door {pct(r['door'])}%;  {where}")
+        print()
+
+
+def recommend_report(runs=3000, only=()):
+    """Changes that would bring a level 5 character in starting gear with 4 potions to about 70% against the Overseer under the middle
+    human, for each calling. Run through tweaked(); nothing is applied. The low and high humans get a third of the runs."""
+    print("=" * 118)
+    print(f"R. Level 5, 4 potions at the Hall, starting gear, attributes placed, current game: Overseer kill% by calling, middle human")
+    print(f"   ({runs} runs a cell; the low and high human a third of that). Armour rows: +N armour from the planned village shop, one less for the Mage.")
+    print("=" * 118)
+    print(f"{'option':<62}" + "".join(f"{c[:5]:>6}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}{'low':>6}{'high':>6}")
+    for label, kw, armour in [("the game as it is", {}, 0)] + RECOMMENDATIONS:
+        if only and not label.startswith(tuple(only)):
+            continue
+        rows = []
+        with tweaked(**kw):
+            for model, n in ((HUMAN_MID, runs), (HUMAN_LOW, runs // 3), (HUMAN_HIGH, runs // 3)):
+                vals = []
+                for c in ARCHS:
+                    w, sh, tr, _ = gear_for(c, "starting")
+                    a = armour if c != "mage" or not armour else armour - 1
+                    vals.append(approach_stats(c, 5, 4, model, n, (w, sh, tr, a), True)["kill"] * 100)
+                rows.append(vals)
+        v = rows[0]
+        print(f"{label:<62}" + "".join(f"{x:6.0f}" for x in v) + f"{sum(v) / 5:6.0f}{max(v) - min(v):7.0f}{sum(rows[1]) / 5:6.0f}{sum(rows[2]) / 5:6.0f}", flush=True)
+
+
+_G, _O, _M = "Goblin Elite Guard", "Goblin Overseer", "Goblin Minion"
+MAGE_VIT = {"mage": dict(vitality=(4, 8))}     # the Mage's Vitality a level 6 -> 8
+# (label, tweaked() arguments, armour). Each is a candidate for the owner to choose from; none is applied.
+RECOMMENDATIONS = [
+    ("1a  the Overseer's Summon taken away", dict(summon=False), 0),
+    ("1b  Elite Guards 40 -> 32 Vitality, damage 3-5 -> 2-4", dict(kinds={_G: dict(hp=32, dmg=(2, 4))}), 0),
+    ("1c  one Elite Guard in the Hall instead of two", dict(hall=[_G]), 0),
+    ("2a  Minor Healing Potion heals 30 (was 20)", dict(potion_heal=30), 0),
+    ("2b  Minor Healing Potion heals 35", dict(potion_heal=35), 0),
+    ("2c  = 2b and the Mage's Vitality 4 + 8 a level (was 6)", dict(potion_heal=35, archs=MAGE_VIT), 0),
+    ("3a  armour sold: Leather Jerkin 2 + Leather Cap 1", {}, 3),
+    ("3b  = 3a and Overseer 100 Vitality, damage 3-6", dict(kinds={_O: dict(hp=100, dmg=(3, 6))}), 3),
+    ("3c  = 3b and the Mage's Vitality 4 + 8 a level", dict(kinds={_O: dict(hp=100, dmg=(3, 6))}, archs=MAGE_VIT), 3),
+    ("4a  Guards 32 / 2-4, Overseer 100 / 3-6, no Summon", dict(kinds={_G: dict(hp=32, dmg=(2, 4)), _O: dict(hp=100, dmg=(3, 6))}, summon=False), 0),
+    ("4b  = 4a and the Mage's Vitality 4 + 8 a level", dict(kinds={_G: dict(hp=32, dmg=(2, 4)), _O: dict(hp=100, dmg=(3, 6))}, summon=False, archs=MAGE_VIT), 0),
+    ("4c  = 4b and the Priest's Minor Heal heals 5 (was 8)", dict(kinds={_G: dict(hp=32, dmg=(2, 4)), _O: dict(hp=100, dmg=(3, 6))}, summon=False, archs=MAGE_VIT, heal_amount=5), 0),
+    ("5   one Elite Guard, no Summon", dict(summon=False, hall=[_G]), 0),
+]
+
+
 def stage_weapon(arch, level):
     idx = 0 if level <= 2 else (1 if level == 3 else len(arch.weapons) - 1)
     return arch.weapons[min(idx, len(arch.weapons) - 1)]
@@ -1328,6 +1854,13 @@ def main():
         sys.exit(0 if check_mudlib() else 1)
     if len(sys.argv) > 1 and sys.argv[1] == "corridor":
         corridor_table(int(sys.argv[2]) if len(sys.argv) > 2 else 400, tuple(sys.argv[3:]))
+        return
+    if len(sys.argv) > 1 and sys.argv[1] in ("calibrate", "human", "recommend", "ablate"):
+        runs = int(sys.argv[2]) if len(sys.argv) > 2 else 3000
+        if sys.argv[1] == "recommend":
+            recommend_report(runs, tuple(a for a in sys.argv[3:]))
+        else:
+            {"calibrate": calibrate_report, "human": human_report, "ablate": ablate_report}[sys.argv[1]](runs)
         return
     if len(sys.argv) > 1 and sys.argv[1] == "pace":
         pace_report(int(sys.argv[2]) if len(sys.argv) > 2 else 250)
