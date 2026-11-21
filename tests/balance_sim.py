@@ -35,6 +35,13 @@ Rules (identical to the code; `python3 tests/balance_sim.py check` compares the 
     Arcane Bolt whenever it can pay; priest Minor Heal at 50% HP, Blessing at the start of a hard fight.
 
 Usage: python3 tests/balance_sim.py [runs]      python3 tests/balance_sim.py check
+
+Everything above and every table the default run prints is the PERFECT player: he acts the instant he is able, drinks at exactly 35% and
+starts every fight at full strength. The human player (docs/BALANCE_HUMAN.md) is separate and off by default:
+  python3 tests/balance_sim.py calibrate [runs]   the old game's evening of the owner (level 5 Scout, Hunting Bow, 4 potions): fit, ablation
+  python3 tests/balance_sim.py ablate [runs]      the current game: what each human habit costs, by calling
+  python3 tests/balance_sim.py human [runs]       the current game: kill% from the cellar entrance for the perfect and three human models
+  python3 tests/balance_sim.py recommend [runs] [row prefix ...]   changes that would bring the middle human to about 70%
 """
 import heapq
 import os
