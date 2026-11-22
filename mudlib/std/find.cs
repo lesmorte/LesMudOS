@@ -171,6 +171,7 @@ public class Find : Thing
                 return true;
         }
 
+        who.Call("RestDisturbed", QueryVerb());
         var name = who.Call<string>("QueryName") ?? "Someone";
         TellRoom(room, $"{name} searches {(ShortDesc != null ? Plain(ShortDesc) : Name.ToLowerInvariant())}.\n", who);
         var gold = answer[0];

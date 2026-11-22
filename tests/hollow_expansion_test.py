@@ -14,6 +14,7 @@ Chronicle); damage to the character; and a count of how often a creature's corps
 Usage (from the repository root, after `dotnet build`):
     LESMUDOS_TEST_PORT=4834 python3 tests/hollow_expansion_test.py
 """
+import json
 import os
 import re
 import shutil
@@ -152,7 +153,7 @@ public class HxProbe : Thing
     public override string? Short() => "a probe";
     public override void Init()
     {
-        foreach (var v in new[] { "tele", "gold", "killed", "smite", "hurt", "mk", "dropcount", "chron", "crit" })
+        foreach (var v in new[] { "tele", "gold", "killed", "smite", "hurt", "mk", "dropcount", "chron", "crit", "pledge" })
             AddAction(v, Do);
     }
     private bool Do(string args)
@@ -167,6 +168,7 @@ public class HxProbe : Thing
             case "killed": Write("KILLED " + me.Call<bool>("QueryKilled", w[0]) + "\n"); return true;
             case "hurt": me.Call("TakeDamage", int.Parse(w[0]), null); Write("HURT ok\n"); return true;
             case "mk": MoveObject(CloneObject(w[0]), me); Write("GIVEN\n"); return true;
+            case "pledge": { var problem = me.Call<string>("ApplyClass", w[0]); Write(problem == null ? "PLEDGED\n" : "REFUSED " + problem + "\n"); return true; }
             case "smite":
             {
                 // damage from the character: the creature's own death code runs (experience, kill credit, Chronicle)
@@ -213,6 +215,69 @@ public class HxProbe : Thing
             }
         }
         return false;
+    }
+}
+'''
+
+OATHBLADE = """// @inherit /std/weapon
+public class HxOathblade : Weapon
+{
+    public override void Create()
+    {
+        Name = "Oathblade"; Ids.Add("oathblade"); ShortDesc = "an oathblade"; LongDesc = "A sword for warriors, sworn on.";
+        DamageMin = 5; DamageMax = 6; Category = "sword"; Value = 5;
+        WornBy.Add("warrior");
+    }
+}
+"""
+
+ADEPT = """// @inherit /std/pclass
+public class HxAdept : PlayerClass
+{
+    public override void Create()
+    {
+        ClassName = "Adept"; Tier = "advanced"; Parent = "mage"; Title = "Adept"; Tagline = "Test advanced class."; Guild = "adepts";
+    }
+}
+"""
+
+CHAMPION = """// @inherit /std/pclass
+public class HxChampion : PlayerClass
+{
+    public override void Create()
+    {
+        ClassName = "Champion"; Tier = "advanced"; Parent = "warrior"; Title = "Champion"; Tagline = "Test advanced class."; Guild = "champions";
+    }
+}
+"""
+
+# A wizard's object, written in a wizard's home, that tries every public door that could dress a player.
+DRESSER = r'''// @inherit /std/thing
+public class Dresser : Thing
+{
+    public override void Create() { Name = "dresser"; Ids.Add("dresser"); }
+    public override string? Short() => "a dresser";
+    public override void Init() { AddAction("dress", Dress); }
+    private bool Dress(string args)
+    {
+        var who = Present(args.Trim(), Environment(ThisPlayer()!)!);
+        if (who == null) { Write("DRESS none\n"); return true; }
+        var tries = new List<string>();
+        foreach (var name in new[] { "jerkin", "oathblade", "robe" })
+        {
+            var item = Present(name, who);
+            if (item == null) { tries.Add(name + "=missing"); continue; }
+            foreach (var f in new[] { "Equip", "PutOn", "Wear", "Wield", "CmdWear", "CmdWield", "Dress", "SetEquipped", "EquipItem", "ForceEquip" })
+            {
+                try { tries.Add(f + "=" + (who.Call(f, item) ?? "null")); }
+                catch (MudRuntimeException e) { tries.Add(f + "!" + e.Message.Length); }
+            }
+            try { tries.Add("Equip2=" + (who.Call("Equip", item, "body") ?? "null")); } catch (MudRuntimeException) { }
+        }
+        var body = who.Call<ObjectRef>("QueryEquipped", "body");
+        var weapon = who.Call<ObjectRef>("QueryEquipped", "weapon");
+        Write("DRESS " + string.Join(" ", tries.Where(t => !t.EndsWith("=null"))) + " body=" + (body == null ? "none" : body.Name) + " weapon=" + (weapon == null ? "none" : weapon.Name) + "\n");
+        return true;
     }
 }
 '''
@@ -442,7 +507,7 @@ def run(work, mudlib, box):
         text = ann.command("browse")
         shown = {}
         for line in text.splitlines():
-            m = re.match(r"\s*(.+?)\s+(\d+) gold\s*$", line)
+            m = re.match(r"\s*(.+?)\s+(\d+) gold(?:\s+\(.*\))?\s*$", line)
             if m:
                 shown[m.group(1).lower()] = int(m.group(2))
         for item, price in stock:
@@ -455,6 +520,9 @@ def run(work, mudlib, box):
             if p != "sister_merewyn":
                 before = score(ann)["gold"]
                 text = ann.command("buy " + name_of(isrc).lower())
+                if "No gold has been taken" in text:   # a piece the adventurer's calling bars: the shop asks to be told twice
+                    truth(f"{who} warns the adventurer about {short_of(isrc)} and takes no gold", score(ann)["gold"] == before, text[-200:])
+                    text = ann.command("buy " + name_of(isrc).lower())
                 after = score(ann)["gold"]
                 truth(f"buy {short_of(isrc)} from {who}", "You buy" in text and after == before - price, (text[-200:], before, after))
         if p == "torren":
@@ -519,29 +587,33 @@ def run(work, mudlib, box):
 
     # ===== 6. armour, worn =====
     ann.command("remove")
+    rosa = newchar("rosa", "priest", gold=100)   # the Scholar's Robe is for Mages and Priests only: a priest wears it here
     for item in NEW_ARMOUR:
+        wearer = rosa if item == "scholars_robe" else ann
+        if wearer is rosa:
+            rosa.command("mk " + O + item)
         src = source(O + item)
         short = short_of(src)
         av, price, slot = SPEC_ARMOUR[item]
         truth(f"{short}: armour {av}, {slot}, {price} gold as in section 3", (int(num(src, "ArmorValue")), int(num(src, "Value"))) == (av, price) and f'Slot = "{slot}"' in src)
-        before = score(ann)
-        text = ann.command("wear " + name_of(src).lower())
+        before = score(wearer)
+        text = wearer.command("wear " + name_of(src).lower())
         check(f"wear {short}", text, "You put on " + short)
-        s = score(ann)
+        s = score(wearer)
         truth(f"{short}: score shows armor +{av}", s["armor"] - before["armor"] == av, (s["armor"], before["armor"]))
         check(f"{short}: listed among the equipment", s["text"], short)
         if item in ATTRIBUTE:
             attr, bonus = ATTRIBUTE[item]
             total, basis = attribute(s["text"], attr)
             truth(f"{short}: wearing it adds {bonus} {attr}", total - basis == bonus, s["text"])
-        ann.command("remove " + name_of(src).lower())
-        after = score(ann)
+        wearer.command("remove " + name_of(src).lower())
+        after = score(wearer)
         truth(f"{short}: taken off, armor is as before", after["armor"] == before["armor"], (after["armor"], before["armor"]))
         if item in ATTRIBUTE:
             attr, bonus = ATTRIBUTE[item]
             truth(f"{short}: taken off, {attr} is the base again", attribute(after["text"], attr)[0] == attribute(after["text"], attr)[1])
-    truth("the jerkin and robe wear restrictions are in the text only (no hook in /std): the files say who may wear them",
-          "mage" in source(O + "leather_jerkin").lower() and "mages" in source(O + "scholars_robe").lower())
+    truth("the jerkin and robe name their callings in the files (the rule itself is tested in section 7b)",
+          'NotWornBy.Add("mage")' in source(O + "leather_jerkin") and 'WornBy.Add("mage")' in source(O + "scholars_robe") and 'WornBy.Add("priest")' in source(O + "scholars_robe"))
 
     # ===== 7. who may wield what: the callings =====
     for archetype, ok_words, refused_words in (
@@ -567,6 +639,121 @@ def run(work, mudlib, box):
             check("a mage may wear the scholar's robe", c.command("wear robe"), "You put on a scholar's robe")
             c.command("mk " + O + "padded_jerkin")
             check("a mage may wear the padded jerkin", c.command("wear padded jerkin"), "You put on a padded jerkin")
+
+    # ===== 7b. armour by calling (docs/specs/hollow-expansion.md, "Armour by calling") =====
+    # Leather Jerkin: not worn by a Mage. Scholar's Robe: worn by Mage and Priest only. Refused in words, shown in the description
+    # and in the shop's list, warned about before gold is taken, an advanced class counts as its calling, an old save keeps a worn
+    # piece, weapons take the same fields, and no wizard's object can dress a player in a forbidden piece.
+    rule = {"leather_jerkin": {"warrior": True, "scout": True, "priest": True, "mage": False, "adventurer": True},
+            "scholars_robe": {"warrior": False, "scout": False, "priest": True, "mage": True, "adventurer": False}}
+    note = {"leather_jerkin": "Mages cannot wear it.", "scholars_robe": "Only Mages and Priests can wear it."}
+    callers = {}
+    for archetype in ("warrior", "scout", "priest", "mage", "adventurer"):
+        c = newchar("cal" + archetype, archetype, gold=300)
+        callers[archetype] = c
+        for item in ("leather_jerkin", "scholars_robe"):
+            src = source(O + item)
+            short = short_of(src)
+            c.command("mk " + O + item)
+            out = c.command("wear " + name_of(src).lower())
+            if rule[item][archetype]:
+                check(f"a {archetype} may wear the {short}", out, "You put on " + short)
+                c.command("remove " + name_of(src).lower())
+            else:
+                check(f"a {archetype} is refused the {short}, in words", out, f"You cannot wear {short}.", note[item], absent=("You put on",))
+                truth(f"and the {archetype} is not wearing it", short not in c.command("score"))
+    mage, warrior = callers["mage"], callers["warrior"]
+    check("the jerkin's description says who may not wear it", warrior.command("look at jerkin"), "Mages cannot wear it.", "hard-boiled leather")
+    check("the robe's description says who may wear it", warrior.command("look at robe"), "Only Mages and Priests can wear it.", "undyed wool")
+    warrior.command("mk " + O + "padded_jerkin")
+    check("a piece with no rule says nothing of callings", warrior.command("look at padded jerkin"), absent=("cannot wear it", "Only "))
+    goto(mage, "village/armourers_shed")
+    text = mage.command("browse")
+    check("Oswy's list marks the leather jerkin as not for mages", text, "leather jerkin", "50 gold  (not for Mages)")
+    truth("and not the padded jerkin or the cap", all("(" not in l for l in text.splitlines() if "padded jerkin" in l or "leather cap" in l), text)
+    gold = score(mage)["gold"]
+    out = mage.command("buy leather jerkin")
+    check("buying the jerkin as a mage: a warning before any gold is taken", out, "You cannot wear a leather jerkin.", "No gold has been taken", "buy leather jerkin", absent=("You buy",))
+    truth("the gold is still there", score(mage)["gold"] == gold, (score(mage)["gold"], gold))
+    out = mage.command("buy leather jerkin")
+    check("saying so again buys it", out, "You buy a leather jerkin for 50 gold")
+    truth("and only then is the gold gone", score(mage)["gold"] == gold - 50, (score(mage)["gold"], gold))
+    out = mage.command("buy padded jerkin")
+    check("a mage buying a piece it can wear is not warned", out, "You buy a padded jerkin", absent=("No gold",))
+    goto(warrior, "village/hedge_scholars_loft")
+    text = warrior.command("browse")
+    check("Halbert's list marks the robe as for mages and priests only", text, "scholar's robe", "40 gold  (Mages and Priests only)")
+    truth("and not the staff", all("(" not in l for l in text.splitlines() if "ironshod staff" in l), text)
+    gold = score(warrior)["gold"]
+    out = warrior.command("buy robe")
+    check("buying the robe as a warrior: warned, no gold taken", out, "You cannot wear a scholar's robe.", "Only Mages and Priests can wear it.", "No gold has been taken", absent=("You buy",))
+    truth("the warrior still has its gold", score(warrior)["gold"] == gold)
+    check("and buys it when asked again", warrior.command("buy robe"), "You buy a scholar's robe for 40 gold")
+    goto(callers["priest"], "village/hedge_scholars_loft")
+    check("a priest buying the robe is not warned", callers["priest"].command("buy robe"), "You buy a scholar's robe", absent=("No gold",))
+
+    # An advanced class counts as the calling it grew from.
+    adept = newchar("caladept", "mage", gold=100)
+    check("a mage takes an advanced class of the mage's", adept.command("pledge hx_adept"), "PLEDGED")
+    adept.command("mk " + O + "leather_jerkin")
+    adept.command("mk " + O + "scholars_robe")
+    check("an advanced mage is still refused the jerkin", adept.command("wear jerkin"), "Mages cannot wear it.", absent=("You put on",))
+    check("and still may wear the robe", adept.command("wear robe"), "You put on a scholar's robe")
+    champ = newchar("calchamp", "warrior", gold=100)
+    check("a warrior takes an advanced class of the warrior's", champ.command("pledge hx_champion"), "PLEDGED")
+    champ.command("mk " + O + "scholars_robe")
+    champ.command("mk " + O + "leather_jerkin")
+    check("an advanced warrior is refused the robe", champ.command("wear robe"), "Only Mages and Priests can wear it.", absent=("You put on",))
+    check("and wears the jerkin", champ.command("wear jerkin"), "You put on a leather jerkin")
+
+    # The same fields work for a weapon.
+    check("a scout may not wield a warriors-only sword", (callers["scout"].command("mk " + T + "oathblade") + callers["scout"].command("wield oathblade")),
+          "You cannot wield an oathblade. Only Warriors can wield it.", absent=("You wield",))
+    warrior.command("mk " + T + "oathblade")
+    check("a warrior may", warrior.command("wield oathblade"), "You wield an oathblade")
+    check("the weapon's description says so", warrior.command("look at oathblade"), "Only Warriors can wield it.")
+
+    # A piece worn when the rule arrived (a save from before it) stays worn until it is taken off.
+    olds = newchar("calolds", "mage")
+    olds.command("save")
+    olds.command("quit")
+    time.sleep(0.8)
+    path = None
+    for root, _, files in os.walk(os.path.join(work, "save")):
+        for f in files:
+            if f.startswith("calolds") and f.endswith(".json"):
+                path = os.path.join(root, f)
+    truth("the old character's save file is there", path is not None)
+    if path:
+        with open(path) as f:
+            saved = json.load(f)
+        saved["carried"] = list(saved.get("carried", [])) + [O + "leather_jerkin"]
+        saved["carriedEquipped"] = list(saved.get("carriedEquipped", [])) + [len(saved["carried"]) - 1]
+        with open(path, "w") as f:
+            json.dump(saved, f)
+        olds = login("calolds")
+        check("an old save with the forbidden jerkin worn: it is still worn at login", olds.command("score"), "body: a leather jerkin")
+        check("it is taken off", olds.command("remove jerkin"), "You take off a leather jerkin")
+        check("and may not be put back on", olds.command("wear jerkin"), "Mages cannot wear it.", absent=("You put on",))
+        olds.command("quit")
+
+    # No wizard's object can dress a player in a forbidden piece through a public method.
+    os.makedirs(os.path.join(mudlib, "wiz", "warden"), exist_ok=True)
+    h.write(mudlib, "/wiz/warden/dresser", DRESSER)
+    victim = newchar("caldupe", "mage")
+    victim.command("mk " + O + "leather_jerkin")
+    victim.command("mk " + O + "scholars_robe")
+    victim.command("mk " + T + "oathblade")
+    w.command("goto " + T + "lab")
+    victim.command("lab")
+    check("the dresser is cloned", w.command("clone ~/dresser"), "dresser")
+    out = w.command("dress caldupe")
+    check("the dresser ran", out, "DRESS ")
+    check("no public method dresses a mage in the jerkin or the blade (it keeps its own staff)", out, "body=none", "weapon=/domains/hollow/obj/apprentice_staff", absent=("oathblade#", "leather_jerkin#"))
+    truth("and the mage is wearing nothing it was not given", "body:" not in victim.command("score") and "jerkin" not in victim.command("score"), victim.command("score"))
+    check("a plain wear by the player is still refused", victim.command("wear jerkin"), "Mages cannot wear it.")
+    for c in list(callers.values()) + [adept, champ, victim]:
+        c.command("quit")
 
     # ===== 8. the Practice Yard's dummy =====
     hero = newchar("hero", gold=100)
@@ -741,6 +928,9 @@ def main():
     os.makedirs(os.path.join(mudlib, "domains", "hxtest"))
     h.write(mudlib, T + "probe", PROBE)
     h.write(mudlib, T + "lab", LAB)
+    h.write(mudlib, T + "oathblade", OATHBLADE)
+    h.write(mudlib, "/classes/hx_adept", ADEPT)
+    h.write(mudlib, "/classes/hx_champion", CHAMPION)
     h.edit(mudlib, "/domains/hollow/village/square", 'Exits["south"]', f'Exits["lab"] = "{T}lab";\n        Exits["south"]')
     # The test copy of the North Road has no wandering wolf, so that walking through it is the same every time.
     h.edit(mudlib, "/domains/hollow/village/north_road", 'AddEncounter("/domains/hollow/mob/wandering_wolf", 25);', "")

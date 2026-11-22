@@ -363,11 +363,11 @@ def run(work, mudlib):
     c.read_until("Goodbye")
 
     # ===== the five archetypes: starting numbers and kit =====
-    expect = {  # Vitality as docs/ATTRIBUTES.md section 8 sets it (Warrior 35, Scout 20, Mage 20 at level 1)
+    expect = {  # Vitality as docs/ATTRIBUTES.md sections 8 and 9 set it (Warrior 35, Scout 21, Mage 21 at level 1)
         "warrior": ("35", "100", "20", "10", ["rusty sword", "small shield"], "weapon: a rusty sword", "shield: a small shield"),
-        "scout": ("20", "100", "20", "10", ["hunting bow", "iron dagger"], "weapon: a hunting bow", "Armor 0"),
+        "scout": ("21", "100", "20", "10", ["hunting bow", "iron dagger"], "weapon: a hunting bow", "Armor 0"),
         "priest": ("26", "40", "100", "15", ["novice's mace", "minor healing potion"], "weapon: a novice's mace", "Armor 0"),
-        "mage": ("20", "30", "100", "15", ["apprentice's staff", "minor healing potion"], "weapon: an apprentice's staff", "Armor 0"),
+        "mage": ("21", "30", "100", "15", ["apprentice's staff", "minor healing potion"], "weapon: an apprentice's staff", "Armor 0"),
         "adventurer": ("30", "70", "70", "20", ["training spear", "trail ration"], "weapon: a training spear", "Armor 0"),
     }
     chars = {}
@@ -417,7 +417,7 @@ def run(work, mudlib):
     text = old.read_until("> ")
     s = a.score_of(old)
     check("the existing character keeps level and gold, gets the new Vitality and no kit",
-          f"{s['level']} {s['gold']} {s['max']}", "3 77 32")  # docs/ATTRIBUTES.md section 8: 4 + 6 x 3 + Vigor 5 x 2
+          f"{s['level']} {s['gold']} {s['max']}", "3 77 35")  # docs/ATTRIBUTES.md section 9: 4 + 7 x 3 + Vigor 5 x 2
     check("no second starting kit for an existing character", str(old.command("i").count("rusty sword")), "1")
     old.command("quit")
 

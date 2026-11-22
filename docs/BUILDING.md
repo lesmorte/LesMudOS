@@ -475,7 +475,7 @@ public class ExampleSword : Weapon
 
 ### Armor
 
-`wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxVitalityBonus` (optional) adds to maximum Vitality while worn. `ReactionMod` (optional, default 0) is added to the wearer's Reaction Time while worn: a shield or heavy armor makes its wearer a little slower. `Category` is `light`, `medium` or `heavy` for body and head armor (it decides who may wear it; a shield or trinket needs none).
+`wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxVitalityBonus` (optional) adds to maximum Vitality while worn. `ReactionMod` (optional, default 0) is added to the wearer's Reaction Time while worn: a shield or heavy armor makes its wearer a little slower. `Category` is `light`, `medium` or `heavy` for body and head armor (it decides who may wear it; a shield or trinket needs none). `WornBy` and `NotWornBy` restrict a piece by calling as well (next section).
 
 ```csharp
 // File: /domains/example/helm.cs
@@ -497,6 +497,27 @@ public class ExampleHelm : Armor
     }
 }
 ```
+
+### Restricting a piece by calling
+
+Armour and weapons are restricted by weight or kind (`Category`) alone unless the file also names callings. Both fields are lists of calling ids (`"warrior"`, `"scout"`, `"priest"`, `"mage"`, `"adventurer"`), set in `Create()`, and both work on armour **and** on weapons:
+
+```csharp
+WornBy.Add("mage");       // only these callings may wear (or wield) it ...
+WornBy.Add("priest");
+NotWornBy.Add("mage");    // ... and these may not (use one or the other; if both are set, both rules apply)
+```
+
+With neither, the category decides, as always. An advanced class, subclass or prestige class counts as the calling it grew from: a Mage who has become a Mage-advanced class is still a Mage here. What the game does with the rule:
+
+- `wear` and `wield` refuse in words that say who the piece is for ("You cannot wear a leather jerkin. Mages cannot wear it." / "Only Mages and Priests can wear it."). The calling rule is checked first, then the weight category.
+- `look at` and `appraise` add the same sentence, so the description needs no words of its own about it (the Leather Jerkin and the Scholar's Robe keep theirs for flavour).
+- A shop's `browse` appends the restriction to the line: `A scholar's robe    40 gold  (Mages and Priests only)`, `A leather jerkin   50 gold  (not for Mages)`.
+- `buy` warns before it takes any gold when the buyer's calling bars the piece, and sells it only if the buyer says the same `buy` again within two minutes ("No gold has been taken. Say buy ... again if you want it anyway.").
+- A piece worn when a rule arrives (a character saved before the rule) stays worn at login until it is taken off; it cannot be put back on.
+- Nothing outside the character puts a piece on it: `Equip` is not a public method, so another object (a wizard's, say) cannot dress a player in a forbidden piece.
+
+Applied in the Hollow: the Leather Jerkin (`NotWornBy.Add("mage")`) and the Scholar's Robe (`WornBy.Add("mage")`, `WornBy.Add("priest")`).
 
 ### A consumable
 

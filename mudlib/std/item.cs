@@ -31,6 +31,52 @@ public class Item : Thing
     /// </summary>
     protected Dictionary<string, double> StatBonus = new();
 
+    /// <summary>
+    /// Armour and weapons by calling (docs/BUILDING.md, "Restricting a piece by calling"): the callings (ids such as "mage") that
+    /// may wear or wield this piece. Empty means the weight category alone decides, as before. An advanced class counts as the
+    /// calling it grew from.
+    /// </summary>
+    protected List<string> WornBy = new();
+    /// <summary>The callings (ids) that may not wear or wield this piece. Combined with WornBy, both rules apply.</summary>
+    protected List<string> NotWornBy = new();
+
+    public List<string> QueryWornBy() => new(WornBy);
+
+    public List<string> QueryNotWornBy() => new(NotWornBy);
+
+    /// <summary>True if a character with these calling and class ids may wear or wield the piece as far as the calling rule goes.</summary>
+    public bool QueryAllowsCalling(List<string> ids)
+    {
+        ids ??= new List<string>();
+        if (WornBy.Count > 0 && !WornBy.Any(w => ids.Contains(w))) return false;
+        return !NotWornBy.Any(n => ids.Contains(n));
+    }
+
+    private static string CallingWords(List<string> ids)
+    {
+        var names = ids.Select(i => Cap(i) + "s").ToList();
+        return names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
+    }
+
+    /// <summary>The restriction in words, for look, appraise and the refusal of wear: "Only Mages and Priests can wear it." Empty for a piece nobody's calling bars.</summary>
+    public string QueryCallingNote()
+    {
+        var verb = QuerySlot() == "weapon" ? "wield" : "wear";
+        var parts = new List<string>();
+        if (WornBy.Count > 0) parts.Add($"Only {CallingWords(WornBy)} can {verb} it.");
+        if (NotWornBy.Count > 0) parts.Add($"{CallingWords(NotWornBy)} cannot {verb} it.");
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>The restriction in a few words, for a shop's list: "Mages and Priests only", "not for Mages". Empty if none.</summary>
+    public string QueryCallingTag()
+    {
+        var parts = new List<string>();
+        if (WornBy.Count > 0) parts.Add($"{CallingWords(WornBy)} only");
+        if (NotWornBy.Count > 0) parts.Add($"not for {CallingWords(NotWornBy)}");
+        return string.Join("; ", parts);
+    }
+
     /// <summary>The item's bonus to an attribute while equipped.</summary>
     public int QueryAttributeBonus(string name) => AttributeBonus.TryGetValue(name ?? "", out var value) ? value : 0;
 
@@ -377,7 +423,8 @@ public class Item : Thing
     public override string Long()
     {
         var note = QualityNote();
-        return base.Long() + (note == "" ? "" : note + "\n");
+        var calling = QueryCallingNote();
+        return base.Long() + (note == "" ? "" : note + "\n") + (calling == "" ? "" : calling + "\n");
     }
 
     /// <summary>Skills this item grants while it is equipped (ids in /skills). None by default; a builder overrides it.</summary>
@@ -387,7 +434,7 @@ public class Item : Thing
     public virtual string Appraisal() => $"{Cap(Short() ?? Name)}. Worth {QueryValue()} gold{(quantity > 1 ? " each" : "")}." + (Magic != "" ? $" Magical property: {Magic}." : " It holds no magic.") + AppraisalQuality() + "\n";
 
     /// <summary>" Quality: fine." for Appraisal, or "" for an ordinary Common item.</summary>
-    protected string AppraisalQuality() => !Stackable && quality == Common ? "" : $" Quality: {QualityNames[quality]}.";
+    protected string AppraisalQuality() => (!Stackable && quality == Common ? "" : $" Quality: {QualityNames[quality]}.") + (QueryCallingNote() is { Length: > 0 } calling ? " " + calling : "");
 
     /// <summary>The equipment slot this item goes in ("weapon", "head", ...), or "" if it cannot be worn or wielded.</summary>
     public virtual string QuerySlot() => "";

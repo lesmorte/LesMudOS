@@ -538,6 +538,9 @@ public abstract class Living : Thing
     /// <summary>Is this creature too long without input to earn experience? Players override it; nothing else is ever idle.</summary>
     public virtual bool QueryIdle() => false;
 
+    /// <summary>True while a player sits resting (docs/specs/rest.md). Creatures and NPCs never do.</summary>
+    public virtual bool QueryResting() => false;
+
     private void ForgetDamageIfRecovered()
     {
         if (damageDealt.Count > 0 && enemies.Count == 0 && Vitality >= QueryMaxVitality()) damageDealt.Clear();
@@ -594,8 +597,12 @@ public abstract class Living : Thing
 
     // ---- Equipment ----
 
-    /// <summary>Put an item from this creature's inventory into its slot. Replaces what was there. No messages.</summary>
-    public bool Equip(ObjectRef item)
+    /// <summary>
+    /// Put an item from this creature's inventory into its slot. Replaces what was there. No messages. Not public: only the creature's
+    /// own code (a player's wear and wield, which check who may use the piece; a creature's Create) dresses it, so no other object can
+    /// dress a player in a piece its calling bars.
+    /// </summary>
+    protected bool Equip(ObjectRef item)
     {
         if (!item.IsAlive || Environment(item) != Self) return false;
         var slot = item.Call<string>("QuerySlot");
@@ -798,6 +805,19 @@ public abstract class Living : Thing
     /// </summary>
     private void SettleResources()
     {
+        BeforeSettle();
+        SettleCore();
+    }
+
+    /// <summary>Called before regeneration is settled: a player uses it to notice that sitting down has ended (the room changed, a fight began).</summary>
+    protected virtual void BeforeSettle() { }
+
+    /// <summary>A multiplier on Endurance and Focus regeneration that comes from the character's own state: a seated player's recovery (docs/specs/rest.md).</summary>
+    protected virtual double RegenStateFactor() => 1.0;
+
+    /// <summary>Settle regeneration up to now at the rates in force until now. Call it before anything changes a rate.</summary>
+    protected void SettleCore()
+    {
         var now = TimeMs();
         var maxEndurance = QueryMaxEndurance();
         var maxFocus = QueryMaxFocus();
@@ -807,7 +827,7 @@ public abstract class Living : Thing
         var tens = (now - resourceTime) / 10000.0;
         resourceTime = now;
         if (tens <= 0) return;
-        var factor = 1.0;
+        var factor = RegenStateFactor();
         var room = Environment();
         if (room != null && room.Call<bool>("QuerySafe")) factor *= 2;
         if (!QueryInCombat()) factor *= 1 + QueryMod("regen_out");
@@ -968,10 +988,20 @@ public abstract class Living : Thing
     /// <summary>Another creature has made this one its enemy. Unless this one is already fighting, its first action is delayed by its Reaction Time.</summary>
     public void AddEnemy(ObjectRef enemy)
     {
-        if (Dead || enemy == Self || !enemy.IsAlive) return;
-        if (!enemies.Contains(enemy) && !QueryInCombat()) DelayFirstAction();
+        if (Dead || enemy == Self || !enemy.IsAlive || PreviousObject() != enemy || !enemy.Call<bool>("IsCreature")) return; // only a creature itself makes itself someone's enemy (BeginFight): no other object can start a fight for it
+        if (!enemies.Contains(enemy) && !QueryInCombat())
+        {
+            DelayFirstAction();
+            Ambushed(enemy);
+        }
         AddEnemyCore(enemy);
     }
+
+    /// <summary>Another creature has just made this one its enemy and no fight was on. A seated player gets up and loses a little more time.</summary>
+    protected virtual void Ambushed(ObjectRef enemy) { }
+
+    /// <summary>Put off this one's next action by a further number of seconds.</summary>
+    protected void DelayActionBy(int seconds) => readyAt += seconds * 1000L;
 
     private void AddEnemyCore(ObjectRef enemy)
     {
