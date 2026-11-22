@@ -83,3 +83,8 @@ Balance requirement, as measured (`ranks level5 gap bolt focus climb`):
 - **Arcane Bolt against the best staff** (per action): it beats the staff against an armoured creature at every rank (x1.7, 2.1, 3.7, 6.7), but it also beats it against an unarmoured one by far more than a small margin (x1.4 at rank I already, 1.6, 2.3, 3.3), because a Mage's staff gains nothing from Might and nothing better than the Staff of the Hollow Oak exists. Not changed: the failure is in rank I too.
 - **The Priest's Focus** runs out before a creature of the Priest's own level does: against a level 5 or level 10 creature that does not die, the Priest dies every time (in about 4 to 6 minutes); a full Focus pool pays for 4 to 5 heals at rank I and 3 at rank II or III.
 - **Arcane Bolt II's ten goblins**: every calling has killed 13 goblins on the way to level 5 in the simulator's whole run.
+
+## Owner's decisions after the build (22 November 2026)
+1. **Minor Heal** is the large heal: 20 / 38 / 60 Vitality for 25 / 32 / 40 Focus at ranks I / II / III (later ranks by the default step), with **no second Minor Heal for 15 seconds after one** (a named number; the wait is on the caster, shown in the refusal and in `skills`). This replaces the provisional heal of 7. Simulated: Priest within 2 points of the mean.
+2. **Double Strike** keeps two hits at 60% and costs **35 Endurance** at rank I (was 20); later ranks' costs follow the default step from 35.
+3. The uneven gains from rank II (Mage +19, Warrior +13, Priest +10, Adventurer +6, Scout +4 at level 5) are left until Aimed Shot is built, then measured again.
