@@ -1,4 +1,4 @@
-# Sneak (approved by the owner 22 November 2026; not built yet)
+# Sneak (approved by the owner 22 November 2026; built 22 November 2026, see "Built" below)
 
 Owner's idea (22 November 2026), after the simulator showed the archer never gets an opening shot in the cellars because every creature there attacks on arrival: "I wonder if scout needs a sneak/hide skill that prevents instant aggro attacks and also the aimed strike before the creature can react." Every number here is a starting value for `tests/balance_sim.py`.
 
@@ -36,6 +36,9 @@ II at level 5: notice chance - 10%, 4 Endurance a room, Precision Strike opener 
 
 ## Build
 One Sonnet agent after the Aimed Shot work merges: the skill and its ranks, the `Alert` flag and its placement on bosses, elites and sentries in the Hollow, the corridor and its dungeons, the simulator (melee and archer Scouts with sneaking, in both player models), tests including a probe that no outside object can hide a player or silence a creature.
+
+## Built (22 November 2026)
+`sneak` (`mudlib/skills/sneak.cs`, ranks I-III: 5 / 4 / 3 Endurance a room, notice -0 / -10 / -20), the rules and dice in `/secure/sneak`, the state and commands in `/std/adventurer` (the state is not saved), the `Boss` and `Alert` flags in `/std/monster`, the leave roll in `Room.MoveThrough`, the surprise in `/std/living` (`QuerySurprising`: the target's first-action delay doubled) and Precision Strike's `ambush` effect (x1.5 / 1.75 / 2.0 / 2.25). Wenna Farrow teaches II, the Scout hallmaster III. Flagged `Boss`: Goblin Overseer, Bandit Leader, Forest Panther, Fallen Knight, Warren Broodmother, Barrow Guardian. Flagged `Alert`: Goblin Elite Guard, Goblin Guard, Goblin Guard (keyholder), Bandit Lookout, Heartwood Goblin. Where the spec was silent: a creature that has not noticed keeps rolling every 10 s at half chance until the Scout leaves the room, even after sneaking ended by a quiet `sneak off`; `sneak off` is quiet; a creature noticing at entry does not wake the others (they wake at the Scout's first loud deed or by their own re-roll); the notice chance has a final floor of 5% and ceiling of 100% after Alert and rank; the spotter refusal comes before the fight refusal; `{sneak}` prompt shows "(sneaking) ". The simulator results are in `python3 tests/balance_sim.py ranks sneak`; tests in `tests/sneak_test.py`.
 
 ## Doors (owner's decision, 22 November 2026: "add openable doors")
 **Built (22 November 2026)**: `AddDoor` in `/std/room`, the register `/secure/doors`, the commands, the door between the Overseer Hall (east) and the chamber (west); see docs/BUILDING.md, "A room with a door", and `tests/sneak_test.py`. Existing locked exits (`LockExit`) were left as they are.

@@ -837,8 +837,10 @@ def step_loud(chief):
             # A corpse that holds something, in the morgue; then a lurker is brought in, and the Scout slips in while it is unaware.
             to(s, "n_morgue")
             s.command("sspawn lootdummy")
-            s.command("kill lootdummy")
-            a.quiet(s, 5.0)
+            for _ in range(6):
+                s.command("kill lootdummy")
+                if "dies" in a.quiet(s, 5.0) or not stat(s)["fighting"]:
+                    break
             s.command("out")
             s.command("sspawnin " + T + "n_morgue lurker")
             room = "morgue"
@@ -1060,7 +1062,7 @@ def step_sneakprobe(chief, mudlib):
     s.command("sneak on")
     to(s, "/wiz/snchief/wizlair")
     out = a.quiet(s, 4.5)
-    check("a wizard's creature always notices (no roll to fail), as creatures did before sneaking", str(stat(s)["fighting"]) + ("has not noticed you" in out), "TrueFalse")
+    check("a wizard's creature always notices (no roll to fail), as creatures did before sneaking", str(stat(s)["fighting"]) + str("has not noticed you" in out), "TrueFalse")
     s.command("sslay")
     s.command("quit")
 

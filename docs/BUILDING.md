@@ -187,6 +187,35 @@ How the two halves stay in agreement: neither room keeps the door's state. The r
 
 A Scout who is sneaking can slip past creatures that do not notice, in and out of a room, and a door in the way undoes that: **opening a door is loud**. It ends the Scout's sneaking and wakes the room, so every aggressive creature in it engages at once. Use a door when the way beyond should have to be earned by facing what guards it: put it on the exit **behind** the guards (the Overseer Hall's east door has the Elite Guards in front of it), never on an exit that a creature stands behind alone. A door is not needed to stop a Scout in front of a `Boss`: a creature flagged `Boss` always notices a sneaking Scout. See "Sneaking" under Creatures for the `Alert` and `Boss` flags.
 
+#### Sneaking: the `Alert` and `Boss` flags
+
+A Scout who has `sneak` on rolls against every **aggressive** creature (`Aggressive = true`) of a room as they enter, and again as they leave. Two flags in a creature's `Create()` change that creature's roll:
+
+- `Alert = true`: a sentry or guard. +30 points to its chance to notice. Set it on anything that stands watch (the Hollow's guards, the Elite Guards, the corridor's lookouts).
+- `Boss = true`: always notices; it never rolls, so it cannot be sneaked past or ambushed. Set it on every boss, whatever else it is.
+
+```csharp
+// @inherit /std/monster
+public class ExampleSentry : Monster
+{
+    public override void Create()
+    {
+        Name = "Gate Sentry";
+        Ids.Add("sentry");
+        ShortDesc = "a gate sentry";
+        LongDesc = "He watches the road and not much else.";
+        Level = 3;
+        MaxVitality = 30;
+        DamageMin = 2;
+        DamageMax = 4;
+        Aggressive = true;
+        Alert = true;
+    }
+}
+```
+
+A creature that is not `Aggressive` is never rolled for. The chance is 50% - 5% for each point of the Scout's Grace above 5 + 5% for each level the creature is above the Scout, kept between 10% and 90%, + 30% if `Alert`, less the Scout's Sneak rank (0 / 10 / 20 points), and never below 5%. Where an unnoticed Scout should not slip past, put a door (above); where he should not be able to ambush, set `Boss`. Creatures written under a wizard's home directory have no standing to be rolled for and always notice, as every creature did before sneaking.
+
 ### A room with random encounters
 
 `AddEncounter(path, percent)`: each time a player walks in there is that chance that the creature wanders in, if none from this room is still alive and a minute has passed since the last. The same rule holds for corpses: no new encounter while the corpse of this room's previous one still lies here. An encounter that is not fighting wanders off at the next reset.

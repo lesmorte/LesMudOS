@@ -122,6 +122,10 @@ Combat has no rounds. Each fighter has its own clock, described fully in [COMBAT
 
 The creature API is `BaseReaction` and `AddCombatAction(id, name, preparation, recovery, windUp, damageMultiplier, reactionMod, strike, kind)`; see BUILDING.md for compiled templates.
 
+### Sneaking
+
+A Scout's `sneak` (docs/CLASS_SYSTEM.md section 15, docs/specs/sneak.md) changes who starts a fight. With it on, an aggressive creature of the room the Scout enters rolls to notice instead of attacking at once; one that does not notice waits, and re-rolls every 10 s at half the chance. A `Boss` always notices; an `Alert` creature has +30 points. The Scout who attacks unnoticed starts the fight: the target's first action waits twice as long. Loud deeds (attacking, skills other than Tracking, taking things, opening a door or chest, `say`, `shout`) end sneaking and wake every creature of the room. The state lives in the player object (`/std/adventurer`), is not saved, and changes only by the player's own commands and the game's own calls (`SneakNotice` from the creature, `SneakDeparts` from the room, `Disturbed` from a trusted object in the room); the rules and dice are `/secure/sneak`.
+
 ### Hooks for special behaviour
 
 - `protected virtual CombatAction? ChooseAction(ObjectRef target)`: which action to begin next (default: the first action). Boss patterns are written here, usually with `ActionsTaken()`.

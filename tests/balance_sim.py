@@ -131,7 +131,8 @@ def rank_value(skill, key, rank):
 
 
 def rank_int(skill, key, rank):
-    return rnd(rank_value(skill, key, rank))
+    v = rank_value(skill, key, rank)
+    return -rnd(-v) if v < 0 else rnd(v)   # half away from zero, as RankInt (Sneak's notice change is negative)
 
 
 def default_ranks(arch_name, level, mode=None):
