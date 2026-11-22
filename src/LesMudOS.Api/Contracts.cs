@@ -25,10 +25,35 @@ public interface IMaster
 
     /// <summary>A runtime or compile error occurred during an execution started by or for the given object.</summary>
     void LogError(string objectName, string message);
+
+    /// <summary>
+    /// The domain of a new object, asked once, before its constructor runs. "" (the default) is the unrestricted world; any other
+    /// value makes the object restricted: while a restricted object's code is anywhere on the call stack, calls to unrestricted
+    /// objects are put to ValidCall first. For a clone the call stack is the cloner's; a blueprint is always created with an empty one.
+    /// </summary>
+    string ObjectDomain(string programPath, bool isClone) => "";
+
+    /// <summary>
+    /// Asked before every move (the MoveObject efun, and an object falling out of a container that is destroyed). Null allows it;
+    /// any other value refuses it, and is the text of the error the efun throws. caller is the object whose code called the efun.
+    /// </summary>
+    string? MoveRefusal(ObjectRef what, ObjectRef destination, ObjectRef caller) => null;
+
+    /// <summary>
+    /// Asked only while restricted code is on the call stack, before it reaches an unrestricted object: a Call (function is the
+    /// method name), a typed view ("As"), text sent by an efun ("CatchTell"), a verb binding ("AddAction") or an input capture
+    /// ("InputTo") on the target. False refuses: the call returns null, the view is null, the text or binding is dropped.
+    /// The master's own calls while it answers are not checked.
+    /// </summary>
+    bool ValidCall(ObjectRef target, string function) => true;
 }
 
 /// <summary>One entry of a mudlib directory, as returned by GetDir.</summary>
-public sealed record DirEntry(string Name, bool IsDirectory, long Size);
+public sealed record DirEntry(string Name, bool IsDirectory, long Size)
+{
+    /// <summary>True if the entry is a symbolic link (to a file or a directory).</summary>
+    public bool IsLink { get; init; }
+}
 
 /// <summary>Marks a field that SaveObject / RestoreObject persist.</summary>
 [AttributeUsage(AttributeTargets.Field)]
@@ -75,10 +100,13 @@ internal interface IDriverServices
     void Destruct(ObjectRef caller, ObjectRef target);
     IReadOnlyList<string> UpdateProgram(ObjectRef caller, string path);
 
-    void Move(ObjectRef what, ObjectRef destination);
+    void Move(ObjectRef caller, ObjectRef what, ObjectRef destination);
     ObjectRef? Present(string id, ObjectRef container);
 
     ObjectRef? PreviousObject(ObjectRef self);
+    IReadOnlyList<ObjectRef> CallerChain();
+    ObjectRef? RestrictedCaller();
+    bool MayView(ObjectRef target);
     ObjectRef? ThisPlayer { get; }
     string Verb { get; }
     void EnableCommands(ObjectRef ob);
@@ -108,6 +136,7 @@ internal interface IDriverServices
     bool CheckAdminSecret(ObjectRef caller, string candidate);
     string HashPassword(string password);
     bool VerifyPassword(string password, string hash);
+    string Sha256(string text);
     IReadOnlyList<DirEntry>? GetDir(ObjectRef caller, string path);
     string? ReadFile(ObjectRef caller, string path);
     void WriteFile(ObjectRef caller, string path, string content);

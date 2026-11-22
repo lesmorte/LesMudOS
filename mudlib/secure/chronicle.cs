@@ -15,11 +15,13 @@ public class ChronicleDaemon : MudObject
     private const string Service = "/secure/events";
     private const string Ledger = "/secure/renown";
 
-    public static readonly string[] Months =
+    private static readonly string[] FrozenMonths =
     {
         "Deepfrost", "Thawmoon", "Sowing", "Blossom", "Greentide", "Highsun",
         "Goldfields", "Harvest", "Leaf-fall", "Mistwane", "Firstfrost", "Longnight"
     };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static string[] Months => (string[])FrozenMonths.Clone();
 
     /// <summary>The Unix day (seconds / 86400, UTC) on which Year 1 began. Never changes once set.</summary>
     [Saved] private long epochDay;

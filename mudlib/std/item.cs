@@ -88,10 +88,14 @@ public class Item : Thing
     public const int Poor = 0, Common = 1, Fine = 2, Excellent = 3, Masterwork = 4, Legendary = 5;
 
     /// <summary>The quality tiers in order, as the words players see and type.</summary>
-    public static readonly string[] QualityNames = { "poor", "common", "fine", "excellent", "masterwork", "legendary" };
+    private static readonly string[] FrozenQualityNames = { "poor", "common", "fine", "excellent", "masterwork", "legendary" };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static string[] QualityNames => (string[])FrozenQualityNames.Clone();
 
     /// <summary>What each quality multiplies the base value by.</summary>
-    public static readonly double[] QualityMultipliers = { 0.5, 1.0, 1.5, 2.5, 4.0, 8.0 };
+    private static readonly double[] FrozenQualityMultipliers = { 0.5, 1.0, 1.5, 2.5, 4.0, 8.0 };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static double[] QualityMultipliers => (double[])FrozenQualityMultipliers.Clone();
 
     /// <summary>The largest quantity one stack may hold.</summary>
     public const int MaxStack = 1000000;
@@ -147,7 +151,7 @@ public class Item : Thing
 
     private static bool Trusted(ObjectRef? ob)
     {
-        if (ob == null || ob.ProgramPath.Contains("..")) return false;
+        if (ob == null || ob.Domain != "" || ob.ProgramPath.Contains("..")) return false; // a sandbox object is never trusted (docs/SANDBOX.md)
         foreach (var tree in TrustedTrees) if (ob.ProgramPath.StartsWith(tree, StringComparison.Ordinal)) return true;
         return false;
     }

@@ -13,9 +13,15 @@ public class RenownLedger : MudObject
     private const string SaveFile = "/secure/renown";
     private const string Service = "/secure/events";
 
-    public static readonly string[] TierNames = { "Unknown", "Local", "Recognized", "Acclaimed", "Renowned", "Famous", "Heroic", "Legendary", "Mythic" };
-    public static readonly int[] TierFloor = { 0, 1, 100, 500, 1000, 2500, 5000, 10000, 25000 };
-    public static readonly string[] TierTitles = { "", "Local Hero", "Wanderer", "Champion", "Defender of Greenvale", "Voice of the People", "Hero of Hollowmere", "Living Legend", "The Mythic" };
+    private static readonly string[] FrozenTierNames = { "Unknown", "Local", "Recognized", "Acclaimed", "Renowned", "Famous", "Heroic", "Legendary", "Mythic" };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static string[] TierNames => (string[])FrozenTierNames.Clone();
+    private static readonly int[] FrozenTierFloor = { 0, 1, 100, 500, 1000, 2500, 5000, 10000, 25000 };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static int[] TierFloor => (int[])FrozenTierFloor.Clone();
+    private static readonly string[] FrozenTierTitles = { "", "Local Hero", "Wanderer", "Champion", "Defender of Greenvale", "Voice of the People", "Hero of Hollowmere", "Living Legend", "The Mythic" };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static string[] TierTitles => (string[])FrozenTierTitles.Clone();
 
     /// <summary>What an NPC says first to a character of this tier, in the bible's spirit. Below Recognized: nothing.</summary>
     private static readonly string[] Recognition =
@@ -205,7 +211,7 @@ public class RenownLedger : MudObject
     public string ChooseTitle(string name, string args)
     {
         var caller = PreviousObject();
-        if (Self.IsClone || caller == null || caller.ProgramPath.Contains("..") || !TrustedTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)))
+        if (Self.IsClone || caller == null || caller.Domain != "" || caller.ProgramPath.Contains("..") || !TrustedTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)))
             return "Only trusted code can choose a title for someone.\n";
         return Choose(name, args);
     }

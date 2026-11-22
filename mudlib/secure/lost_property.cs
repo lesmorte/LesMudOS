@@ -41,7 +41,7 @@ public class LostProperty : MudObject
     private bool CalledByCorpse()
     {
         var caller = PreviousObject();
-        return !Self.IsClone && caller != null && caller.IsClone && caller.ProgramPath == "/std/corpse";
+        return !Self.IsClone && caller != null && caller.IsClone && caller.ProgramPath == "/std/corpse" && caller.Domain == "" && RestrictedCaller() == null;
     }
 
     /// <summary>A corpse reports its current contents. An empty report removes the record.</summary>
@@ -84,7 +84,7 @@ public class LostProperty : MudObject
     {
         var result = new List<string> { "0" };
         var caller = PreviousObject();
-        if (Self.IsClone || caller == null || caller != ThisPlayer() || !caller.IsClone || caller.ProgramPath != "/std/player") return result;
+        if (Self.IsClone || caller == null || caller != ThisPlayer() || !caller.IsClone || caller.ProgramPath != "/std/player" || caller.Domain != "" || RestrictedCaller() != null) return result;
         var name = caller.Call<string>("QueryName")?.ToLowerInvariant();
         if (string.IsNullOrEmpty(name)) return result;
 

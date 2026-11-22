@@ -38,6 +38,9 @@ internal sealed class Kernel : IDriverServices
     private readonly ConditionalWeakTable<Type, Dictionary<(string, int), MethodInfo?>> _methodCache = new();
 
     private readonly List<ObjectRef> _callStack = new();
+    private int _restricted;    // how many frames on _callStack belong to restricted objects (a domain other than "")
+    private int _masterDepth;   // > 0 while the master answers a question: its own calls are not put to ValidCall
+    private int _refusals;      // ValidCall refusals in this execution, for the log
     private readonly byte[]? _adminSecretHash;
     private int _adminSecretFailures;
 
@@ -68,22 +71,80 @@ internal sealed class Kernel : IDriverServices
     private IMaster MasterObject => _master?.Target as IMaster ?? throw new MudRuntimeException("No master object");
 
     /// <summary>Ask the master object a question, with the master on the call stack.</summary>
-    private T AskMaster<T>(Func<IMaster, T> question) => In(_master!, () => question(MasterObject));
+    private T AskMaster<T>(Func<IMaster, T> question)
+    {
+        _masterDepth++;
+        try { return In(_master!, () => question(MasterObject)); }
+        finally { _masterDepth--; }
+    }
 
     // ---- Call stack: which object's code is running, for PreviousObject() ----
 
-    private void In(ObjectRef ob, Action work)
+    private void Push(ObjectRef ob)
     {
         _callStack.Add(ob);
+        if (ob.Domain.Length > 0) _restricted++;
+    }
+
+    private void Pop()
+    {
+        if (_callStack.Count == 0) return;
+        var ob = _callStack[^1];
+        _callStack.RemoveAt(_callStack.Count - 1);
+        if (ob.Domain.Length > 0 && _restricted > 0) _restricted--;
+    }
+
+    private void ClearStack()
+    {
+        _callStack.Clear();
+        _restricted = 0;
+        _masterDepth = 0;
+    }
+
+    private void In(ObjectRef ob, Action work)
+    {
+        Push(ob);
         try { work(); }
-        finally { if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1); }
+        finally { Pop(); }
     }
 
     private T In<T>(ObjectRef ob, Func<T> work)
     {
-        _callStack.Add(ob);
+        Push(ob);
         try { return work(); }
-        finally { if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1); }
+        finally { Pop(); }
+    }
+
+    // ---- Restricted code (docs/SANDBOX.md): objects with a domain, and the master's ValidCall ----
+
+    /// <summary>Is restricted code on the call stack, outside the master's own answers?</summary>
+    private bool Restricted => _restricted > 0 && _masterDepth == 0;
+
+    /// <summary>May the running code reach this object in this way? Always yes unless restricted code is running and the target is not restricted.</summary>
+    private bool Permit(ObjectRef target, string function)
+    {
+        if (!Restricted || target.Domain.Length > 0 || _master is not { IsAlive: true }) return true;
+        if (AskMaster(m => m.ValidCall(target, function))) return true;
+        _refusals++;
+        if (_refusals <= 3) Log.Info($"sandbox: refused {function} on {target.Name} (restricted code: {RestrictedCaller()?.Name ?? "?"})");
+        else if (_refusals == 4) Log.Info("sandbox: further refusals in this execution are not logged");
+        return false;
+    }
+
+    /// <summary>
+    /// A delayed call, an action handler or an input handler runs later in its owner's frame, so it must be the owner's own code:
+    /// a method or lambda of the owner's class or one of its base classes, bound to the owner (or to nothing, or to a closure).
+    /// Otherwise one object could hand another a delegate and have it run later as the other.
+    /// </summary>
+    private static void RequireOwnCode(ObjectRef owner, Delegate function, string what)
+    {
+        if (function.Target is MudObject bound && !ReferenceEquals(bound, owner.Target))
+            throw new MudRuntimeException($"{what}: {owner.Name} may only use its own code");
+        var assembly = function.Method.DeclaringType?.Assembly;
+        if (assembly == null || assembly == typeof(MudObject).Assembly) return;
+        for (var t = owner.Target?.GetType(); t != null && t != typeof(MudObject); t = t.BaseType)
+            if (t.Assembly == assembly) return;
+        throw new MudRuntimeException($"{what}: {owner.Name} may only use its own code");
     }
 
     // =====================================================================
@@ -120,19 +181,32 @@ internal sealed class Kernel : IDriverServices
 
     private void RunTimers()
     {
+        RunDueCallOuts();
+        if (DateTime.UtcNow >= _nextHeartBeat)
+        {
+            _nextHeartBeat = DateTime.UtcNow + HeartBeatInterval;
+            foreach (var ob in _heartBeats.ToArray())
+                if (ob is { IsAlive: true, HeartBeat: true })
+                    Execute(ob.Living ? ob : null, () => In(ob, () => ob.Target?.HeartBeat()));
+            RunDueCallOuts(); // what a heartbeat scheduled for now runs before the next line any player typed
+        }
+    }
+
+    /// <summary>
+    /// Run every call-out that is due, including one made for "now" by a call-out of this same pass (so that work scheduled with
+    /// no delay, such as the restore of a character leaving the workshop, runs before the next network event). Bounded, so that a
+    /// call-out that reschedules itself with no delay cannot stall the loop.
+    /// </summary>
+    private void RunDueCallOuts()
+    {
+        var budget = _callOuts.Count + 64;
         var now = DateTime.UtcNow;
-        while (_callOuts.TryPeek(out var entry, out var due) && due <= now)
+        while (budget-- > 0 && _callOuts.TryPeek(out var entry, out var due) && due <= now)
         {
             _callOuts.Dequeue();
             if (_cancelledCallOuts.Remove(entry.Id) || !entry.Owner.IsAlive) continue;
             Execute(entry.Player is { IsAlive: true } ? entry.Player : null, () => In(entry.Owner, entry.Function));
-        }
-        if (now >= _nextHeartBeat)
-        {
-            _nextHeartBeat = now + HeartBeatInterval;
-            foreach (var ob in _heartBeats.ToArray())
-                if (ob is { IsAlive: true, HeartBeat: true })
-                    Execute(ob.Living ? ob : null, () => In(ob, () => ob.Target?.HeartBeat()));
+            now = DateTime.UtcNow;
         }
     }
 
@@ -146,7 +220,8 @@ internal sealed class Kernel : IDriverServices
         Runtime.Ticks = 0;
         _thisPlayer = player;
         _verb = "";
-        _callStack.Clear();
+        ClearStack();
+        _refusals = 0;
         Exception? failure = null;
         try
         {
@@ -160,7 +235,7 @@ internal sealed class Kernel : IDriverServices
         {
             _thisPlayer = null;
             _pending = null;
-            _callStack.Clear();
+            ClearStack();
         }
         // Reported here, not inside the catch block: a catch handler still runs
         // on top of the faulting stack, which after runaway recursion is nearly full.
@@ -192,7 +267,7 @@ internal sealed class Kernel : IDriverServices
         string text;
         Runtime.Ticks = 0;
         _thisPlayer = owner;
-        _callStack.Clear();
+        ClearStack();
         try
         {
             if (afterOutput && !In(owner, () => owner.Target?.PromptsAfterOutput() ?? false)) return;
@@ -206,7 +281,7 @@ internal sealed class Kernel : IDriverServices
         finally
         {
             _thisPlayer = null;
-            _callStack.Clear();
+            ClearStack();
         }
         connection.Send(text);
         connection.AtPrompt = true;
@@ -373,34 +448,56 @@ internal sealed class Kernel : IDriverServices
             throw new MudRuntimeException($"{program.Path} is abstract: it can be inherited but not loaded or cloned");
 
         var handle = new ObjectRef(name, program.Path, isClone);
-        _pending = (handle, program.ObjectType);
-        _callStack.Add(handle);
+        // The domain comes first, from the cloner's call stack; then a blueprint is made with an empty stack, so that loading a
+        // program behaves the same whoever happens to load it first.
+        handle.Domain = _master is { IsAlive: true } ? AskMaster(m => m.ObjectDomain(program.Path, isClone)) ?? "" : "";
+        List<ObjectRef>? outer = null;
+        var outerMasterDepth = _masterDepth;
+        if (!isClone)
+        {
+            outer = new List<ObjectRef>(_callStack);
+            ClearStack();
+        }
         try
         {
-            Activator.CreateInstance(program.ObjectType);
-        }
-        catch (TargetInvocationException wrapped) when (wrapped.InnerException is not null)
-        {
-            handle.Target = null;
-            throw wrapped.InnerException;
+            _pending = (handle, program.ObjectType);
+            Push(handle);
+            try
+            {
+                Activator.CreateInstance(program.ObjectType);
+            }
+            catch (TargetInvocationException wrapped) when (wrapped.InnerException is not null)
+            {
+                handle.Target = null;
+                throw wrapped.InnerException;
+            }
+            finally
+            {
+                _pending = null;
+                Pop();
+            }
+
+            _objects[name] = handle;
+            try
+            {
+                In(handle, () => handle.Target!.Create());
+            }
+            catch
+            {
+                Destroy(handle);
+                throw;
+            }
+            return handle;
         }
         finally
         {
-            _pending = null;
-            if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1);
+            if (outer != null)
+            {
+                ClearStack();
+                foreach (var ob in outer) Push(ob);
+                _masterDepth = outerMasterDepth;
+            }
         }
-
-        _objects[name] = handle;
-        try
-        {
-            In(handle, () => handle.Target!.Create());
-        }
-        catch
-        {
-            Destroy(handle);
-            throw;
-        }
-        return handle;
     }
 
     public ObjectRef? FindObject(string name)
@@ -425,10 +522,10 @@ internal sealed class Kernel : IDriverServices
         if (!target.IsAlive) return;
         var environment = target.Environment;
 
-        // Contents fall out into the environment, or are destroyed with the container.
+        // Contents fall out into the environment, or are destroyed with the container (also when the master would not let them be there).
         foreach (var item in target.Inventory.ToArray())
         {
-            if (environment is { IsAlive: true }) Move(item, environment);
+            if (environment is { IsAlive: true } && MoveRefusalFor(item, environment, target) == null) MoveCore(item, environment);
             else Destroy(item);
         }
 
@@ -466,6 +563,7 @@ internal sealed class Kernel : IDriverServices
     public object? CallOther(ObjectRef target, string function, object?[] args)
     {
         if (target.Target is not { } instance) return null;
+        if (!Permit(target, function)) return null;
         var methods = _methodCache.GetOrCreateValue(instance.GetType());
         if (!methods.TryGetValue((function, args.Length), out var method))
         {
@@ -489,12 +587,22 @@ internal sealed class Kernel : IDriverServices
     // IDriverServices: containment
     // =====================================================================
 
-    public void Move(ObjectRef what, ObjectRef destination)
+    public void Move(ObjectRef caller, ObjectRef what, ObjectRef destination)
     {
         if (!what.IsAlive || !destination.IsAlive) throw new MudRuntimeException("Cannot move a destructed object");
         for (var e = destination; e is not null; e = e.Environment)
             if (e == what) throw new MudRuntimeException($"Cannot move {what.Name} into itself");
+        if (MoveRefusalFor(what, destination, caller) is { } refusal) throw new MudRuntimeException(refusal);
+        MoveCore(what, destination);
+    }
 
+    /// <summary>The master's reason to refuse a move, or null. Not asked while the master itself is answering.</summary>
+    private string? MoveRefusalFor(ObjectRef what, ObjectRef destination, ObjectRef caller)
+        => _master is { IsAlive: true } && _masterDepth == 0 ? AskMaster(m => m.MoveRefusal(what, destination, caller)) : null;
+
+    private void MoveCore(ObjectRef what, ObjectRef destination)
+    {
+        var from = what.Environment;
         // Leave the old environment and drop every command binding that depended on being there.
         if (what.Environment is { } old)
         {
@@ -511,6 +619,10 @@ internal sealed class Kernel : IDriverServices
         try
         {
             bool StillThere() => what.IsAlive && what.Environment == destination && destination.IsAlive;
+
+            // The object hears of its own move first, before anything in its new place can offer it commands.
+            In(what, () => what.Target?.OnMoved(from));
+            if (!StillThere()) return;
 
             if (what.Living)
             {
@@ -583,6 +695,17 @@ internal sealed class Kernel : IDriverServices
         return top >= 1 ? _callStack[top - 1] : null;
     }
 
+    public IReadOnlyList<ObjectRef> CallerChain() => _callStack.ToArray();
+
+    public ObjectRef? RestrictedCaller()
+    {
+        if (_restricted == 0) return null;
+        foreach (var ob in _callStack) if (ob.Domain.Length > 0) return ob;
+        return null;
+    }
+
+    public bool MayView(ObjectRef target) => Permit(target, "As");
+
     public ObjectRef? ThisPlayer => _thisPlayer;
     public string Verb => _verb;
 
@@ -613,6 +736,8 @@ internal sealed class Kernel : IDriverServices
     public void AddAction(ObjectRef owner, string verb, ActionHandler handler)
     {
         if (_thisPlayer is not { IsAlive: true, Living: true } player) return;
+        RequireOwnCode(owner, handler, "AddAction");
+        if (!Permit(player, "AddAction")) return;
         player.Actions.RemoveAll(a => a.Owner == owner && a.Verb == verb);
         player.Actions.Add(new ActionBinding(verb, owner, handler));
     }
@@ -630,6 +755,8 @@ internal sealed class Kernel : IDriverServices
     public void InputTo(ObjectRef caller, Action<string> handler, bool noEcho)
     {
         var target = _thisPlayer ?? caller;
+        RequireOwnCode(caller, handler, "InputTo");
+        if (!Permit(target, "InputTo")) return;
         if (target.Connection is not Connection connection) throw new MudRuntimeException("InputTo: no interactive player");
         target.InputTo = handler;
         target.InputToOwner = caller;
@@ -658,16 +785,19 @@ internal sealed class Kernel : IDriverServices
 
     public void Write(string message)
     {
-        if (_thisPlayer is { IsAlive: true } player) In(player, () => player.Target!.CatchTell(message));
+        if (_thisPlayer is { IsAlive: true } player) { if (Permit(player, "CatchTell")) In(player, () => player.Target!.CatchTell(message)); }
         else Log.Info($"write: {message.TrimEnd()}");
     }
 
-    public void TellObject(ObjectRef ob, string message) => In(ob, () => ob.Target?.CatchTell(message));
+    public void TellObject(ObjectRef ob, string message)
+    {
+        if (Permit(ob, "CatchTell")) In(ob, () => ob.Target?.CatchTell(message));
+    }
 
     public void TellRoom(ObjectRef room, string message, ObjectRef[] exclude)
     {
         foreach (var listener in room.Inventory.ToArray())
-            if (listener.Living && Array.IndexOf(exclude, listener) < 0)
+            if (listener.Living && Array.IndexOf(exclude, listener) < 0 && Permit(listener, "CatchTell"))
                 In(listener, () => listener.Target?.CatchTell(message));
     }
 
@@ -691,6 +821,7 @@ internal sealed class Kernel : IDriverServices
 
     public int CallOut(ObjectRef owner, Action function, double delaySeconds)
     {
+        RequireOwnCode(owner, function, "CallOut");
         var id = ++_nextCallOutId;
         var due = DateTime.UtcNow + TimeSpan.FromSeconds(Math.Max(0, delaySeconds));
         _callOuts.Enqueue(new CallOutEntry(id, owner, _thisPlayer, function), due);
@@ -760,11 +891,11 @@ internal sealed class Kernel : IDriverServices
         var directories = directory.GetDirectories()
             .Where(d => !d.Name.StartsWith('.') && !(segments.Length == 0 && d.Name is "bin" or "obj"))
             .OrderBy(d => d.Name, StringComparer.Ordinal)
-            .Select(d => new DirEntry(d.Name, true, 0));
+            .Select(d => new DirEntry(d.Name, true, 0) { IsLink = d.LinkTarget != null });
         var files = directory.GetFiles()
             .Where(f => !f.Name.StartsWith('.'))
             .OrderBy(f => f.Name, StringComparer.Ordinal)
-            .Select(f => new DirEntry(f.Name, false, f.Length));
+            .Select(f => new DirEntry(f.Name, false, f.Length) { IsLink = f.LinkTarget != null });
         return directories.Concat(files).ToList();
     }
 
@@ -971,6 +1102,8 @@ internal sealed class Kernel : IDriverServices
         return string.Join('$', PasswordScheme, PasswordIterations.ToString(CultureInfo.InvariantCulture),
             Convert.ToBase64String(salt), Convert.ToBase64String(hash));
     }
+
+    public string Sha256(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
 
     public bool VerifyPassword(string password, string hash)
     {

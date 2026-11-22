@@ -78,7 +78,9 @@ internal sealed partial class ProgramCompiler
         path = path.Trim().Replace('\\', '/');
         if (path.EndsWith(".cs", StringComparison.Ordinal)) path = path[..^3];
         if (!path.StartsWith('/')) path = "/" + path;
-        if (!PathPattern().IsMatch(path) || path.Contains("..", StringComparison.Ordinal))
+        // One spelling per file: no "." or empty segments ("/./wiz/x" or "//wiz/x" would load /wiz/x under another program path).
+        if (!PathPattern().IsMatch(path) || path.Contains("..", StringComparison.Ordinal)
+            || path.Length < 2 || path.Substring(1).Split('/').Any(segment => segment.Length == 0 || segment == "."))
             throw new MudRuntimeException($"Illegal path '{path}'");
         return path;
     }

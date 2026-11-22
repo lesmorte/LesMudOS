@@ -54,7 +54,7 @@ public class Finds : MudObject
 
     private static bool IsTrusted(ObjectRef? ob)
     {
-        if (ob == null || !ob.IsAlive) return false;
+        if (ob == null || !ob.IsAlive || ob.Domain != "") return false; // a sandbox object is never trusted (docs/SANDBOX.md)
         var path = ob.ProgramPath;
         if (path.Contains("..") || path.Contains("//")) return false;
         foreach (var tree in TrustedTrees) if (path.StartsWith(tree, StringComparison.Ordinal)) return true;

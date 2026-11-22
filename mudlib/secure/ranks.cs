@@ -24,10 +24,14 @@ public class RankDaemon : Thing
     /// What a rank costs at a trainer whose offer names no price (docs/specs/skill-ranks.md, "Trainers"; starting values for the
     /// simulator): rank II 40 gold, III 150, IV 400, V 900. A rank with no price here is not offered unless a trainer names one.
     /// </summary>
-    public static readonly Dictionary<int, int> RankPrices = new() { [2] = 40, [3] = 150, [4] = 400, [5] = 900 };
+    private static readonly Dictionary<int, int> FrozenRankPrices = new() { [2] = 40, [3] = 150, [4] = 400, [5] = 900 };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static Dictionary<int, int> RankPrices => new(FrozenRankPrices);
 
     /// <summary>The requirement kinds a line may name, in one place: Evaluate has one case for each.</summary>
-    public static readonly string[] RequirementKinds = { "level", "quest", "kills", "kills_with", "renown", "standing", "item" };
+    private static readonly string[] FrozenRequirementKinds = { "level", "quest", "kills", "kills_with", "renown", "standing", "item" };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static string[] RequirementKinds => (string[])FrozenRequirementKinds.Clone();
 
     private static bool InTrustedTree(string path)
     {
@@ -36,7 +40,7 @@ public class RankDaemon : Thing
         return false;
     }
 
-    private static bool Trusted(ObjectRef? ob) => ob != null && ob.IsAlive && InTrustedTree(ob.ProgramPath);
+    private static bool Trusted(ObjectRef? ob) => ob != null && ob.IsAlive && ob.Domain == "" && InTrustedTree(ob.ProgramPath); // never a sandbox object
 
     private static bool IsPlayerBody(ObjectRef? ob) => ob != null && ob.IsAlive && ob.IsClone && ob.ProgramPath == PlayerProgram;
 
