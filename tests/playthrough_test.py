@@ -70,7 +70,9 @@ check = h.check
 BRIEF = open(os.path.join(ROOT, "docs", "areas", "vincents-hollow.md")).read()
 
 # The solo run asks for wizard help after this many minutes or deaths, and the whole test gives up after HARD_MINUTES.
-SOLO_MINUTES = float(os.environ.get("LESMUDOS_PLAY_MINUTES", "26"))
+# Raised from 26 to 32 by the owner on 22 November 2026: aggressive creatures engaging on arrival, resting and
+# the Overseer Hall door each added time, and the run sat within seconds of the old limit.
+SOLO_MINUTES = float(os.environ.get("LESMUDOS_PLAY_MINUTES", "32"))
 SOLO_DEATHS = int(os.environ.get("LESMUDOS_PLAY_DEATHS", "12"))
 HARD_MINUTES = float(os.environ.get("LESMUDOS_PLAY_HARD_MINUTES", "45"))
 
