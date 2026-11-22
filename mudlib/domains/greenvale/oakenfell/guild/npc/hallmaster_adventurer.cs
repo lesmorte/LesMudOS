@@ -1,6 +1,7 @@
-// @inherit /std/npc
+// @inherit /std/trainer
 
-public class GqHallmasterAdventurer : Npc
+/// <summary>A hallmaster of the Hall of Callings, and the Adventurer's rank trainer for rank III and above (docs/specs/skill-ranks.md).</summary>
+public class GqHallmasterAdventurer : Trainer
 {
     public override void Create()
     {
@@ -33,6 +34,9 @@ public class GqHallmasterAdventurer : Npc
         AddTopic("adventurer,adventurers,calling,generalist,versatile,travel", "Versatile, adaptable, curious. We give up some of the sharp edge of the specialists for a lot of flexibility. We use most basic weapons, wear light armor, and see a good deal of the world. The three paths are bridges to more specific things, down the road.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "The banners on the east wall have a line for every path. East of here is the Chronicle Gallery, west the Envoys' Gallery.");
         AddTopic("attributes,attribute,lean,leans,stats,points,all six,six", "An Adventurer begins with six in each of the six, and spends the road deciding. I have known one who put everything in Vigor and outlasted three companies. I have known one who put everything in Insight, and found more than she could carry.");
+        AddTopic("ranks,rank,train,training,teach,teaching,trainer,third,third rank", "Ranks! Now that is a question I like. The third rank of the double strike, which we call the Triple Strike, and the Quadruple after it, are taught here, by me, at the lantern. The second you will have had from Brann Odell in the Hollow, or you will be going back for it, which is a fine walk. Appraise has no ranks: you either know what a thing is worth or you do not. Say {cmd}ranks{/} for the whole of it, prices and all, and {cmd}train double{/} when the gold is in your hand.");
+        TeachCalling("adventurer", 3, 5);
+        ElsewhereLine = "The second rank is taught in Vincent's Hollow.";
         AddEmote("Jory fiddles with one of the buttons on his coat and smiles at a private memory.", 8);
         AddEmote("Jory pulls a worn map halfway out of his pocket, glances at it fondly, and puts it back.", 6);
     }

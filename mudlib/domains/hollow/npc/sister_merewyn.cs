@@ -1,11 +1,11 @@
-// @inherit /std/shopkeeper
+// @inherit /std/trainer
 
 /// <summary>
 /// Sister Merewyn, keeper of the Shrine of the Quiet Hand. Sells the Quiet Hand's blessing (a full restoration at once, for coin), gives
-/// the quest The Quiet Offering and pays it with the Shrine-Blessed Mace. The Priest's rank trainer is to be taught here later.
+/// the quest The Quiet Offering and pays it with the Shrine-Blessed Mace. She is also the Priest's rank II trainer (docs/specs/skill-ranks.md).
 /// Quest states are per player: 0 not started, 1 active, 2 completed (Adventurer.QueryQuest / SetQuest), as for Guildmaster Rowan.
 /// </summary>
-public class VhShrineKeeper : Shopkeeper
+public class VhShrineKeeper : Trainer
 {
     private const string Quest = "the-quiet-offering";
     private const string QuestTitle = "The Quiet Offering";
@@ -36,7 +36,7 @@ public class VhShrineKeeper : Shopkeeper
         AddTopic("shrine,quiet hand,hand,stone hand,faith,creed,prayer,pray,basin,water", "The Quiet Hand is an open hand, palm up, asking nothing. It is older than the village, though nobody can say how much, and Vincent's people built this shrine around it. We keep still water in its palm. A stilled mind, we say, is the best offering. Some come for comfort and some come for strength. I can offer a little of both.");
         AddTopic("blessing,bless,heal,healing,hurt,weary,rest,restore,wounds,tired,cost,price", "A blessing from the Quiet Hand costs six gold into the bowl, and it will leave you rested and whole, body and breath and focus. It will not raise the dead, I should say, and it will not make a coward brave. Say {cmd}buy blessing{/} and kneel. {cmd}browse{/} will show it to you.");
         AddTopic("offering,offerings,errand,quest,work,job,favour,favor,mace,blessed mace,shrine-blessed mace,help", "The pilgrims used to leave silver at the old cellar door, and now the goblin scavengers in the storage chamber carry it off. The basin wants a fresh offering to be reblessed: a wildflower and a flask of clean water, laid at the Hand, and a good reason for the scavengers to stay below. Bring me a wildflower and a flask of clean water (Elspeth sells both for a few coins), and show me you have faced a goblin scavenger in the old smugglers' tunnels. Then I will bless a mace for you from the shrine's own store, washed in the basin and left a night beneath the Hand. Say {cmd}accept offering{/} if you will, and {cmd}report{/} when you have the things.");
-        AddTopic("teach,teaching,teacher,trainer,train,rank,ranks,priest,priests,skill,skills,lessons,heal spell,spells", "There are gentler works than the ones you have been taught, and I will teach them here, to those who have the calling for them. Soon. The shrine is not ready yet, and neither am I. Ask me again soon.");
+        AddTopic("teach,teaching,teacher,trainer,train,rank,ranks,priest,priests,skill,skills,lessons,heal spell,spells", "There are fuller works than the ones you have been taught, and I teach them here, to those who have the calling for them: the second working of the heal and of the blessing. The fifth level, and forty gold into the bowl. Say {cmd}ranks{/} and I will show you, and {cmd}train heal{/} or {cmd}train bless{/} when you are ready. What comes after is taught at the Hall of Legends, in Oakenfell.");
         AddTopic("village,hollow,vincent,lane,fletcher,fletchers,neighbours,neighbors", "The Hollow is a noisy village, for all its small size. We have the fletchers' thud, the smith's hammer, the children and the geese. The Hand likes it that way. It is easier to find quiet in a noisy place, where you have to make it, than in a quiet one, where it merely happens.");
         AddTopic("cellar,cellars,goblin,goblins,tunnels,storage,scavengers,scavenger", "The old cellar door used to be our way of sending pilgrims home: a bowl, a candle, a prayer. Now the goblins come through it. I do not hate them. I think they are frightened, and I think something is giving them orders. A frightened thing with orders is the most dangerous thing in the world, and the saddest.");
         AddTopic("rumour,rumor,rumours,rumors,news,gossip,candles,candle,flames,north", "Look at the candles on the north sill. They lean away from the wall, all of them, whichever way the door is open. In forty years I have seen it only when something is stirring below the village: a goblin camp moving, or the Overseer's drums. They leaned the other way, once, the night Vincent vanished. My grandmother kept the shrine then, and she never told me why.");
@@ -47,6 +47,8 @@ public class VhShrineKeeper : Shopkeeper
         AddEmote("Sister Merewyn dips two fingers in the basin and touches them to her brow.", 6);
 
         AddStock(BlessingPath, 6);
+        TeachCalling("priest", 2, 2);
+        ElsewhereLine = "The third rank and beyond are taught in Oakenfell, at the Hall of Legends.";
     }
 
     /// <summary>The blessing is not an item: buying it restores the buyer at once, as Harland's bed does.</summary>
