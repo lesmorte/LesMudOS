@@ -913,7 +913,7 @@ def main():
         lowe.read_until("> ")
         time.sleep(0.5)
         same("restore: after a restart the character is as it entered", base_wren, chief.command("dump wren"))
-        if "Sandbox Test Hall" not in pat.command("look"):
+        if "A plain hall for the sandbox test." not in pat.command("look"):
             pat.command("sbtest")
 
         # ================================================================ the level 5 to 9 rule

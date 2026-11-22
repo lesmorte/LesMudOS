@@ -66,10 +66,11 @@ The handle to an object. Store and pass handles, never `this`.
 | `string Name` | `/path` for a blueprint, `/path#n` for a clone |
 | `string ProgramPath` | Mudlib path of the source file |
 | `bool IsClone` | |
+| `string Domain` | Given by the master when the object is created (`IMaster.ObjectDomain`) and never changed. `""` is the unrestricted world; any other value makes the object *restricted* (section 5, and SANDBOX.md). The sample mudlib uses `wiz:<name>` for the wizard sandbox. |
 | `bool IsAlive` | False once destructed |
 | `object? Call(string function, params object?[] args)` | Late-bound call to a public method (`call_other`). Returns null if the object is dead or has no public method with that name and argument count. |
 | `T? Call<T>(string function, params object?[] args)` | Same, with a typed result. Returns `default(T)` if the function is missing or returns another type. |
-| `T? As<T>()` | Typed view, or null. Safe for interfaces in `LesMudOS.Api`. For mudlib types it returns null once caller and target are on different program versions. Do not store the result. |
+| `T? As<T>()` | Typed view, or null. Safe for interfaces in `LesMudOS.Api`. For mudlib types it returns null once caller and target are on different program versions. Null too while restricted code runs, for any unrestricted object the master's `ValidCall(target, "As")` refuses (the sample master refuses every one). Do not store the result. |
 
 `==` on two handles tests object identity.
 
@@ -88,6 +89,7 @@ Virtual methods on `MudObject` that the driver calls. Override the ones you need
 | `void CatchTell(string message)` | Text is sent to this object: `Write`, `TellObject`, `TellRoom`, `Say` and the `NotifyFail` message (or `What?`) all arrive here. The default writes it to the object's connection. `/std/player` overrides it to render colour tags. | Unchanged |
 | `void NetDead()` | The object's connection dropped | This object |
 | `void OnDestruct()` | Just before this object is destructed by `Destruct` | Unchanged |
+| `void OnMoved(ObjectRef? from)` | Right after this object was moved (from its old environment, null if none), before any `Init` in its new place. Any object may also call it by name, so act on the object's real state, never on the argument. The player body uses it for the workshop checkpoint (SANDBOX.md). | Unchanged |
 
 Called by name on specific objects:
 
@@ -125,15 +127,17 @@ Protected methods on `MudObject`. `ob` parameters default to this object where m
 |---|---|
 | `ObjectRef? ThisPlayer()` | The living object the current execution is for |
 | `ObjectRef? PreviousObject()` | The object whose code called into this one: through `Call`, through an efun that triggered one of this object's applies, or directly. Null if the driver entered this object at top level (command, heartbeat, call-out). Use it for security checks instead of trusting an argument. |
+| `IReadOnlyList<ObjectRef> CallerChain()` | Every object whose code is running in this execution, outermost first (the bottom is what the driver entered: the command's binding owner, the heartbeat or call-out owner). A blueprint's constructor and `Create()` run with an empty chain of their own, whoever loads them. |
+| `ObjectRef? RestrictedCaller()` | The outermost restricted object (one with a `Domain`) on the call stack, or a restricted `ThisPlayer()`, or null: whether this is a *restricted execution*. Daemons that keep records refuse restricted executions with it. |
 | `string QueryVerb()` | The verb of the command being executed |
 | `void EnableCommands()` | Mark this object living. Also makes it `ThisPlayer()` for the rest of the execution, so it can bind its own commands. When called from a constructor or `Create()` of an object that another object is cloning, `ThisPlayer()` is restored to the cloner when the clone call returns, so creating a creature from a command does not hijack the command. |
 | `bool Living(ObjectRef ob)` | |
 | `bool Interactive(ObjectRef ob)` | Has a connection |
 | `IReadOnlyList<ObjectRef> Users()` | All interactive objects |
 | `void Exec(ObjectRef to, ObjectRef from)` | Move a connection between objects. Needs `ValidOperation("exec")`. |
-| `void AddAction(string verb, ActionHandler handler)` | Bind a verb for `ThisPlayer()`, owned by this object. `ActionHandler` is `bool (string args)`; return true if handled. Rebinding the same verb from the same object replaces the old binding. |
+| `void AddAction(string verb, ActionHandler handler)` | Bind a verb for `ThisPlayer()`, owned by this object. `ActionHandler` is `bool (string args)`; return true if handled. Rebinding the same verb from the same object replaces the old binding. The handler must be this object's own code (a method or lambda of its class or a base class, not bound to another object); otherwise the efun throws. A restricted execution cannot bind on an unrestricted `ThisPlayer()` unless the master's `ValidCall(player, "AddAction")` allows it. |
 | `void NotifyFail(string message)` | Message shown if no handler accepts the command. Like every other message it is delivered with `CatchTell` on the player's object (before colour support it was written straight to the connection, which a player body could not intercept). The `> ` prompt and the driver's own `*** error` lines still go straight to the connection. |
-| `void InputTo(Action<string> handler, bool noEcho = false)` | Route the player's next line to a handler instead of the command parser. With `noEcho` the driver sends telnet IAC WILL ECHO, so the client stops echoing what is typed; when the line arrives it sends IAC WONT ECHO and a newline before calling the handler. Use it for passwords. |
+| `void InputTo(Action<string> handler, bool noEcho = false)` | Route the player's next line to a handler instead of the command parser. With `noEcho` the driver sends telnet IAC WILL ECHO, so the client stops echoing what is typed; when the line arrives it sends IAC WONT ECHO and a newline before calling the handler. Use it for passwords. The handler must be this object's own code, as for `AddAction`; a restricted execution needs `ValidCall(player, "InputTo")`. |
 
 ### Communication
 
@@ -144,7 +148,7 @@ Protected methods on `MudObject`. `ob` parameters default to this object where m
 | `void TellRoom(ObjectRef room, string message, params ObjectRef[] exclude)` | To every living object directly inside `room` |
 | `void Say(string message)` | To everyone in the room of `ThisPlayer()` (or of this object, if there is none) except that object |
 
-Messages are not newline-terminated for you; include `\n`.
+Messages are not newline-terminated for you; include `\n`. While restricted code runs, each unrestricted listener is put to the master's `ValidCall(listener, "CatchTell")` first, and skipped if it refuses.
 
 ### Time
 
@@ -152,6 +156,8 @@ Messages are not newline-terminated for you; include `\n`.
 |---|---|
 | `int CallOut(Action function, double delaySeconds)` | Schedule a call. Returns an id. Skipped if this object is destructed first. `ThisPlayer()` during the call is whoever it was at scheduling time, if still alive. The delay may be fractional and is honoured to the millisecond: the game loop sleeps exactly until the earliest call-out is due (it is not rounded up to a second or to the 2-second heartbeat), so a call-out runs within a few milliseconds of its time unless another execution is running. The combat clock (docs/COMBAT_TIMING.md) is built on this. |
 | `bool RemoveCallOut(int id)` | Cancel a pending call-out owned by this object |
+
+A call-out must be this object's own code, as for `AddAction`: an object cannot schedule a method of another object, which would then run later in its own name. Call-outs that fall due while the due ones are being run (one made for "now" by another call-out) run in the same pass, before the next line any player typed is read; the pass is bounded, so a call-out that reschedules itself with no delay cannot stall the game.
 | `void SetHeartBeat(bool on)` | |
 | `long Time()` | Unix time in seconds |
 | `long TimeMs()` | Unix time in milliseconds, from the same clock as the call-out queue. For measuring and scheduling intervals shorter than a second; the combat engine stamps every action with it. |
@@ -182,11 +188,15 @@ Mudlib code cannot use `System.Security.Cryptography`, so password hashing is do
 
 Neither efun needs the master's permission: a hash is useless without the save file it is stored in, which the master protects. The driver never logs a password or a hash, and builds no error message from either.
 
+| Efun | Description |
+|---|---|
+| `string Sha256(string text)` | The SHA-256 of the text's UTF-8 bytes, 64 lower-case hex digits. For fingerprints (the publication register records one per file). |
+
 ### Administration
 
 | Efun | Description |
 |---|---|
-| `IReadOnlyList<DirEntry>? GetDir(string path)` | List a mudlib directory: sub-directories first, then files, in name order. `DirEntry` has `Name`, `IsDirectory` and `Size` (bytes; 0 for directories). The path must be absolute and clean (`/` is the mudlib root; no `.` or `..` segments, no names starting with a dot), so it cannot leave the mudlib. Returns null if it is not a directory. Needs `ValidOperation("get-dir")` (arg: path). |
+| `IReadOnlyList<DirEntry>? GetDir(string path)` | List a mudlib directory: sub-directories first, then files, in name order. `DirEntry` has `Name`, `IsDirectory`, `Size` (bytes; 0 for directories) and `IsLink` (a symbolic link). The path must be absolute and clean (`/` is the mudlib root; no `.` or `..` segments, no names starting with a dot), so it cannot leave the mudlib. Returns null if it is not a directory. Needs `ValidOperation("get-dir")` (arg: path). |
 | `string? ReadFile(string path)` | The text of a mudlib file, or null if it does not exist. Paths here include the extension (`/std/room.cs`) and follow the same rules as `GetDir`. Files over 256 KB are refused. Needs `ValidOperation("read-file")` (arg: path). |
 | `void WriteFile(string path, string content)` | Create or replace a mudlib file, atomically. The directory must exist; content over 256 KB is refused. Writing does not recompile: call `UpdateProgram`. Every write is logged by the driver. Needs `ValidOperation("write-file")` (arg: path). |
 | `bool CopyFile(string from, string to)` | Copy a mudlib file. Paths follow the same rules as `ReadFile`. False if the source does not exist. Throws if the source is a directory, the destination directory does not exist, the destination already exists (nothing is ever overwritten), both paths are the same, or the file is over 256 KB. Logged by the driver. Needs `ValidOperation("read-file")` (arg: from) and `ValidOperation("write-file")` (arg: to). |
@@ -210,6 +220,11 @@ Neither efun needs the master's permission: a hash is useless without the save f
 | `bool ValidWrite(string path, ObjectRef caller)` | Gate for `SaveObject` |
 | `bool ValidOperation(string operation, ObjectRef caller, string? arg)` | Gate for `"update"` (arg: path), `"exec"` (arg: target name), `"destruct"` of another object (arg: target name), `"shutdown"`, `"admin-secret"`, `"get-dir"`, `"read-file"`, `"write-file"`, `"make-dir"`, `"remove-file"`, `"remove-dir"` (arg: path) |
 | `void LogError(string objectName, string message)` | Called after any error in an execution |
+| `string ObjectDomain(string programPath, bool isClone)` | Optional (default `""`). The `Domain` of a new object, asked before its constructor runs. For a clone the call stack is the cloner's; a blueprint is always created with an empty one. |
+| `string? MoveRefusal(ObjectRef what, ObjectRef destination, ObjectRef caller)` | Optional (default null). Asked before every move: the `MoveObject` efun (caller is the object whose code called it) and an object falling out of a destroyed container (caller is the container; refused contents are destroyed with it). Null allows; any other value refuses, and is the text of the error the efun throws. |
+| `bool ValidCall(ObjectRef target, string function)` | Optional (default true). Asked only while restricted code is on the call stack (or `ThisPlayer()` is restricted), before it reaches an unrestricted object: a `Call` (function: the method name), a typed view (`"As"`), text from a text efun (`"CatchTell"`), a verb binding (`"AddAction"`), an input capture (`"InputTo"`). False refuses: the call returns null and is logged (a few lines per execution at most). The master's own calls while it answers are not checked. |
+
+Program paths have one spelling: `LoadObject`, `CloneObject` and the directives refuse a path with an empty or `.` segment (`//wiz/x`, `/./wiz/x`), which would otherwise load a file under a second program path.
 
 ## 6. Wizard levels in the sample mudlib
 
@@ -243,6 +258,9 @@ Commands in `/std/player` and the level each needs:
 | `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`), `cat <file>` | 1, anywhere |
 | `mkdir <dir>`, `edit <file>`, `copy <from> <to>`, `move <from> <to>`, `rename <file> <newname>`, `delete <file>`, `rmdir <dir>`, `update <path>`, `clone <path>` | 1 in your own home `/wiz/<you>/...`; otherwise as in the next table |
 | `shutdown` (saves every online player first) | 10 |
+| `submit <dir> [to /domains/<name>] [: note]`, `submissions [all]`, `submission <n>`, `withdraw <n>` | 1 (see PUBLISHING.md) |
+| `approve <n> [to /domains/<name>]`, `reject <n> <reason>` | 5, never for one's own request |
+| `revoke <n> [: reason]` | 10 |
 | `promote <secret>` | Any, but only works while there is no level-10 wizard |
 
 #### Wizard homes and who may change what
@@ -255,15 +273,17 @@ The single rule is `ChangeRefusal(path)` in `/std/player`. Every command that cr
 |---|---|---|---|---|
 | Under your own home, `/wiz/<you>/...` | level 1 | level 1 | level 1 | level 1 |
 | Under another wizard's home | level 5 | level 5 | level 3 | level 1 |
-| The home directory itself `/wiz/<name>`, `/wiz`, or a file directly in `/wiz` | level 10 (see below) | level 5 | level 3 | level 1 |
-| `/secure`, `/std` | level 10 | level 5 | level 3 | level 1 |
-| Anywhere else | level 5 | level 5 | level 3 | level 1 |
+| The home directory itself `/wiz/<name>`, `/wiz`, or a file directly in `/wiz` | level 10 (see below) | level 10 | level 3 | level 1 |
+| `/secure`, `/std` | level 10 | level 10 | level 3 | level 1 |
+| Anywhere else (the real game: `/domains`, `/classes`, `/skills`, `/events`, ...) | level 10 | level 10 | level 3 | level 1 |
+
+Below level 10 the real game changes only through an approved publication (SANDBOX.md section 4, PUBLISHING.md); before the sandbox, level 5 wrote and updated it directly. In the workshop (a wizard standing in sandbox space) `clone` works on any path at any level, and what it makes is a sandbox object. Out in the real game a wizard cannot clone their own sandbox code: it could not leave the workshop, and the clone is refused and destroyed at once.
 
 Reading (`list`, `cd`, `cat`) is level 1 everywhere. A wizard below level 5 who tries to change something in another wizard's home is refused with `/wiz/<name> is another wizard's home. Below wizard level 5 you may read it (list, cd, cat) but not change it.` `update`, `clone` and `goto` are not loosened for other people's files: below the level shown they are refused (`goto` is level 1 everywhere, as before). The home directory and `/wiz` cannot be removed, renamed or moved, or have files created directly in them, by anyone below level 10, the owner included; the owner controls everything under the home. (The one exception: `mkdir` of your own home, which normally exists already, is allowed.) The directory commands cannot rename directories anyway, since `RenameFile` moves files only.
 
 `~` at the start of a path (`~` alone, or `~/...`) means the wizard's own home in every command that takes a path, including `goto`, `update` and `clone`; `cd` with no argument goes there (`cd /` goes to the root). `~name` is not special. `pwd` and all messages show the real path.
 
-The master gives file efuns to player bodies only. Code that a wizard writes under `/wiz` is an ordinary program: it gets no file efuns, cannot call `Promote` or `Bootstrap`, cannot read or write save files, and cannot reach the admin secret. The tests in the "wizard homes" section of `tests/smoke_test.py` try each of these from a level-1 wizard's object.
+The master gives file efuns to player bodies (and to the publication register, under `/domains`) only. Code that a wizard writes under `/wiz` is sandbox code (SANDBOX.md): it gets no file efuns, cannot call `Promote` or `Bootstrap`, cannot read or write save files, and cannot reach the admin secret, and while it runs the master refuses every privileged efun to every program, so it cannot borrow a body's either. It can call only read-only functions of real objects, and anything on a character in the workshop. The tests in the "wizard homes" section of `tests/smoke_test.py` and the whole of `tests/sandbox_test.py` try these from a level-1 wizard's objects.
 
 `mudlib/Mudlib.csproj` leaves `wiz/**` out, so files that wizards create at run time cannot break `dotnet build`.
 

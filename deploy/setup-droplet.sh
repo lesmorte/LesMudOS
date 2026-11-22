@@ -19,7 +19,7 @@ APP_DIR="${APP_DIR:-/opt/lesmudos}"
 APP_USER="${APP_USER:-lesmudos}"
 # Which parts of the mudlib the running game may write to:
 #   wiz  = wizards' home directories only (in-game editing works only there)
-#   all  = the whole mudlib (level 5+ wizards can edit the live world; needed for publishing sandbox work)
+#   all  = the whole mudlib (level 10 wizards can edit the live world; needed for publishing sandbox work)
 MUDLIB_WRITABLE="${MUDLIB_WRITABLE:-wiz}"
 SWAP_MB="${SWAP_MB:-1024}"                # swap file size; 0 for none
 BACKUP_KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"

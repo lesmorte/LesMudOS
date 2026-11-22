@@ -2,7 +2,7 @@
 
 How to add rooms, creatures, shops and items to the game. Every template below is real code: `tests/area_test.py` extracts the blocks whose first line is `// File: <path>.cs`, writes them into a test mudlib under `/domains/example`, loads them in the driver and plays with them. If a template here stops compiling, that test fails.
 
-Every wizard may build in their own home directory `/wiz/<name>` (see "Where your files go" below) at any level: `edit`, `update`, `clone` and `goto` work there from level 1. Outside your home you need level 3 to `clone`, 1 to `goto` and `stat`, 5 to `update` and to edit files. See [GAME_SYSTEMS.md](GAME_SYSTEMS.md) for the rules and numbers behind the classes, and [DRIVER_API.md](DRIVER_API.md) for the sandbox.
+Every wizard may build in their own home directory `/wiz/<name>` (see "Where your files go" below) at any level: `edit`, `update`, `clone` and `goto` work there from level 1. Your home is your workshop: what you build and run there cannot touch the real game (see "Your workshop" below), and your work reaches the game when another wizard approves it ("Publishing your work"). Outside `/wiz` you need level 10 to edit or `update` anything; level 3 to `clone` in the real game, level 1 for `goto` and `stat`. See [GAME_SYSTEMS.md](GAME_SYSTEMS.md) for the rules and numbers behind the classes, [SANDBOX.md](SANDBOX.md) for the sandbox and [PUBLISHING.md](PUBLISHING.md) for the reviewer's side.
 
 ## Where your files go
 
@@ -20,7 +20,46 @@ copy ~/rooms/hall ~/rooms/hall2     also: move, rename, delete (asks first), rmd
 
 You control everything under your home at any wizard level. Other wizards can read it, and wizards of level 5 or more can change it. The home directory itself and `/wiz` can be removed or renamed only by a level-10 wizard. An exit in one of your rooms names a path like any other: `Exits["north"] = "/wiz/yourname/rooms/hall";`.
 
-The mudlib project excludes `wiz/**` from `dotnet build`, so the rule that class names are unique across the whole mudlib (checklist item 3) is not checked for your files; a compile error in them shows when you `update` them.
+The mudlib project excludes `wiz/**` from `dotnet build`, so the rule that class names are unique across the whole mudlib (checklist item 3) is not checked for your files until you submit them; a compile error in them shows when you `update` them.
+
+### Your workshop
+
+Your home is a sandbox. Walk into one of your rooms (`goto ~/rooms/hall`, or an exit) and you are in your workshop:
+
+```
+You step into the workshop. Nothing that happens here will follow you out.
+```
+
+From that moment your character is saved as it was and not saved again until you leave. Inside, anything goes: give yourself a thousand levels, a fortune, a sword that kills in one blow, die, try your quests. `score` shows `[in the workshop: nothing here is saved]`. Leave by walking out, by `goto` to a real room, by dying, by quitting or losing your connection: you come back exactly as you walked in, with what you carried then, and are told so in one line:
+
+```
+You leave the workshop as you entered it.
+```
+
+The rules, each refused in one line when you meet it:
+
+- Only wizards can enter. Players cannot be brought in, by an exit, by your code or by anything else.
+- Nothing made in the workshop can leave it: not dropped in a real room, not given, not carried out (it is gone when you are restored). That includes real things your code clones there: a goblin from `/domains` cloned by your room is a workshop goblin, and its corpse and loot are workshop things. `stat` marks them `Sandbox object`.
+- Real things you carried in cannot be set down inside ("Real things cannot be set down in the workshop; they leave with you").
+- Your code reaches only the workshop: it can read anything (`Query...`, `Short`, `Long`), but it cannot change, move, hurt, heal, pay, tell or bind a verb on anyone or anything outside, and the history (Chronicle, Renown, rumours) never hears of it. Calls that would are refused silently: the call returns null.
+- In the workshop `clone` works on any file at any level (`clone /domains/hollow/mob/goblin` to fight a real goblin's copy). Out in the real game you cannot clone your own home's code at all.
+- Change your password outside the workshop: nothing done inside is saved.
+
+Wizards of any level make no history anywhere: no Renown, no Chronicle entries or firsts.
+
+### Publishing your work
+
+When an area is ready, ask for it to be published:
+
+```
+submit ~/glade : a quiet glade east of the village      the directory goes to /domains/glade
+submit ~/glade to /domains/eastglade                     or name the destination (one name below /domains)
+submissions                                              your requests and what happened to them
+submission 3                                             one in full, with every file's fingerprint
+withdraw 3                                               take it back while it waits
+```
+
+Write the paths in your files as paths in your home (`/wiz/yourname/glade/inner`): approval rewrites every one of them to the destination. A request is refused at once if a file does not compile, names any other path under `/wiz`, uses a class name the mudlib already has, or has a name that is not lower-case letters, digits and `_` (`.cs` files only). Do not change the files until the request is decided: any change, added file or removed file makes approval fail, and you must submit again (a new request for the same directory replaces the one waiting). Any one wizard of level 5 or higher other than you decides; you are told either way, with the reason for a rejection. Your files stay in your home: change them and submit again to publish an update, which goes to the same place. Players reach a published area once a real room has an exit to it, which a level 10 wizard adds.
 
 ## The checklist
 
@@ -877,12 +916,12 @@ You do not build corpses; `Monster` and the player's death make them. For a buil
 
 ## Testing in the game
 
-Log in as a wizard (level 5 lets you do everything below except `slay`).
+Log in as a wizard. In your own home every command below works from level 1; on the real game's files `update` needs level 10, and `restore` level 5.
 
 ```
-update /domains/example/hall      compile (or recompile) a room and put you back in it
-goto /domains/example/hall        walk into a room by path (or goto <player>)
-clone /domains/example/sword      put a new object in your inventory
+update ~/rooms/hall               compile (or recompile) a room and put you back in it
+goto ~/rooms/hall                 walk into a room by path (or goto <player>); a room of yours is your workshop
+clone /domains/example/sword      put a new object in your inventory (in the workshop: a workshop copy)
 stat here                         the room: safe flag, spawns and how many are alive, exits, hidden exits, danger band
 stat rat                          a creature or item in the room: level, Vitality, damage, loot
 stat me                           your own numbers

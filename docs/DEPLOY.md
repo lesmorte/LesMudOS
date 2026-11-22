@@ -108,8 +108,10 @@ Set any of these before running the script, for example `MUDLIB_WRITABLE=all bas
 
 ### Which should `MUDLIB_WRITABLE` be?
 
-- **`wiz` (default).** Wizards can create and edit files in their own home directories from inside the game. Nobody can change the live world from inside the game: `edit`, `copy`, `delete` and the rest fail outside `/wiz`. The world changes only when you update from the repository. This is the safer choice, and the right one until the sandbox and publishing work is finished.
-- **`all`.** Level 5 wizards and above can edit the live world from inside the game, and approving a wizard's work can publish it into the world. Changes made this way exist only on the droplet until someone copies them back into the repository, and an update replaces them with the repository's versions.
+- **`wiz` (default).** Wizards can create and edit files in their own home directories from inside the game, and test them in their workshop (docs/SANDBOX.md). Nobody can change the live world from inside the game: `edit`, `copy`, `delete` and the rest fail outside `/wiz`, and approving a publication fails cleanly (the register reports the refused write and leaves nothing behind). The world changes only when you update from the repository.
+- **`all`.** The game may write the whole mudlib, as its own rules allow: level 10 wizards may edit the live world, and approving a wizard's work (docs/PUBLISHING.md) publishes it under `/domains`. Level 5 to 9 wizards cannot write outside `/wiz` whatever this setting is. Changes made this way exist only on the droplet until someone copies them back into the repository: an update replaces the mudlib with the repository's version (`rsync --delete`), which removes published areas that are not in the repository. Copy `/opt/lesmudos/mudlib/domains/<name>` into the repository (and the publication register, `save/secure/publish.json`, is kept with the saves) before updating.
+
+The driver needs no setting for the sandbox: it is the sample mudlib's policy, always on. There is no test-only switch to turn it off.
 
 ### Idle players
 
