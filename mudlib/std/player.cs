@@ -395,18 +395,12 @@ public class Player : Adventurer
         if (args.Trim() != "" && CraftHelp(args) is { } craftTopic) { Write(craftTopic); return true; }
         if (args.Trim().ToLowerInvariant() is "ranks" or "rank" or "train" or "training")
         {
-            Write("Ranks: every skill and spell with a command word has ranks, I, II, III and on. A higher rank is stronger and costs a
-" +
-                  "little more; the command word stays the same. Rank II needs level 5, rank III level 10, IV level 15, V level 20.
-" +
-                  "A rank is bought with gold from a trainer of your calling: in Vincent's Hollow for rank II (the loft, the shrine, the
-" +
-                  "Strung Yew and the Practice Yard), at the Hall of Legends in Oakenfell for rank III and above. At a trainer,
-" +
-                  "{cmd}ranks{/} shows what you can learn, the price and anything else a rank asks (Arcane Bolt II asks for ten goblins slain);
-" +
-                  "{cmd}train{/} SKILL buys the next rank. Ranks cannot be skipped. {cmd}skills{/} shows your rank in each and the next rank's level.
-");
+            Write("Ranks: every skill and spell with a command word has ranks, I, II, III and on. A higher rank is stronger and costs a\n" +
+                  "little more; the command word stays the same. Rank II needs level 5, rank III level 10, IV level 15, V level 20.\n" +
+                  "A rank is bought with gold from a trainer of your calling: in Vincent's Hollow for rank II (the loft, the shrine, the\n" +
+                  "Strung Yew and the Practice Yard), at the Hall of Legends in Oakenfell for rank III and above. At a trainer,\n" +
+                  "{cmd}ranks{/} shows what you can learn, the price and anything else a rank asks (Arcane Bolt II asks for ten goblins slain);\n" +
+                  "{cmd}train{/} SKILL buys the next rank. Ranks cannot be skipped. {cmd}skills{/} shows your rank in each and the next rank's level.\n");
             return true;
         }
         Write(

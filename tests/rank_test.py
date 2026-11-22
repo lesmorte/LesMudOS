@@ -464,6 +464,8 @@ def step1_skills_list(work):
           "double", "(Double Strike)", "[20 Endurance", "(rank II at level 5)", "Two quick blows, each at 60% of weapon damage")
     check("skills: a rank I only skill names no next rank", [l for l in out.splitlines() if "(Appraise)" in l][0] if "(Appraise)" in out else out, "(Appraise)", absent=("(rank II",))
     check("skills: Jack of All Trades is among the traits", out, "Jack of All Trades")
+    check("help ranks explains ranks, the levels and the trainers", adv.command("help ranks"), "Rank II needs level 5", "ranks", "train", "Hall of Legends")
+    check("help names ranks and train", adv.command("help", marker="Colour:"), "Ranks:", "train")
     adv.command("rklevel 5")
     check("at level 5: rank II can be learned from a trainer", skill_line(adv, "Double Strike"), "(rank II can be learned from a trainer)")
     adv.command("quit")
