@@ -2579,7 +2579,7 @@ SPEC_HEAL_ROWS = {2: dict(heal=38), 3: dict(heal=60)}
 
 def ranks_level5(runs=3000):
     band_head("RK1. Level 5 and skill ranks: Overseer kill% from the cellar entrance, starting gear, 4 potions, points placed, middle human, RestFactor 5", runs)
-    with ranked(mode="none", double=False):
+    with ranked(mode="none", double=False, table=heal_table(8)):
         band_line("before ranks (rank I, no Double Strike, Minor Heal 8)", l5_kills(runs=runs))
     with ranked(mode="none"):
         base = l5_kills(runs=runs)
@@ -2654,7 +2654,7 @@ def ranks_double(runs=3000):
         base2 = l5_kills([c for c in ARCHS if c != "adventurer"], runs)
     band_head("RK3. Double Strike: the Adventurer against the other callings, level 5 Overseer as RK1", runs)
     with ranked(mode="none", double=False):
-        band_line("no Double Strike (before ranks) [rank I]", {**base1, "adventurer": l5_kills(["adventurer"], runs)["adventurer"]})
+        band_line("no Double Strike (Minor Heal as shipped) [rank I]", {**base1, "adventurer": l5_kills(["adventurer"], runs)["adventurer"]})
     for label, base, rows, mode in (
             ("spec: 2 x 60%, 20 Endurance [rank I]", dict(factor=0.6, endurance=20), None, "none"),
             ("spec: rank II 2 x 75% [rank II]", dict(factor=0.6, endurance=20), None, "cap"),
@@ -2675,10 +2675,13 @@ LEVEL10 = [k.id for k in CORRIDOR if not k.boss and k.band[0] <= 10 <= k.band[1]
 LEVEL5C = [k.id for k in CORRIDOR if not k.boss and k.band[0] <= 5 <= k.band[1]]
 
 
-def gap_at(level, keys, runs):
+LEVEL10B = [k.id for k in CORRIDOR if k.boss and k.band[0] <= 10 <= k.band[1]]
+
+
+def gap_at(level, keys, runs, potions=0):
     """Mean win% of each calling (perfect player, corridor gear, one creature at a time from full) over these corridor creatures."""
     random.seed(1000 + level)
-    return {c: sum(cfight(c, level, k, 0, runs)["win"] for k in keys) / len(keys) * 100 for c in ARCHS}
+    return {c: sum(cfight(c, level, k, potions, runs)["win"] for k in keys) / len(keys) * 100 for c in ARCHS}
 
 
 def ranks_gap(runs=400):
@@ -2687,12 +2690,17 @@ def ranks_gap(runs=400):
     print(f"    (docs/CORRIDOR_BALANCE.md), one creature at a time from full, win% averaged over the ordinary creatures whose band holds the level ({runs} fights a creature)")
     print("=" * 140)
     print(f"{'':<66}" + "".join(f"{c[:5]:>6}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}")
-    for level, keys in ((5, LEVEL5C), (10, LEVEL10)):
-        print(f"-- level {level}: {', '.join(keys)}")
-        for label, kw in (("today (rank I, no Double Strike)", dict(mode="none", double=False)), ("rank I, with Double Strike I", dict(mode="none")),
+    for level, keys, potions in ((5, LEVEL5C, 0), (10, LEVEL10, 0), (10, LEVEL10B, CORRIDOR_POTIONS), (5, ["overseer"], 2)):
+        print(f"-- level {level}: {', '.join(keys)}" + (f" ({potions} potions)" if potions else "")
+              + (": the Goblin Overseer alone, best Hollow gear, the +5 Vitality trinket (table 2 of the default output)" if keys == ["overseer"] else ""))
+        for label, kw in (("today (rank I, no Double Strike, Minor Heal 8)", dict(mode="none", double=False, table=heal_table(8))), ("rank I, with Double Strike I", dict(mode="none")),
                           (f"every skill at the rank level {level} allows ({'II' if level == 5 else 'III'})", dict(mode="cap"))):
             with ranked(**kw):
-                v = gap_at(level, keys, runs)
+                if keys == ["overseer"]:
+                    random.seed(20260101)
+                    v = {c: boss_stats(c, 5, ARCHS[c].weapons[-1], 2, TRINKET_HP, runs * 3)[0] * 100 for c in ARCHS}
+                else:
+                    v = gap_at(level, keys, runs, potions)
             vals = [v[c] for c in ARCHS]
             print(f"{label:<66}" + "".join(f"{x:6.0f}" for x in vals) + f"{sum(vals) / 5:6.1f}{max(vals) - min(vals):7.0f}", flush=True)
             dump_json(dict(kind="gap", level=level, label=label, wins=vals))
