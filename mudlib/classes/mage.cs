@@ -10,10 +10,10 @@ public class MageClass : PlayerClass
         SortOrder = 4;
         Title = "Mage";
         Tagline = "Raw arcane power, and little else. Fragile, and best at a distance.";
-        Description = "The mage fights with spells, wields dagger or staff and wears light armor only. Starting Vitality 20, 100 Focus but only 30 Endurance. Spell: Arcane Bolt. Skill: Magical Lore. Trait: Focus Efficiency.";
+        Description = "The mage fights with spells, wields dagger or staff and wears light armor only. Starting Vitality 21, 100 Focus but only 30 Endurance. Spell: Arcane Bolt. Skill: Magical Lore. Trait: Focus Efficiency.";
         StartReaction = 2.5;
         VitalityBase = 4;
-        VitalityPerLevel = 6;
+        VitalityPerLevel = 7;
         EnduranceBase = 14;
         EndurancePerLevel = 1;
         FocusBase = 71;

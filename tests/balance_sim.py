@@ -167,9 +167,9 @@ class Arch:
 
 ARCHS = {a.name: a for a in [
     Arch("warrior", (13, 8), 3.0, 1.00, (79, 2), (4, 1), (8, 5, 7, 5, 5, 6), 10, ("rusty sword", "woodcutter axe", "fine longsword"), True, armor_bonus=2, hit_armed=2),
-    Arch("scout", (3, 7), 2.0, 1.00, (81, 2), (2, 1), (5, 9, 5, 6, 5, 6), 10, ("hunting bow", "fine longsword"), False, dodge=5),
+    Arch("scout", (3, 8), 2.0, 1.00, (81, 2), (2, 1), (5, 9, 5, 6, 5, 6), 10, ("hunting bow", "fine longsword"), False, dodge=5),
     Arch("priest", (7, 7), 2.5, 0.97, (23, 1), (75, 4), (5, 5, 6, 6, 9, 5), 15, ("novice mace",), True, healing_pct=25, potions=1),
-    Arch("mage", (4, 6), 2.5, 0.96, (14, 1), (71, 4), (5, 5, 5, 9, 7, 5), 15, ("apprentice staff",), False, spell_cost_pct=-20, potions=1),
+    Arch("mage", (4, 7), 2.5, 0.96, (14, 1), (71, 4), (5, 5, 5, 9, 7, 5), 15, ("apprentice staff",), False, spell_cost_pct=-20, potions=1),
     Arch("adventurer", (10, 8), 2.5, 0.98, (50, 2), (50, 2), (6, 6, 6, 6, 6, 6), 20, ("training spear", "woodcutter axe", "fine longsword"), True),
 ]}
 TRINKET_HP = 5

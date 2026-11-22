@@ -41,21 +41,21 @@ START = {
     "mage": (5, 5, 5, 9, 7, 5),
     "adventurer": (6, 6, 6, 6, 6, 6),
 }
-# Sections 2 and 8: class base and per-level amount for Vitality, Endurance and Focus (section 8 changed the Vitality of
-# the Warrior, the Scout and the Mage).
+# Sections 2, 8 and 9: class base and per-level amount for Vitality, Endurance and Focus (section 8 changed the Vitality of
+# the Warrior, the Scout and the Mage; section 9 the Scout's and the Mage's per-level amounts to 8 and 7).
 CLASS = {
     "warrior": ((13, 8), (79, 2), (4, 1)),
-    "scout": ((3, 7), (81, 2), (2, 1)),
+    "scout": ((3, 8), (81, 2), (2, 1)),
     "priest": ((7, 7), (23, 1), (75, 4)),
-    "mage": ((4, 6), (14, 1), (71, 4)),
+    "mage": ((4, 7), (14, 1), (71, 4)),
     "adventurer": ((10, 8), (50, 2), (50, 2)),
 }
-# The table of section 2 as section 8 revised it: Vitality at 1, 5, 10; Endurance at 1, 10; Focus at 1, 10.
+# The table of section 2 as sections 8 and 9 revised it: Vitality at 1, 5, 10; Endurance at 1, 10; Focus at 1, 10.
 TABLE = {
     "warrior": ((35, 67, 107), (100, 118), (20, 29)),
-    "scout": ((20, 48, 83), (100, 118), (20, 29)),
+    "scout": ((21, 53, 93), (100, 118), (20, 29)),
     "priest": ((26, 54, 89), (40, 49), (100, 136)),
-    "mage": ((20, 44, 74), (30, 39), (100, 136)),
+    "mage": ((21, 49, 84), (30, 39), (100, 136)),
     "adventurer": ((30, 62, 102), (70, 88), (70, 88)),
 }
 # Section 2, regeneration per tick at the start (Vitality, Endurance, Focus), with section 8's Focus rate (0.15% a point).

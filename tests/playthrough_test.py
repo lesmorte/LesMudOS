@@ -50,11 +50,11 @@ h.DEFAULT_ARCHETYPE = ARCH
 ARCH_START = {
     "warrior": dict(hp=35, gold=10, endurance=100, focus=20, kit=["a rusty sword", "a small shield"], shield=True,
                     prefer=[("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("sword", "rusty sword")]),
-    "scout": dict(hp=20, gold=10, endurance=100, focus=20, kit=["a hunting bow", "an iron dagger"], shield=False,
+    "scout": dict(hp=21, gold=10, endurance=100, focus=20, kit=["a hunting bow", "an iron dagger"], shield=False,
                   prefer=[("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("bow", "hunting bow"), ("dagger", "iron dagger")]),
     "priest": dict(hp=26, gold=15, endurance=40, focus=100, kit=["a novice's mace", "a minor healing potion"], shield=False,
                    prefer=[("mace", "novice's mace"), ("staff", "apprentice's staff")]),
-    "mage": dict(hp=20, gold=15, endurance=30, focus=100, kit=["an apprentice's staff", "a minor healing potion"], shield=False,
+    "mage": dict(hp=21, gold=15, endurance=30, focus=100, kit=["an apprentice's staff", "a minor healing potion"], shield=False,
                  prefer=[("dagger", "enchanted dagger"), ("staff", "apprentice's staff"), ("dagger", "iron dagger")]),
     "adventurer": dict(hp=30, gold=20, endurance=70, focus=70, kit=["a training spear", "a trail ration"], shield=False,
                        prefer=[("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"), ("spear", "training spear")]),
