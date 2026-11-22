@@ -111,3 +111,9 @@ The Priest against the mean of the five callings, standard test (level 5, starti
 
 Reading: the Priest pins near 100 for any heal from 12 upward unless the cost leaves only one or two heals a fight; no cost in the table puts both columns within 5 points (70/90/112 gives +7.3 and -5.1). The cliff is between a heal of 7 and one of 12 (a few Vitality per heal, not the cost). The numbers are unchanged in the game; the choice is the owner's.
 
+
+## Owner's decision on Minor Heal (22 November 2026, after the corrected measurement)
+The large heal stays for others; **healing yourself gives half** (10 / 19 / 30 at ranks I / II / III, rounded half up, later ranks likewise). The 15-second wait and the costs stay. The skill's description and the shrine's teaching say why in the world's voice: the Quiet Hand gives freely to the one who reaches for another and sparingly to the one who reaches for himself. The simulator must report the solo Priest at half (the earlier table found a heal of 12 already too strong, so half may still leave the Priest ahead): that number goes to the owner; the game ships half as decided.
+
+## Doors (owner's decision, 22 November 2026)
+Builders get openable doors: see `docs/specs/sneak.md`, which needs one before the Overseer.

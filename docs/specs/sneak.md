@@ -36,3 +36,12 @@ II at level 5: notice chance - 10%, 4 Endurance a room, Precision Strike opener 
 
 ## Build
 One Sonnet agent after the Aimed Shot work merges: the skill and its ranks, the `Alert` flag and its placement on bosses, elites and sentries in the Hollow, the corridor and its dungeons, the simulator (melee and archer Scouts with sneaking, in both player models), tests including a probe that no outside object can hide a player or silence a creature.
+
+## Doors (owner's decision, 22 November 2026: "add openable doors")
+The engine has locked exits but no door a builder can place and a player can open. Add one:
+- A room declares a door on an exit: `AddDoor(direction, name)` with options for starting closed (default), a key item or none, and whether it closes again on reset (default yes). The room on the other side declares the matching door, and the two halves share one state (open one side, both are open).
+- `open <door|direction>` and `close <door|direction>`; a locked door needs its key (`unlock`, `lock`), and existing locked exits may be expressed as locked doors where that is a clean change, otherwise left alone.
+- A closed door stops walking, fleeing, patrols and wandering creatures, Tracking (already specified: it does not read through closed doors), and anything thrown or shot later. `look` and the exits line show the door and whether it is open.
+- Opening or closing is heard: the room on each side is told. Opening a door is "loud" for sneaking.
+- Old saves and existing rooms are unaffected: no existing exit becomes a door unless a builder says so.
+- The first one: a closed, unlocked door between the Overseer Hall and the Overseer's chamber.
