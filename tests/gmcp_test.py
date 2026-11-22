@@ -356,6 +356,62 @@ def example(label, value):
     EXAMPLES.setdefault(label, value)
 
 
+def lua_value(value):
+    if isinstance(value, dict):
+        return "{" + ", ".join(f"[{json.dumps(k)}] = {lua_value(v)}" for k, v in value.items()) + "}"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def capture_village(path, moves=45):
+    """Not part of the checks: with GMCP_CAPTURE=<file> a new character walks the village, depth first and back again, and the
+    Room.Info messages the game sent are written as a Lua fixture for clients/mudlet/test/map_test.lua (real data, real exits)."""
+    walker = login("Walker")
+    first = walker.wait("Room.Info")
+    visited = {first["num"]}
+    blocked = set()
+    stack = [first]
+    taken = 0
+    while stack and taken < moves:
+        here = stack[-1]
+        options = [(n, t) for n, t in sorted(here["exits"].items()) if t not in visited and (here["num"], n) not in blocked]
+        if options:
+            name, target = options[0]
+            m = walker.mark()
+            walker.command(name)
+            taken += 1
+            got = walker.wait("Room.Info", lambda v: v["num"] != here["num"], m, timeout=2.0)
+            if got is None or got["num"] != target:
+                blocked.add((here["num"], name))
+                if got is not None and got["num"] != here["num"]:
+                    stack.append(got)
+                    visited.add(got["num"])
+                continue
+            visited.add(target)
+            stack.append(got)
+            continue
+        stack.pop()
+        if not stack:
+            break
+        parent = stack[-1]
+        back = next((n for n, t in sorted(here["exits"].items()) if t == parent["num"]), None)
+        if back is None:
+            break
+        m = walker.mark()
+        walker.command(back)
+        taken += 1
+        walker.wait("Room.Info", lambda v: v["num"] == parent["num"], m, timeout=2.0)
+    frames = [v for p, v in walker.frames if p == "Room.Info"]
+    with open(path, "w") as f:
+        f.write("-- Room.Info messages as the game sent them to a character who walked the village (tests/gmcp_test.py with GMCP_CAPTURE).\n")
+        f.write("return {\n" + "".join("  " + lua_value(v) + ",\n" for v in frames) + "}\n")
+    walker.send("quit")
+    print(f"captured {len(frames)} Room.Info messages, {len(visited)} rooms, to {path}")
+
+
 def run(work, mudlib, logpath, driver_box):
     # ================= the offer, and a client without GMCP =================
     warden = login("Warden", answer="dont")
@@ -391,6 +447,10 @@ def run(work, mudlib, logpath, driver_box):
     truth("what a GMCP client sees as text is, byte for byte, what a client without GMCP sees", texts["Gina"] == texts["Gwen"],
           (len(texts["Gina"]), len(texts["Gwen"]), first, texts["Gina"][max(0, first - 80):first + 120], texts["Gwen"][max(0, first - 80):first + 120]))
     truth("that text is not empty", len(texts["Gina"]) > 500, len(texts["Gina"]))
+
+    if os.environ.get("GMCP_CAPTURE"):
+        capture_village(os.environ["GMCP_CAPTURE"])
+        return
 
     # ================= a GMCP client: login =================
     alice = login("Alice")

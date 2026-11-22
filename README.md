@@ -226,6 +226,7 @@ public class Lantern : Item
 | `tests/balance_sim.py` | Standalone combat balance simulation (event clock); `check` compares it with the mudlib numbers |
 | `deploy/lesmudos.service` | Sample systemd unit (a starting point; not yet tested on a server) |
 | `tests/gmcp_test.py` | GMCP (telnet option 201): the offer and the stream of a client without it, Room.Info with room numbers that survive a driver restart, hidden exits and doors per character, Char.Vitals and Char.Status, Comm.Channel.Text, Core.Supports and Core.Ping, malformed and oversized incoming messages, and a wizard's probe (port 4841, about 2 minutes) |
+| `clients/mudlet` | A Mudlet package that draws the map from GMCP and shows the vitals gauges; see [docs/MUDLET.md](docs/MUDLET.md) (not tested in a real Mudlet) |
 | `docs` | Design and API reference |
 
 ## Tests
