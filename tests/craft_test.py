@@ -734,7 +734,7 @@ def run(work, mudlib, box):
     _, known, gold_after = pinfo(w, "ann")
     truth("the price was paid and the recipe saved as taught", gold_after == gold_before - 5 and known.get("berry_juice") == "taught", (gold_before, gold_after, known))
     check("learning it again", ann.command("learn berry juice"), "You already know how to make Berry Juice.")
-    check("a secret recipe cannot be taught, and the gold comes back", ann.command("learn endurance tonic"), "cannot teach you that")
+    check("a secret recipe cannot be taught, and the gold comes back", ann.command("learn minor endurance tonic"), "cannot teach you that")
     _, known, gold = pinfo(w, "ann")
     truth("the secret was not learned", "stamina_tonic" not in known and gold == gold_after, (known, gold))
     ann.command(f"mk {O}salve_book 1 1")
