@@ -1,6 +1,7 @@
-// @inherit /std/npc
+// @inherit /std/trainer
 
-public class GqHallmasterWarrior : Npc
+/// <summary>A hallmaster of the Hall of Callings, and the Warrior's rank trainer for rank III and above (docs/specs/skill-ranks.md).</summary>
+public class GqHallmasterWarrior : Trainer
 {
     public override void Create()
     {
@@ -33,6 +34,9 @@ public class GqHallmasterWarrior : Npc
         AddTopic("warrior,warriors,calling,front line,fight", "Warriors hold the line. Defense, melee, mastery of the weapon: that is the whole of the calling. Shield Bash, Defensive Training and Weapon Proficiency are what you begin with. The three paths are what you may grow into.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "The banners on the east wall name every path. The Chronicle Gallery lies east of this chamber, the Envoys' Gallery west. Go and look.");
         AddTopic("attributes,attribute,might,vigor,resolve,strength,lean,leans,stats,points", "A Warrior leans on Might and Vigor, and holds on by Resolve. The Knight takes Resolve furthest, the Berserker takes Might, and the Monk takes the stillness between. Place your points where your path leans, and not where your pride does.");
+        AddTopic("ranks,rank,train,training,teach,teaching,trainer,third,third rank", "Rank three and up. Here, from me. Rank two is the Hollow's yard. Say {cmd}ranks{/}. Then {cmd}train bash{/}. Bring gold.");
+        TeachCalling("warrior", 3, 5);
+        ElsewhereLine = "The second rank is taught in Vincent's Hollow.";
         AddEmote("Gorrim rolls his shoulders and surveys the hall like a man counting the exits.", 8);
         AddEmote("Gorrim straightens a rack of practice shields by an inch.", 6);
     }

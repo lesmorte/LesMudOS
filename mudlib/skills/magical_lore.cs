@@ -11,6 +11,7 @@ public class MagicalLoreSkill : Skill
         FocusCost = 5;
         Recovery = 0.5;
         Target = "item";
+        MaxRank = 1; // rank I only (docs/specs/skill-ranks.md, the Rank tables)
     }
 
     public override void Resolve(ObjectRef user, ObjectRef? target)

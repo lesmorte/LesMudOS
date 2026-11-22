@@ -1,4 +1,5 @@
 // @inherit /std/living
+// @use /std/skill
 
 /// <summary>
 /// Everything about playing the game: the character sheet, gameplay commands,
@@ -192,6 +193,14 @@ public abstract class Adventurer : Living
         var total = 0.0;
         foreach (var trait in classTraits) total += trait.Call<double>("Modifier", key, Self);
         foreach (var trait in GrantedTraits()) total += trait.Call<double>("Modifier", key, Self);
+        return total;
+    }
+
+    /// <summary>A modifier from the character's class traits only (not items, not timed effects): what the crafting daemon's learning reads.</summary>
+    public double QueryClassTraitMod(string key)
+    {
+        var total = 0.0;
+        foreach (var trait in classTraits) total += trait.Call<double>("Modifier", key ?? "", Self);
         return total;
     }
 
@@ -677,7 +686,14 @@ public abstract class Adventurer : Living
     private string SkillLine(ObjectRef skill)
     {
         var delay = (QueryReaction() + skill.Call<double>("QueryReactionMod") + skill.Call<double>("QueryRecovery")) * 2;
-        return skill.Call<string>("Line", delay) ?? "";
+        var id = skill.Call<string>("QueryId") ?? "";
+        var rank = QuerySkillRank(id);
+        var line = skill.Call<string>("LineAt", delay, Math.Max(1, rank)) ?? "";
+        if (!skill.Call<bool>("QueryHasRanks") || rank < 1) return line;
+        var next = rank + 1;
+        if (!skill.Call<bool>("QueryRankExists", next)) return line + " (the highest rank)";
+        var level = Skill.LevelForRank(next);
+        return line + (level > Level ? $" (rank {Skill.Roman(next)} at level {level})" : $" (rank {Skill.Roman(next)} can be learned from a trainer)");
     }
 
     /// <summary>Why a skill cannot be paid for or used now, or null. Checked before a fight is started for it.</summary>
@@ -685,11 +701,113 @@ public abstract class Adventurer : Living
     {
         var isSpell = skill.Call<string>("QueryKind") == "spell";
         if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
-        var focus = skill.Call<int>("QueryFocusCost");
+        var focus = skill.Call<int>("QueryFocusCostFor", Self);
         if (isSpell && focus > 0) focus = Math.Max(1, (int)Math.Round(focus * (1 + QueryMod("spell_cost_pct") / 100.0), MidpointRounding.AwayFromZero));
-        if (QueryEndurance() < skill.Call<int>("QueryEnduranceCost")) return "You are too tired for that.";
+        if (QueryEndurance() < skill.Call<int>("QueryEnduranceCostFor", Self)) return "You are too tired for that.";
         if (QueryFocus() < focus) return "You do not have the focus for that.";
         return null;
+    }
+
+    // ---- Skill ranks, unlocks and the counters they read (docs/specs/skill-ranks.md) ----
+    // Saved with the character. Only the rank daemon, /secure/ranks, may change any of it: it does so when a trainer sells a rank to the
+    // player who asked (the player's own `train`), and when a creature from a trusted tree dies. There is no other setter, so no other
+    // object (a wizard's, say) can grant a rank, an unlock or a kill. A save made before ranks existed has none of it: rank I everywhere.
+
+    private const string RankDaemon = "/secure/ranks";
+    private const int MaxRankRecords = 500;
+    private const int MaxCounterValue = 100_000_000;
+
+    /// <summary>Skill id to the rank held, for ranks above I only (absent is rank I).</summary>
+    [Saved] private Dictionary<string, int> skillRanks = new();
+    /// <summary>The offers whose unlock requirements this character has met at a trainer, for good: "trainer path|skill id|rank".</summary>
+    [Saved] private List<string> rankUnlocks = new();
+    /// <summary>Creatures killed (a share of the kill), by creature kind ("goblin"). Kept from creation; read by unlocks.</summary>
+    [Saved] private Dictionary<string, int> killsByKind = new();
+    /// <summary>Killing blows struck with a skill, by skill id ("arcane_bolt").</summary>
+    [Saved] private Dictionary<string, int> killsWithSkill = new();
+
+    private bool FromRankDaemon()
+    {
+        var caller = PreviousObject();
+        return caller != null && !caller.IsClone && caller.ProgramPath == RankDaemon;
+    }
+
+    /// <summary>Does the character have this skill or spell now (from a class, or from what they wear or wield)?</summary>
+    public bool QueryHasSkill(string id) =>
+        !string.IsNullOrEmpty(id) && classSkills.Concat(GrantedSkills()).Any(s => s.Call<string>("QueryId") == id);
+
+    /// <summary>The rank held in a skill: 0 if the character does not have it, 1 for rank I, more for a rank bought from a trainer.</summary>
+    public int QuerySkillRank(string id)
+    {
+        if (!QueryHasSkill(id)) return 0;
+        return Math.Max(1, skillRanks.GetValueOrDefault(id ?? ""));
+    }
+
+    /// <summary>Every rank above I, by skill id (a copy).</summary>
+    public Dictionary<string, int> QuerySkillRanks() => new(skillRanks);
+
+    public bool QueryRankUnlocked(string key) => rankUnlocks.Contains(key ?? "");
+
+    public List<string> QueryRankUnlocks() => new(rankUnlocks);
+
+    public int QueryKillsOfKind(string kind) => killsByKind.GetValueOrDefault(kind ?? "");
+
+    public int QueryKillsWith(string skillId) => killsWithSkill.GetValueOrDefault(skillId ?? "");
+
+    public Dictionary<string, int> QueryKillCounts() => new(killsByKind);
+
+    public Dictionary<string, int> QueryKillsWithCounts() => new(killsWithSkill);
+
+    private static bool RankKey(string key) => !string.IsNullOrEmpty(key) && key.Length <= 160;
+
+    /// <summary>Set the rank of a skill (1 removes the record). Only the rank daemon may.</summary>
+    public bool RankSetSkill(string id, int rank)
+    {
+        if (!FromRankDaemon() || !RankKey(id) || id.Length > 40 || rank < 1 || rank > 100) return false;
+        if (rank == 1) { skillRanks.Remove(id); return true; }
+        if (!skillRanks.ContainsKey(id) && skillRanks.Count >= MaxRankRecords) return false;
+        skillRanks[id] = rank;
+        return true;
+    }
+
+    /// <summary>Record an unlock for good. Only the rank daemon may.</summary>
+    public bool RankRecordUnlock(string key)
+    {
+        if (!FromRankDaemon() || !RankKey(key) || rankUnlocks.Contains(key) || rankUnlocks.Count >= MaxRankRecords) return false;
+        rankUnlocks.Add(key);
+        return true;
+    }
+
+    /// <summary>One more kill of a creature kind. Only the rank daemon may, for a death in the game.</summary>
+    public bool RankCountKill(string kind)
+    {
+        if (!FromRankDaemon() || !RankKey(kind) || kind.Length > 40) return false;
+        if (!killsByKind.ContainsKey(kind) && killsByKind.Count >= MaxRankRecords) return false;
+        killsByKind[kind] = Math.Min(MaxCounterValue, killsByKind.GetValueOrDefault(kind) + 1);
+        return true;
+    }
+
+    /// <summary>One more killing blow struck with a skill. Only the rank daemon may.</summary>
+    public bool RankCountKillWith(string skillId)
+    {
+        if (!FromRankDaemon() || !RankKey(skillId) || skillId.Length > 40) return false;
+        if (!killsWithSkill.ContainsKey(skillId) && killsWithSkill.Count >= MaxRankRecords) return false;
+        killsWithSkill[skillId] = Math.Min(MaxCounterValue, killsWithSkill.GetValueOrDefault(skillId) + 1);
+        return true;
+    }
+
+    /// <summary>Take gold for a rank. Only the rank daemon may; false if the character has too little.</summary>
+    public bool RankPay(int amount)
+    {
+        if (!FromRankDaemon() || amount < 0 || Gold < amount) return false;
+        Gold -= amount;
+        return true;
+    }
+
+    /// <summary>Write the character to disk after a rank is bought. Only the rank daemon may ask.</summary>
+    public void RankSave()
+    {
+        if (FromRankDaemon()) PersistNow();
     }
 
     // ---- Equipment access (docs/CLASS_SYSTEM.md section 5) ----

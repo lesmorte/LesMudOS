@@ -214,6 +214,26 @@ public abstract class Room : MudObject
         return direction != null && CanUseExit(who, direction) ? direction : null;
     }
 
+    /// <summary>Where an exit leads for this creature: an ordinary exit's room, or a hidden exit's if they have found it; else null.</summary>
+    public string? QueryExitDestination(ObjectRef who, string direction) =>
+        Exits.TryGetValue(direction ?? "", out var path) ? path : hidden.TryGetValue(direction ?? "", out var h) && Found(who, direction!) ? h.Path : null;
+
+    /// <summary>
+    /// The rooms behind the ways this creature cannot take right now: an exit locked against them (a closed door) and a hidden exit
+    /// they have not found. For Tracking's sense of something close (docs/specs/skill-ranks.md); it reveals no direction and finds nothing.
+    /// </summary>
+    public List<string> QueryClosedDestinations(ObjectRef who)
+    {
+        var result = new List<string>();
+        foreach (var direction in Exits.Keys.Concat(hidden.Keys).Distinct())
+        {
+            if (CanUseExit(who, direction)) continue;
+            var path = Exits.TryGetValue(direction, out var p) ? p : hidden[direction].Path;
+            if (!result.Contains(path)) result.Add(path);
+        }
+        return result;
+    }
+
     /// <summary>Every exit this creature can use right now.</summary>
     public List<string> QueryUsableExits(ObjectRef who)
         => Exits.Keys.Concat(hidden.Keys.Where(d => Found(who, d))).Distinct().Where(d => CanUseExit(who, d)).ToList();

@@ -174,16 +174,18 @@ Chosen at character creation, after the password, from a short in-character pres
 | Warrior | Defensive Training | trait | | | +2 armor. |
 | Warrior | Weapon Proficiency | trait | | | +2 to hit with any weapon. |
 | Scout | Evasion | trait | | | 5% dodge (8% before docs/ATTRIBUTES.md section 8). |
-| Scout | Tracking (`track`) | skill | 5 Endurance | 0 / 0.5 | Lists the creatures in each adjacent room. |
+| Scout | Tracking (`track`) | skill | 5 Endurance | 0 / 0.5 | Lists the creatures in each room the scout could walk to now (never through a closed door or an unfound hidden way). Rank II, the last, reads two rooms away and senses creatures behind a closed way. |
 | Scout | Precision Strike (`strike`) | skill | 25 Endurance | 0.5 / 1.0 | An attack at +2 to hit with a 15% critical chance. |
-| Priest | Minor Heal (`heal`) | spell | 25 Focus | 0.5 / 1.0 | Restores 8 Vitality (10 with Divine Knowledge) to the caster or a target in the room. |
+| Priest | Minor Heal (`heal`) | spell | 25 Focus | 0.5 / 1.0 | Restores 7 Vitality (9 with Divine Knowledge) to the caster or a target in the room. PROVISIONAL (was 8; the owner's choice of heal is pending, see section 13). |
 | Priest | Blessing (`bless`) | spell | 25 Focus | 0.5 / 1.0 | +1 to hit and +1 armor for 60 seconds, on the caster or a target. |
 | Priest | Divine Knowledge | trait | | | Healing spells restore 25% more. |
 | Mage | Arcane Bolt (`bolt`) | spell | 20 Focus (16 with Focus Efficiency) | 0.5 / 1.0 | 6-9 damage that ignores armor; needs no hit roll, can be dodged. |
 | Mage | Focus Efficiency | trait | | | Spells cost 20% less Focus. |
 | Mage | Magical Lore (`lore`) | skill | 5 Focus | 0 / 0.5 | Shows an item's exact numbers and any magical property. |
 | Adventurer | Survival Training | trait | | | Vitality, Endurance and Focus regenerate 50% faster out of combat. |
+| Adventurer | Double Strike (`double`) | skill | 20 Endurance | 0.5 / 1.0 | Two blows with the wielded weapon (or fists), each with its own dodge, hit, critical and block rolls, each at 60% of the damage. Triple Strike at rank III, Quadruple Strike at rank IV. |
 | Adventurer | Appraise (`appraise`) | skill | 5 Endurance | 0 / 0.5 | Shows an item's exact numbers and what shops pay for it. |
+| Adventurer | Jack of All Trades | trait | | | Crafting and gathering proficiency is gained 25% faster in every craft. |
 | Adventurer | Improvised Combat | trait | | | Unarmed damage 2-5, and weapons carry 0.5 less reaction modifier (never below 0). |
 | Adventurer | Traveler's Instinct | trait | | | The exits line of a room also shows where each exit leads, and marks locked ones. |
 
@@ -298,7 +300,8 @@ Files:
 | `/std/adventurer.cs` | The player's classes, skills, equipment access, `score`, `skills`, `restore`, `slay`, `setlevel` |
 | `/std/skill.cs`, `/std/trait.cs`, `/std/pclass.cs`, `/std/area.cs` | The small bases a skill, trait, class and area file inherit |
 | `/secure/classes.cs` | The registry. It lists the `/classes` and `/skills` directories on demand (the master grants this object, and only it, `get-dir` on those two paths), so a new file is found without a restart and without editing any list |
-| `/classes/*.cs`, `/skills/*.cs` | The five archetypes and the 16 starting skills and traits |
+| `/classes/*.cs`, `/skills/*.cs` | The five archetypes and the 18 starting skills and traits |
+| `/secure/ranks.cs`, `/std/trainer.cs` | Skill ranks: the rank daemon (requirements, `Train`, kill counters) and the trainer's `ranks` and `train` (section 13) |
 | `area.cs` in a domain directory | The area name and region name of every room in that directory |
 
 To add a skill or trait: one file in `/skills` that inherits `/std/skill` (a command word, costs, timing, `Resolve(user, target)`) or `/std/trait` (`Mods["key"] = value`). The modifier keys understood are `tohit`, `tohit_armed`, `damage`, `armor`, `dodge`, `block`, `crit`, `regen_out`, `spell_cost_pct`, `healing_pct`, `spell_damage_pct`, `unarmed_min`, `unarmed_max`, `weapon_reaction_reduction`, `ignore_weapon`, `nospell` and `exit_detail`. To add a class: one file in `/classes` that inherits `/std/pclass` and sets its fields (tier, parent, requirements through `Require("level", "5")`, `ExpModifier`, `AttackRate`, the skills, traits and equipment access it adds, `Enabled`). Nothing else is edited. A class's id is its file name.
@@ -310,3 +313,30 @@ The entry point stage B uses to give an advanced class: `player.Call<string>("Ap
 Experience: `Adventurer.ExperienceFor(level)` is the single place for the formula and the modifier.
 
 Balance as built (`python3 tests/balance_sim.py`): see the tables it prints. The class numbers of section 7 are the tuned values.
+
+## 13. Skill and spell ranks (built November 2026)
+
+The owner's brief is [specs/skill-ranks.md](specs/skill-ranks.md). Skills do not improve with use; a better version is bought from a trainer as a rank.
+
+- **The rule.** Every skill or spell with a command word has ranks I, II, III ... A character starts at rank I of what the calling grants. Rank r needs level `Skill.RankLevelStep` x (r - 1), RankLevelStep = 5: II at 5, III at 10, IV at 15, V at 20. Traits have no ranks; Magical Lore and Appraise are rank I only (`MaxRank = 1`); Tracking stops at II (`MaxRank = 2`). A higher rank replaces the lower; the command word does not change. Advanced-class skills will start at rank I when the class is taken.
+- **The numbers.** Each skill file holds its rank table: the rank I fields, `Effect("key", value)` for numbers of its own, and `RankRow(rank, "key=value;...", title)` for later ranks. `Skill.RankValue(key, rank)` is the one helper every number is read through: a row's number, else the rank before plus the default step (30% of the rank I value for an effect, 15% for a cost; nothing for a key in `FixedKeys`, such as a duration or a count). The combat engine (`Living.UseSkill`) reads the cost, to-hit, critical chance, damage fraction and number of blows at the user's rank (`Query...For(user)`); a skill's own `Resolve` reads its numbers with `RankInt(key, RankOf(user))`. Preparation and Recovery never change with a rank.
+- **What is shipped.**
+
+| Skill | I | II | III | IV | V |
+|---|---|---|---|---|---|
+| Arcane Bolt | 6-9, 20 Focus | 8-12, 23 | 10-14, 26 | 12-17, 29 | 14-19, 32 |
+| Minor Heal (PROVISIONAL) | 7, 25 Focus | 9, 32 | 11, 40 | 13, 44 | 15, 48 |
+| Blessing | +1/+1, 25 Focus | +2/+2, 29 | +3/+3, 33 | +4/+4, 36 | +4/+4, 40 |
+| Shield Bash | 75%, 15 Endurance | 98%, 17 | 120%, 20 | 143%, 22 | 165%, 24 |
+| Precision Strike | +2, 15%, 25 Endurance | +3, 20%, 29 | +4, 25%, 33 | +5, 30%, 36 | +6, 35%, 40 |
+| Tracking | adjacent rooms, 5 Endurance | two rooms away, 6 | (none) | | |
+| Double Strike | 2 x 60%, 20 Endurance | 2 x 75%, 23 | Triple Strike 3 x 60%, 26 | Quadruple Strike 4 x 55%, 29 | 4 x 73%, 32 |
+
+  Blessing V's +4.3 rounds to +4; Double Strike V is the default step from IV. Durations (Blessing's 60 s) and Shield Bash's 2-second stagger do not change.
+- **The saved data** (`/std/adventurer.cs`): `skillRanks` (skill id to rank, above I only), `rankUnlocks` (offers whose requirements were met, for good), `killsByKind` and `killsWithSkill` (the counters unlocks read, kept from the first kill after this build). Only `/secure/ranks` may change them (`RankSetSkill`, `RankRecordUnlock`, `RankCountKill`, `RankCountKillWith`, `RankPay`, `RankSave` check `PreviousObject()`). An old save loads at rank I with no unlocks and no counts.
+- **Unlocks.** An offer of a rank (a trainer's, not the skill's) may list requirements, all of which must hold; the gold is always paid. Kinds, one line of data each, all in `/secure/ranks.cs` `Evaluate`: `level N` (always present, from the cap rule), `quest ID`, `kills KIND N`, `kills_with SKILL N`, `renown N`, `standing FACTION N` (accepted, never met until factions exist; the trainer says so), `item PATH` (shown, not taken) and `item PATH take` (handed over at the purchase). An unknown kind is never met. Once all are met at a trainer (at `ranks` or `train`) the unlock is recorded for good.
+- **Creature kind** (for `kills`): the beast-table kind the creature declares (its `Skin`, else its `Blood`, the names of `mudlib/crafting/beasts.cs`: every goblin has `Blood = "goblin"`), else its `ChronicleKind` (by default its file name). `Monster.QueryCreatureKind()`.
+- **Counting.** With shared experience a kill counts for every eligible participant (`Living.EligibleDamage`); a `kills_with` count goes only to the one who struck the killing blow, with the skill whose blow or spell was landing (`Living.QueryStrikingSkill`). The existing kill credit does not exclude wizards (they earn experience), so their kills count too; the Chronicle's "wizards make no history" is unchanged. A death that a wizard's object forces (calling `Die` or `FinishDamage` from `/wiz`) counts for nothing.
+- **Trainers.** `/std/trainer`: `TeachCalling(calling, from, to)` offers every ranked skill of a calling at the default prices (`RankDaemon.RankPrices`: II 40, III 150, IV 400, V 900 gold; a rank with no price is not offered), `AddRankOffer(skill, rank, price, requirements...)` one offer on its own terms, `AddRankLine(requirement, text)` the trainer's words for an unmet one. Rank II: Halbert Quill (Mage; Arcane Bolt II needs ten goblins slain), Sister Merewyn (Priest), Wenna Farrow (Scout), Brann Odell (Warrior and Adventurer), in the new village rooms. Ranks III to V: the five hallmasters of the Hall of Callings (Gorrim, Veyla, Anselm, Ilsabet, Jory).
+- **Jack of All Trades** reaches the crafting daemon's `LearnSpeed` through `QueryClassTraitMod("learn_speed")`: class traits only, so neither a timed effect nor an item can speed learning.
+- **Balance.** `python3 tests/balance_sim.py ranks` prints the tables the spec asks for; the results and the open decisions are in [specs/skill-ranks.md](specs/skill-ranks.md), "As built".

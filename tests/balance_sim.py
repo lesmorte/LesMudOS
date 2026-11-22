@@ -61,8 +61,71 @@ BLESS_MS = 60000
 BASH_COST, BASH_REC, BASH_FACTOR = 15, 1.5, 0.75
 STRIKE_COST, STRIKE_PREP, STRIKE_REC, STRIKE_HIT, STRIKE_CRIT = 25, 0.5, 1.0, 2, 15
 BOLT_COST, BOLT_PREP, BOLT_REC, BOLT_DMG = 20, 0.5, 1.0, (6, 9)
-HEAL_COST, HEAL_PREP, HEAL_REC, HEAL_AMOUNT = 25, 0.5, 1.0, 8
+HEAL_COST, HEAL_PREP, HEAL_REC = 25, 0.5, 1.0
+HEAL_AMOUNT = None   # None: the Minor Heal of the rank table (SKILL_RANKS); a number overrides every rank (the old recommendations' tweaks)
+DOUBLE_STRIKE = True # False: the Adventurer as before ranks (no Double Strike), for comparison tables only
 BLESS_COST = 25
+DOUBLE_PREP, DOUBLE_REC = 0.5, 1.0
+
+# ---- Skill ranks (docs/specs/skill-ranks.md; mudlib/std/skill.cs RankValue; `check` compares the tables with the /skills files) ----
+# Rank r needs level RANK_LEVEL_STEP x (r - 1). A rank's number is its row's, else the previous rank's plus the default step (EFFECT_STEP of
+# the rank I value for an effect, COST_STEP for a cost, nothing for a fixed key). "base" is rank I. Costs: "endurance" / "focus".
+RANK_LEVEL_STEP = 5
+EFFECT_STEP, COST_STEP = 0.30, 0.15
+RANK_FIXED = {"hits", "range", "seconds", "stagger"}
+SKILL_RANKS = {
+    "arcane_bolt": dict(base=dict(focus=20, min=6, max=9), rows={2: dict(min=8, max=12, focus=23), 3: dict(min=10, max=14, focus=26)}),
+    # PROVISIONAL (owner's choice pending): option (b) of `ranks heal`, 7 at rank I and the default step; the spec's 20 / 38 / 60 is option (a).
+    "minor_heal": dict(base=dict(focus=25, heal=7), rows={2: dict(focus=32), 3: dict(focus=40)}),
+    "blessing": dict(base=dict(focus=25, hit=1, armor=1, seconds=60), rows={2: dict(hit=2, armor=2), 3: dict(hit=3, armor=3), 4: dict(hit=4, armor=4)}),
+    "shield_bash": dict(base=dict(endurance=15, factor=0.75, stagger=2.0), rows={2: dict(factor=0.98), 3: dict(factor=1.2)}),
+    "precision_strike": dict(base=dict(endurance=25, tohit=2, crit=15), rows={2: dict(tohit=3, crit=20), 3: dict(tohit=4, crit=25), 4: dict(tohit=5, crit=30)}),
+    "double_strike": dict(base=dict(endurance=20, hits=2, factor=0.6), rows={2: dict(factor=0.75), 3: dict(hits=3, factor=0.6), 4: dict(hits=4, factor=0.55)}),
+    "tracking": dict(base=dict(endurance=5, range=1), rows={2: dict(range=2)}, max=2),
+}
+# The preparation of each ranked skill (never changed by a rank; option (c) of the Minor Heal table tries a longer one).
+SKILL_PREP = {"minor_heal": 0.5}
+# Which act of the simulator is which skill, and the skill each calling uses in a fight.
+SKILL_OF = {"bash": "shield_bash", "strike": "precision_strike", "bolt": "arcane_bolt", "heal": "minor_heal", "bless": "blessing", "double": "double_strike"}
+CALLING_SKILLS = {"warrior": ("shield_bash",), "scout": ("precision_strike", "tracking"), "priest": ("minor_heal", "blessing"),
+                  "mage": ("arcane_bolt",), "adventurer": ("double_strike",)}
+# How ranks are held: "cap" = every skill at the highest rank the level allows (the character buys a rank when level and gold allow; at levels
+# 5 and 10 the gold is in hand, see `ranks`), "none" = rank I in everything (nobody buys), or a number = that rank where the level allows it.
+RANK_MODE = "cap"
+# The heal of option (c) of the Minor Heal table: seconds after a heal before the next may begin (0 = none, the game).
+HEAL_LOCKOUT_MS = 0
+
+
+def rank_cap(level):
+    return max(1, level // RANK_LEVEL_STEP + 1)
+
+
+def rank_value(skill, key, rank):
+    """mudlib/std/skill.cs RankValue."""
+    t = SKILL_RANKS[skill]
+    base = t["base"].get(key, 0)
+    if key == "crit" and base < 0:
+        return base
+    step = 0 if key in RANK_FIXED else COST_STEP if key in ("endurance", "focus") else EFFECT_STEP
+    value = base
+    for r in range(2, rank + 1):
+        row = t["rows"].get(r, {})
+        value = row[key] if key in row else value + step * base
+    return value
+
+
+def rank_int(skill, key, rank):
+    return rnd(rank_value(skill, key, rank))
+
+
+def default_ranks(arch_name, level, mode=None):
+    mode = RANK_MODE if mode is None else mode
+    out = {}
+    for sk in CALLING_SKILLS.get(arch_name, ()):
+        top = SKILL_RANKS[sk].get("max", 99)
+        r = 1 if mode == "none" else rank_cap(level) if mode == "cap" else min(int(mode), rank_cap(level))
+        out[sk] = max(1, min(top, r))
+    return out
 
 
 def xp_for_level(n):
@@ -283,6 +346,15 @@ class Fighter:
         self.step = 0          # position in a creature's pattern
         self.fired = 0         # bit mask of the once-only triggers already used
         self.armor_extra = 0
+        self.ranks = {}
+        self.bless_bonus = (1, 1)   # to hit and armor of the Blessing on this fighter
+        self.heal_ready = 0         # option (c): the next heal may not begin before this
+
+    def rank(self, skill):
+        return self.ranks.get(skill, 1)
+
+    def skill_int(self, skill, key):
+        return rank_int(skill, key, self.rank(skill))
 
     def alive(self):
         return self.hp > 0
@@ -302,7 +374,7 @@ class Fighter:
         return f
 
     def attack(self, t=0):
-        return rnd(self.rate * self.level) + self.to_hit + (1 if t < self.bless_until else 0) + int(self.mod("tohit", t)) + stat(self.attrs, "precision")
+        return rnd(self.rate * self.level) + self.to_hit + (self.bless_bonus[0] if t < self.bless_until else 0) + int(self.mod("tohit", t)) + stat(self.attrs, "precision")
 
     def defense(self):
         return max(0, self.level - 1) + stat(self.attrs, "evasion")
@@ -313,7 +385,7 @@ class Fighter:
         return chance > 0 and random.randrange(1000) < round(chance * 10)
 
     def total_armor(self, t=0):
-        return self.armor + (1 if t < self.bless_until else 0) + int(self.mod("armor", t))
+        return self.armor + (self.bless_bonus[1] if t < self.bless_until else 0) + int(self.mod("armor", t))
 
     def dodge(self):
         if self.arch:
@@ -360,7 +432,7 @@ def make_monster(name):
     return Fighter(k.level, k.hp, k.dmg, k.to_hit, k.armor, k.reaction, k.acts, k)
 
 
-def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True, armor_extra=0):
+def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True, armor_extra=0, ranks=None):
     """arch: an Arch or its name. weapon: a key of WEAPONS. shield: None means the archetype's own habit.
     armor_extra: armor from worn pieces other than the shield (vest, helm)."""
     if isinstance(arch, str):
@@ -374,6 +446,7 @@ def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True, armor_e
     p = Fighter(level, player_max_hp(arch, level, extra_hp), dmg, to_hit, armor, reaction, (Act("attack", 0, rec),),
                 arch=arch, shield=has_shield, rate=arch.rate)
     p.extra_hp = extra_hp
+    p.ranks = dict(ranks) if ranks is not None else default_ranks(arch.name, level)
     set_level_resources(p, level)
     p.stamina, p.mana = float(p.max_stamina), float(p.max_mana)
     p.weapon_rec = rec
@@ -387,9 +460,27 @@ def player_acts(p):
     a["bash"] = Act("bash", 0, BASH_REC)
     a["strike"] = Act("strike", STRIKE_PREP, STRIKE_REC)
     a["bolt"] = Act("bolt", BOLT_PREP, BOLT_REC)
-    a["heal"] = Act("heal", HEAL_PREP, HEAL_REC)
+    a["heal"] = Act("heal", SKILL_PREP.get("minor_heal", HEAL_PREP), HEAL_REC)
     a["bless"] = Act("bless", 0.5, 1.0)
+    a["double"] = Act("double", DOUBLE_PREP, DOUBLE_REC)
     return a
+
+
+def skill_cost(p, act_id):
+    """(Endurance, Focus) an act costs this player at its rank, as Living.UseSkill: the rank's whole cost, then the spell cost modifier."""
+    sk = SKILL_OF.get(act_id)
+    if sk is None:
+        return 0, 0
+    end = p.skill_int(sk, "endurance")
+    foc = p.skill_int(sk, "focus")
+    if foc > 0 and p.arch is not None and p.arch.spell_cost_pct:
+        foc = max(1, rnd(foc * (100 + p.arch.spell_cost_pct) / 100.0))
+    return end, foc
+
+
+def can_pay(p, act_id, extra_mana=0):
+    end, foc = skill_cost(p, act_id)
+    return p.stamina >= end and p.mana >= foc + extra_mana
 
 
 SUMMON = True   # False takes the Overseer's Summon away (only the recommendations of docs/BALANCE_HUMAN.md try that)
@@ -422,6 +513,10 @@ def spell_cost(p, base):
     return base * (100 + p.arch.spell_cost_pct) / 100.0
 
 
+def heal_ok(p, t):
+    return can_pay(p, "heal") and t >= p.heal_ready
+
+
 def player_choice(p, t, living, potions, hard, state):
     """Returns (act id, potions left)."""
     arch = p.arch
@@ -430,20 +525,22 @@ def player_choice(p, t, living, potions, hard, state):
     if potions > 0 and p.hp <= p.max_hp * 0.35:
         return "potion"
     if arch.name == "priest":
-        if p.hp <= p.max_hp * 0.5 and p.mana >= HEAL_COST:
+        if p.hp <= p.max_hp * 0.5 and heal_ok(p, t):
             return "heal"
-        if hard and t >= p.bless_until and p.mana >= BLESS_COST + HEAL_COST and not state.get("blessed"):
+        if hard and t >= p.bless_until and can_pay(p, "bless", skill_cost(p, "heal")[1]) and not state.get("blessed"):
             state["blessed"] = True
             return "bless"
-    if arch.name == "warrior" and p.stamina >= BASH_COST and p.shield:
+    if arch.name == "warrior" and can_pay(p, "bash") and p.shield:
         if target.resolve_at is not None and target.resolve_at > t:
             return "bash"
         if p.stamina >= 60:
             return "bash"
-    if arch.name == "scout" and p.stamina >= STRIKE_COST:
+    if arch.name == "scout" and can_pay(p, "strike"):
         return "strike"
-    if arch.name == "mage" and p.mana >= spell_cost(p, BOLT_COST):
+    if arch.name == "mage" and can_pay(p, "bolt"):
         return "bolt"
+    if arch.name == "adventurer" and DOUBLE_STRIKE and can_pay(p, "double"):
+        return "double"
     return "attack"
 
 
@@ -531,21 +628,13 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
                     push(t + ent.delay_ms(act, t), "ready", ent)
                     ent.ready_at = t + ent.delay_ms(act, t)
                     continue
-                if choice == "bash":
-                    ent.stamina -= BASH_COST
-                    ent.paid = (BASH_COST, 0)
-                elif choice == "strike":
-                    ent.stamina -= STRIKE_COST
-                    ent.paid = (STRIKE_COST, 0)
-                elif choice == "bolt":
-                    ent.mana -= spell_cost(ent, BOLT_COST)
-                    ent.paid = (0, spell_cost(ent, BOLT_COST))
-                elif choice == "heal":
-                    ent.mana -= HEAL_COST
-                    ent.paid = (0, HEAL_COST)
-                elif choice == "bless":
-                    ent.mana -= BLESS_COST
-                    ent.paid = (0, BLESS_COST)
+                if choice in SKILL_OF:
+                    end, foc = skill_cost(ent, choice)
+                    ent.stamina -= end
+                    ent.mana -= foc
+                    ent.paid = (end, foc)
+                    if choice == "heal" and HEAL_LOCKOUT_MS:
+                        ent.heal_ready = t + HEAL_LOCKOUT_MS
             else:
                 act = choose(ent)
                 ent.taken += 1
@@ -606,31 +695,44 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
         push(m.ready_at, "ready", m)
         return
     if act.id == "heal":
-        ent.hp = min(ent.max_hp, ent.hp + rnd(HEAL_AMOUNT * (100 + ent.arch.healing_pct + stat(ent.attrs, "healing_power")) / 100.0))
+        amount = HEAL_AMOUNT if HEAL_AMOUNT is not None else ent.skill_int("minor_heal", "heal")
+        ent.hp = min(ent.max_hp, ent.hp + max(1, rnd(amount * (100 + ent.arch.healing_pct + stat(ent.attrs, "healing_power")) / 100.0)))
         return
     if act.id == "bless":
-        ent.bless_until = t + BLESS_MS
+        ent.bless_until = t + ent.skill_int("blessing", "seconds") * 1000
+        ent.bless_bonus = (ent.skill_int("blessing", "hit"), ent.skill_int("blessing", "armor"))
         return
     if act.id == "bolt":
         if target.dodge() and random.randint(1, 100) <= target.dodge():
             return
-        dmg = max(1, rnd(random.randint(*BOLT_DMG) * (1 + stat(ent.attrs, "spell_power") / 100.0)))
+        lo, hi = ent.skill_int("arcane_bolt", "min"), ent.skill_int("arcane_bolt", "max")
+        dmg = max(1, rnd(random.randint(lo, max(lo, hi)) * (1 + stat(ent.attrs, "spell_power") / 100.0)))
         target.hp -= dmg
         if target.hp <= 0 and on_kill is not None:
             on_kill(player, target)
         return
+    if ent.is_player and act.id == "double":
+        for _ in range(max(1, ent.skill_int("double_strike", "hits"))):
+            if target.hp <= 0:
+                break
+            dmg, _ = do_hit(ent, target, t, factor=rank_value("double_strike", "factor", ent.rank("double_strike")))
+            if dmg > 0:
+                target.hp -= dmg
+                if target.hp <= 0 and on_kill is not None:
+                    on_kill(player, target)
+        return
     if ent.is_player:
         kw = {}
         if act.id == "strike":
-            kw = dict(to_hit_bonus=STRIKE_HIT, crit=STRIKE_CRIT)
+            kw = dict(to_hit_bonus=ent.skill_int("precision_strike", "tohit"), crit=ent.skill_int("precision_strike", "crit"))
         if act.id == "bash":
-            kw = dict(factor=BASH_FACTOR)
+            kw = dict(factor=rank_value("shield_bash", "factor", ent.rank("shield_bash")))
         dmg, _ = do_hit(ent, target, t, **kw)
         if dmg <= 0:
             return
         target.hp -= dmg
         if act.id == "bash" and target.hp > 0:
-            out["stagger"](target, t)
+            out["stagger"](target, t, rank_value("shield_bash", "stagger", ent.rank("shield_bash")))
         if target.hp <= 0 and on_kill is not None:
             on_kill(player, target)
         return
@@ -792,17 +894,19 @@ class HumanPolicy:
         """The calling's skill, as typed; the game refuses it (and the slot goes to the auto-attack) if it cannot be paid."""
         a = p.arch.name
         if a == "priest":
-            if p.hp <= p.max_hp * 0.5 and p.mana >= HEAL_COST:
+            if p.hp <= p.max_hp * 0.5 and heal_ok(p, t):
                 return "heal"
-            if hard and t >= p.bless_until and p.mana >= BLESS_COST + HEAL_COST and not state.get("blessed"):
+            if hard and t >= p.bless_until and can_pay(p, "bless", skill_cost(p, "heal")[1]) and not state.get("blessed"):
                 state["blessed"] = True
                 return "bless"
-        elif a == "warrior" and p.shield and p.stamina >= BASH_COST:
+        elif a == "warrior" and p.shield and can_pay(p, "bash"):
             return "bash"
-        elif a == "scout" and p.stamina >= STRIKE_COST:
+        elif a == "scout" and can_pay(p, "strike"):
             return "strike"
-        elif a == "mage" and p.mana >= spell_cost(p, BOLT_COST):
+        elif a == "mage" and can_pay(p, "bolt"):
             return "bolt"
+        elif a == "adventurer" and DOUBLE_STRIKE and can_pay(p, "double"):
+            return "double"
         return "attack"
 
     def choose(self, p, t, living, potions, hard, state, push):
@@ -1049,6 +1153,9 @@ PRICES = {"rusty sword": 10, "woodcutter axe": 18, "fine longsword": 60, "huntin
           "apprentice staff": 10, "training spear": 8}
 
 
+FULL_RUN_GOBLINS = []   # goblins killed before reaching level 5, one entry per run of full_run (for the Arcane Bolt II unlock, `ranks`)
+
+
 def full_run(arch_name, runs=500):
     """A whole solo run, Tavern Cellar to the Overseer. The player has the archetype's kit and gold, buys the next
     weapon of the archetype's progression and a shield when it can carry one, keeps up to 2 potions, rests to full
@@ -1069,6 +1176,7 @@ def full_run(arch_name, runs=500):
         failed = False
         fight_ms = 0
         buy_shield = arch.shield and arch_name != "warrior"
+        goblins = 0
 
         def weapon():
             return arch.weapons[stage]
@@ -1091,8 +1199,10 @@ def full_run(arch_name, runs=500):
                 potions += 1
 
         def on_kill(p, enemy):
-            nonlocal xp, gold, level
+            nonlocal xp, gold, level, goblins
             k = enemy.kind
+            if "Goblin" in k.name and level < 5:
+                goblins += 1
             xp += k.xp
             if k.gold[1]:
                 gold += random.randint(*k.gold)
@@ -1144,6 +1254,7 @@ def full_run(arch_name, runs=500):
                 trinket = TRINKET_HP
         farm_total += farm
         deaths_total += deaths
+        FULL_RUN_GOBLINS.append(goblins)
         if failed:
             continue
         while level < BOSS_LEVEL and farm < 400:
@@ -1569,6 +1680,7 @@ def check_mudlib():
     if num(text, "HealAmount") != POTION_HEAL:
         problems.append("healing potion: HealAmount differs")
     check_classes(os.path.join(root, "..", ".."), problems, num)
+    check_skills(os.path.join(root, "..", ".."), problems)
     check_corridor(problems)
     for p in problems:
         print("MISMATCH", p)
@@ -1720,6 +1832,55 @@ def pace_report(runs=250):
             if n + 1 in (11, 20, 50, 100):
                 out.append(f"level {n + 1}: T={xp_to_reach(n + 1, table, p):,} xp, {hours:,.0f} h")
         print(f"  p={p}: " + "; ".join(out))
+
+
+SKILL_FIELDS = {"focus": "FocusCost", "endurance": "EnduranceCost", "tohit": "ToHitBonus", "crit": "CritChance", "factor": "DamageFactor", "hits": "Hits"}
+SKILL_DEFAULTS = {"FocusCost": 0, "EnduranceCost": 0, "ToHitBonus": 0, "CritChance": -1, "DamageFactor": 1.0, "Hits": 1}
+
+
+def check_skills(read_root, problems):
+    """Compare SKILL_RANKS (rank I numbers, rows, the highest rank) and the preparation and recovery of the fighting skills with mudlib/skills,
+    and the rank rule's numbers with mudlib/std/skill.cs."""
+    root = os.path.join(read_root, "skills")
+    with open(os.path.join(read_root, "std", "skill.cs"), encoding="utf-8") as f:
+        base = f.read()
+    for field, value in (("RankLevelStep", RANK_LEVEL_STEP), ("EffectStep", EFFECT_STEP), ("CostStep", COST_STEP)):
+        m = re.search(rf"const (?:int|double) {field} = ([\d.]+);", base)
+        if m is None or float(m.group(1)) != value:
+            problems.append(f"std/skill.cs: {field} is {m.group(1) if m else None}, {value} in the simulation")
+    for name, t in SKILL_RANKS.items():
+        with open(os.path.join(root, name + ".cs"), encoding="utf-8") as f:
+            text = f.read()
+        have = {}
+        for key, field in SKILL_FIELDS.items():
+            m = re.search(rf"\b{field} = (-?[\d.]+);", text)
+            have[key] = float(m.group(1)) if m else SKILL_DEFAULTS[field]
+        for k, v in re.findall(r'Effect\("(\w+)", (-?[\d.]+)\)', text):
+            have[k] = float(v)
+        for key, value in t["base"].items():
+            if have.get(key) != value:
+                problems.append(f"skill {name}: rank I {key} is {have.get(key)} in the mudlib, {value} in the simulation")
+        rows = {}
+        for r, values in re.findall(r'RankRow\((\d+), "([^"]*)"', text):
+            rows[int(r)] = {k: float(v) for k, v in (part.split("=") for part in values.split(";") if part)}
+        want = {r: {k: float(v) for k, v in row.items()} for r, row in t["rows"].items()}
+        if rows != want:
+            problems.append(f"skill {name}: rank rows {rows} in the mudlib, {want} in the simulation")
+        m = re.search(r"\bMaxRank = (\d+);", text)
+        if (int(m.group(1)) if m else 0) != t.get("max", 0):
+            problems.append(f"skill {name}: MaxRank {m.group(1) if m else 0} in the mudlib, {t.get('max', 0)} in the simulation")
+    for name, prep, rec in (("arcane_bolt", BOLT_PREP, BOLT_REC), ("minor_heal", HEAL_PREP, HEAL_REC), ("shield_bash", 0, BASH_REC),
+                            ("precision_strike", STRIKE_PREP, STRIKE_REC), ("double_strike", DOUBLE_PREP, DOUBLE_REC)):
+        with open(os.path.join(root, name + ".cs"), encoding="utf-8") as f:
+            text = f.read()
+        for field, value in (("Preparation", prep), ("Recovery", rec)):
+            m = re.search(rf"\b{field} = ([\d.]+);", text)
+            if (float(m.group(1)) if m else 0.0) != value:
+                problems.append(f"skill {name}: {field} is {m.group(1) if m else None} in the mudlib, {value} in the simulation")
+    with open(os.path.join(read_root, "classes", "adventurer.cs"), encoding="utf-8") as f:
+        text = f.read()
+    if '"double_strike"' not in text or '"jack_of_all_trades"' not in text:
+        problems.append("class adventurer: Double Strike or Jack of All Trades is not granted")
 
 
 def check_classes(read_root, problems, num):
@@ -2350,6 +2511,283 @@ def stage_weapon(arch, level):
     return arch.weapons[min(idx, len(arch.weapons) - 1)]
 
 
+# ---- skill ranks (docs/specs/skill-ranks.md; python3 tests/balance_sim.py ranks [runs] [part ...])
+
+@contextmanager
+def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None):
+    """Temporarily change how ranks are held (RANK_MODE), Double Strike on or off, a skill's rank table (skill -> dict(base=..., rows=...)
+    merged over the current one), the Minor Heal's Preparation and the heal lockout (option c). Nothing here is applied to the game."""
+    global RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS
+    saved_tables = {k: dict(base=dict(v["base"]), rows={r: dict(x) for r, x in v["rows"].items()}, **({"max": v["max"]} if "max" in v else {}))
+                    for k, v in SKILL_RANKS.items()}
+    saved = (RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, saved_tables, dict(SKILL_PREP))
+    try:
+        if mode is not None:
+            RANK_MODE = mode
+        if double is not None:
+            DOUBLE_STRIKE = double
+        for sk, t in (table or {}).items():
+            SKILL_RANKS[sk]["base"].update(t.get("base", {}))
+            if "rows" in t:
+                SKILL_RANKS[sk]["rows"] = {r: dict(x) for r, x in t["rows"].items()}
+        if prep is not None:
+            SKILL_PREP["minor_heal"] = prep
+        if lockout_s is not None:
+            HEAL_LOCKOUT_MS = round(lockout_s * 1000)
+        yield
+    finally:
+        RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS = saved[0], saved[1], saved[2]
+        SKILL_RANKS.clear()
+        SKILL_RANKS.update(saved[3])
+        SKILL_PREP.clear()
+        SKILL_PREP.update(saved[4])
+
+
+def l5_kills(callings=None, runs=3000, seed=1):
+    """Kill% against the Overseer from the cellar entrance: level 5, starting gear, 4 potions, points placed, middle human with the rest
+    command at RestFactor 5 (the owner's standing target). One number per calling."""
+    m = rest_human("mid", 5)
+    return {c: approach_stats(c, 5, 4, m, runs, "starting", True, seed)["kill"] * 100 for c in (callings or ARCHS)}
+
+
+def band_line(label, v, note=""):
+    vals = [v[c] for c in ARCHS]
+    mean = sum(vals) / 5
+    off = {c: v[c] - mean for c in ARCHS}
+    print(f"{label:<66}" + "".join(f"{x:6.0f}" for x in vals) + f"{mean:6.1f}{max(vals) - min(vals):7.0f}   priest {off['priest']:+5.1f}, adv. {off['adventurer']:+5.1f}"
+          + (f"   {note}" if note else ""), flush=True)
+    dump_json(dict(kind="ranks", label=label, kills=vals))
+    return vals
+
+
+def band_head(title, runs):
+    print("=" * 140)
+    print(title + f" ({runs} runs a cell)")
+    print("=" * 140)
+    print(f"{'':<66}" + "".join(f"{c[:5]:>6}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}   distance from the mean")
+
+
+def heal_table(h, costs=(25, 32, 40), rows=None):
+    """A Minor Heal table: rank I heal h, later ranks by the default step from it (or the given rows), with these Focus costs."""
+    r = rows or {}
+    return {"minor_heal": dict(base=dict(heal=h, focus=costs[0]),
+                               rows={2: dict(focus=costs[1], **r.get(2, {})), 3: dict(focus=costs[2], **r.get(3, {}))})}
+
+
+SPEC_HEAL_ROWS = {2: dict(heal=38), 3: dict(heal=60)}
+
+
+def ranks_level5(runs=3000):
+    band_head("RK1. Level 5 and skill ranks: Overseer kill% from the cellar entrance, starting gear, 4 potions, points placed, middle human, RestFactor 5", runs)
+    with ranked(mode="none", double=False, table=heal_table(8)):
+        band_line("before ranks (rank I, no Double Strike, Minor Heal 8)", l5_kills(runs=runs))
+    with ranked(mode="none"):
+        base = l5_kills(runs=runs)
+        band_line("rank I, the Adventurer with Double Strike I (2 x 60%)", base)
+    with ranked(mode="cap"):
+        band_line("every calling holds rank II (bought at level 5; Minor Heal as shipped)", l5_kills(runs=runs))
+    for c in ARCHS:
+        with ranked(mode="cap"):
+            one = dict(base)
+            one[c] = l5_kills([c], runs)[c]
+        band_line(f"only the {c} holds rank II (the others rank I)", one)
+
+
+def heal_search(rank_mode, others, runs, lo=6, hi=24, costs=(25, 32, 40), **extra):
+    """The largest rank I heal whose Priest stays within 5 points of the five-calling mean (the other four given). Returns (h, priest%)."""
+    best = None
+    for h in range(lo, hi + 1):
+        with ranked(mode=rank_mode, table=heal_table(h, costs), **extra):
+            pr = l5_kills(["priest"], runs)["priest"]
+        mean = (sum(others.values()) + pr) / 5
+        ok = abs(pr - mean) <= 5
+        print(f"    heal {h:>2} [{'rank I' if rank_mode == 'none' else 'rank II'}]: priest {pr:5.1f}, mean {mean:5.1f}, {pr - mean:+5.1f} {'in band' if ok else ''}", flush=True)
+        dump_json(dict(kind="heal_search", mode=rank_mode, heal=h, priest=pr, mean=mean))
+        if ok:
+            best = (h, round(pr, 1))
+        elif best is not None and pr - mean > 5:
+            break
+    return best
+
+
+def ranks_heal(runs=3000):
+    """The Minor Heal options for the owner: (a) the spec's table, (b) the largest rank I heal that keeps the Priest within 5 points of the
+    mean with the spec's costs, (c) a big heal paid for another way, tuned to the same band. Two columns of truth: everyone at rank I, and
+    everyone at rank II (bought at level 5)."""
+    others = {}
+    for mode in ("none", "cap"):
+        with ranked(mode=mode):
+            others[mode] = l5_kills([c for c in ARCHS if c != "priest"], runs)
+    band_head("RK2. Minor Heal options, level 5 Overseer as RK1. [rank I] = nobody has bought a rank; [rank II] = every calling holds rank II", runs)
+
+    def row(label, mode, **kw):
+        with ranked(mode=mode, **kw):
+            pr = l5_kills(["priest"], runs)["priest"]
+        return band_line(label + f"  [{'rank I' if mode == 'none' else 'rank II'}]", {**others[mode], "priest": pr})
+
+    for mode in ("none", "cap"):
+        row("(a) spec: 20 / 38 / 60 for 25 / 32 / 40 Focus", mode, table=heal_table(20, rows=SPEC_HEAL_ROWS))
+        row("    8 (today), later ranks by the default step, spec costs", mode, table=heal_table(8))
+    print("  (b) search: rank I heal h, II and III by the default step from h, costs 25 / 32 / 40")
+    b1 = heal_search("none", others["none"], runs)
+    b2 = heal_search("cap", others["cap"], runs)
+    print(f"  (b) largest heal in band: measured at rank I {b1}, measured at rank II {b2}", flush=True)
+    if os.environ.get("RANKS_HEAL_C", "1") == "1":
+        print("  (c) the spec's 20 / 38 / 60 heal, paid for another way:")
+        for cost in ((40, 50, 62), (50, 64, 80), (60, 75, 95), (75, 95, 120)):
+            for mode in ("none", "cap"):
+                row(f"(c1) 20 / 38 / 60 for {cost[0]} / {cost[1]} / {cost[2]} Focus", mode, table=heal_table(20, cost, SPEC_HEAL_ROWS))
+        for prep in (1.0, 2.0, 3.0):
+            for mode in ("none", "cap"):
+                row(f"(c2) 20 / 38 / 60, Preparation {prep:g} ({prep * 2:g} s wind-up)", mode, table=heal_table(20, rows=SPEC_HEAL_ROWS), prep=prep)
+        for lock in (15, 30, 45, 60):
+            for mode in ("none", "cap"):
+                row(f"(c3) 20 / 38 / 60, no heal for {lock} s after a heal", mode, table=heal_table(20, rows=SPEC_HEAL_ROWS), lockout_s=lock)
+    return b1, b2
+
+
+def ranks_double(runs=3000):
+    """Double Strike: the spec's numbers and others, Adventurer against the mean (rank I and rank II)."""
+    with ranked(mode="none"):
+        base1 = l5_kills([c for c in ARCHS if c != "adventurer"], runs)
+    with ranked(mode="cap"):
+        base2 = l5_kills([c for c in ARCHS if c != "adventurer"], runs)
+    band_head("RK3. Double Strike: the Adventurer against the other callings, level 5 Overseer as RK1", runs)
+    with ranked(mode="none", double=False):
+        band_line("no Double Strike (Minor Heal as shipped) [rank I]", {**base1, "adventurer": l5_kills(["adventurer"], runs)["adventurer"]})
+    for label, base, rows, mode in (
+            ("spec: 2 x 60%, 20 Endurance [rank I]", dict(factor=0.6, endurance=20), None, "none"),
+            ("spec: rank II 2 x 75% [rank II]", dict(factor=0.6, endurance=20), None, "cap"),
+            ("2 x 50%, 20 Endurance [rank I]", dict(factor=0.5, endurance=20), None, "none"),
+            ("2 x 45%, 20 Endurance [rank I]", dict(factor=0.45, endurance=20), None, "none"),
+            ("2 x 40%, 20 Endurance [rank I]", dict(factor=0.4, endurance=20), None, "none"),
+            ("2 x 60%, 35 Endurance [rank I]", dict(factor=0.6, endurance=35), None, "none"),
+            ("2 x 60%, 50 Endurance [rank I]", dict(factor=0.6, endurance=50), None, "none"),
+            ("2 x 50%, rank II 2 x 60% [rank II]", dict(factor=0.5, endurance=20), {2: dict(factor=0.6), 3: dict(hits=3, factor=0.5), 4: dict(hits=4, factor=0.45)}, "cap"),
+            ("2 x 45%, rank II 2 x 55% [rank II]", dict(factor=0.45, endurance=20), {2: dict(factor=0.55), 3: dict(hits=3, factor=0.45), 4: dict(hits=4, factor=0.4)}, "cap")):
+        t = {"double_strike": dict(base=base, **({"rows": rows} if rows else {}))}
+        with ranked(mode=mode, table=t):
+            a = l5_kills(["adventurer"], runs)["adventurer"]
+        band_line(label, {**(base1 if mode == "none" else base2), "adventurer": a})
+
+
+LEVEL10 = [k.id for k in CORRIDOR if not k.boss and k.band[0] <= 10 <= k.band[1]]
+LEVEL5C = [k.id for k in CORRIDOR if not k.boss and k.band[0] <= 5 <= k.band[1]]
+
+
+LEVEL10B = [k.id for k in CORRIDOR if k.boss and k.band[0] <= 10 <= k.band[1]]
+
+
+def gap_at(level, keys, runs, potions=0):
+    """Mean win% of each calling (perfect player, corridor gear, one creature at a time from full) over these corridor creatures."""
+    random.seed(1000 + level)
+    return {c: sum(cfight(c, level, k, potions, runs)["win"] for k in keys) / len(keys) * 100 for c in ARCHS}
+
+
+def ranks_gap(runs=400):
+    print("=" * 140)
+    print("RK4. The gap between callings at levels 5 and 10 (the spec's balance requirement: not wider than today). Perfect player, corridor gear")
+    print(f"    (docs/CORRIDOR_BALANCE.md), one creature at a time from full, win% averaged over the ordinary creatures whose band holds the level ({runs} fights a creature)")
+    print("=" * 140)
+    print(f"{'':<66}" + "".join(f"{c[:5]:>6}" for c in ARCHS) + f"{'mean':>6}{'spread':>7}")
+    for level, keys, potions in ((5, LEVEL5C, 0), (10, LEVEL10, 0), (10, LEVEL10B, CORRIDOR_POTIONS), (5, ["overseer"], 2)):
+        print(f"-- level {level}: {', '.join(keys)}" + (f" ({potions} potions)" if potions else "")
+              + (": the Goblin Overseer alone, best Hollow gear, the +5 Vitality trinket (table 2 of the default output)" if keys == ["overseer"] else ""))
+        for label, kw in (("today (rank I, no Double Strike, Minor Heal 8)", dict(mode="none", double=False, table=heal_table(8))), ("rank I, with Double Strike I", dict(mode="none")),
+                          (f"every skill at the rank level {level} allows ({'II' if level == 5 else 'III'})", dict(mode="cap"))):
+            with ranked(**kw):
+                if keys == ["overseer"]:
+                    random.seed(20260101)
+                    v = {c: boss_stats(c, 5, ARCHS[c].weapons[-1], 2, TRINKET_HP, runs * 3)[0] * 100 for c in ARCHS}
+                else:
+                    v = gap_at(level, keys, runs, potions)
+            vals = [v[c] for c in ARCHS]
+            print(f"{label:<66}" + "".join(f"{x:6.0f}" for x in vals) + f"{sum(vals) / 5:6.1f}{max(vals) - min(vals):7.0f}", flush=True)
+            dump_json(dict(kind="gap", level=level, label=label, wins=vals))
+
+
+# The best staff there is at each level (none is sold or found beyond the Hollow): name, damage, to hit, Insight it gives.
+STAFFS = {1: ("Apprentice's Staff", (7, 11), 1, 0), 5: ("Staff of the Hollow Oak", (10, 14), 1, 2),
+          10: ("Staff of the Hollow Oak", (10, 14), 1, 2), 15: ("Staff of the Hollow Oak", (10, 14), 1, 2)}
+# The most armour on a creature of about that level (level 1: the level 2 Goblin Guard's 2, no level 1 creature wears any; level 15: none exists, extrapolated).
+ARMOURED = {1: 2, 5: 3, 10: 5, 15: 6}
+
+
+def ranks_bolt():
+    """The Mage's bolt at each rank against the Mage's best staff of that level, per action and per second, against an armoured and an
+    unarmoured creature of that level. Expected values (no randomness): hit chance x mean damage x (1 + crit chance x 0.5); the bolt has no
+    hit roll (no creature of those levels dodges but the corridor's three, ignored here)."""
+    print("=" * 140)
+    print("RK5. Arcane Bolt at each rank against the Mage's best staff of that level (the spec: the bolt must beat the staff per action against an armoured")
+    print("    creature of the level, and not an unarmoured one by more than a small margin). Mage with points in Insight, the staff in hand.")
+    print("=" * 140)
+    print(f"{'level':>5} {'rank':>4} {'bolt':>6} {'Focus':>6}  {'staff':<24}{'armour':>7}{'bolt/act':>9}{'staff/act':>10}{'ratio':>7}   {'unarmoured staff/act':>21}{'ratio':>7}   {'bolt/s':>7}{'staff/s':>8}")
+    a = ARCHS["mage"]
+    for level, rank in ((1, 1), (5, 2), (10, 3), (15, 4)):
+        name, (lo, hi), hit, ins = STAFFS[level]
+        attrs = list(attrs_at(a, level))
+        attrs[ATTR.index("insight")] += ins
+        attrs = tuple(attrs)
+        sp = stat(attrs, "spell_power")
+        blo, bhi = rank_int("arcane_bolt", "min", rank), rank_int("arcane_bolt", "max", rank)
+        bolt = sum(max(1, rnd(d * (1 + sp / 100.0))) for d in range(blo, bhi + 1)) / (bhi - blo + 1)
+        atk = rnd(a.rate * level) + hit + stat(attrs, "precision")
+        crit = 1 + (5 + stat(attrs, "crit")) / 100 * 0.5
+        mean = (lo + hi) / 2 * (1 + stat(attrs, "physical_power") / 100.0) * crit
+        armoured, bare = (hit_chance(atk, arm, max(0, level - 1)) * mean for arm in (ARMOURED[level], 0))
+        cost = rnd(rank_int("arcane_bolt", "focus", rank) * (100 + a.spell_cost_pct) / 100.0)
+        bolt_s, staff_s = bolt / ((a.reaction + BOLT_REC) * 2), armoured / ((a.reaction + 0.5 + 1.0) * 2)
+        print(f"{level:>5} {['', 'I', 'II', 'III', 'IV'][rank]:>4} {blo:>2}-{bhi:<3} {cost:>6}  {name:<24}{ARMOURED[level]:>7}{bolt:9.1f}{armoured:10.1f}{bolt / armoured:7.2f}"
+              f"   {bare:21.1f}{bolt / bare:7.2f}   {bolt_s:7.2f}{staff_s:8.2f}")
+
+
+def ranks_focus(runs=1000):
+    """The spec: a Priest's Focus runs out before a creature of the Priest's own level does, so the heal cannot make solo fights riskless. The
+    Priest (corridor gear, perfect player, no potions) against a creature of its own level that never dies: how long until death, and how many
+    heals a full Focus pool pays for."""
+    print("=" * 140)
+    print(f"RK6. The Priest's Focus against a creature of its own level that does not die ({runs} fights a cell, perfect player, corridor gear, no potions)")
+    print("=" * 140)
+    for level, key in ((5, "stray_wolf"), (10, "fallen_knight")):
+        for mode in ("none", "cap"):
+            with ranked(mode=mode):
+                died = 0
+                t_dead = 0.0
+                for _ in range(runs):
+                    p = cplayer("priest", level)
+                    e = make_monster(key)
+                    e.hp = e.max_hp = 10 ** 7
+                    r = fight(p, [e], 0)
+                    t_dead += r["ms"] / 1000.0
+                    died += not r["alive"]
+                rk = default_ranks("priest", level)["minor_heal"]
+                heal, cost = rank_int("minor_heal", "heal", rk), rank_int("minor_heal", "focus", rk)
+                p = cplayer("priest", level)
+                print(f"  level {level:>2} vs {key:<14} Minor Heal {['', 'I', 'II', 'III'][rk]:<3}: {heal} Vitality (before Healing Power and Divine Knowledge) for {cost} Focus; full Focus"
+                      f" {p.max_mana} = {p.max_mana // cost} heals; dead in {t_dead / runs:4.0f} s on average, {died * 100 / runs:.0f}% of fights end in the Priest's death", flush=True)
+                dump_json(dict(kind="focus", level=level, mode=mode, died=died / runs, seconds=t_dead / runs))
+
+
+def ranks_climb(runs=300):
+    """Goblins killed before level 5 in the whole run of table 3 (for Arcane Bolt II's ten goblins)."""
+    print("=" * 140)
+    print(f"RK7. Goblins slain on the way to level 5 (table 3's whole run, {runs} runs a calling): does a Mage have ten for Arcane Bolt II at level 5?")
+    print("=" * 140)
+    for c in ARCHS:
+        FULL_RUN_GOBLINS.clear()
+        full_run(c, runs)
+        g = sorted(FULL_RUN_GOBLINS)
+        print(f"  {c:<11} median {g[len(g) // 2]:>3}, 10th percentile {g[len(g) // 10]:>3}, share with 10 or more {sum(x >= 10 for x in g) * 100 / len(g):4.0f}%", flush=True)
+
+
+def ranks_report(runs=3000, parts=()):
+    parts = parts or ("level5", "heal", "double", "gap", "bolt", "focus", "climb")
+    for part in parts:
+        {"level5": lambda: ranks_level5(runs), "heal": lambda: ranks_heal(runs), "double": lambda: ranks_double(runs),
+         "gap": lambda: ranks_gap(max(100, runs // 8)), "bolt": ranks_bolt, "focus": lambda: ranks_focus(max(200, runs // 3)),
+         "climb": lambda: ranks_climb(max(100, runs // 10))}[part]()
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "check":
         sys.exit(0 if check_mudlib() else 1)
@@ -2368,6 +2806,10 @@ def main():
         parts = tuple(a for a in sys.argv[2:] if not a.isdigit()) or ("grid", "sens")
         for part in parts:
             {"grid": rest_grid, "sens": lambda r: rest_sens(r // 2), "pace": lambda r: rest_pace(max(40, r // 30)), "options": rest_options, "perfect": rest_perfect, "harvest": rest_harvest}[part](runs)
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "ranks":
+        runs = int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else 3000
+        ranks_report(runs, tuple(a for a in sys.argv[2:] if not a.isdigit()))
         return
     if len(sys.argv) > 1 and sys.argv[1] == "pace":
         pace_report(int(sys.argv[2]) if len(sys.argv) > 2 else 250)

@@ -95,9 +95,46 @@ public class Monster : Npc
         catch (MudRuntimeException) { }
     }
 
+    /// <summary>
+    /// The creature's kind for kill counters ("goblin"): the beast-table kind it declares (its Skin, else its Blood, the names of
+    /// mudlib/crafting/beasts.cs), else its ChronicleKind (by default its file name). docs/specs/skill-ranks.md, Unlocks.
+    /// </summary>
+    public string QueryCreatureKind()
+    {
+        string Prop(string name) { try { return (Self.Call<string>("get_" + name) ?? "").Trim().ToLowerInvariant(); } catch (MudRuntimeException) { return ""; } }
+        var beast = Prop("Skin");
+        if (beast == "") beast = Prop("Blood");
+        if (beast != "") return beast;
+        return ChronicleKind != "" ? ChronicleKind : Self.ProgramPath.Substring(Self.ProgramPath.LastIndexOf('/') + 1);
+    }
+
+    private static readonly string[] RankTrustedTrees = { "/std/", "/secure/", "/domains/", "/classes/", "/skills/", "/events/" };
+
+    private static bool RankDaemonTrusts(string path)
+    {
+        if (path.Contains("..") || path.Contains("//")) return false;
+        foreach (var tree in RankTrustedTrees) if (path.StartsWith(tree, StringComparison.Ordinal)) return true;
+        return false;
+    }
+
+    // Tells the rank daemon who shares this death and which skill struck the killing blow. Best-effort: a failure never stops a death.
+    private void CreditRankCounters(List<ObjectRef> participants, ObjectRef? killer)
+    {
+        try
+        {
+            var skill = killer != null && killer.IsAlive && participants.Contains(killer) ? killer.Call<string>("QueryStrikingSkill") ?? "" : "";
+            LoadObject("/secure/ranks").Call("CreditKill", participants, killer, QueryCreatureKind(), skill);
+        }
+        catch (MudRuntimeException) { }
+    }
+
     public override void Die(ObjectRef? killer)
     {
         if (Dead) return;
+        // A death the game itself caused (this creature's own code, a blow or spell from a trusted tree, the driver) counts toward the
+        // kill counters of docs/specs/skill-ranks.md; one a wizard's object forced by calling Die or FinishDamage does not.
+        var cause = PreviousObject();
+        var counted = cause == null || cause == Self || RankDaemonTrusts(cause.ProgramPath);
         Dead = true;
         ResetCombat();
         var room = Environment();
@@ -112,6 +149,7 @@ public class Monster : Npc
         {
             foreach (var (who, share) in DivideExperience(XpValue, killer, eligible)) who.Call("AddXp", share);
             foreach (var (who, _) in eligible) who.Call("NotifyKill", Self.ProgramPath);
+            if (counted) CreditRankCounters(eligible.Select(e => e.who).ToList(), killer);
             var actor = eligible.Any(e => e.who == killer) ? killer! : eligible.OrderByDescending(e => e.damage).First().who;
             ReportDeath(actor, eligible.Select(e => e.who).ToList(), room);
         }

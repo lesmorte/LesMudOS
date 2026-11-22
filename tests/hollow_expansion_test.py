@@ -492,8 +492,9 @@ def run(work, mudlib, box):
         check(f"{who}: an unknown topic gets a shrug", ann.command(f"ask {word} about zzzz"), "can't tell you")
         keys = " ".join(k for ks, _ in topics_of(N + p) for k in ks).lower()
         topic_text = " ".join(l for _, l in topics_of(N + p)).lower()
-        truth(f"{who} has topics for the trade, the village, the cellars, a rumour and teaching (and talks of teaching as to come: soon)",
-              all(k in keys for k in ("village", "cellar", "rumour", "teach")) and "soon" in topic_text and
+        # Teaching is no longer to come (docs/specs/skill-ranks.md): each names the `ranks` command it is taught by now.
+        truth(f"{who} has topics for the trade, the village, the cellars, a rumour and teaching (and says how ranks are learned now: ranks)",
+              all(k in keys for k in ("village", "cellar", "rumour", "teach")) and "{cmd}ranks{/}" in topic_text and
               any(k in keys for k in ("trade", "dummy", "blessing", "armour", "staff", "bow")), keys[:120])
 
     # ===== 4. shops: browse, buy, and never profitable to sell back =====

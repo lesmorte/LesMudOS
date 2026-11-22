@@ -1,6 +1,7 @@
-// @inherit /std/npc
+// @inherit /std/trainer
 
-public class GqHallmasterMage : Npc
+/// <summary>A hallmaster of the Hall of Callings, and the Mage's rank trainer for rank III and above (docs/specs/skill-ranks.md).</summary>
+public class GqHallmasterMage : Trainer
 {
     public override void Create()
     {
@@ -33,6 +34,9 @@ public class GqHallmasterMage : Npc
         AddTopic("calling,arcane,magic,spells,spellcasting,lore", "Spellcasting, utility, magical damage: the calling of the Mages. You begin with Arcane Bolt, Focus Efficiency and Magical Lore. The three paths are where that work leads.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "The banners on the east wall describe every path in a line. The Chronicle Gallery is east and the Envoys' Gallery west.");
         AddTopic("attributes,attribute,insight,focus,lean,leans,stats,points", "A Mage is Insight first: it is the size of the well and the force of the bolt. Spirit comes second, and fills the well sooner. Vigor a Mage neglects, and the first cold night pays for it. Do not tell Anselm that I said so.");
+        AddTopic("ranks,rank,train,training,teach,teaching,trainer,third,third rank", "Ranks, yes. The third working of a Mage's spells and every one after it are taught here, by me. The second you learn in Vincent's Hollow. Say {cmd}ranks{/} and I shall show you, precisely, what you may learn, what it costs and what you lack. Then {cmd}train{/} and the spell's word.");
+        TeachCalling("mage", 3, 5);
+        ElsewhereLine = "The second rank is taught in Vincent's Hollow.";
         AddEmote("Ilsabet turns a page, nods to herself, and underlines something.", 8);
         AddEmote("Ilsabet pushes her spectacles up her nose and peers over them at a visitor.", 6);
     }
