@@ -637,7 +637,9 @@ public class CraftingDaemon : Thing
     {
         var who = ThisPlayer();
         if (!Trusted(PreviousObject()) || who == null || who.Call<int>("QueryWizLevel") < 10) return false;
-        if (!new[] { "random", "mid", "high", "low", "fail" }.Contains(mode)) return false;
+        // "growth:NN.N" is "mid" for every roll but the growth roll, which is fixed at NN.N (0 to 100): for tests of the learning speed.
+        var fixedGrowth = mode != null && mode.StartsWith("growth:") && ParseNumber(mode.Substring(7), out var g) && g >= 0 && g <= 100;
+        if (!fixedGrowth && !new[] { "random", "mid", "high", "low", "fail" }.Contains(mode)) return false;
         rollMode = mode;
         return true;
     }
@@ -703,6 +705,7 @@ public class CraftingDaemon : Thing
     private bool RollPercent(double chance, bool forSuccess) => rollMode switch
     {
         "mid" or "low" => forSuccess,
+        _ when rollMode.StartsWith("growth:") => forSuccess,
         "high" => true,
         "fail" => false,
         _ => Random(10000) < (int)Math.Round(chance * 100),
@@ -711,6 +714,7 @@ public class CraftingDaemon : Thing
     private (int A, int B) RollPair(int range) => rollMode switch
     {
         "mid" => (range / 2, range - range / 2),
+        _ when rollMode.StartsWith("growth:") => (range / 2, range - range / 2),
         "high" => (range, range),
         "low" or "fail" => (0, 0),
         _ => (Random(range + 1), Random(range + 1)),
@@ -750,16 +754,53 @@ public class CraftingDaemon : Thing
         return roll < chance ? (true, 0) : (false, Math.Min(at + 1, rungs.Count - 1));
     }
 
+    /// <summary>Parse "-1" or "0.5" with a dot on every machine (mudlib code may not use cultures).</summary>
+    private static bool ParseNumber(string text, out double value)
+    {
+        value = 0;
+        text = text.Trim();
+        var negative = text.StartsWith("-");
+        if (negative) text = text.Substring(1);
+        var parts = text.Split('.');
+        if (parts.Length > 2 || parts[0].Length == 0 || !parts[0].All(char.IsDigit) || (parts.Length == 2 && (parts[1].Length == 0 || !parts[1].All(char.IsDigit)))) return false;
+        var fraction = parts.Length == 2 ? double.Parse(parts[1]) / Math.Pow(10, parts[1].Length) : 0;
+        value = (double.Parse(parts[0]) + fraction) * (negative ? -1 : 1);
+        return true;
+    }
+
     /// <summary>The growth roll, 0 to 100. Test rolls: mid and high always gain (roll 0), low never does, random is random.</summary>
-    private double RollGrowth() => rollMode switch
+    private double RollGrowth() => rollMode.StartsWith("growth:") && ParseNumber(rollMode.Substring(7), out var fixedRoll) ? fixedRoll : rollMode switch
     {
         "mid" or "high" => 0.0,
         "low" or "fail" => 100.0,
         _ => Random(10000) / 100.0,
     };
 
-    /// <summary>What multiplies the chance of a point for this character (1.0; a later class bonus to learning goes here).</summary>
-    private double LearnSpeed(ObjectRef who) => 1.0;
+    /// <summary>
+    /// What multiplies the chance of a point for this character: 1.0, plus the "learn_speed" percent of the character's class traits
+    /// (the Adventurer's Jack of All Trades: +25%). Only traits that come from class files count: not timed effects (any object may add
+    /// one) and not items.
+    /// </summary>
+    private double LearnSpeed(ObjectRef who) => 1.0 + Math.Max(0, who.Call<double>("QueryClassTraitMod", "learn_speed")) / 100.0;
+
+    /// <summary>The learning multiplier of a character, for tests and tools (read-only).</summary>
+    public double LearnSpeedOf(ObjectRef who) => who == null || !who.IsAlive ? 1.0 : LearnSpeed(who);
+
+    /// <summary>A growth step for tests, with a learning multiplier. Pure. As GrowthFor.</summary>
+    public List<int> GrowthForSpeed(int tenths, double work, int position, double roll, double speed)
+    {
+        EnsureLoaded();
+        var (gained, next) = GrowthStep(tenths, work, position, roll, Math.Max(0, speed));
+        return new List<int> { gained ? 1 : 0, next };
+    }
+
+    /// <summary>The chance (percent) of the rung a ladder position stands on, for a skill in tenths, for tests. Pure.</summary>
+    public double RungChance(int tenths, int position)
+    {
+        EnsureLoaded();
+        var rungs = Ladder(tenths);
+        return rungs[Math.Clamp(position, 0, rungs.Count - 1)];
+    }
 
     /// <summary>
     /// A growth step for tests. Pure. Returns [1 if a point is gained else 0, the next ladder position] for a skill in tenths,
