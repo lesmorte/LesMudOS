@@ -117,8 +117,11 @@ internal sealed class Kernel : IDriverServices
 
     // ---- Restricted code (docs/SANDBOX.md): objects with a domain, and the master's ValidCall ----
 
-    /// <summary>Is restricted code on the call stack, outside the master's own answers?</summary>
-    private bool Restricted => _restricted > 0 && _masterDepth == 0;
+    /// <summary>
+    /// Is restricted code on the call stack, outside the master's own answers? An execution for a restricted ThisPlayer (a sandbox
+    /// creature's arrival offering Init to the things around it) counts too: real code running for a sandbox object acts for it.
+    /// </summary>
+    private bool Restricted => (_restricted > 0 || _thisPlayer is { Domain.Length: > 0 }) && _masterDepth == 0;
 
     /// <summary>May the running code reach this object in this way? Always yes unless restricted code is running and the target is not restricted.</summary>
     private bool Permit(ObjectRef target, string function)
@@ -699,9 +702,9 @@ internal sealed class Kernel : IDriverServices
 
     public ObjectRef? RestrictedCaller()
     {
-        if (_restricted == 0) return null;
-        foreach (var ob in _callStack) if (ob.Domain.Length > 0) return ob;
-        return null;
+        if (_restricted > 0)
+            foreach (var ob in _callStack) if (ob.Domain.Length > 0) return ob;
+        return _thisPlayer is { Domain.Length: > 0 } player ? player : null;
     }
 
     public bool MayView(ObjectRef target) => Permit(target, "As");

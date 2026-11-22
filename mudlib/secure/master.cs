@@ -124,8 +124,8 @@ public class Master : MudObject, IMaster
         var owner = SandboxOwner(programPath);
         if (owner != null) return "wiz:" + owner;
         if (!isClone) return "";
+        if (RestrictedCaller() is { } restricted) return restricted.Domain;
         var chain = CallerChain();
-        foreach (var ob in chain) if (ob.Domain != "") return ob.Domain;
         foreach (var ob in chain)
             if (IsPlayerBody(ob) && InWorkshop(ob)) return "wiz:" + (ob.Call<string>("QueryName") ?? "").ToLowerInvariant();
         return "";

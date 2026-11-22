@@ -154,7 +154,10 @@ public abstract class MudObject
     /// </summary>
     protected IReadOnlyList<ObjectRef> CallerChain() => D.CallerChain();
 
-    /// <summary>The outermost restricted object (one with a domain) on the call stack, or null if none is: is this a restricted execution?</summary>
+    /// <summary>
+    /// The outermost restricted object (one with a domain) on the call stack, or a restricted ThisPlayer(), or null if there is none:
+    /// is this a restricted execution?
+    /// </summary>
     protected ObjectRef? RestrictedCaller() => D.RestrictedCaller();
 
     /// <summary>The verb of the command being executed.</summary>

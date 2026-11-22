@@ -1105,7 +1105,14 @@ public class Player : Adventurer
         if (!IsWizard(LevelClone) && !InOwnHome(path) && !inWorkshop) { Write($"You need wizard level {LevelClone} to clone anything outside your own home directory, {Esc(HomePath)} (anything at all inside your workshop).\n"); return true; }
         var ob = CloneObject(path);
         var room = Environment();
-        MoveObject(ob, ob.Call<bool>("CanGet") || room == null ? Self : room);
+        try { MoveObject(ob, ob.Call<bool>("CanGet") || room == null ? Self : room); }
+        catch (MudRuntimeException refusal)
+        {
+            // The workshop's boundary (docs/SANDBOX.md): a sandbox object made out in the real game goes at once.
+            if (ob.IsAlive) Destruct(ob);
+            Write(Esc(refusal.Message) + (ob.Domain != "" ? " Clone it in your workshop (goto ~/a room of yours).\n" : "\n"));
+            return true;
+        }
         Write($"Cloned {Esc(ob.Name)}.\n");
         return true;
     }
@@ -1357,6 +1364,7 @@ public class Player : Adventurer
 
     private void LeaveWorkshop()
     {
+        EnableCommands(); // this call-out acts for this body, whoever was ThisPlayer() when it was scheduled
         restoreScheduled = false;
         if (!inWorkshop || leavingWorkshop) return;
         var inside = InSandboxSpace();

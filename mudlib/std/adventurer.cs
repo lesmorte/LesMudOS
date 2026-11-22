@@ -1523,7 +1523,12 @@ public abstract class Adventurer : Living
         foreach (var (item, n) in plan)
         {
             var description = Describe(item, n);
-            if (MovePortion(item, n, room) == null) { Write($"You cannot drop {description}.\n"); continue; }
+            if (MovePortion(item, n, room) == null)
+            {
+                // The one rule of a wizard's workshop that a drop can meet (docs/SANDBOX.md).
+                Write(room.Domain != "" && item.Domain == "" ? "Real things cannot be set down in the workshop; they leave with you.\n" : $"You cannot drop {description}.\n");
+                continue;
+            }
             LeaveRest();
             Write($"You drop {description}.\n");
             Say($"{Name} drops {description}.\n");
@@ -1980,7 +1985,7 @@ public abstract class Adventurer : Living
         if (!IsWizard(LevelStat)) return false;
         var thing = args.Trim() == "" ? null : FindHere(args.Trim());
         if (thing == null) { NotifyFail("Stat what? (a name, me, or here)"); return false; }
-        Write(thing.Call<string>("Stat") ?? thing.Name + "\n");
+        Write((thing.Call<string>("Stat") ?? thing.Name + "\n") + (thing.Domain != "" ? $"  Sandbox object ({thing.Domain}): it cannot leave the workshop.\n" : ""));
         return true;
     }
 
