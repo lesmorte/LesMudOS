@@ -40,6 +40,146 @@ public abstract class Skill : MudObject
     protected List<string> WeaponCategories = new();
     protected bool NeedsShield;
     protected bool NeedsUnarmed;
+    /// <summary>Separate weapon blows one use of an attack skill makes, each with its own hit roll (Double Strike: 2).</summary>
+    protected int Hits = 1;
+
+    // ---- Ranks (docs/specs/skill-ranks.md) ----
+    // Every active skill has ranks I, II, III ... The rank I numbers are the fields above (and Effect lines for numbers of the skill's
+    // own); RankRow lines give later ranks. Every number of every rank is read through RankValue, the one shared helper: no skill
+    // works out its own scaling. A rank a row does not name, and a number a row leaves out, follows the default step from the rank
+    // before: each rank adds EffectStep of the rank I value to an effect and CostStep of the rank I cost to a cost. Keys named in
+    // FixedKeys (durations, ranges, counts) do not change unless a row names them. Preparation and Recovery never change.
+
+    /// <summary>Rank r needs level RankLevelStep x (r - 1): rank II at 5, III at 10, IV at 15. The one place the step is named.</summary>
+    public const int RankLevelStep = 5;
+    /// <summary>The default step of an effect (damage, healing, bonus size) per rank: 30% of the rank I value.</summary>
+    public const double EffectStep = 0.30;
+    /// <summary>The default step of a resource cost per rank: 15% of the rank I cost.</summary>
+    public const double CostStep = 0.15;
+    /// <summary>The highest rank this skill has; 0 means every rank the level cap allows (the rule defines them all). 1: rank I only.</summary>
+    protected int MaxRank;
+    /// <summary>The skill's own rank I numbers by name ("min" 6, "max" 9, "heal" 8), for what the fields above do not hold.</summary>
+    protected readonly Dictionary<string, double> Effects = new();
+    /// <summary>Numbers that a rank does not change unless a row names them ("hits", "range", "seconds").</summary>
+    protected readonly HashSet<string> FixedKeys = new() { "hits" };
+    private readonly Dictionary<int, Dictionary<string, double>> rankRows = new();
+    private readonly Dictionary<int, string> rankTitles = new();
+
+    /// <summary>A rank I number of the skill's own: Effect("heal", 8).</summary>
+    protected void Effect(string key, double value) => Effects[key] = value;
+
+    /// <summary>
+    /// The numbers of one rank as data: RankRow(2, "min=8;max=12;focus=23"). Keys: endurance, focus (costs), tohit, crit, factor, hits,
+    /// and the skill's own Effect keys. A key left out follows the default step. title renames the skill at this rank and above
+    /// ("Triple Strike"); the command word never changes.
+    /// </summary>
+    protected void RankRow(int rank, string values, string title = "")
+    {
+        if (rank < 2) return;
+        var row = new Dictionary<string, double>();
+        foreach (var part in (values ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var eq = part.IndexOf('=');
+            if (eq > 0 && ParseNumber(part.Substring(eq + 1), out var v))
+                row[part.Substring(0, eq).Trim()] = v;
+        }
+        rankRows[rank] = row;
+        if (title != "") rankTitles[rank] = title;
+    }
+
+    /// <summary>Parse "-1" or "0.5" with a dot on every machine (mudlib code may not use cultures).</summary>
+    private static bool ParseNumber(string text, out double value)
+    {
+        value = 0;
+        text = text.Trim();
+        var negative = text.StartsWith("-");
+        if (negative) text = text.Substring(1);
+        var parts = text.Split('.');
+        if (parts.Length > 2 || parts[0].Length == 0 || !parts[0].All(char.IsDigit) || (parts.Length == 2 && (parts[1].Length == 0 || !parts[1].All(char.IsDigit)))) return false;
+        var fraction = parts.Length == 2 ? double.Parse(parts[1]) / Math.Pow(10, parts[1].Length) : 0;
+        value = (double.Parse(parts[0]) + fraction) * (negative ? -1 : 1);
+        return true;
+    }
+
+    /// <summary>The level a rank needs: 1 for rank I, RankLevelStep x (rank - 1) after.</summary>
+    public static int LevelForRank(int rank) => rank <= 1 ? 1 : RankLevelStep * (rank - 1);
+
+    /// <summary>The highest rank a character of this level may hold, by the cap rule alone.</summary>
+    public static int RankCapForLevel(int level) => Math.Max(1, level / RankLevelStep + 1);
+
+    /// <summary>I, II, III, IV ...</summary>
+    public static string Roman(int n)
+    {
+        if (n <= 0) return "";
+        var values = new[] { 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1 };
+        var words = new[] { "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I" };
+        var text = new StringBuilder();
+        for (var i = 0; i < values.Length; i++) while (n >= values[i]) { text.Append(words[i]); n -= values[i]; }
+        return text.ToString();
+    }
+
+    /// <summary>True for a skill with ranks above I (an active skill with a command, not a trait, and not marked rank I only).</summary>
+    public bool QueryHasRanks() => Kind != "trait" && Command != "" && MaxRank != 1;
+
+    /// <summary>The highest rank there is (0: no end but the level cap).</summary>
+    public int QueryMaxRank() => Kind == "trait" || Command == "" ? 1 : MaxRank;
+
+    /// <summary>Does the skill have this rank at all (ignoring level)?</summary>
+    public bool QueryRankExists(int rank) => rank == 1 || (rank > 1 && QueryHasRanks() && (MaxRank == 0 || rank <= MaxRank));
+
+    private double BaseValue(string key) => key switch
+    {
+        "endurance" => EnduranceCost,
+        "focus" => FocusCost,
+        "tohit" => ToHitBonus,
+        "crit" => CritChance,
+        "factor" => DamageFactor,
+        "hits" => Hits,
+        _ => Effects.TryGetValue(key, out var v) ? v : 0,
+    };
+
+    /// <summary>
+    /// The one shared helper: a number of the skill at a rank. Rank I is the base; each later rank is its row's number if the row names
+    /// it, else the previous rank's plus the default step (CostStep for endurance and focus, EffectStep for the rest, nothing for a
+    /// fixed key or a crit of -1, the basic chance) times the rank I value.
+    /// </summary>
+    public double RankValue(string key, int rank)
+    {
+        var value = BaseValue(key);
+        if (key == "crit" && value < 0) return value;
+        var step = FixedKeys.Contains(key) ? 0 : key is "endurance" or "focus" ? CostStep : EffectStep;
+        for (var r = 2; r <= rank; r++)
+            value = rankRows.TryGetValue(r, out var row) && row.TryGetValue(key, out var named) ? named : value + step * BaseValue(key);
+        return value;
+    }
+
+    /// <summary>RankValue rounded to the nearest whole number (half away from zero).</summary>
+    public int RankInt(string key, int rank) => (int)Math.Round(RankValue(key, rank), MidpointRounding.AwayFromZero);
+
+    /// <summary>The rank this user holds (1 for anyone who has not bought more; creatures use rank I).</summary>
+    public int RankOf(ObjectRef? user) => user == null ? 1 : Math.Max(1, user.Call<int>("QuerySkillRank", QueryId()));
+
+    /// <summary>The name at a rank: "Arcane Bolt II", or the rank's own title ("Triple Strike") with no numeral.</summary>
+    public string QueryTitleAt(int rank)
+    {
+        var own = "";
+        for (var r = 2; r <= rank; r++) if (rankTitles.TryGetValue(r, out var t)) own = t;
+        if (own != "") return own;
+        return rank <= 1 || !QueryHasRanks() ? Title : Title + " " + Roman(rank);
+    }
+
+    public string QueryTitleFor(ObjectRef? user) => QueryTitleAt(RankOf(user));
+    public int QueryEnduranceCostAt(int rank) => RankInt("endurance", rank);
+    public int QueryFocusCostAt(int rank) => RankInt("focus", rank);
+    public int QueryEnduranceCostFor(ObjectRef? user) => QueryEnduranceCostAt(RankOf(user));
+    public int QueryFocusCostFor(ObjectRef? user) => QueryFocusCostAt(RankOf(user));
+    public int QueryToHitBonusFor(ObjectRef? user) => RankInt("tohit", RankOf(user));
+    public int QueryCritChanceFor(ObjectRef? user) => RankInt("crit", RankOf(user));
+    public double QueryDamageFactorFor(ObjectRef? user) => RankValue("factor", RankOf(user));
+    public int QueryHitsFor(ObjectRef? user) => Math.Max(1, RankInt("hits", RankOf(user)));
+
+    /// <summary>The summary at a rank. A skill whose summary quotes numbers overrides it.</summary>
+    public virtual string QuerySummaryAt(int rank) => Summary;
 
     // ---- What the engine and the commands read ----
 
@@ -94,16 +234,21 @@ public abstract class Skill : MudObject
     /// <summary>After an attack skill's blow has missed or been dodged.</summary>
     public virtual void OnMiss(ObjectRef user, ObjectRef target) { }
 
-    /// <summary>The line the skills list shows. delaySeconds is this user's total delay for it.</summary>
-    public string Line(double delaySeconds)
+    /// <summary>The line the skills list shows, at rank I. delaySeconds is this user's total delay for it.</summary>
+    public string Line(double delaySeconds) => LineAt(delaySeconds, 1);
+
+    /// <summary>The line the skills list shows at a rank: name and rank, cost and time, the summary.</summary>
+    public string LineAt(double delaySeconds, int rank)
     {
         var cost = new List<string>();
-        if (EnduranceCost > 0) cost.Add($"{EnduranceCost} Endurance");
-        if (FocusCost > 0) cost.Add($"{FocusCost} Focus");
+        var endurance = QueryEnduranceCostAt(rank);
+        var focus = QueryFocusCostAt(rank);
+        if (endurance > 0) cost.Add($"{endurance} Endurance");
+        if (focus > 0) cost.Add($"{focus} Focus");
         var timing = Kind == "trait" ? "" : $" [{(cost.Count == 0 ? "free" : string.Join(", ", cost))}; " +
             (Preparation > 0 ? $"wind-up {Num(Preparation * 2)} s, " : "") + $"{Num(delaySeconds)} s]";
-        var name = Command == "" ? Title : $"{{cmd}}{Command}{{/}} ({Title})";
-        return $"{name}{timing}: {Summary}";
+        var name = Command == "" ? Title : $"{{cmd}}{Command}{{/}} ({QueryTitleAt(rank)})";
+        return $"{name}{timing}: {QuerySummaryAt(rank)}";
     }
 
     private static string Num(double value)

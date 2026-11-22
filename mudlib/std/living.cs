@@ -40,6 +40,8 @@ public class CombatAction
     public ObjectRef? Skill;
     /// <summary>The consumable of a "use" action.</summary>
     public ObjectRef? Item;
+    /// <summary>Blows an attack action makes, each with its own dodge, hit, critical and block rolls (Double Strike: 2).</summary>
+    public int Hits = 1;
 }
 
 /// <summary>
@@ -1273,12 +1275,34 @@ public abstract class Living : Thing
                 return;
             }
             if (action.Strike != "") TellRoom(room, $"{Cap(QueryLabel())} {action.Strike}\n");
-            Attack(target!, action);
+            strikingSkill = action.Skill?.Call<string>("QueryId") ?? "";
+            try
+            {
+                for (var blow = 0; blow < Math.Max(1, action.Hits); blow++)
+                {
+                    if (blow > 0 && (!target!.IsAlive || target.Call<bool>("IsDead") || Environment(target) != room || Dead || !Self.IsAlive)) break;
+                    Attack(target!, action);
+                }
+            }
+            finally { strikingSkill = ""; }
         }
-        else if (action.Kind == "skill" && action.Skill != null && action.Skill.IsAlive) action.Skill.Call("Resolve", Self, present ? target : null);
+        else if (action.Kind == "skill" && action.Skill != null && action.Skill.IsAlive)
+        {
+            strikingSkill = action.Skill.Call<string>("QueryId") ?? "";
+            try { action.Skill.Call("Resolve", Self, present ? target : null); }
+            finally { strikingSkill = ""; }
+        }
         else Special(action, present ? target : null);
         if (!Dead && Self.IsAlive) PruneEnemies();
     }
+
+    private string strikingSkill = "";
+
+    /// <summary>
+    /// The skill whose blow or spell this creature is landing at this moment ("arcane_bolt"), or "" for a plain attack or anything else.
+    /// A creature that dies asks its killer, to count a killing blow struck with a skill (docs/specs/skill-ranks.md, Unlocks). Read-only.
+    /// </summary>
+    public string QueryStrikingSkill() => strikingSkill;
 
     private void Attack(ObjectRef target, CombatAction action)
     {
@@ -1394,19 +1418,20 @@ public abstract class Living : Thing
         if (Dead) return "You are in no state to do that.";
         var isSpell = skill.Call<string>("QueryKind") == "spell";
         if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
-        var enduranceCost = skill.Call<int>("QueryEnduranceCost");
-        var focusCost = skill.Call<int>("QueryFocusCost");
+        // Every number comes from the skill at the rank this creature holds (docs/specs/skill-ranks.md): the skill's one helper reads it.
+        var enduranceCost = skill.Call<int>("QueryEnduranceCostFor", Self);
+        var focusCost = skill.Call<int>("QueryFocusCostFor", Self);
         if (isSpell && focusCost > 0) focusCost = Math.Max(1, (int)Math.Round(focusCost * (1 + QueryMod("spell_cost_pct") / 100.0), MidpointRounding.AwayFromZero));
         var isAttack = skill.Call<bool>("QueryIsAttack");
         var action = new CombatAction
         {
-            Id = skill.Call<string>("QueryId") ?? "skill", Name = skill.Call<string>("QueryTitle") ?? "Skill",
+            Id = skill.Call<string>("QueryId") ?? "skill", Name = skill.Call<string>("QueryTitleFor", Self) ?? "Skill",
             Preparation = skill.Call<double>("QueryPreparation"), Recovery = skill.Call<double>("QueryRecovery"),
             ReactionMod = skill.Call<double>("QueryReactionMod"), WindUp = skill.Call<string>("QueryWindUp") ?? "",
             Kind = isAttack ? "attack" : "skill", EnduranceCost = enduranceCost, FocusCost = focusCost,
-            ToHitBonus = skill.Call<int>("QueryToHitBonus"), CritChance = skill.Call<int>("QueryCritChance"),
-            DamageFactor = skill.Call<double>("QueryDamageFactor"), DamageMultiplier = Math.Max(1, skill.Call<int>("QueryDamageMultiplier")),
-            Skill = skill,
+            ToHitBonus = skill.Call<int>("QueryToHitBonusFor", Self), CritChance = skill.Call<int>("QueryCritChanceFor", Self),
+            DamageFactor = skill.Call<double>("QueryDamageFactorFor", Self), DamageMultiplier = Math.Max(1, skill.Call<int>("QueryDamageMultiplier")),
+            Hits = Math.Max(1, skill.Call<int>("QueryHitsFor", Self)), Skill = skill,
         };
         if (!CanPay(action))
             return QueryEndurance() < action.EnduranceCost ? "You are too tired for that." : "You do not have the focus for that.";
