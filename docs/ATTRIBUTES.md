@@ -198,3 +198,7 @@ Priest and Adventurer tables are unchanged. Known consequences: a character who 
 | Scout Vitality | 3 base, 7 a level | 3 base, **8** a level |
 
 Simulated result for a level 5 character in starting gear with 4 potions and points placed, middle human model, with these two changes and resting: about 81 / 71 / 84 / 73 / 74 (the Priest stays high until Minor Heal is settled in the skill ranks work). Rooms refill whether or not someone is resting in them: that risk is intended.
+
+## 10. The storytelling pass (step 5, done 21 November 2026)
+
+The world now speaks the six words. About thirty people (the Hollow, the road and Oakenfell) answer topics on the attribute that fits who they are; six new readables (the guild's trophy labels, the shrine's scratched names, the tavern slate, the Hall of Legends' Six Words plaque, the Silver Stag's wall, the Proving Yard slate) and three older plaques remember people by an attribute; a few Chronicle templates and Renown recognition lines read deeds as feats of an attribute (the deed, never the person's score); each calling's description names the attributes it leans on. Only Guildmaster Rowan names the `improve` command. The level-up message and `score` already said, in one line naming `improve`, that points were waiting, so nothing in `mudlib/std` changed. `tests/story_test.py` covers it.
