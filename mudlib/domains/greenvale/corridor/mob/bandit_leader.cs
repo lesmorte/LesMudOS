@@ -44,6 +44,7 @@ public class CmBanditLeader : Monster
         GoldMin = 30;
         GoldMax = 60;
         Aggressive = true;
+        Boss = true;
         DeathMessage = "The Bandit Leader sinks to one knee, lets the sabre fall from his fingers, and topples over.";
         BaseReaction = 3.5;
         AddCombatAction("slash", "Sabre Slash", preparation: 0, recovery: 1);

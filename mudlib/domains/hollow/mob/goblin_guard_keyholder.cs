@@ -28,6 +28,7 @@ public class GoblinGuardKeyholder : Monster
         GoldMin = 4;
         GoldMax = 12;
         Aggressive = true;
+        Alert = true;
         AddLoot("/domains/hollow/obj/rusty_key", 100);
     }
 }

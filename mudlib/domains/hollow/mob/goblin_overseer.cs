@@ -37,6 +37,7 @@ public class GoblinOverseer : Monster
         Armor = 3;
         XpValue = 250;
         Aggressive = true;
+        Boss = true;
         DeathMessage = "The Goblin Overseer staggers, drops to his knees, and falls dead among his maps.";
         BaseReaction = 4.0;
         AddCombatAction("slash", "Axe Slash", preparation: 0, recovery: 1.0);

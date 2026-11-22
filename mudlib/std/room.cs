@@ -416,6 +416,9 @@ public abstract class Room : MudObject
             return false;
         }
 
+        // A sneaking character who is leaving: creatures that have not noticed them roll once more, and a room costs Endurance.
+        if (Interactive(who) && !who.Call<bool>("SneakDeparts", destination)) return false;
+
         var name = who.Call<string>("QueryName") ?? "Someone";
         if (secret)
         {

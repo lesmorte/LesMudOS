@@ -35,6 +35,7 @@ public class CmFallenKnight : Monster
         GoldMin = 20;
         GoldMax = 40;
         Aggressive = true;
+        Boss = true;
         DeathMessage = "The Fallen Knight sags to his knees, the pale light dying in his helm, and lies still beside the bier.";
         BaseReaction = 3.5;
         AddCombatAction("cleave", "Rusted Cleave", preparation: 0, recovery: 1);

@@ -28,5 +28,6 @@ public class GoblinGuard : Monster
         GoldMin = 4;
         GoldMax = 12;
         Aggressive = true;
+        Alert = true;
     }
 }

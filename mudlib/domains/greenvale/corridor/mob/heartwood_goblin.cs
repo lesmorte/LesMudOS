@@ -36,6 +36,7 @@ public class CmHeartwoodGoblin : Monster
         GoldMin = 5;
         GoldMax = 12;
         Aggressive = true;
+        Alert = true;
         BaseReaction = 3;
         AddCombatAction("slash", "Slash", preparation: 0, recovery: 1);
         AddCombatAction("heavy", "Heavy Swing", preparation: 0.5, recovery: 1.5, windUp: "hauls the club back over his shoulder", damageMultiplier: 2, strike: "brings the club down with all his weight!");

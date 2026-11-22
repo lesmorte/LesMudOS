@@ -32,6 +32,7 @@ public class CmBanditLookout : Monster
         GoldMin = 3;
         GoldMax = 8;
         Aggressive = true;
+        Alert = true;
         BaseReaction = 3;
         AddCombatAction("slash", "Slash", preparation: 0, recovery: 1);
         AddLoot("/domains/hollow/obj/iron_dagger", 20);

@@ -30,6 +30,7 @@ public class GoblinEliteGuard : Monster
         GoldMin = 12;
         GoldMax = 22;
         Aggressive = true;
+        Alert = true;
         BaseReaction = 3.5;
         AddCombatAction("slash", "Slash", preparation: 0, recovery: 1.0);
         AddLoot("/domains/hollow/obj/captains_sabre", 10);

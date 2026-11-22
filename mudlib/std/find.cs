@@ -172,6 +172,7 @@ public class Find : Thing
         }
 
         who.Call("RestDisturbed", QueryVerb());
+        who.Call("Disturbed", QueryVerb()); // opening a container is loud for a sneaking Scout
         var name = who.Call<string>("QueryName") ?? "Someone";
         TellRoom(room, $"{name} searches {(ShortDesc != null ? Plain(ShortDesc) : Name.ToLowerInvariant())}.\n", who);
         var gold = answer[0];

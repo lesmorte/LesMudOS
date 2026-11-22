@@ -39,7 +39,7 @@ public class SnProbe : Thing
     public override string? Short() => "a probe";
     public override void Init()
     {
-        foreach (var v in new[] { "sgold", "slevel", "sspawn", "stele", "sstat", "shurt", "sfill", "sslay", "sgive", "sdoor", "srolls", "sres", "sclone", "ssneak", "sdrop" })
+        foreach (var v in new[] { "sgold", "slevel", "sspawn", "stele", "sstat", "shurt", "sfill", "sslay", "sgive", "sdoor", "srolls", "sres", "sclone", "sdrop", "sspawnin", "sclear", "schance", "sskill" })
             AddAction(v, Do);
     }
     private ObjectRef? Named(string name, ObjectRef room) =>
@@ -84,6 +84,14 @@ public class SnProbe : Thing
             }
             case "srolls": Write("ROLLS " + LoadObject("/secure/sneak").Call<bool>("SetTestRolls", w[0]) + "\n"); return true;
             case "sres": me.Call("SetResources", int.Parse(w[0]), int.Parse(w[1])); Write("RES " + me.Call<int>("QueryEndurance") + "\n"); return true;
+            case "sspawnin": MoveObject(CloneObject("/domains/sneaktest/" + w[1]), LoadObject(w[0])); Write("SPAWNEDIN\n"); return true;
+            case "sclear": { foreach (var o in AllInventory(LoadObject(w[0])).ToList()) if (o.IsAlive && o.Call<bool>("IsMonster")) o.Call("Die", (ObjectRef?)null); Write("CLEARED\n"); return true; }
+            case "schance":
+            {
+                var n = w.Select(int.Parse).ToArray();
+                Write("CHANCE " + LoadObject("/secure/sneak").Call<int>("NoticeChance", n[0], n[1], n[2], n[3] == 1, n[4]) + "\n"); return true;
+            }
+            case "sskill": { var k = LoadObject("/skills/" + w[0]); Write("SKILL " + string.Join(" ", Enumerable.Range(1, int.Parse(w[2])).Select(r => k.Call<double>("RankValue", w[1], r))) + "\n"); return true; }
             case "sclone": { var r = CloneObject(w[0]); MoveObject(r, room); Write("CLONED " + r.Name + "\n"); return true; }
         }
         return false;
@@ -255,14 +263,96 @@ def test_files():
     f[T + "stay_b"] = droom("SnStayB", "Stay Hall B", {"west": T + "stay_a"}, 'AddDoor("west", "door", closed: false, closesOnReset: false);\n', reset=6)
     f[T + "pat_a"] = droom("SnPatA", "Patrol Hall A", {"east": T + "pat_b", "out": T + "hall"}, 'AddDoor("east", "door");\nAddSpawn("/domains/sneaktest/warden");\n')
     f[T + "pat_b"] = droom("SnPatB", "Patrol Hall B", {"west": T + "pat_a"}, 'AddDoor("west", "door");\n')
-    f[T + "hall"] = droom("SnHall", "Sneak Hall", {"up": VILLAGE + "square", "door_a": T + "door_a", "lock_a": T + "lock_a", "reset_a": T + "reset_a", "stay_a": T + "stay_a", "pat_a": T + "pat_a"}, "",
+    f[T + "hall"] = droom("SnHall", "Sneak Hall", {"up": VILLAGE + "square", "door_a": T + "door_a", "lock_a": T + "lock_a", "reset_a": T + "reset_a", "stay_a": T + "stay_a", "pat_a": T + "pat_a", "lurk": T + "n_lurk", "sent": T + "n_sent", "tyrant": T + "n_tyrant", "giant": T + "n_giant", "two": T + "n_two", "empty": T + "n_empty", "morgue": T + "n_morgue", "jabroom": T + "n_jabroom", "ndoor": T + "n_ndoor"}, "",
                           rk.HALL_INIT.replace("/domains/ranktest/probe", T + "probe"))
     f.update(sneak_files())
     return f
 
 
+CHEST = """// @inherit /std/find
+public class SnChest : Find
+{
+    public override void Create()
+    {
+        Name = "Test Chest"; Ids.Add("chest"); ShortDesc = "a test chest"; LongDesc = "A chest made for the sneak test.";
+        ItemPath = "/domains/sneaktest/sword";
+    }
+}
+"""
+
+WIZ_MONSTER = """// @inherit /std/monster
+public class SnWizLurker : Monster
+{
+    public override void Create()
+    {
+        Name = "Wizlurker"; Ids.Add("wizlurker"); ShortDesc = "a wizard's lurker"; LongDesc = "Made by a wizard.";
+        Level = 1; MaxVitality = 50000; DamageMin = 1; DamageMax = 1; ToHit = -40; Armor = 0; Dodge = 0; XpValue = 0; Aggressive = true; BaseReaction = 2.0;
+    }
+}
+"""
+
+WIZ_LAIR = """// @inherit /std/room
+public class SnWizLair : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Wizard Lair"; LongDesc = "A wizard's room with a wizard's creature.";
+        Exits["out"] = "/domains/sneaktest/hall";
+        AddSpawn("/wiz/snchief/wizlurker");
+    }
+}
+"""
+
+SNEAK_MEDDLER = r'''// @inherit /std/thing
+public class SnSneakMeddler : Thing
+{
+    public override void Create() { Name = "snmeddler"; Ids.Add("snmeddler"); }
+    public override string? Short() => "a snmeddler";
+    public override void Init() { AddAction("smeddle", Meddle); }
+    private bool Meddle(string args)
+    {
+        var who = Users().First(u => u.Call<string>("QueryName")!.ToLowerInvariant() == args.Trim());
+        var room = Environment(who)!;
+        var lurker = AllInventory(room).FirstOrDefault(o => o.IsAlive && o.Call<bool>("IsMonster"));
+        if (lurker == null) { Write("MEDDLE NOLURKER in " + room.ProgramPath + "\n"); return true; }
+        var tries = new List<string>();
+        void Try(string label, Func<object?> f)
+        {
+            try { tries.Add(label + "=" + (f() ?? "null")); }
+            catch (MudRuntimeException e) { tries.Add(label + "!" + e.Message.Length); }
+        }
+        var daemon = LoadObject("/secure/sneak");
+        Try("Notice", () => who.Call<int>("SneakNotice", lurker!));
+        Try("Engage", () => { lurker!.Call("Engage"); return "called"; });
+        Try("Departs", () => who.Call<bool>("SneakDeparts", LoadObject("/domains/sneaktest/hall")));
+        Try("Disturbed", () => { who.Call("Disturbed", "open"); who.Call("Disturbed", "say"); return "called"; });
+        Try("Rolls", () => daemon.Call<bool>("SetTestRolls", "notice:0.0"));
+        Try("RollsRandom", () => daemon.Call<bool>("SetTestRolls", "random"));
+        Try("RollsNow", () => daemon.Call<string>("QueryTestRolls"));
+        Try("Sneaking", () => who.Call<bool>("QuerySneaking"));
+        Try("Surprising", () => who.Call<bool>("QuerySurprising"));
+        Write("MEDDLE " + string.Join(" ", tries) + "\n");
+        return true;
+    }
+}
+'''
+
+LURKERS = (("lurker", "Lurker", 1, ""), ("sentry", "Sentry", 1, "        Alert = true;\n"), ("tyrant", "Tyrant", 1, "        Boss = true;\n"), ("giant", "Giant", 6, ""))
+
+
 def sneak_files():
-    return {}
+    f = {}
+    for ident, name, level, flag in LURKERS:
+        f[T + ident] = creature("Sn" + name, name, ident, level=level, aggressive=True, reaction=6.0, flags=flag)
+    f[T + "jab"] = creature("SnJab", "Jab", "jab", reaction=2.0)
+    f[T + "lootdummy"] = creature("SnLootDummy", "Lootdummy", "lootdummy", hp=1, flags='        AddLoot("/domains/sneaktest/sword", 100);\n')
+    f[T + "chest"] = CHEST
+    # One room per case: each has its own creature (cloned when the room loads) and a way back out to the hall.
+    for room, spawns in (("empty", ""), ("lurk", "lurker"), ("sent", "sentry"), ("tyrant", "tyrant"), ("giant", "giant"), ("two", "lurker lurker"), ("morgue", ""), ("jabroom", "")):
+        f[T + "n_" + room] = droom("SnN" + room.capitalize(), "Sneak " + room.capitalize(), {"out": T + "hall"})
+    f[T + "n_ndoor"] = droom("SnNDoor", "Sneak Door", {"out": T + "hall", "east": T + "n_ndoor_b"}, 'AddDoor("east", "door");\n')
+    f[T + "n_ndoor_b"] = droom("SnNDoorB", "Sneak Door Beyond", {"west": T + "n_ndoor"}, 'AddDoor("west", "door");\n')
+    return f
 
 
 def login(name, calling):
@@ -495,6 +585,486 @@ def step_doorprobe(chief, mudlib):
     watcher.command("quit")
 
 
+# ---------------------------------------------------------------- 3. sneak
+
+def rolls(chief, value):
+    """Fix every notice roll (percent, 0 to 99.9): a creature notices if the roll is below its chance."""
+    check(f"dice fixed at {value}", chief.command(f"srolls notice:{value}"), "ROLLS True")
+
+
+def stat(c):
+    out = c.command("sstat")
+    m = re.search(r"end (\d+)/(\d+) .*sneaking (\w+) fighting (\w+) grace (\d+)", out)
+    return {"end": int(m.group(1)), "sneaking": m.group(3) == "True", "fighting": m.group(4) == "True", "grace": int(m.group(5))} if m else {}
+
+
+def chance(grace, scout, creature, alert=False, adj=0):
+    c = max(10, min(90, 50 - 5 * (grace - 5) + 5 * (creature - scout)))
+    return max(5, min(100, c + (30 if alert else 0) + adj))
+
+
+def sneaker(name, calling="scout", level=1):
+    c = login(name, calling)
+    c.command("sfill")
+    return c
+
+
+def step_sneak(chief):
+    # The formula, at its edges.
+    for args, want in (("9 1 1 0 0", 30), ("5 1 1 0 0", 50), ("15 1 1 0 0", 10), ("1 1 1 0 0", 70), ("1 1 10 0 0", 90), ("9 1 1 1 0", 60),
+                       ("1 1 10 1 0", 100), ("9 5 1 0 0", 10), ("9 1 6 0 0", 55), ("9 1 1 0 -10", 20), ("9 1 1 0 -20", 10),
+                       ("15 1 1 0 -20", 5), ("9 1 1 1 -20", 40), ("9 10 1 0 0", 10), ("0 1 1 0 0", 75)):
+        check(f"notice chance for grace/scout/creature/alert/rank {args}", chief.command("schance " + args), f"CHANCE {want}")
+    check("Precision Strike's ambush factors by rank", chief.command("sskill precision_strike ambush 4"), "SKILL 1.5 1.75 2 2.25")
+    check("Sneak's Endurance a room by rank", chief.command("sskill sneak room 3"), "SKILL 5 4 3")
+    check("Sneak's notice change by rank", chief.command("sskill sneak notice 3"), "SKILL 0 -10 -20")
+
+    w = sneaker("snwar", "warrior")
+    check("a warrior has no sneak command", w.command("sneak"), absent=("begin to move quietly",))
+    w.command("quit")
+
+    s = sneaker("snscout")
+    g = stat(s)["grace"]
+    check("sneak is a skill the Scout has, in the skills list", s.command("skills"), "sneak", "Sneak", "Moves quietly")
+    out = s.command("sneak")
+    check("sneak turns it on and says what a room costs", out, "You begin to move quietly. Each room you enter costs 5 Endurance.")
+    check("the state shows", str(stat(s)["sneaking"]), "True")
+    check("score shows it with the rank and the cost", s.command("score"), "You are sneaking (rank I): each room costs 5 Endurance")
+    check("the prompt token {sneak}", s.command("prompt {sneak}> ") + s.command("look"), "(sneaking) >")
+    s.command("prompt off")
+    check("sneak again is already on", s.command("sneak on"), "You are already sneaking.")
+    check("sneak off stops it", s.command("sneak off"), "You stop sneaking.")
+    check("and is not sneaking", s.command("sneak off"), "You are not sneaking.")
+    check("sneak with a stray word", s.command("sneak sideways"), "Sneak on, or sneak off.")
+    check("score shows no sneaking now", s.command("score"), absent=("You are sneaking",))
+    check("nothing is saved: the state is false after the stop", str(stat(s)["sneaking"]), "False")
+
+    # Entry, without sneaking: the creature attacks as it always did.
+    rolls(chief, "50.0")
+    to(s, "hall")
+    put(s, "lurk", "lurker")
+    out = say(s, "lurk", 4.0)
+    check("not sneaking: the lurker attacks", out, "attacks you")
+    chief_slay(s)
+    s.command("sfill")
+
+    # Entry while sneaking, at the edges of the chance (30% for this Scout against a level 1 creature).
+    c30 = chance(g, 1, 1)
+    for label, room, creature_alert, roll, noticed in (
+            (f"plain, roll just under {c30}%", "lurk", False, f"{c30 - 1}.9", True),
+            (f"plain, roll exactly {c30}%", "lurk", False, f"{c30}.0", False),
+            ("alert (+30): a roll the plain one misses", "sent", True, f"{c30}.0", True),
+            ("alert, roll at its chance", "sent", True, f"{chance(g, 1, 1, True)}.0", False),
+            ("a level 6 creature: +25", "giant", False, f"{chance(g, 1, 6) - 1}.9", True),
+            ("a level 6 creature, at its chance", "giant", False, f"{chance(g, 1, 6)}.0", False),
+            ("a Boss always notices, at the highest roll", "tyrant", False, "99.9", True)):
+        rolls(chief, roll)
+        to(s, "hall")
+        s.command("sfill")
+        s.command("sneak on")
+        put(s, room, {"lurk": "lurker", "sent": "sentry", "giant": "giant", "tyrant": "tyrant"}[room])
+        s.command("sres 60 0")
+        out = s.command(room)
+        st = stat(s)
+        out += a.quiet(s, 4.0)
+        if noticed:
+            check(f"entry, {label}: it notices and attacks", out, "has noticed you!", "attacks you")
+        else:
+            check(f"entry, {label}: it does not notice", out, "has not noticed you.", absent=("attacks you", "noticed you!"))
+        check(f"entry, {label}: the room cost 5 Endurance (60 to 55)", str(54 <= st["end"] <= 56), "True")
+        st = stat(s)
+        check(f"entry, {label}: sneaking is {'over' if noticed else 'still on'}", str(st["sneaking"]), str(not noticed))
+        check(f"entry, {label}: the fight is {'on' if noticed else 'not begun'}", str(st["fighting"]), str(noticed))
+        chief_slay(s)
+        s.command("sneak off")
+
+    # A room with nothing aggressive in it costs the same and nothing happens.
+    rolls(chief, "0.0")
+    to(s, "hall")
+    s.command("sfill")
+    s.command("sneak on")
+    s.command("sres 60 0")
+    s.command("empty")
+    st = stat(s)
+    check("an empty room: no roll, no fight, still sneaking, 5 Endurance", str(st["sneaking"]) + str(54 <= st["end"] <= 56) + str(st["fighting"]), "TrueTrueFalse")
+    s.command("quit")
+
+
+def stat_max(c):
+    m = re.search(r"end \d+/(\d+)", c.command("sstat"))
+    return int(m.group(1))
+
+
+def put(c, room, *creatures):
+    """Empty a test room of creatures and put fresh ones in it (the probe's own, so no room has to reset between cases)."""
+    c.command("sclear " + T + "n_" + room)
+    for x in creatures:
+        c.command(f"sspawnin {T}n_{room} {x}")
+
+
+def chief_slay(c):
+    c.command("sslay")
+    a.drain(c, 0.6)
+
+
+# ---------------------------------------------------------------- 4. staying and leaving
+
+def step_leave(chief):
+    s = sneaker("snleave")
+    g = stat(s)["grace"]
+    c30 = chance(g, 1, 1)
+    rolls(chief, "50.0")
+    to(s, "hall")
+    s.command("sneak on")
+    put(s, "lurk", "lurker")
+    say(s, "lurk", 1.5)
+    check("an unaware lurker: still sneaking", str(stat(s)["sneaking"]), "True")
+    # Leaving: the lurker rolls at the entry chance; a notice starts the fight and the Scout stays.
+    rolls(chief, f"{c30 - 1}.9")
+    before = stat(s)["end"]
+    out = say(s, "out", 3.0)
+    check("leaving: a lurker that notices starts the fight", out, "has noticed you!", "attacks you", absent=("Sneak Hall",))
+    check("the Scout stays in the room", s.command("look"), "Sneak Lurk")
+    check("no Endurance was spent on a room not left", str(stat(s)["end"] >= before), "True")
+    check("sneaking is over", str(stat(s)["sneaking"]), "False")
+    # Spotted: sneak is refused while that creature lives and the Scout stays.
+    out = s.command("sneak")
+    check("sneak is refused where a creature has seen you", out, "has seen you; there is no hiding from it here.")
+    s.command("sfill")
+    chief_slay(s)
+    out = s.command("sneak")
+    check("with the spotter dead it works again", out, "You begin to move quietly.")
+    s.command("sneak off")
+    # A fight refuses it too.
+    s.command("sspawn dummy")
+    s.command("kill dummy")
+    check("sneak is refused in a fight", s.command("sneak"), "You cannot slip out of sight while you are fighting.")
+    chief_slay(s)
+
+    # Leaving at a roll the lurker fails: the Scout goes and pays.
+    to(s, "hall")
+    s.command("sfill")
+    s.command("sneak on")
+    rolls(chief, "50.0")
+    put(s, "lurk", "lurker")
+    say(s, "lurk", 1.5)
+    start = stat(s)["end"]
+    out = say(s, "out", 1.5)
+    check("leaving past a lurker that does not notice: out in the hall", s.command("look"), "Sneak Hall")
+    check("and the room cost 5 Endurance", str(stat(s)["end"] <= start - 5 + 1), "True")
+    check("still sneaking", str(stat(s)["sneaking"]), "True")
+
+    # While staying: a re-roll every 10 s at half the chance (c30/2).
+    half = c30 // 2
+    rolls(chief, "50.0")
+    put(s, "lurk", "lurker")
+    say(s, "lurk", 1.5)
+    rolls(chief, f"{half}.0")  # not below half the chance: the creature stays unaware at 10 s although the full chance would catch it
+    out = say(s, "look", 12.5)
+    check("a re-roll at the half chance does not notice at a roll between half and full", out, absent=("noticed you!", "attacks you"))
+    check("still sneaking", str(stat(s)["sneaking"]), "True")
+    rolls(chief, f"{half - 1}.9")
+    out = say(s, "look", 11.5)
+    check("a roll below the half chance notices at the next re-roll", out, "has noticed you!", "attacks you")
+    check("sneaking is over", str(stat(s)["sneaking"]), "False")
+    chief_slay(s)
+
+    # Two creatures: each must fail the leave roll.
+    to(s, "hall")
+    s.command("sfill")
+    rolls(chief, "50.0")
+    s.command("sneak on")
+    put(s, "two", "lurker", "lurker")
+    out = say(s, "two", 1.5)
+    check("two lurkers, both unaware", out, "has not noticed you.", absent=("attacks you",))
+    # The dice are one number for every roll, so one noticing is as good as both for this check: the point is that a notice from any starts the fight.
+    rolls(chief, f"{c30 - 1}.9")
+    out = say(s, "out", 3.0)
+    check("two lurkers: a notice from them starts the fight and the Scout stays", out, "has noticed you!", "attacks you")
+    check("in the room still", s.command("look"), "Sneak Two")
+    chief_slay(s)
+
+    # Too tired to sneak a room.
+    to(s, "hall")
+    s.command("sfill")
+    rolls(chief, "50.0")
+    s.command("sneak on")
+    s.command("sres 3 0")
+    out = say(s, "empty", 1.0)
+    check("too tired: sneaking ends and the Scout goes on openly", out, "You are too tired to keep sneaking, and go on openly.", "Sneak Empty")
+    check("and is no longer sneaking", str(stat(s)["sneaking"]), "False")
+    s.command("quit")
+
+
+# ---------------------------------------------------------------- 5. loud and quiet
+
+def step_loud(chief):
+    s = sneaker("snloud")
+    rolls(chief, "50.0")
+
+    s.command("slevel 2")  # shout needs level 2
+
+    def fresh(room="lurk", n=1):
+        chief_slay(s)
+        to(s, "hall")
+        s.command("sfill")
+        s.command("sneak on")
+        put(s, room, *(["lurker"] * n))
+        return say(s, room, 1.2)
+
+    # kill and strike start a fight with one lurker: the second, which had not noticed, wakes and attacks too.
+    for label, room, line, n in (("say", "lurk", "say hello", 1), ("shout", "lurk", "shout hello", 1), ("kill", "lurk", "kill lurker", 2),
+                                 ("a skill that is not Tracking (strike)", "lurk", "strike lurker", 2), ("opening a door", "ndoor", "open door", 1)):
+        fresh(room, n)
+        check(f"{label}: sneaking was on", str(stat(s)["sneaking"]), "True")
+        out = say(s, line, 4.0)
+        check(f"{label}: it is loud, sneaking ends", out, "You are no longer sneaking.")
+        check(f"{label}: and the room wakes: the lurker attacks", out, "attacks you")
+        check(f"{label}: the state is off", str(stat(s)["sneaking"]), "False")
+    to(s, "hall")
+    s.command("ndoor")
+    s.command("close door")
+    s.command("out")
+
+    # Picking up from the floor and from a corpse, and searching a chest.
+    for label, setup, line in (("get from the floor", "floor", "get evensword"), ("get from a corpse", "corpse", "loot"), ("looting a chest", "chest", "get chest")):
+        chief_slay(s)
+        to(s, "hall")
+        s.command("sfill")
+        s.command("sneak off")
+        room = "lurk"
+        if setup == "corpse":
+            # A corpse that holds something, in the morgue; then a lurker is brought in, and the Scout slips in while it is unaware.
+            to(s, "n_morgue")
+            s.command("sspawn lootdummy")
+            s.command("kill lootdummy")
+            a.quiet(s, 5.0)
+            s.command("out")
+            s.command("sspawnin " + T + "n_morgue lurker")
+            room = "morgue"
+        s.command("sneak on")
+        if setup != "corpse": put(s, "lurk", "lurker")
+        say(s, room, 1.0)
+        if setup == "floor":
+            s.command("sclone /domains/sneaktest/sword")
+        if setup == "chest":
+            s.command("sclone /domains/sneaktest/chest")
+        check(f"{label}: sneaking was on in a room with a lurker", str(stat(s)["sneaking"]), "True")
+        out = say(s, line, 4.0)
+        check(f"{label}: it is loud", out, "You are no longer sneaking.")
+        check(f"{label}: the lurker attacks", out, "attacks you")
+    chief_slay(s)
+
+    # Quiet: look, rest, tell, Tracking.
+    fresh("lurk")
+    out = say(s, "look", 1.0) + say(s, "rest", 1.0) + say(s, "tell snchief hello", 1.0) + say(s, "stand", 0.5)
+    check("look, rest, tell and stand are quiet", out, absent=("no longer sneaking", "attacks you"))
+    check("still sneaking", str(stat(s)["sneaking"]), "True")
+    out = say(s, "track", 3.0)
+    check("Tracking is quiet", out, absent=("no longer sneaking", "attacks you"))
+    check("still sneaking after Tracking", str(stat(s)["sneaking"]), "True")
+    chief_slay(s)
+    s.command("quit")
+
+
+# ---------------------------------------------------------------- 6. the opener
+
+def first_action(c, line, name, limit=16.0):
+    a.drain(c, 0.4)
+    data = ""
+    start = time.time()
+    c.send(line)
+    pattern = r"(?im)^(?!.*attacks you)(?:the |a )?" + name + r" .*\byou\b|you dodge (?:the |a )?" + name
+    while time.time() - start < limit:
+        data += a.quiet(c, 0.05)
+        if re.search(pattern, data):
+            return time.time() - start, data
+    if os.environ.get("SNEAK_DEBUG"):
+        print("      no action seen:", repr(data[-500:]))
+    return None, data
+
+
+def landed(text):
+    return [int(x) for x in re.findall(r"\(\+(\d+) damage\)", text)]
+
+
+def step_ambush(chief):
+    s = sneaker("snambush")
+    s.command("verbose on")  # damage numbers in the blow lines
+    s.command("sgive sword")
+    s.command("sgive bow")
+    s.command("wield evensword")
+    rolls(chief, "50.0")
+    # Surprise: the target's first action waits twice as long (Jab: Reaction 2.0, 4 s; 8 s surprised).
+    to(s, "n_jabroom")
+    s.command("sspawn jab")
+    secs, data = first_action(s, "kill jab", "jab")
+    check("an ordinary fight: the target's first action comes at Reaction x 2 (4 s)", str(secs is not None and 3.4 <= secs <= 4.9), "True")
+    chief_slay(s)
+    s.command("out")
+    to(s, "n_jabroom")
+    s.command("sfill")
+    s.command("sneak on")
+    s.command("sspawn jab")
+    secs, data = first_action(s, "kill jab", "jab")
+    print("      surprised first action (seconds):", secs)
+    check("begun unnoticed: the target is surprised, its first action doubles (8 s)", str(secs is not None and 7.4 <= secs <= 9.4), "True")
+    chief_slay(s)
+    # With a bow: the ranged opening is kept (2 s) and the surprise added.
+    s.command("wield evenbow")
+    to(s, "n_jabroom")
+    s.command("sfill")
+    s.command("sneak on")
+    s.command("sspawn jab")
+    secs, data = first_action(s, "kill jab", "jab")
+    print("      bow, surprised first action (seconds):", secs)
+    check("a bow from hiding: 4 s + 2 s ranged opening + 4 s surprise (10 s)", str(secs is not None and 9.3 <= secs <= 11.4), "True")
+    chief_slay(s)
+
+    # Damage of the opener: Precision Strike x1.5 from hiding (10 x 1.5 = 15), 10 otherwise; Aimed Shot keeps its opener (x2.5).
+    s.command("wield evensword")
+
+    def blows(prep, line, sneak, tries=8):
+        got = []
+        for _ in range(tries):
+            to(s, "n_jabroom")
+            s.command("sfill")
+            if sneak:
+                s.command("sneak on")
+            s.command("sspawn jab")
+            a.drain(s, 0.3)
+            s.send(line)
+            text = ""
+            end = time.time() + 6
+            while time.time() < end and not landed(text) and "You miss" not in text:
+                text += a.quiet(s, 0.25)
+            got += landed(text)
+            chief_slay(s)
+            s.command("out")
+            if len(got) >= 3:
+                break
+        return got
+    plain = blows("strike", "strike jab", False)
+    hidden = blows("strike", "strike jab", True)
+    print("      strike damage plain / from hiding:", plain, hidden)
+    check("Precision Strike not from hiding: the weapon's 10 (a critical may add)", str(bool(plain) and min(plain) == 10), "True")
+    check("Precision Strike as the blow that starts the fight from hiding: x1.5 (15)", str(bool(hidden) and min(hidden) == 15), "True")
+    s.command("wield evenbow")
+    aimed = blows("aim", "aim jab", True)
+    print("      aimed shot from hiding:", aimed)
+    check("Aimed Shot from hiding keeps its own opener (x2.5 = 25)", str(bool(aimed) and min(aimed) == 25), "True")
+    s.command("quit")
+
+
+# ---------------------------------------------------------------- 7. ranks
+
+def step_ranks(chief):
+    s = sneaker("snrank")
+    to(s, VILLAGE + "strung_yew")
+    check("Wenna offers Sneak II", s.command("ranks"), "Wenna Farrow teaches", "Sneak II")
+    s.command("slevel 5")
+    s.command("sgold 500")
+    out = s.command("train sneak")
+    check("Wenna teaches Sneak II", out, "You pay Wenna Farrow", "Sneak II")
+    check("rank II: room cost 4", s.command("sneak"), "Each room you enter costs 4 Endurance.")
+    check("score shows rank II and the notice change", s.command("score"), "You are sneaking (rank II): each room costs 4 Endurance, and creatures notice you 10 points less often")
+    check("Wenna teaches no further", s.command("train sneak"), "no further than rank II")
+    s.command("sneak off")
+    g = stat(s)["grace"]
+    c = chance(g, 5, 6, False, -10)   # a level 6 creature: the chance is not at its floor
+    for roll, noticed in ((f"{c - 1}.9", True), (f"{c}.0", False)):
+        rolls(chief, roll)
+        to(s, "hall")
+        s.command("sfill")
+        s.command("sneak on")
+        put(s, "giant", "giant")
+        s.command("sres 60 0")
+        out = s.command("giant")
+        st = stat(s)
+        out += a.quiet(s, 3.0)
+        check(f"rank II at roll {roll} (chance {c}%): {'noticed' if noticed else 'unnoticed'}", out, "has noticed you!" if noticed else "has not noticed you.")
+        check("rank II room cost 4 (60 to 56)", str(55 <= st["end"] <= 57), "True")
+        chief_slay(s)
+        s.command("sneak off")
+    # Rank III from the Scout hallmaster.
+    s.command("slevel 10")
+    s.command("sgold 2000")
+    to(s, HALL)
+    out = s.command("ranks")
+    check("Veyla offers Sneak III", out, "Veyla", "Sneak III")
+    out = s.command("train sneak")
+    check("Veyla teaches Sneak III", out, "Sneak III")
+    check("rank III: room cost 3", s.command("sneak"), "Each room you enter costs 3 Endurance.")
+    check("score shows rank III", s.command("score"), "You are sneaking (rank III): each room costs 3 Endurance, and creatures notice you 20 points less often")
+    s.command("sneak off")
+    g = stat(s)["grace"]
+    c = chance(g, 10, 1, True, -20)   # an Alert creature: the chance is not at its floor
+    for roll, noticed in ((f"{c - 1}.9", True), (f"{c}.0", False)):
+        rolls(chief, roll)
+        to(s, "hall")
+        s.command("sfill")
+        s.command("sneak on")
+        put(s, "sent", "sentry")
+        s.command("sres 60 0")
+        out = s.command("sent")
+        st = stat(s)
+        out += a.quiet(s, 3.0)
+        check(f"rank III at roll {roll} (chance {c}%)", out, "has noticed you!" if noticed else "has not noticed you.")
+        check("rank III room cost 3 (60 to 57)", str(56 <= st["end"] <= 58), "True")
+        chief_slay(s)
+        s.command("sneak off")
+    # Rank I Scout cannot buy from Veyla before II.
+    s2 = sneaker("snranktwo")
+    s2.command("slevel 10")
+    s2.command("sgold 2000")
+    to(s2, HALL)
+    check("Veyla does not teach rank II", s2.command("train sneak"), "does not teach")
+    s2.command("quit")
+    s.command("quit")
+
+
+# ---------------------------------------------------------------- 8. probes
+
+def step_sneakprobe(chief, mudlib):
+    h.write(mudlib, "/wiz/snchief/snmeddler", SNEAK_MEDDLER)
+    h.write(mudlib, "/wiz/snchief/wizlurker", WIZ_MONSTER)
+    h.write(mudlib, "/wiz/snchief/wizlair", WIZ_LAIR)
+    s = sneaker("snprobe")
+    rolls(chief, "50.0")
+    to(s, "hall")
+    s.command("sneak on")
+    put(s, "lurk", "lurker")
+    say(s, "lurk", 1.5)
+    start = stat(s)
+    to(chief, "n_lurk")
+    check("the meddler is cloned", chief.command("clone ~/snmeddler"), "snmeddler")
+    out = chief.command("smeddle snprobe")
+    check("the meddler ran", out, "MEDDLE ")
+    check("a wizard's object is no creature: it cannot ask whether the Scout is noticed", out, "Notice=-1")
+    check("it cannot set a creature on the Scout", out, "Engage=called")
+    check("nor make the Scout depart with a roll or a cost", out, "Departs=True")
+    check("nor end the sneaking by Disturbed", out, "Disturbed=called", "Sneaking=True")
+    check("nor fix or free the dice", out, "Rolls=False", "RollsRandom=False", "RollsNow=notice:50.0")
+    check("Surprising is false outside a fight being begun", out, "Surprising=False")
+    out = a.quiet(s, 3.5)
+    check("no creature attacked the Scout for the meddler", out, absent=("attacks you", "noticed you"))
+    after = stat(s)
+    check("the Scout is still sneaking in the same room, nothing spent", str(after["sneaking"]) + str(after["end"] >= start["end"]) + str(after["fighting"]), "TrueTrueFalse")
+    chief_slay(s)
+
+    # A wizard's own creature, in a wizard's own room, is a creature that has no standing to be rolled for: it always notices.
+    to(chief, "hall")
+    s.command("sneak off")
+    to(s, "hall")
+    s.command("sfill")
+    s.command("sneak on")
+    to(s, "/wiz/snchief/wizlair")
+    out = a.quiet(s, 4.5)
+    check("a wizard's creature always notices (no roll to fail), as creatures did before sneaking", str(stat(s)["fighting"]) + ("has not noticed you" in out), "TrueFalse")
+    s.command("sslay")
+    s.command("quit")
+
+
 def run(work, mudlib):
     chief = h.Client("snchief", archetype="adventurer")
     chief.read_until("> ")
@@ -511,7 +1081,8 @@ def run(work, mudlib):
 
 
 def extra_steps(chief, mudlib):
-    return ()
+    return (("sneak", lambda: step_sneak(chief)), ("leave", lambda: step_leave(chief)), ("loud", lambda: step_loud(chief)),
+            ("ambush", lambda: step_ambush(chief)), ("ranks", lambda: step_ranks(chief)), ("sneakprobe", lambda: step_sneakprobe(chief, mudlib)))
 
 
 def main():

@@ -192,6 +192,9 @@ public abstract class Skill : MudObject
     /// <summary>The damage factor when the skill is the action that starts the fight (the "opener" Effect), or 0 if it has no such bonus.</summary>
     public double QueryOpenerFactorFor(ObjectRef? user) => RankValue("opener", RankOf(user));
 
+    /// <summary>The damage factor when the attack starts the fight from hiding (the "ambush" Effect: Precision Strike), or 0 if it has no such bonus.</summary>
+    public double QueryAmbushFactorFor(ObjectRef? user) => RankValue("ambush", RankOf(user));
+
     /// <summary>Does being hit while preparing spoil this skill (Aimed Shot)?</summary>
     public bool QuerySpoilable() => Spoilable;
 

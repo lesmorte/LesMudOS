@@ -44,6 +44,7 @@ public class CmBarrowGuardian : Monster
         GoldMin = 10;
         GoldMax = 24;
         Aggressive = true;
+        Boss = true;
         DeathMessage = "The Barrow Guardian cracks along its length and collapses into rubble.";
         BaseReaction = 4.5;
         AddCombatAction("slam", "Stone Fist", preparation: 0, recovery: 1.5);
