@@ -8,6 +8,7 @@ public class OverseerChamber : Room
         ShortDesc = "Overseer Chamber";
         LongDesc = "Unlike the rest of the dungeon, this room is surprisingly organized. Maps, notes, and excavation sketches cover a large wooden table. A strange symbol resembling a crow is repeatedly scrawled throughout the chamber.";
         Exits["west"] = "/domains/hollow/cellars/overseer_hall";
+        AddDoor("west", "door", description: "The same black planks as seen from inside, with a heavy bar leaning against the wall beside them.");
 
         AddDetail("table,wooden table,large table", "A large wooden table, buried under maps, notes and excavation sketches. Most are in crude goblin script, but the sketches show tunnels, shafts and one great round chamber, drawn again and again.");
         AddDetail("maps,map,notes,sketches,excavation sketches", "Hand-drawn maps of the tunnels beneath the village. Many arrows lead down, toward a place marked with a circle and a crow.");

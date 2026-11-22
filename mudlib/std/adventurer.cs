@@ -1121,6 +1121,9 @@ public abstract class Adventurer : Living
         EndRest();
     }
 
+    /// <summary>Placeholder for the loud-action hook, filled in with sneaking.</summary>
+    public void Disturbed(string verb) { }
+
     // ---- Death ----
 
     /// <summary>

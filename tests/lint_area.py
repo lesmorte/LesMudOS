@@ -180,6 +180,15 @@ def exits_in(toks):
     return out
 
 
+def doors_in(toks):
+    """The direction of every `AddDoor("dir", ...)` with a plain literal."""
+    out = []
+    for k in range(len(toks)):
+        if is_id(toks[k], "AddDoor") and is_op(at(toks, k + 1), "(") and is_str(at(toks, k + 2)) and not toks[k + 2][1].interp:
+            out.append(toks[k + 2][1].raw)
+    return out
+
+
 def detail_keys(toks):
     """The first argument of every AddDetail("keys", ...)."""
     return [at(toks, k + 2)[1].raw for k in range(len(toks))
@@ -362,6 +371,18 @@ def run(root, flt):
                 back = [d for _, d in exits_in(lib.source(dest).toks)]
                 if p not in back:
                     report(p, 2, WARN, f'exit "{direction}" to {dest} has no exit back to {p}')
+
+        # Check 14: a door is declared on both sides (docs/BUILDING.md, "A room with a door"): the room it leads to must declare a door on an exit that leads back.
+        exit_map = dict(exits)
+        for direction in doors_in(src.toks):
+            dest = exit_map.get(direction)
+            if dest is None:
+                report(p, 14, ERROR, f'AddDoor("{direction}") but the room has no exit "{direction}" (set Exits first)')
+            elif lib.is_file(dest):
+                other = lib.source(dest)
+                back = dict(exits_in(other.toks))
+                if not any(back.get(d) == p for d in doors_in(other.toks)):
+                    report(p, 14, ERROR, f'door "{direction}" to {dest}: that room declares no door on an exit back to {p}')
 
         # Checks 3, 7 and 8 and 9 look at every string literal in the file.
         strings = [t[1] for t in src.toks if t[0] == "str"]
