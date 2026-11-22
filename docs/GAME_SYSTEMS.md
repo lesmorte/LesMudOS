@@ -478,3 +478,25 @@ Design: [specs/communication.md](specs/communication.md). The commands are run b
 **Names.** Players see the capitalised character name. A body that answers `QueryInvisible()` with true is shown as "Someone" to everyone who is not a wizard of at least its level, and cannot be targeted by `tell` or `whisper` by them. (No body is invisible yet.) Nothing here writes to the Chronicle or Renown, and tells and whispers are not logged.
 
 **Not done.** A linkdead target ("{name} has lost their link."): a dropped connection destroys the body at once (`NetDead`), so there is none to find. When linkdead characters exist, `FindPlayer` in `/secure/comm` is the one place to teach about them.
+
+## 16. GMCP and the map (docs/specs/gmcp.md)
+
+The driver speaks GMCP (telnet option 201; protocol and efuns in [DRIVER_API.md](DRIVER_API.md)). What is sent is the mudlib's decision, in one daemon, `/secure/gmcp`, so that every rule about who may be told what is in one place. The room numbers come from `/secure/roomids`. A client that did not answer `DO` costs the game one `GmcpActive` call per prompt and receives nothing.
+
+**Packages.**
+
+| Package | When | Fields |
+|---|---|---|
+| `Room.Info` | the character enters a room, types `look`, or the exits they can see change (a hidden way found, a door opened, closed, locked or shut by a reset, by anyone) | `num`, `name`, `area`, `environment`, `exits` (direction to room number), `doors` (direction to `open`, `closed` or `locked`) |
+| `Char.Vitals` | any of them changes, at most four times a second for a player | `vitality`, `maxvitality`, `endurance`, `maxendurance`, `focus`, `maxfocus`, `resting`, `sneaking`, `fighting`, and `hp`, `maxhp`, `mp`, `maxmp` (the same numbers as `vitality` and `focus`, for stock Mudlet gauges) |
+| `Char.Status` | login and any change | `name`, `calling`, `level`, `experience`, `next_level` (the experience the next level needs, 0 at the highest level), `gold`, `points_to_place` |
+| `Comm.Channel.Text` | a tell, a shout or a channel line is delivered to the character (not their own echo, and not `say` or `whisper`) | `channel` (`tell`, `shout` or the channel's id), `talker` (as the character sees the name), `text` (cleaned, as shown, colour tags removed) |
+
+**Where it hooks in.** The player body polls the service after every prompt the driver sends and at every heart beat (`Prompt` and `Tick` in `/std/adventurer`), and `Look` asks for `Room.Info` outright. The service asks the body for its facts (`GmcpFacts`) and the room for the exits this character may see (`GmcpRoomFacts`), compares them with what it last sent that character, and sends what changed; vitals that change inside 250 ms of the last message wait for the gap to end and go out once, with the latest numbers. Resource regeneration is lazy in this game (it is worked out when asked), so the heart beat poll is what moves a gauge while nothing is typed. `/secure/comm` and `/secure/channels` call the service for each line they have just delivered. That is every hook: `Prompt`, `Tick`, `Look` and three delivery lines.
+
+**Per-character visibility.** `Room.Info` is built from the same rules as the exits line of the text: a hidden exit is listed once that character has found it and never before; a closed or locked door's exit is listed with its state; an exit that is only blocked (no way, with a message) is not listed. A wizard is sent only the exits a player would be, not the hidden ones their text marks. Nothing about creatures, items, other players or their vitals is ever sent.
+
+**Room numbers.** `/secure/roomids` gives each room file a whole number, from 1, saved at once to `save/secure/roomids.json` and never reused (a deleted or renamed room keeps its number). Rooms under `/wiz` and room clones get numbers above 1,000,000,000 that are not saved. `area` is the area's name (`area.cs`); a room with no area file says `Elsewhere`; a room under `/wiz/<name>` says `Workshop of <Name>`. `environment` is the room's `Terrain` (`outdoors`, `indoors`, `underground`, `road` or `water`), else its area's, else `outdoors`; the roads and the cellars, barrow and warrens of the Hollow set theirs in their `area.cs`.
+
+**Security.** `GmcpSend` refuses a caller whose program is not under `/std` or `/secure`. The service's public methods, `GmcpFacts` and `GmcpRoomFacts` each check `PreviousObject()`: the service answers only the player body itself (about itself) or `/secure/comm` and `/secure/channels` (about the line they delivered), and the body and the room answer only the service. `Assign` answers only the service. A wizard's object can ask whether a player uses GMCP (one boolean) and nothing else; `tests/gmcp_test.py` has a probe that tries each of these. Player-written text (channel lines) goes to the driver as a plain string and is encoded there.
+

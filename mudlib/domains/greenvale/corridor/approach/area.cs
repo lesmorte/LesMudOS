@@ -6,5 +6,6 @@ public class OakenfellApproachArea : Area
     {
         AreaName = "The Oakenfell Approach";
         RegionName = "Greenvale";
+        Terrain = "road";
     }
 }

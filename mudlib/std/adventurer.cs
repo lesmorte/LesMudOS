@@ -292,7 +292,11 @@ public abstract class Adventurer : Living
         return text.ToString();
     }
 
-    public override string Prompt() => adventureBegun ? ExpandPrompt() : "> ";
+    public override string Prompt()
+    {
+        GmcpPoll();
+        return adventureBegun ? ExpandPrompt() : "> ";
+    }
 
     public override bool PromptsAfterOutput() => adventureBegun;
 
@@ -1004,6 +1008,30 @@ public abstract class Adventurer : Living
     {
         var room = Environment();
         Tell(room == null ? "You are nowhere.\n" : room.Call<string>("LongFor", Self) ?? "You see nothing.\n");
+        if (adventureBegun && GmcpActive(Self)) LoadObject("/secure/gmcp").Call("Look", Self); // Room.Info, whether or not it changed
+    }
+
+    // ---- GMCP (docs/specs/gmcp.md) ----
+    // The service /secure/gmcp decides what is sent; this body gives it the facts about this character, and only to it, and asks it
+    // after every prompt and every heart beat whether anything changed. A client without GMCP costs one efun call.
+
+    private void GmcpPoll()
+    {
+        if (adventureBegun && GmcpActive(Self)) LoadObject("/secure/gmcp").Call("Poll", Self);
+    }
+
+    /// <summary>What Char.Vitals and Char.Status are made of. Only /secure/gmcp may ask; anyone else gets null.</summary>
+    public Dictionary<string, object?>? GmcpFacts()
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller.IsClone || caller.ProgramPath != "/secure/gmcp") return null;
+        return new Dictionary<string, object?>
+        {
+            ["vitality"] = Vitality, ["maxvitality"] = QueryMaxVitality(), ["endurance"] = QueryEndurance(), ["maxendurance"] = QueryMaxEndurance(),
+            ["focus"] = QueryFocus(), ["maxfocus"] = QueryMaxFocus(), ["resting"] = QueryResting(), ["sneaking"] = sneaking, ["fighting"] = QueryInCombat(),
+            ["name"] = Name, ["calling"] = archetypeName, ["level"] = Level, ["experience"] = xp,
+            ["next_level"] = Level >= MaxLevel ? 0 : QueryXpForLevel(Level + 1), ["gold"] = Gold, ["points_to_place"] = QueryAttributePoints(),
+        };
     }
 
     protected override bool NeedsHeartBeat() => true;
@@ -1014,6 +1042,7 @@ public abstract class Adventurer : Living
     protected override void Tick()
     {
         IdleCheck();
+        if (Self.IsAlive) GmcpPoll(); // regeneration shows in the gauges with no command typed
         if (Dead || !Self.IsAlive) return;
         if (resting) RestBeat();
         if (++regenBeats < RegenBeats) return;

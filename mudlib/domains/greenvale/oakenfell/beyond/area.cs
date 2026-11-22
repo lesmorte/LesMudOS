@@ -6,5 +6,6 @@ public class OakenfellBeyondArea : Area
     {
         AreaName = "The Roads beyond Oakenfell";
         RegionName = "Greenvale";
+        Terrain = "road";
     }
 }

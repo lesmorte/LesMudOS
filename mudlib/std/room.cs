@@ -22,6 +22,8 @@ public abstract class Room : MudObject
     protected bool NoTell;
     /// <summary>Shouts neither leave this room nor are heard in it (wizards are not bound).</summary>
     protected bool NoShout;
+    /// <summary>What this room is like, for clients that draw a map (GMCP): outdoors, indoors, underground, road or water. If it is left empty the room takes its area's, and outdoors if the area says nothing.</summary>
+    protected string Terrain = "";
 
     private sealed class Spawn
     {
@@ -202,6 +204,33 @@ public abstract class Room : MudObject
     public int QueryBandLow() => bandSet ? bandLow : FindArea()?.Call<int>("QueryBandLow") ?? 0;
 
     public int QueryBandHigh() => bandSet ? bandHigh : FindArea()?.Call<int>("QueryBandHigh") ?? 0;
+
+    /// <summary>The terrain of this room: its own, else its area's, else outdoors.</summary>
+    public string QueryTerrain()
+    {
+        if (Terrain != "") return Terrain;
+        var area = FindArea()?.Call<string>("QueryTerrain") ?? "";
+        return area != "" ? area : "outdoors";
+    }
+
+    /// <summary>
+    /// What the GMCP service (/secure/gmcp) may tell this viewer's client about this room: its name, area, terrain, the exits this
+    /// character can see (a hidden exit only once they have found it, as in the exits line of the text) with the path each leads to, and
+    /// the state of the doors on them. Nothing about creatures or objects. Only /secure/gmcp may ask; anyone else gets null.
+    /// </summary>
+    public Dictionary<string, object?>? GmcpRoomFacts(ObjectRef viewer)
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller.IsClone || caller.ProgramPath != "/secure/gmcp" || viewer == null || !viewer.IsAlive) return null;
+        var ways = new Dictionary<string, string>();
+        var states = new Dictionary<string, string>();
+        foreach (var direction in Exits.Keys.Concat(hidden.Keys.Where(d => !Exits.ContainsKey(d) && Found(viewer, d))))
+        {
+            ways[direction] = Exits.TryGetValue(direction, out var path) ? path : hidden[direction].Path;
+            if (doors.ContainsKey(direction)) states[direction] = QueryDoorState(direction);
+        }
+        return new Dictionary<string, object?> { ["name"] = ShortDesc, ["area"] = QueryAreaName(), ["environment"] = QueryTerrain(), ["exits"] = ways, ["doors"] = states };
+    }
 
     /// <summary>The path of the room an exit leads to, or null.</summary>
     public string? QueryExitPath(string direction) => Exits.GetValueOrDefault(direction);

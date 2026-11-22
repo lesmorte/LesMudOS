@@ -177,6 +177,7 @@ public class Channels : MudObject
             if (user != speaker && d.CanMute && user.Call<bool>("QueryChannelOff", d.Id)) continue;
             if (user != speaker && user.Call<bool>("QueryIgnores", name.ToLowerInvariant())) continue;
             TellObject(user, $"[{d.Id}] {Seen(user, speaker)}: {Esc(text)}\n");
+            if (GmcpActive(user)) LoadObject("/secure/gmcp").Call("Channel", user, d.Id, Seen(user, speaker), text); // GMCP: Comm.Channel.Text
         }
         return "";
     }

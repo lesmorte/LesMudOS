@@ -225,6 +225,7 @@ public class Lantern : Item
 | `tests/timing_test.py` | Measures real intervals between combat actions against the timing formula (port 4815, about 3 minutes) |
 | `tests/balance_sim.py` | Standalone combat balance simulation (event clock); `check` compares it with the mudlib numbers |
 | `deploy/lesmudos.service` | Sample systemd unit (a starting point; not yet tested on a server) |
+| `tests/gmcp_test.py` | GMCP (telnet option 201): the offer and the stream of a client without it, Room.Info with room numbers that survive a driver restart, hidden exits and doors per character, Char.Vitals and Char.Status, Comm.Channel.Text, Core.Supports and Core.Ping, malformed and oversized incoming messages, and a wizard's probe (port 4841, about 2 minutes) |
 | `docs` | Design and API reference |
 
 ## Tests
@@ -243,6 +244,7 @@ LESMUDOS_TEST_PORT=4838 python3 tests/aim_test.py
 LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
 LESMUDOS_TEST_PORT=4832 python3 tests/comm_test.py
 LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
+LESMUDOS_TEST_PORT=4841 python3 tests/gmcp_test.py
 python3 tests/balance_sim.py
 python3 tests/balance_sim.py ranks [runs] [level5 heal double gap bolt focus climb aim wait aimfix healcost selfheal]
 ```

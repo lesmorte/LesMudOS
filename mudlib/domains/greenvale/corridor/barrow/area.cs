@@ -6,5 +6,6 @@ public class ForgottenBarrowArea : Area
     {
         AreaName = "The Forgotten Barrow";
         RegionName = "Greenvale";
+        Terrain = "underground";
     }
 }
