@@ -1,4 +1,4 @@
-# Sneak (PROPOSAL: not approved, not built)
+# Sneak (approved by the owner 22 November 2026; not built yet)
 
 Owner's idea (22 November 2026), after the simulator showed the archer never gets an opening shot in the cellars because every creature there attacks on arrival: "I wonder if scout needs a sneak/hide skill that prevents instant aggro attacks and also the aimed strike before the creature can react." Every number here is a starting value for `tests/balance_sim.py`.
 
@@ -27,11 +27,12 @@ II at level 5: notice chance - 10%, 4 Endurance a room, Precision Strike opener 
 - **Solo power.** Opening every fight with a x2.5 shot and a doubled delay may be too much. The simulator already says a hypothetical archer who opens every fight wins 92% of standard runs (mean 81). The opener multipliers, not the notice chance, are the dial.
 - **The other callings get nothing.** That is the point of a calling feature, but the Adventurer ("Jack of All Trades") could reasonably have a weaker version later.
 
-## To decide
-1. Build it at all, and for the Scout only?
-2. May a sneaking Scout walk straight past (as written), or does leaving the room also need a roll?
-3. Should bosses be merely harder to sneak past (`Alert`, +30%), or impossible?
-4. One command (`sneak`), or a separate stationary `hide` as well?
+## Owner's decisions (22 November 2026; they override the Rule above where they differ)
+1. **Build it, for the Scout only.** A strong archer is acceptable; mitigation may come later. The simulator reports the numbers but nothing is tuned down on that account.
+2. **Leaving is not free.** Moving on from a room that holds aggressive creatures who have not noticed the Scout "should work like flee": it needs a roll. Each such creature rolls to notice again, at the entry chance, as the Scout leaves; if any notices, the fight starts and the Scout stays. So crossing a guarded room unseen takes two successes, in and out. (Walking out of a room with no aggressive creature needs nothing.)
+3. **Doors as the builder's answer.** Opening a door is loud: it ends sneaking and every aggressive creature in the room engages at once. A door on the path therefore stops a Scout slipping through. Add one in the cellars before the Overseer: a closed door on the way from the Overseer Hall into the Overseer's chamber, so the Elite Guards in the Hall must be faced. Use the existing door mechanic; the door closes again on the room's reset. Builders' notes (docs/BUILDING.md) say when to place such a door.
+4. **Elites and sentries are harder to pass** (`Alert`, +30% to notice). **Bosses cannot be sneaked past or ambushed**: a creature flagged `Boss` always notices.
+5. **One command.** Sneaking is something you do on the way in: it must be on before entering the room. Once a creature in the room has spotted the Scout, `sneak` is refused there for as long as that creature lives and the Scout stays; there is no separate `hide`.
 
 ## Build
 One Sonnet agent after the Aimed Shot work merges: the skill and its ranks, the `Alert` flag and its placement on bosses, elites and sentries in the Hollow, the corridor and its dungeons, the simulator (melee and archer Scouts with sneaking, in both player models), tests including a probe that no outside object can hide a player or silence a creature.
