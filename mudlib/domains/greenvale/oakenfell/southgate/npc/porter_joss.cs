@@ -12,7 +12,7 @@ public class SgPorterJoss : Npc
         ShortDesc = "Joss Barrow, a porter";
         LongDesc = "A huge, slow-moving man with a bull's neck, a leather harness across his shoulders and hands like spades. He sits on a battered trunk, watching the street with a mild, patient air.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Carry your bags, friend? A couple of coins to the Stag, a few more to the Market. No haggling.");
         AddChat("I've carried a duke's wardrobe and a dead man's chest. This street has everything.");

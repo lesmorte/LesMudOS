@@ -13,7 +13,7 @@ public class GrWystan : Npc
         ShortDesc = "Wystan, a nervous clerk";
         LongDesc = "A thin young man in an ink-spotted coat, hunched over a lap desk with a stub of pencil, who jumps whenever a branch cracks. His eyes are red with strain, and he keeps a bundle of waybills hugged to his chest.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("Forty-one bales, thirty crates, sixteen oxen. I have counted them eleven times.");
         AddChat("Please do not stand behind me. I mean no offense. It is only that I do not like it.");

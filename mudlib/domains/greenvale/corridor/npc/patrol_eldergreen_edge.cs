@@ -15,7 +15,7 @@ public class CpEldergreenEdge : Patrol
         ShortDesc = "a Riverwatch patrol";
         LongDesc = "Two rangers walk together, close enough to speak without raising their voices, in cloaks of green and grey with the dust of the road on the hems. Each wears a badge of a silver eye at the collar, and each carries a longbow strung and a short blade worn thin at the edge. They watch the verges more than they watch you, and they have the unhurried gait of people who will walk this road again tomorrow.";
         Level = 7;
-        MaxHp = 140;
+        MaxVitality = 140;
         DamageMin = 5;
         DamageMax = 8;
         DefendPlayers = true;

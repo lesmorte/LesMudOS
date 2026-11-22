@@ -8,7 +8,7 @@ public class PrecisionStrikeSkill : Skill
         Title = "Precision Strike";
         Command = "strike";
         Summary = "An attack at +2 to hit with a 15% chance of a critical hit.";
-        StaminaCost = 25;
+        EnduranceCost = 25;
         Preparation = 0.5;
         Recovery = 1.0;
         WindUp = "takes careful aim";

@@ -13,7 +13,7 @@ public class GrHereward : Npc
         ShortDesc = "Hereward, the caravan guard captain";
         LongDesc = "A broad, grey-bearded man in a boiled-leather coat, with a short spear planted butt-down beside him and a notched shield on his back. He does not sit, and his eyes go to the tree line every few breaths.";
         Level = 5;
-        MaxHp = 70;
+        MaxVitality = 70;
 
         AddChat("Three on watch, three asleep. That is how we do it, and that is how the wagons get to the city.");
         AddChat("Stay inside the ring after dark. The wood is theirs once the sun goes.");

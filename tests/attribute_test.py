@@ -114,7 +114,7 @@ public class {cls} : Monster
     public override void Create()
     {{
         Name = "{name}"; Ids.Add("{ident}"); ShortDesc = "a {name.lower()}"; LongDesc = "A creature made for the attribute test.";
-        Level = {level}; MaxHp = {hp}; DamageMin = {dmg[0]}; DamageMax = {dmg[1]}; ToHit = {tohit}; Armor = 0; Dodge = {dodge}; XpValue = 0;
+        Level = {level}; MaxVitality = {hp}; DamageMin = {dmg[0]}; DamageMax = {dmg[1]}; ToHit = {tohit}; Armor = 0; Dodge = {dodge}; XpValue = 0;
         BaseReaction = 3.0;
 {attrs}    }}
 }}
@@ -145,8 +145,8 @@ public class AtProbe : Thing
         {
             case "atele": MoveObject(me, LoadObject(args.Trim())); Write("TELE ok\n"); return true;
             case "aspawn": { var ob = CloneObject("/domains/attrtest/" + w[0]); MoveObject(ob, room); Write("SPAWNED " + ob.Name + "\n"); return true; }
-            case "ahurt": me.Call("Heal", 99999); me.Call("TakeDamage", int.Parse(w[0]), null); Write("HURT " + me.Call<int>("QueryHp") + "/" + me.Call<int>("QueryMaxHp") + "\n"); return true;
-            case "aset": me.Call("SetResources", int.Parse(w[0]), int.Parse(w[1])); Write("SET " + me.Call<int>("QueryStamina") + " " + me.Call<int>("QueryMana") + "\n"); return true;
+            case "ahurt": me.Call("Heal", 99999); me.Call("TakeDamage", int.Parse(w[0]), null); Write("HURT " + me.Call<int>("QueryVitality") + "/" + me.Call<int>("QueryMaxVitality") + "\n"); return true;
+            case "aset": me.Call("SetResources", int.Parse(w[0]), int.Parse(w[1])); Write("SET " + me.Call<int>("QueryEndurance") + " " + me.Call<int>("QueryFocus") + "\n"); return true;
             case "aslow":
             {
                 // aslow N: N slows from a creature's blow; how many the character shook off.
@@ -172,8 +172,8 @@ public class AtProbe : Thing
                 Write("ASTAT " + string.Join(" ", keys.Select(k => k + "=" + F(who.Call<double>("QueryStat", k)))) +
                       " " + string.Join(" ", new[] { "might", "grace", "vigor", "insight", "spirit", "resolve" }.Select(k => k + "=" + who.Call<int>("QueryAttribute", k))) +
                       " critchance=" + F(who.Call<double>("QueryCrit")) + " attack=" + who.Call<int>("QueryAttack") + " defense=" + who.Call<int>("QueryDefense") +
-                      " vregen=" + F(who.Call<double>("QueryVitalityRegen")) + " eregen=" + F(who.Call<double>("QueryStaminaRegen")) + " fregen=" + F(who.Call<double>("QueryManaRegen")) +
-                      " maxhp=" + who.Call<int>("QueryMaxHp") + " maxend=" + who.Call<int>("QueryMaxStamina") + " maxfoc=" + who.Call<int>("QueryMaxMana") +
+                      " vregen=" + F(who.Call<double>("QueryVitalityRegen")) + " eregen=" + F(who.Call<double>("QueryEnduranceRegen")) + " fregen=" + F(who.Call<double>("QueryFocusRegen")) +
+                      " maxhp=" + who.Call<int>("QueryMaxVitality") + " maxend=" + who.Call<int>("QueryMaxEndurance") + " maxfoc=" + who.Call<int>("QueryMaxFocus") +
                       " points=" + who.Call<int>("QueryAttributePoints") + "\n");
                 return true;
             }
@@ -309,10 +309,10 @@ def attr_line(values):
 
 
 def resources(c):
-    """(hp, maxhp, stamina, maxstamina, mana, maxmana) from the hp command."""
+    """(vitality, max, endurance, max, focus, max) from the vitality command."""
     for _ in range(4):
-        t = c.command("hp")
-        m = re.search(r"HP (\d+)/(\d+)   Stamina (\d+)/(\d+)   Mana (\d+)/(\d+)", t)
+        t = c.command("vitality")
+        m = re.search(r"Vitality (\d+)/(\d+)   Endurance (\d+)/(\d+)   Focus (\d+)/(\d+)", t)
         if m:
             return tuple(int(x) for x in m.groups())
         time.sleep(0.3)
@@ -400,7 +400,7 @@ def run(work, mudlib):
               f"{st['vregen'] / 1000:.2f} {st['eregen'] / 1000:.2f} {st['fregen'] / 1000:.2f}", f"{rv:.2f} {re_:.2f} {rf:.2f}")
         want = regen(calling, START[calling])
         check(f"{calling}: and exactly by the formulas", f"{st['vregen']} {st['eregen']} {st['fregen']}", " ".join(str(int(round(x * 1000))) for x in want))
-        check(f"{calling}: stat shows the regeneration", c.command("stat me"), "Regeneration per 10 s: vitality")
+        check(f"{calling}: stat shows the regeneration", c.command("stat me"), "Regeneration per 10 s: Vitality")
         (v1, v5, v10), (e1, e10), (f1, f10) = TABLE[calling]
         c.command("setlevel 5")
         _, mhp, _, mst, _, mma = resources(c)
@@ -545,14 +545,14 @@ def run(work, mudlib):
     pr.command("setlevel 1")
     pr.command("atele " + T + "arena")
     pr.command("ahurt 15")
-    out = a.quiet(pr, 0.1) + (pr.send("heal") or "") + pr.read_until("hit points", timeout=12)
-    check("Spirit 9 and Insight 6: Healing Power +9% with Divine Knowledge's 25%: Minor Heal restores 11 (8 x 1.34)", out, "restoring 11 hit points")
+    out = a.quiet(pr, 0.1) + (pr.send("heal") or "") + pr.read_until("Vitality", timeout=12)
+    check("Spirit 9 and Insight 6: Healing Power +9% with Divine Knowledge's 25%: Minor Heal restores 11 (8 x 1.34)", out, "restoring 11 Vitality")
     a.drain(pr, 3.5)
     pr.command("setlevel 10")
     pr.command("improve spirit 18")
     pr.command("ahurt 60")
-    out = (pr.send("heal") or "") + pr.read_until("hit points", timeout=12)
-    check("Spirit 27: +44% +1% +25%: Minor Heal restores 14 (8 x 1.70)", out, "restoring 14 hit points")
+    out = (pr.send("heal") or "") + pr.read_until("Vitality", timeout=12)
+    check("Spirit 27: +44% +1% +25%: Minor Heal restores 14 (8 x 1.70)", out, "restoring 14 Vitality")
     a.drain(pr, 3.5)
     pr.command("restore")
 

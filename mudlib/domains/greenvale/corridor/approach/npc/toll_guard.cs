@@ -14,7 +14,7 @@ public class OaTollGuard : Npc
         ShortDesc = "Oswin Hale, an Assembly guard";
         LongDesc = "A broad, weathered man in a green tabard over a mail shirt, with a spear grounded at his side and a green oak badge on his breast. His eyes move constantly from wagon to wagon to the tree-line, and he looks like a man who has seen the pole raised on trouble before.";
         Level = 5;
-        MaxHp = 55;
+        MaxVitality = 55;
 
         AddChat("Keep moving, keep to the paving. Plenty of road ahead.");
         AddChat("I stand here so the toll keeper can count in peace. That is all the Assembly asks of me, and a good deal more than I would ask of myself.");

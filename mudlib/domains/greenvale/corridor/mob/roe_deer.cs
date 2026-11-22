@@ -23,7 +23,7 @@ public class CmRoeDeer : Monster
         ShortDesc = "a roe deer";
         LongDesc = "A roe deer stands at the edge of the trees, its red-brown coat dappled with light and its white rump patch a flag in the shade. It watches the road with huge dark eyes, ready to bound away at the first sudden move. A cornered deer will lash out with sharp hooves.";
         Level = 3;
-        MaxHp = 22;
+        MaxVitality = 22;
         DamageMin = 1;
         DamageMax = 3;
         ToHit = 0;

@@ -12,7 +12,7 @@ public class VhTanner : Trainer
         ShortDesc = "Dunstan Skell the tanner";
         LongDesc = "A lean, long-armed man with his sleeves rolled to the shoulder and hands stained the colour of tea. He has stopped noticing the smell, and he stands close to you anyway, quite cheerfully.";
         Level = 2;
-        MaxHp = 22;
+        MaxVitality = 22;
 
         AddChat("You get used to the smell. Everyone says that, and everyone is lying, but I do mean it kindly.");
         AddChat("Bring a hide in fresh and I'll make you something that lasts. Bring it in rotten and I'll make you a lesson.");

@@ -9,7 +9,7 @@ public class CmWarrenBroodmother : Monster
 {
     private readonly string[] opening = new string[0];
     private readonly string[] cycle = { "fang", "fang", "spit" };
-    private readonly int[] triggerHp = { 66, 33 };
+    private readonly int[] triggerVitality = { 66, 33 };
     private readonly string[] triggerAction = { "brood", "brood" };
     private int step;
     private int fired;
@@ -35,7 +35,7 @@ public class CmWarrenBroodmother : Monster
         ShortDesc = "the Warren Broodmother";
         LongDesc = "A swollen, pale creature the size of a cart squats in the heart of the warren, its many-jointed legs folded beneath a bloated body. Its jaws drip a greasy fluid, and the walls around it are thick with webbing and egg sacs. It lifts its head to the sound of your steps with a slow, wet hiss.";
         Level = 10;
-        MaxHp = 80;
+        MaxVitality = 80;
         DamageMin = 6;
         DamageMax = 10;
         ToHit = 3;
@@ -50,12 +50,12 @@ public class CmWarrenBroodmother : Monster
         AddCombatAction("brood", "Call the Brood", preparation: 0.5, recovery: 1, windUp: "scrapes at the egg sacs with a foreleg", kind: "summon");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
-        for (var i = 0; i < triggerHp.Length; i++)
+        for (var i = 0; i < triggerVitality.Length; i++)
         {
-            if ((fired & (1 << i)) == 0 && Hp * 100 <= triggerHp[i] * QueryMaxHp())
+            if ((fired & (1 << i)) == 0 && Vitality * 100 <= triggerVitality[i] * QueryMaxVitality())
             {
                 fired |= 1 << i;
                 chosen = triggerAction[i];

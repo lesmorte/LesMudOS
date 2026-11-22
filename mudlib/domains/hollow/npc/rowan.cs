@@ -23,7 +23,7 @@ public class Rowan : Npc
         ShortDesc = "Guildmaster Rowan";
         LongDesc = "A lean, grey-bearded man with a scar through one eyebrow and the stillness of someone who has stopped being surprised. The guild's sword-and-banner badge is pinned to his coat.";
         Level = 4;
-        MaxHp = 50;
+        MaxVitality = 50;
 
         AddChat("Every village has its legends. Ours is Vincent himself. Some believe he found something beneath these lands before he vanished.");
         AddChat("The board has work for anyone brave enough. Read it, then tell me which contract you want: {cmd}accept cellar{/}, or {cmd}accept orders{/}.");

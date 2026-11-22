@@ -32,7 +32,7 @@ public class CmRogueBandit : Monster
         ShortDesc = "a rogue bandit";
         LongDesc = "A broad man in mismatched leather, his face half hidden by a scarf and his sword hand scarred, who has plainly been cast out by every band he ever joined. He fights as he lives: for himself, and dirty. A cudgel hangs at one hip beside the sword.";
         Level = 8;
-        MaxHp = 60;
+        MaxVitality = 60;
         DamageMin = 10;
         DamageMax = 16;
         ToHit = 3;
@@ -50,7 +50,7 @@ public class CmRogueBandit : Monster
         AddLoot("/domains/hollow/obj/trail_ration", 20);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

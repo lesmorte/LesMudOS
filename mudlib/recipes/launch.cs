@@ -31,7 +31,8 @@ public class CrLaunchRecipes : RecipeSet
             .At("herbalist table").Skill("herbalism", "novice")
             .Makes("/domains/hollow/obj/craft/minor_healing_salve")
             .Description("Work a healing herb and a wildflower into a paste.");
-        Recipe("minor_stamina_tonic", "Minor Stamina Tonic")
+        // The id and the output file keep their old name (stamina): the id is a key in saved characters (known recipes) and the file is a saved path.
+        Recipe("minor_stamina_tonic", "Minor Endurance Tonic")
             .Needs("blueberries").Needs("honey")
             .At("herbalist table").Skill("herbalism", "novice")
             .Makes("/domains/hollow/obj/craft/minor_stamina_tonic")

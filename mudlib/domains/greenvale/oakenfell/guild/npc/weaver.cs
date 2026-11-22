@@ -12,7 +12,7 @@ public class GqWeaver : Npc
         ShortDesc = "Tamsin, an old weaver";
         LongDesc = "A tiny, white-haired woman with a loom as tall as she is and fingers stained blue to the second knuckle. Her hands never stop moving, even when she is looking at you, and her eyes are sharp.";
         Level = 8;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Hmm? Oh, you are not an apprentice. I thought you were the new one. They are all so tall these days.");
         AddChat("Eighty years I have been weaving, and I still find a thread I did not expect.");

@@ -11,7 +11,7 @@ public class SgSellswordMaddok : Npc
         ShortDesc = "Maddok, an off-duty sellsword";
         LongDesc = "A broad, grey-bearded man with a patch over one eye. He sits by the hearth with a whetstone and a dagger, working the edge in slow, patient strokes.";
         Level = 4;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Mm.");
         AddChat("Don't take every job. Take the ones that pay.");

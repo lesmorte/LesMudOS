@@ -26,7 +26,7 @@ public class CmWildBoar : Monster
         ShortDesc = "a wild boar";
         LongDesc = "A wild boar the size of a calf roots through the leaf litter, bristling with coarse black hair, yellowed tusks curving from its lower jaw. Mud cakes its flanks and its small red eyes miss nothing. It wheels to face anything that comes too close.";
         Level = 6;
-        MaxHp = 40;
+        MaxVitality = 40;
         DamageMin = 11;
         DamageMax = 19;
         ToHit = 1;
@@ -38,7 +38,7 @@ public class CmWildBoar : Monster
         AddCombatAction("charge", "Charge", preparation: 1, recovery: 1.5, windUp: "lowers its tusks and paws at the ground", damageMultiplier: 2, strike: "crashes forward in a bone-shaking charge!");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

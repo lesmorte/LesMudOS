@@ -12,7 +12,7 @@ public class RvMartaGill : Npc
         ShortDesc = "Marta Gill, a fishwife";
         LongDesc = "A stout woman with a shawl over her head and her sleeves rolled, gutting a heap of perch with a knife that flashes in the lamplight. Her eyes are red-rimmed, and she keeps glancing at the street.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Have you seen a brindled hound? Answers to Biscuit. One white ear.");
         AddChat("He is only a dog, I know. But he is mine.");

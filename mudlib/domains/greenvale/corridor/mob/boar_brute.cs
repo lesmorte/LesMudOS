@@ -27,7 +27,7 @@ public class CmBoarBrute : Monster
         ShortDesc = "a boar brute";
         LongDesc = "A boar of monstrous size, its back scarred by old spear wounds and its tusks as long as a man's forearm, snorts in the shade. The ground shivers a little when it shifts its weight. The musk that clings to it is thick enough to taste.";
         Level = 7;
-        MaxHp = 45;
+        MaxVitality = 45;
         DamageMin = 8;
         DamageMax = 14;
         ToHit = 2;
@@ -39,7 +39,7 @@ public class CmBoarBrute : Monster
         AddCombatAction("trample", "Trample", preparation: 1, recovery: 2, windUp: "rears its great head and stamps the ground", damageMultiplier: 2, strike: "thunders down on its victim!");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

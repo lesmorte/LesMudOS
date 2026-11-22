@@ -22,7 +22,7 @@ public class Consumable : Item
     {
         if (Environment() != user) return;
         var healed = HealAmount > 0 ? user.Call<int>("Heal", HealAmount) : 0;
-        TellObject(user, (UseMessage ?? $"You {UseVerb} {DescribeCount(1)}.") + (healed > 0 ? $" You recover {healed} hit points." + (user.Call<string>("HealNote", healed) ?? "") : "") + "\n");
+        TellObject(user, (UseMessage ?? $"You {UseVerb} {DescribeCount(1)}.") + (healed > 0 ? $" You recover {healed} Vitality." + (user.Call<string>("HealNote", healed) ?? "") : "") + "\n");
         OnUse(user);
         UseOne(); // one of a stack; the last one is gone
     }

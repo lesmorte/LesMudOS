@@ -12,7 +12,7 @@ public class GqTrainerWren : Npc
         ShortDesc = "Wren, a trainer of archery and footwork";
         LongDesc = "A lithe, quiet young woman with a braid down her back and a bow that is plainly older than she is. She moves among the posts as lightly as a cat, and corrects her students in a voice so soft that they lean in to hear it.";
         Level = 22;
-        MaxHp = 120;
+        MaxVitality = 120;
 
         AddChat("Breathe out. Now loose. You see? The arrow knows when you are ready.");
         AddChat("Footwork is everything. A bowman who cannot move is a target with a bow.");

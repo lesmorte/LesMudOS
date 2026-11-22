@@ -22,7 +22,7 @@ public class CmStrayWolf : Monster
         ShortDesc = "a stray wolf";
         LongDesc = "A rangy grey wolf, cut off from its pack and thin with hunger, shadows the road at a distance. Its ribs show through a matted coat and its lips are drawn back from yellow teeth. Hunger has made it bold enough to bite.";
         Level = 5;
-        MaxHp = 60;
+        MaxVitality = 60;
         DamageMin = 6;
         DamageMax = 10;
         ToHit = 1;

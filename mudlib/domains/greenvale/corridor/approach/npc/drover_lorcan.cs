@@ -14,7 +14,7 @@ public class OaDroverLorcan : Npc
         ShortDesc = "Lorcan Pike, a drover";
         LongDesc = "A grizzled, bandy-legged drover of fifty with a pipe clamped in his teeth, a wide hat and the leathery face of a man who has slept under more wagons than roofs. A string of pack mules stands behind him, nose to tail.";
         Level = 3;
-        MaxHp = 35;
+        MaxVitality = 35;
 
         AddChat("Mules or oxen, it's all the same. They know every road better than you do.");
         AddChat("Thirty years on the road, and the best thing I ever learned was when to turn round.");

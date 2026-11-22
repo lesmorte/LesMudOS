@@ -14,7 +14,7 @@ public class OaRanger : Npc
         ShortDesc = "Constance Ardley, a Riverwatch ranger";
         LongDesc = "A tall, weathered woman in a green-grey cloak with a longbow slung across her back and a rider's boots worn pale at the toe. A silver badge in the shape of an eye is pinned at her collar, and her gaze never rests in one place for long.";
         Level = 7;
-        MaxHp = 70;
+        MaxVitality = 70;
 
         AddChat("The road's quiet today. I like it quiet, but I don't trust it.");
         AddChat("Ever vigilant, that's the Riverwatch's word. Mostly it means standing here looking at things.");

@@ -15,7 +15,7 @@ public class OaWagonMaster : Npc
         ShortDesc = "Baldric Teague, the wagon master";
         LongDesc = "A barrel-chested man with a grey-shot beard, a whip coiled at his belt and a blue coat gone green at the seams. He walks the rows with a limp and a stick, and every wagon he passes seems to straighten a little.";
         Level = 5;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Row two, hitch up! The road does not shorten for those who sleep late.");
         AddChat("A caravan is only as quick as its slowest axle, and that axle is always mine.");

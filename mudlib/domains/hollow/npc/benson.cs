@@ -12,7 +12,7 @@ public class Benson : Npc
         ShortDesc = "Old Farmer Benson";
         LongDesc = "A stooped, weathered man with hands like tree roots and a straw hat older than some of the villagers. He knows every story the Hollow has ever told, and tells most of them twice.";
         Level = 1;
-        MaxHp = 12;
+        MaxVitality = 12;
 
         AddChat("Vincent founded this place. Brave man... but he went lookin' for somethin' beneath the earth and never returned.");
         AddChat("My grandfather helped dig that well. Swore the water tasted of iron the first winter, and never said why.");

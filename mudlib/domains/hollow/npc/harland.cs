@@ -11,7 +11,7 @@ public class Harland : Trainer
         ShortDesc = "Harland the Innkeeper";
         LongDesc = "A broad, red-faced man with a grey beard tied in a knot and a stained apron over his barrel chest. He keeps the Hollowman's Rest with a firm hand and a ready smile, and he has a nervous glance for the trapdoor in the floor.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Started with rats years ago. Then goblins moved in. Now something's organizing them.");
         AddChat("Vincent used to talk about tunnels beneath the village. Nobody believed him.");

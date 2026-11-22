@@ -12,7 +12,7 @@ public class EeCadoc : Npc
         ShortDesc = "Cadoc, a charcoal burner";
         LongDesc = "A thin, stooped young man sitting on a log with a blanket over his knees, rubbing his eyes. His face is black with soot, and his eyelids are red-rimmed and drooping. A bucket of water stands beside him.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Mm. Was I asleep? I was resting my eyes.");
         AddChat("Berenice says I sleep through everything. I don't. I hear the clamps. Sort of.");

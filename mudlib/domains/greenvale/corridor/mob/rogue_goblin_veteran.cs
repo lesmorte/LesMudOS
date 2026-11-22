@@ -32,7 +32,7 @@ public class CmRogueGoblinVeteran : Monster
         ShortDesc = "a rogue goblin veteran";
         LongDesc = "A scarred, gap-toothed goblin in a patchwork of looted plate swings a heavy flanged mace with the ease of long practice. Dozens of notches on the haft count his kills. He has outlived every warband that ever employed him.";
         Level = 9;
-        MaxHp = 53;
+        MaxVitality = 53;
         DamageMin = 7;
         DamageMax = 10;
         ToHit = 4;
@@ -50,7 +50,7 @@ public class CmRogueGoblinVeteran : Monster
         AddLoot("/domains/hollow/obj/trail_ration", 20);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

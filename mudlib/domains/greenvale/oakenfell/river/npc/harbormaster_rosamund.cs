@@ -13,7 +13,7 @@ public class RvHarbormasterIsolde : Npc
         ShortDesc = "Rosamund Kell, the harbormaster";
         LongDesc = "A tall, grey-haired woman in a long blue coat with a brass whistle on a chain and a slate under one arm. She surveys the quay with the cool eyes of someone who has never once lost track of a barge.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("State your business, or stand aside. Both are acceptable.");
         AddChat("Eleven piers, forty barges, one harbormaster. I have never mislaid a ship, and I do not intend to begin.");

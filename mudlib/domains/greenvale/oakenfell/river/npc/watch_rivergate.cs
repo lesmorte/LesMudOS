@@ -13,7 +13,7 @@ public class RvWatchRivergate : Npc
         ShortDesc = "Tessaly Orme, a city watchwoman";
         LongDesc = "A square-built watchwoman in a green surcoat marked with a white oak, a boathook in one hand and a horn at her belt. Her gaze rests on the water the way another guard's rests on a crowd.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Keep clear of the edge. The Mere has taken better swimmers than you.");
         AddChat("Barges clear the arch by day only. After dusk, we let down the portcullis, and the river waits for morning.");

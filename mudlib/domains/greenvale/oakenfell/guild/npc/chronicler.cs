@@ -12,7 +12,7 @@ public class GqChronicler : Npc
         ShortDesc = "Perrin, the Chronicler of the Hall";
         LongDesc = "A stooped, bright-eyed old man in a grey scribe's gown, ink permanently worked into the creases of his fingers and a pair of spectacles pushed up into white hair. He holds himself the way people do who spend their lives handling things older than they are, and he speaks of the stone walls the way other men speak of their grandchildren.";
         Level = 20;
-        MaxHp = 90;
+        MaxVitality = 90;
 
         AddChat("Welcome to the Chronicle Gallery. I am Perrin, the Chronicler. Take your time; nothing here is going anywhere. Ask me what the Chronicle is, if you like.");
         AddChat("Levels are power. Renown is fame. The Chronicle is legacy. A person may become strong, and a person may become famous, but only a few are remembered.");

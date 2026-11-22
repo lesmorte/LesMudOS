@@ -19,7 +19,7 @@ public class GoblinWarrior : Monster
         BaseReaction = 3.0;
         AddCombatAction("slash", "Slash", preparation: 0, recovery: 1.0);
         Level = 3;
-        MaxHp = 28;
+        MaxVitality = 28;
         DamageMin = 2;
         DamageMax = 4;
         ToHit = 0;

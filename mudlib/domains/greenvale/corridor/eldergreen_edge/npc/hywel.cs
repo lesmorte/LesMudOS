@@ -13,7 +13,7 @@ public class EeHywel : Npc
         ShortDesc = "Hywel, a veteran Riverwatch ranger";
         LongDesc = "A lean, stooped man in a faded green cloak, with a grey beard braided to his chest and a longbow older than most of the cadets. The silver eye at his collar has worn smooth, and he has the unhurried manner of a man who has outlasted a great many worse mornings.";
         Level = 7;
-        MaxHp = 75;
+        MaxVitality = 75;
 
         AddChat("Thirty years in this wood. It still sounds different every dawn.");
         AddChat("I knew a man who tried to count the oaks between here and the Green Gate. He lost count at four hundred and went home.");

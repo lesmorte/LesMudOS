@@ -13,7 +13,7 @@ public class SgRecruiterSera : Npc
         ShortDesc = "Sera Voss, Free Companies recruiter";
         LongDesc = "A tall, rangy woman of forty with a braid of dark hair and a nose broken more than once. She wears a red-and-black sash over a scarred leather jerkin, and her smile is friendly, practical and entirely professional.";
         Level = 5;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Coin Before Crown. That's the Free Companies' word, and we live by it.");
         AddChat("Looking for work, blade, or a company to march with? You've come to the right bench.");

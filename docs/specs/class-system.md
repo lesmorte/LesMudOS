@@ -68,35 +68,35 @@ Archetypes should remain relevant throughout a character's life.
 ### Warrior
 
 - Role: Front-line martial combat
-- Primary Resource: Stamina
+- Primary Resource: Endurance
 - Focus: Defense, melee combat, weapon mastery
 - Starting Features: Shield Bash, Defensive Training, Weapon Proficiency
 
 ### Scout
 
 - Role: Agility and precision
-- Primary Resource: Stamina
+- Primary Resource: Endurance
 - Focus: Speed, ranged combat, critical strikes
 - Starting Features: Evasion, Tracking, Precision Strike
 
 ### Priest
 
 - Role: Support and divine magic
-- Primary Resource: Mana
+- Primary Resource: Focus
 - Focus: Healing, blessings, defensive magic
 - Starting Features: Minor Heal, Blessing, Divine Knowledge
 
 ### Mage
 
 - Role: Arcane magic
-- Primary Resource: Mana
+- Primary Resource: Focus
 - Focus: Spellcasting, utility, magical damage
-- Starting Features: Arcane Bolt, Mana Efficiency, Magical Lore
+- Starting Features: Arcane Bolt, Focus Efficiency, Magical Lore
 
 ### Adventurer
 
 - Role: Versatile generalist
-- Primary Resource: Stamina and Mana
+- Primary Resource: Endurance and Focus
 - Focus: Adaptability, exploration, utility, hybrid playstyles
 
 The Adventurer sacrifices specialization for flexibility.
@@ -158,8 +158,8 @@ These classes serve as bridges between traditional archetypes and future prestig
 
 **Spellblade.** Hybrid martial and magical combatant.
 
-- Focus: Weapon-enhanced spells, Combat enchantments, Mana and Stamina management
-- Example Skills: Arcane Strike, Weapon Infusion, Mana Blade
+- Focus: Weapon-enhanced spells, Combat enchantments, Focus and Endurance management
+- Example Skills: Arcane Strike, Weapon Infusion, Focus Blade
 - Potential Future Subclasses: Arcane Knight, Rune Knight, Spell Duelist
 
 **Beastmaster.** Explorer and companion handler.

@@ -13,7 +13,7 @@ public class EeIdris : Npc
         ShortDesc = "Idris, a young Riverwatch ranger";
         LongDesc = "A lanky young man in a new green cloak that is a little too big for him, with a short bow, a quiver of fresh-fletched arrows and a keen, eager face. The silver eye-badge at his collar has not yet a scratch on it.";
         Level = 5;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Posted here from Watchfort Crossing a month ago. It's quieter than the stories, and louder than I'd like.");
         AddChat("I saw a goblin scout on the east trail last week. A real one. Small, quick, grey as a stone. It looked right at me and vanished.");

@@ -32,7 +32,7 @@ public class CmForestPanther : Monster
         ShortDesc = "a forest panther";
         LongDesc = "A black panther, sleek and silent, lies along a ledge above the path with its tail twitching slowly. Its golden eyes do not blink and its shoulders flex with the promise of a spring. It looks like a piece of the night that has decided to hunt.";
         Level = 10;
-        MaxHp = 120;
+        MaxVitality = 120;
         DamageMin = 6;
         DamageMax = 10;
         ToHit = 5;
@@ -47,7 +47,7 @@ public class CmForestPanther : Monster
         AddCombatAction("rake", "Raking Frenzy", preparation: 0, recovery: 1);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

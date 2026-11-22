@@ -14,7 +14,7 @@ public class GrDrogo : Npc
         ShortDesc = "Drogo, a hired blade of the Free Companies";
         LongDesc = "A lean, scarred man with a sellsword's easy slouch, a long sword across his knees and a dull red company badge stitched to his sleeve. He is cleaning a whetstone with great care, and he smiles with the lower half of his face only.";
         Level = 5;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Coin before crown, friend. That is the only creed I trust.");
         AddChat("Hired to the end of the run, and not a mile more. I have a name for finishing the job I am paid for.");

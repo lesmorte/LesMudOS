@@ -10,7 +10,7 @@ public class PriestClass : PlayerClass
         SortOrder = 3;
         Title = "Priest";
         Tagline = "Healing hands and a hard mace. Keeps itself and its friends on their feet.";
-        Description = "The priest wields mace or staff, wears light or medium armor and may carry a shield. Starting HP 26, 100 Mana but only 40 Stamina. Spells: Minor Heal, Blessing. Trait: Divine Knowledge.";
+        Description = "The priest wields mace or staff, wears light or medium armor and may carry a shield. Starting Vitality 26, 100 Focus but only 40 Endurance. Spells: Minor Heal, Blessing. Trait: Divine Knowledge.";
         StartReaction = 2.5;
         VitalityBase = 7;
         VitalityPerLevel = 7;

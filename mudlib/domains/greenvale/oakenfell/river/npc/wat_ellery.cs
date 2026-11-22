@@ -12,7 +12,7 @@ public class RvWatEllery : Npc
         ShortDesc = "Wat Ellery, an angler";
         LongDesc = "A gaunt man with a long rod propped on the parapet and a wide straw hat tipped over his eyes. A wicker basket sits beside him, containing a very small perch and a sandwich.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Sh. You will frighten them.");
         AddChat("Thirty years I have fished off this bridge. The river and I have an understanding. It does not give me fish, and I do not leave.");

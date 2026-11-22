@@ -12,7 +12,7 @@ public class RvLennaSorrel : Npc
         ShortDesc = "Lenna Quill, a trade clerk";
         LongDesc = "A neat young woman in a brown clerk's coat, ink on her thumb and a pair of spectacles on a cord. She writes figures in a ledger with swift, tiny strokes.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Freight, bills of lading, weights and measures. How may I assist?");
         AddChat("The river never stops. Neither do the forms.");

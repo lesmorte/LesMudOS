@@ -11,7 +11,7 @@ public class Mara : Npc
         ShortDesc = "Mara the Barmaid";
         LongDesc = "A quick, freckled woman with auburn hair pinned up in a hurry and a bar towel tucked into her belt. She knows the name and the order of every regular in the room.";
         Level = 1;
-        MaxHp = 12;
+        MaxVitality = 12;
 
         AddChat("Mind your coin, friend. I've heard the scrabbling from that cellar every night this week, and it isn't mice.");
         AddChat("Hungry or weary? Harland's your man for a bowl of stew or a bed upstairs. Ask him at the bar.");

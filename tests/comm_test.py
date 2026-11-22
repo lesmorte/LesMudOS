@@ -32,7 +32,7 @@ def check(label, text, *expected, absent=()):
 
 def flush(c):
     """Everything sent to this character so far, by a round trip (the server answers in order)."""
-    return c.command("hp")
+    return c.command("vitality")
 
 
 def heard(c, text, seconds=5):

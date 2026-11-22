@@ -8,7 +8,7 @@ public class MagicalLoreSkill : Skill
         Title = "Magical Lore";
         Command = "lore";
         Summary = "Shows an item's exact numbers and any magical property. {cmd}lore{/} ITEM.";
-        ManaCost = 5;
+        FocusCost = 5;
         Recovery = 0.5;
         Target = "item";
     }

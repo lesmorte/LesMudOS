@@ -10,7 +10,7 @@ public class AdventurerClass : PlayerClass
         SortOrder = 5;
         Title = "Adventurer";
         Tagline = "A little of everything and a nose for the road. Hardy, resourceful and well supplied.";
-        Description = "The adventurer wields most weapons, wears light armor and may carry a shield. Starting HP 30, 70 Stamina and 70 Mana, and the best gold. Skill: Appraise. Traits: Survival Training, Improvised Combat, Traveler's Instinct.";
+        Description = "The adventurer wields most weapons, wears light armor and may carry a shield. Starting Vitality 30, 70 Endurance and 70 Focus, and the best gold. Skill: Appraise. Traits: Survival Training, Improvised Combat, Traveler's Instinct.";
         StartReaction = 2.5;
         VitalityBase = 10;
         VitalityPerLevel = 8;

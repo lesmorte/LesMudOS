@@ -13,7 +13,7 @@ public class HwCassian : Npc
         ShortDesc = "Cassian, a Riverwatch hunter";
         LongDesc = "A weathered man of fifty in a hooded cloak the colour of bark, with a short bow across his knees and a silver eye pinned inside his collar where it will not catch the light. He has the stillness of someone who has spent a great many hours in one place, and his eyes go to the trees whenever they leave you.";
         Level = 7;
-        MaxHp = 70;
+        MaxVitality = 70;
 
         AddChat("Quiet shift. I'm not complaining. I've learned what the other kind sounds like.");
         AddChat("Ever vigilant. In the Heartwood it means keeping your back to the cairn and your eyes on the trees.");

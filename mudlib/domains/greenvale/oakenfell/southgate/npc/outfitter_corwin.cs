@@ -13,7 +13,7 @@ public class SgOutfitterCorwin : Shopkeeper
         ShortDesc = "Corwin Dray, the outfitter";
         LongDesc = "A neat, narrow man of middle years in a long grey apron with many pockets. His spectacles sit low on his nose, and he handles stock like a man who has counted everything twice.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("Everything an adventurer forgets until it matters. Try {cmd}browse{/} and see what you lack.");
         AddChat("Rope, tinder, potions and rations. The four things between you and a bad week.");

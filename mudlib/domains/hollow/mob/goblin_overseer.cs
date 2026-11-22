@@ -4,7 +4,7 @@
 /// The boss of the Forgotten Cellars. Four actions in a fixed pattern that players can learn:
 /// Battle Cry first (his damage is +2 for the next 30 seconds), then Axe Slash, Axe Slash, Power Strike
 /// (double damage, announced 2 seconds before it lands) and round again; and once, as his next action after
-/// his HP first falls to half, Summon Goblin Minion.
+/// his Vitality first falls to half, Summon Goblin Minion.
 /// </summary>
 public class GoblinOverseer : Monster
 {
@@ -30,7 +30,7 @@ public class GoblinOverseer : Monster
         ShortDesc = "the Goblin Overseer";
         LongDesc = "Taller and better armed than any goblin you have seen, the Overseer wears a crow-marked sash over scavenged mail. His eyes are sharp, and he looks at you like a problem to be solved.";
         Level = 5;
-        MaxHp = 114;
+        MaxVitality = 114;
         DamageMin = 4;
         DamageMax = 7;
         ToHit = 2;
@@ -51,11 +51,11 @@ public class GoblinOverseer : Monster
         AddLoot("/domains/hollow/obj/overseers_orders", 100);
     }
 
-    /// <summary>Battle Cry as the first action of a fight; Summon once, when his HP has first fallen to half; otherwise Axe Slash, Axe Slash, Power Strike.</summary>
+    /// <summary>Battle Cry as the first action of a fight; Summon once, when his Vitality has first fallen to half; otherwise Axe Slash, Axe Slash, Power Strike.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         if (ActionsTaken() == 0) return FindAction("cry")!;
-        if (!summoned && Hp * 2 <= QueryMaxHp())
+        if (!summoned && Vitality * 2 <= QueryMaxVitality())
         {
             summoned = true;
             return FindAction("summon")!;

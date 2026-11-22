@@ -12,7 +12,7 @@ public class GqGuildClerk : Npc
         ShortDesc = "Osric, clerk of the Joined Guilds";
         LongDesc = "A harried young man with a ledger under each arm, an inkpot at his belt and an air of mild apology. He walks quickly and stops suddenly, as though he has just remembered something he was supposed to do.";
         Level = 6;
-        MaxHp = 35;
+        MaxVitality = 35;
 
         AddChat("Hello. Welcome to Crafters' Court. I am Osric, clerk to the Joined Guilds. If you are here to enroll, I am afraid the guilds are not enrolling at present. I am so sorry.");
         AddChat("The notice board will say when they open. I check it every morning myself. I would very much like to tell you more.");

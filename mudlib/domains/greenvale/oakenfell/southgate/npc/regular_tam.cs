@@ -14,7 +14,7 @@ public class SgRegularTam : Npc
         ShortDesc = "Old Tam, the oldest regular";
         LongDesc = "A very old man with a white beard, a bent back and a stick propped on the bench beside him. His eyes are bright and sharp, and his hands tremble only when they hold nothing.";
         Level = 2;
-        MaxHp = 20;
+        MaxVitality = 20;
 
         AddChat("I was drinking in this room before most of you were born, and I'll be drinking here when you've all been buried.");
         AddChat("They say the Great Oak was bigger than the Hall of Legends. Nonsense. It was bigger than the Hall, the Square and the Row put together.");

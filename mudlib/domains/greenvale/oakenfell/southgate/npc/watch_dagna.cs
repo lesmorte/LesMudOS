@@ -13,7 +13,7 @@ public class SgWatchDagna : Npc
         ShortDesc = "Dagna Rusk, a gate watchwoman";
         LongDesc = "A tall, quiet woman with a straight back and a scar through one eyebrow. She stands at the gate as if she were part of the stone, and she misses nothing.";
         Level = 4;
-        MaxHp = 50;
+        MaxVitality = 50;
 
         AddChat("Mm.");
         AddChat("Move along.");

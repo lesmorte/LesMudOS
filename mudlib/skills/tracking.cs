@@ -8,7 +8,7 @@ public class TrackingSkill : Skill
         Title = "Tracking";
         Command = "track";
         Summary = "Lists the creatures in each adjacent room.";
-        StaminaCost = 5;
+        EnduranceCost = 5;
         Recovery = 0.5;
     }
 

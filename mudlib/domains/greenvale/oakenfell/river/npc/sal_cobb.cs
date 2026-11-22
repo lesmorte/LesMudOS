@@ -13,7 +13,7 @@ public class RvSalCobb : Npc
         ShortDesc = "Sal Cobb, a net-mender";
         LongDesc = "A bent, tiny old woman perched on an upturned crate with a net across her knees and a wooden needle flying in her fingers. Her skin is the color and texture of a walnut.";
         Level = 1;
-        MaxHp = 12;
+        MaxVitality = 12;
 
         AddChat("Hush, dear. A net should be mended in silence, or it comes undone.");
         AddChat("My mother mended nets here, and her mother, and when they were not mending nets they were mending husbands.");

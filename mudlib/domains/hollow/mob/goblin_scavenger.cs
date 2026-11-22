@@ -19,7 +19,7 @@ public class GoblinScavenger : Monster
         BaseReaction = 1.5;
         AddCombatAction("stab", "Quick Stab", preparation: 0, recovery: 0.5);
         Level = 2;
-        MaxHp = 13;
+        MaxVitality = 13;
         DamageMin = 1;
         DamageMax = 3;
         ToHit = 2;

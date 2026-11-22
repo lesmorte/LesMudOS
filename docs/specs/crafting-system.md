@@ -88,11 +88,11 @@ All recipes use at most three ingredients. All are obtainable near Vincent's Hol
 | # | Recipe | Ingredients | Station | Effect |
 |---|---|---|---|---|
 | 1 | Berry Juice | Blackberries + Clean Water | Cooking Fire | Restore minor Vitality |
-| 2 | Sweet Berry Juice | Berry Juice + Honey | Cooking Fire | Restore Vitality and Stamina |
+| 2 | Sweet Berry Juice | Berry Juice + Honey | Cooking Fire | Restore Vitality and Endurance |
 | 3 | Simple Bandage | Cloth Strip | None | Minor healing |
 | 4 | Herbal Bandage | Cloth Strip + Healing Herb | Herbalist Table | Moderate healing |
 | 5 | Minor Healing Salve | Healing Herb + Wildflower | Herbalist Table | Healing over time |
-| 6 | Minor Stamina Tonic | Blueberries + Honey | Herbalist Table | Restore Stamina |
+| 6 | Minor Endurance Tonic | Blueberries + Honey | Herbalist Table | Restore Endurance |
 | 7 | Treated Leather | Rabbit Skin + Wolf Blood | Tanning Rack | Crafting component; higher vendor value |
 | 8 | Traveler's Leather Wrap | Treated Leather + Cloth Strip | Workbench | +1 carry capacity; starter utility equipment |
 | 9 | Blood Ink | Goblin Blood + Wildflower | Workbench | Future crafting component, used by scribes, scholars and rune crafters. Primary reason Goblin Blood has economic value. |

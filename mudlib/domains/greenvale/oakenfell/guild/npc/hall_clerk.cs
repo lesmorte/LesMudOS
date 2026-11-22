@@ -13,7 +13,7 @@ public class GqHallClerk : Npc
         ShortDesc = "Mabyn, Clerk of the Hall of Legends";
         LongDesc = "A neat, middle-aged man in a long oak-green coat with the Hall's five joined bars on the breast, his hair cut precisely and his cuffs spotless. He has a ledger, a pen, and a tidy answer to most questions, and he is visibly proud to be the one who holds the Hall's pen.";
         Level = 18;
-        MaxHp = 75;
+        MaxVitality = 75;
 
         AddChat("Good day. Mabyn, clerk of the Hall of Legends. Our motto is Greatness Is Chosen. I speak for the Hall itself. What may I tell you?");
         AddChat("The Hall of Legends is a confederation of guilds. We oversee advanced training, certify the guilds, and see that professions advance in good order. We also keep the Chronicle.");

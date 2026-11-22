@@ -9,7 +9,7 @@ public class CmBlackBear : Monster
 {
     private readonly string[] opening = new string[0];
     private readonly string[] cycle = { "swipe", "swipe", "maul" };
-    private readonly int[] triggerHp = { 50 };
+    private readonly int[] triggerVitality = { 50 };
     private readonly string[] triggerAction = { "roar" };
     private int step;
     private int fired;
@@ -29,7 +29,7 @@ public class CmBlackBear : Monster
         ShortDesc = "a black bear";
         LongDesc = "A full-grown black bear, glossy and thick-necked, stands on its hind legs to scratch its back against an ancient trunk. Its small eyes are mild until they are not. The claw marks scored in the bark would flay a man.";
         Level = 8;
-        MaxHp = 54;
+        MaxVitality = 54;
         DamageMin = 8;
         DamageMax = 13;
         ToHit = 3;
@@ -42,12 +42,12 @@ public class CmBlackBear : Monster
         AddCombatAction("roar", "Bellowing Roar", preparation: 0.5, recovery: 0.5, windUp: "fills its great chest", kind: "buff");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
-        for (var i = 0; i < triggerHp.Length; i++)
+        for (var i = 0; i < triggerVitality.Length; i++)
         {
-            if ((fired & (1 << i)) == 0 && Hp * 100 <= triggerHp[i] * QueryMaxHp())
+            if ((fired & (1 << i)) == 0 && Vitality * 100 <= triggerVitality[i] * QueryMaxVitality())
             {
                 fired |= 1 << i;
                 chosen = triggerAction[i];

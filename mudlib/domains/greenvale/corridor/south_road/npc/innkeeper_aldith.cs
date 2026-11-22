@@ -14,7 +14,7 @@ public class SrInnkeeperAldith : Shopkeeper
         ShortDesc = "Aldith, the innkeeper";
         LongDesc = "A stout, rosy woman in a spotless apron with a ring of keys on her belt and a ladle in her fist. Her grey-blonde hair is pinned in a bun, her sleeves are rolled to the elbow, and she can find a dirty boot at forty paces.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Welcome to the Rest. Hot food, a clean bed and water for your horse. Nothing else, and nothing more.");
         AddChat("Try {cmd}browse{/} if you're hungry, and {cmd}buy bed{/} if you're weary.");

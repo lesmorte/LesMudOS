@@ -12,7 +12,7 @@ public class RvPietDunne : Npc
         ShortDesc = "Piet Dunne, a warehouseman";
         LongDesc = "A square, ruddy man with a pencil behind his ear and chalk on his sleeves, holding a slate with a list of figures that he glances at constantly. He counts sacks as they pass, whispering to himself.";
         Level = 1;
-        MaxHp = 20;
+        MaxVitality = 20;
 
         AddChat("Forty, forty-one... Do not talk to me. I will lose count.");
         AddChat("Everything that comes into Oakenfell by water passes through here. Everything. Even the things nobody asked for.");

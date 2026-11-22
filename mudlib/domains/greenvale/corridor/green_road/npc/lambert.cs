@@ -13,7 +13,7 @@ public class GrLambert : Shopkeeper
         ShortDesc = "Lambert, the caravan merchant";
         LongDesc = "A heavy, sandy-haired man in a good wool coat gone shiny at the cuffs, sitting on an upturned crate with a strongbox between his boots. He has the cheerful eyes of a man who sells things and the tired mouth of one who has done it for a long way in the dark.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Potions and provisions, friend, as good as you will find between here and the city. Try {cmd}browse{/}.");
         AddChat("Prices are a touch above Oakenfell's, I will not pretend otherwise. You are paying for the miles, and for me not being eaten.");

@@ -14,7 +14,7 @@ public class SrVeteranKenrick : Npc
         ShortDesc = "Kenrick, a grizzled veteran";
         LongDesc = "A broad, scarred man in a faded leather jerkin with a notched sword propped beside his stool and a cup of small beer in his fist. His left hand is missing two fingers, and he keeps it turned out of sight.";
         Level = 5;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Sit down, lad, lass, whatever you are. I'll not bite. Not before supper.");
         AddChat("The road is fine. The road is always fine. It's the bits either side that bite.");

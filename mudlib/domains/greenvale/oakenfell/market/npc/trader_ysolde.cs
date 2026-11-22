@@ -14,7 +14,7 @@ public class MkTraderYsolde : Npc
         ShortDesc = "Ysolde Fenwick, a cloth merchant";
         LongDesc = "A graceful, grey-haired woman in a gown of deep blue, her hands stained to the wrist in dye. Bolts of cloth hang from her stall in every colour of the rainbow.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Cloth! Wool and linen, silk and dye! Mind the colour, it runs.");
         AddChat("Greenvale blue, Greenvale green: dyed in the Mere, and no finer colours south of the mountains.");

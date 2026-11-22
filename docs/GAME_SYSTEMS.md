@@ -23,7 +23,7 @@ mudlib/std/
   armor.cs       : Item with armor value and slot
   consumable.cs  : Item that is eaten or drunk for an effect
   coins.cs       : Item that turns into gold when picked up
-  living.cs      : abstract Thing with hit points, combat, equipment
+  living.cs      : abstract Thing with Vitality, combat, equipment
   npc.cs         : Living with dialogue; peaceful by default
   monster.cs     : Npc that fights, gives experience and drops loot
   shopkeeper.cs  : Npc that sells from a stock list and buys items back
@@ -92,7 +92,7 @@ Built for the wilderness road (docs/PLAN-corridor-crafting.md, F2). Builder exam
 | Field | Meaning | Default |
 |---|---|---|
 | `Level` | 1 and up | 1 |
-| `MaxHp`, `Hp` | Hit points | 10 |
+| `MaxVitality` (old name `MaxHp` still works), `Vitality` | Maximum and current Vitality | 10 |
 | `DamageMin`, `DamageMax` | Unarmed or natural attack | 1, 2 |
 | `ToHit` | Bonus on attack rolls | 0 |
 | `Armor` | Natural armor | 0 |
@@ -155,7 +155,7 @@ On death: a death line for the room; experience at once, shared by the players w
 
 ### Creature numbers for the Hollow
 
-| Creature | Level | HP | Damage | To hit | Armor | XP | Gold | Base Reaction | Actions (Preparation / Recovery) |
+| Creature | Level | Vitality | Damage | To hit | Armor | XP | Gold | Base Reaction | Actions (Preparation / Recovery) |
 |---|---|---|---|---|---|---|---|---|---|
 | Large Rat | 1 | 12 | 1-2 | 0 | 0 | 8 | 0 | 2.0 | Bite 0 / 0.5; aggressive |
 | Giant Rat | 1 | 15 | 1-3 | 0 | 0 | 12 | 0 | 2.0 | Bite 0 / 0.5; aggressive |
@@ -174,9 +174,9 @@ Goblin Overseer actions (delays in seconds are (4.0 + reaction mod + Recovery) x
 - **Battle Cry** (0 / 0.5, 9 s): his first action in a fight. For the next 30 seconds his damage is +2.
 - **Axe Slash** (0 / 1.0, 10 s): the normal attack.
 - **Power Strike** (1.0 / 2.0, 12 s): double damage, announced 2 seconds before it lands; every third attack, in a fixed pattern (slash, slash, power).
-- **Summon Goblin Minion** (0.5 / 1.0, 10 s): his next action once his HP first falls to half or below. Once per life. The minion joins the fight but waits its own Reaction Time (5 s) before acting.
+- **Summon Goblin Minion** (0.5 / 1.0, 10 s): his next action once his Vitality first falls to half or below. Once per life. The minion joins the fight but waits its own Reaction Time (5 s) before acting.
 
-These are the final numbers after the event-clock balance simulation (section 12). Compared with the 2-second-round version, HP is about 1.5 to 2.2 times higher and weapon damage about 3 times higher, because a player now strikes every 6 to 11 seconds instead of every 2. Every creature of the table has a mudlib file (the Guard Post keeps one plain Goblin Guard and one `goblin_guard_keyholder` that is identical except that its corpse always holds the Rusty Key). The Overseer is aggressive (it attacks anyone who enters its chamber). Gold from monsters is in the corpse. Creature names are capitalised (`Name = "Goblin Guard"`, used by `stat` and by shopkeepers and NPCs when they speak); what players read in fights and on corpses is the short description with its article ("a goblin guard", "the corpse of a goblin guard").
+These are the final numbers after the event-clock balance simulation (section 12). Compared with the 2-second-round version, Vitality is about 1.5 to 2.2 times higher and weapon damage about 3 times higher, because a player now strikes every 6 to 11 seconds instead of every 2. Every creature of the table has a mudlib file (the Guard Post keeps one plain Goblin Guard and one `goblin_guard_keyholder` that is identical except that its corpse always holds the Rusty Key). The Overseer is aggressive (it attacks anyone who enters its chamber). Gold from monsters is in the corpse. Creature names are capitalised (`Name = "Goblin Guard"`, used by `stat` and by shopkeepers and NPCs when they speak); what players read in fights and on corpses is the short description with its article ("a goblin guard", "the corpse of a goblin guard").
 
 ## 7. Items
 
@@ -185,7 +185,7 @@ These are the final numbers after the event-clock balance simulation (section 12
 | Class | Fields | Commands |
 |---|---|---|
 | `Weapon` | `DamageMin`, `DamageMax`, `ToHit`, `ReactionMod`, `Recovery` | `wield <weapon>`, `unwield` |
-| `Armor` | `ArmorValue`, `Slot`, `ReactionMod`, optional `MaxHpBonus` | `wear <item>`, `remove <item>` |
+| `Armor` | `ArmorValue`, `Slot`, `ReactionMod`, optional `MaxVitalityBonus` | `wear <item>`, `remove <item>` |
 | `Consumable` | `HealAmount`, `UseVerb` (`eat`, `drink`), `UseMessage`, `Recovery` | `eat <item>`, `drink <item>` (also `quaff`); a queued action |
 | `Coins` | `Amount` (or `AmountMin`/`AmountMax`, rolled when first seen), `SetAmount(n)` | Picking it up (or looting it) adds the gold and destructs the item |
 
@@ -217,7 +217,7 @@ Every item carries instance state: a **quality** (0 Poor, 1 Common, 2 Fine, 3 Ex
 | Overseer's Orders | quest item | readable | 0 | Boss, always |
 | Rusty Key | key | | 0 | The corpse of one of the two Goblin Guards, always |
 | Minor Healing Potion | consumable, drink | heals 20, Recovery 0.5 | 15 | Storage Chamber; merchant |
-| Magical Trinket | armor, trinket | max HP +5 | 40 | Hidden Cache, always |
+| Magical Trinket | armor, trinket | max Vitality +5 | 40 | Hidden Cache, always |
 | Rare Enchanted Dagger | weapon | 7-11, to hit +2, Recovery 0.5 | 80 | Hidden Cache, 25% |
 | Random Gold | coins | 30-60 | | Hidden Cache, always |
 
@@ -233,26 +233,26 @@ Every item carries instance state: a **quality** (0 Poor, 1 Common, 2 Fine, 3 Ex
 
 Services use the same class with a different stock:
 
-- **Harland the Innkeeper** sells food and drink (consumables) and a bed. Buying the bed restores the buyer to full HP and takes them upstairs to the Guest Rooms.
+- **Harland the Innkeeper** sells food and drink (consumables) and a bed. Buying the bed restores the buyer to full Vitality and takes them upstairs to the Guest Rooms.
 - **Traveling Merchant** sells Minor Healing Potions and trail rations.
 
 `Shopkeeper` has `protected virtual bool OnBuy(ObjectRef buyer, string path)` so a service can do something other than hand over an item. Stock samples are kept inside the shopkeeper so that `buy sword` and `value sword` find them by name. The Traveling Merchant sells potions at 15 and rations at 5. Harland sells stew (4), ale (2) and the bed (5); buying the bed heals the buyer fully and takes them up to the Guest Rooms.
 
 ## 8a. Classes, skills and areas
 
-The five callings, their skills and traits, equipment categories and access, the level-scaled attack rule, the travel pass and the Vale Road are described in [CLASS_SYSTEM.md](CLASS_SYSTEM.md). Every living thing has Stamina and Mana. Weapons and armor have a `Category`. Rooms get their area and region names from an `area.cs` in their directory (`score` shows them). Creature numbers in the tables here are unchanged by the class system; `tests/balance_sim.py` shows how each archetype fares against them.
+The five callings, their skills and traits, equipment categories and access, the level-scaled attack rule, the travel pass and the Vale Road are described in [CLASS_SYSTEM.md](CLASS_SYSTEM.md). Every living thing has Endurance and Focus. Weapons and armor have a `Category`. Rooms get their area and region names from an `area.cs` in their directory (`score` shows them). Creature numbers in the tables here are unchanged by the class system; `tests/balance_sim.py` shows how each archetype fares against them.
 
 ## 9. The player character
 
 `Adventurer` (abstract, inherits `Living`) carries everything about playing the game; `Player` inherits it and keeps accounts, wizard tools and files.
 
-Saved with the player: level, experience, HP, gold, quest states, a save record (path and state, section 7) for each carried item and which are equipped, and the logout room.
+Saved with the player: level, experience, Vitality, gold, quest states, a save record (path and state, section 7) for each carried item and which are equipped, and the logout room.
 
-- **New character:** chooses one of five callings after the password (Warrior, Scout, Priest, Mage, Adventurer); level 1, the calling's HP, gold, resources and starting kit (CLASS_SYSTEM.md section 7); unarmed 1-3.
+- **New character:** chooses one of five callings after the password (Warrior, Scout, Priest, Mage, Adventurer); level 1, the calling's Vitality, gold, resources and starting kit (CLASS_SYSTEM.md section 7); unarmed 1-3.
 - **Experience to reach level n**, times the experience modifier of the character's classes: 100, 300, 600 and 1000 for levels 2 to 5 (50 x n x (n - 1)); 5,400, 12,000, 21,700, 34,100 and 49,300 for levels 6 to 10 (the corridor pace model, [CORRIDOR_BALANCE.md](CORRIDOR_BALANCE.md) section 4); and 49,300 x (n / 10)^3 above level 10. **The curve beyond level 10 is provisional**: it only continues the last step smoothly and is to be re-fitted when there is content for those levels. The level cap is 100.
-- **Each level:** +8 max HP, and full heal on levelling. (Attack grows by the class's attack rate per level and Defense by 1.)
-- **Regeneration:** 1 HP every 10 seconds out of combat; 3 in a safe room.
-- **Death:** the player is told so, and a **corpse** in the room where they died takes everything they carry (equipment included) and a gold fee of 10% of their purse. They wake in the Guest Rooms at full HP, with experience and level intact, and must walk back to the corpse and `loot` it. Their killer forgets them. The loss is saved at once.
+- **Each level:** +8 max Vitality, and full heal on levelling. (Attack grows by the class's attack rate per level and Defense by 1.)
+- **Regeneration:** 1 Vitality every 10 seconds out of combat; 3 in a safe room.
+- **Death:** the player is told so, and a **corpse** in the room where they died takes everything they carry (equipment included) and a gold fee of 10% of their purse. They wake in the Guest Rooms at full Vitality, with experience and level intact, and must walk back to the corpse and `loot` it. Their killer forgets them. The loss is saved at once.
 - **Logout room:** quitting in a room whose `QueryLogoutRoom()` is true (the Guest Rooms) makes that the next login room. Otherwise players enter at the Village Square.
 - **Inventory persistence:** on save, the record of each carried item (path, quality, quantity, properties) and which are equipped are stored and the items are destructed with the player on quit; on login they are cloned again with their state, merged into stacks and re-equipped. Other per-item state (a lantern being lit) is not kept. Items do not drop to the floor on quit.
 
@@ -263,7 +263,7 @@ Commands, available to every player:
 | `kill <target>` (also `attack`) | Start a fight |
 | `flee [direction]` | Leave the fight; fails 25% of the time. With no direction it goes back the way you came, else by a random usable exit, else "There is no way out!". A direction that is not a usable exit fails without spending the attempt |
 | `verbose [on\|off]` | Show `(+N damage)` in green for damage you deal, `(-N damage)` in red for damage you take, `(+N Vitality)` for healing. Off by default, saved with the character |
-| `prompt [text\|default\|off]` | Show or set the line printed after every command and after unprompted output. Tokens `{name} {hp} {maxhp} {stamina} {maxstamina} {mana} {maxmana}`; default `{name} ({hp}/{maxhp}) ({stamina}/{maxstamina}) ({mana}/{maxmana}) > `; `off` gives `> `. At most 80 characters, no colour tags or control characters from the player's text. Saved. The token table is `Adventurer.PromptTokens` |
+| `prompt [text\|default\|off]` | Show or set the line printed after every command and after unprompted output. Tokens `{name} {vitality} {maxvitality} {endurance} {maxendurance} {focus} {maxfocus}`; default `{name} ({vitality}/{maxvitality}) ({endurance}/{maxendurance}) ({focus}/{maxfocus}) > `. The old tokens `{hp} {maxhp} {stamina} {maxstamina} {mana} {maxmana}` still work, silently, so saved prompts do not break; `off` gives `> `. At most 80 characters, no colour tags or control characters from the player's text. Saved. The token table is `Adventurer.PromptTokens` |
 | `sync TOKEN` | A client aid. Answers to the sender only, in one line `[sync TOKEN]`; the token keeps letters and digits only, 16 at most. It takes no game time and is not an action on the combat clock. A client sends it right behind a command to know where the reply ends (the prompt cannot tell, since it also follows unprompted output). It counts as input for the idle timer. Help lists it |
 | `consider <target>` | Rough comparison of levels |
 | `search` | Look for a hidden exit; a short timed action; not while fighting (section 3a) |
@@ -277,14 +277,14 @@ Commands, available to every player:
 | `browse`, `buy`, `sell`, `value` (or `price`) | In a shop |
 | `accept`, `report` | In the Adventurers Guild |
 | `ansi [on\|off]` (also `color`, `colour`) | Show or change ANSI colour (section 14) |
-| `score` (also `sc`) | Level, experience and what the next level needs, HP, gold, equipment, quests |
-| `hp` | One-line health, Stamina and Mana |
+| `score` (also `sc`) | Level, experience and what the next level needs, Vitality, gold, equipment, quests |
+| `vitality` (old name `hp` still works) | One-line Vitality, Endurance and Focus |
 | `skills` | Your skills, spells and traits with costs and timing |
 | `quests` | Quest log |
 
 `look at <thing>` falls back to room details, and `look at <creature>` adds a rough health line. `stat <thing>` accepts `me`, `here` or a name present in the room.
 
-Public functions on the player for other objects: `QueryLevel`, `QueryHp`, `QueryMaxHp`, `QueryGold`, `AddGold(int)` (negative to take; refuses to go below zero and returns false), `AddXp(int)`, `QueryQuest(string id)`, `SetQuest(string id, int state)`, `NotifyKill(string programPath)`, `QueryKilled(string programPath)`.
+Public functions on the player for other objects: `QueryLevel`, `QueryVitality`, `QueryMaxVitality`, `QueryGold`, `AddGold(int)` (negative to take; refuses to go below zero and returns false), `AddXp(int)`, `QueryQuest(string id)`, `SetQuest(string id, int state)`, `NotifyKill(string programPath)`, `QueryKilled(string programPath)`.
 
 ### Wizard tools for builders
 
@@ -292,7 +292,7 @@ Public functions on the player for other objects: `QueryLevel`, `QueryHp`, `Quer
 |---|---|---|
 | `goto <room path or player>` | 1 | Move to a room, or to where a player is |
 | `stat <thing>` | 1 | Show a living thing's or item's numbers |
-| `restore [<target>]` | 5 | Restore full HP, Stamina and Mana (was `heal`; the word now belongs to the Priest's spell) |
+| `restore [<target>]` | 5 | Restore full Vitality, Endurance and Focus (was `heal`; the word now belongs to the Priest's spell) |
 | `slay <target>` | 10 | Kill a creature at once, with normal death processing and kill credit |
 
 These follow the existing rule: below the level, the command answers "What?". `shutdown` now saves every online player before the driver stops.
@@ -386,7 +386,7 @@ Kills count only if they happened while the quest was active or before it was ac
 
 - `tests/smoke_test.py` keeps testing the driver and wizard tools against `/domains/town`. Because new players now start in Vincent's Hollow, the smoke test patches the start room in its temporary copy of the mudlib. Its existing checks must keep passing.
 - `tests/area_test.py` is a new end-to-end test for the gameplay systems and the area: movement through every exit of the area, look/read on the brief's objects, each NPC's quoted dialogue, buying and equipping, a real fight with a weak creature, corpses and looting, death and respawn, a driver restart and a crash with the lost-property store, the locked cache, the boss abilities (using `smite` and `heal` where luck would make the test flaky), both quests through to the ending, and persistence of the character across logout.
-- A simulation script, `tests/balance_sim.py`, plays the combat rules on an event clock outside the driver (the same delay formula as the mudlib; `python3 tests/balance_sim.py check` parses the mudlib files and fails if the numbers differ) with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average HP lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
+- A simulation script, `tests/balance_sim.py`, plays the combat rules on an event clock outside the driver (the same delay formula as the mudlib; `python3 tests/balance_sim.py check` parses the mudlib files and fails if the numbers differ) with the numbers from this document and reports, for a solo player with sensible purchases, the win rate and average Vitality lost per room. Target: the area is completable solo by level 5 with potions and rests, and the boss is dangerous but beatable (roughly 50-75% for a level 4-5 player in the best village gear).
 - `tests/playthrough_test.py` (port 4813, `LESMUDOS_TEST_PORT`) is the first-player test. It copies the mudlib unmodified (no stub rooms), makes a brand-new non-wizard level 1 character and plays the whole area: every exit of all 18 rooms in both directions, the sign, plaque and quest board, the brief's objects, every NPC's quoted lines word for word, the shop and the tavern (including the bed and logging out in the Guest Rooms), a deliberate death with corpse recovery and the locked-corpse message for a second player, then both quests with a fight loop (flee, rest, bed, potions, looting, the Hidden Cache, levelling) up to the Goblin Overseer, `report`, the rewards and the ending speech. A warden wizard account is used only to peek at state; if the solo character cannot finish, the test records a finding and falls back to `heal`, clearly labelled. It takes 15 to 20 minutes.
 - `tests/timing_test.py` (port 4815) measures real intervals between combat actions against the formula (design section 6): unarmed, sword, shield, haste, slow, fast and slow creatures, the first-action delay of creatures drawn in, the Overseer's pattern and its Power Strike warning, the potion queue and `stop`, and lifetime cases (spamming `kill`, dying with a potion queued, a target quitting during a wind-up).
 - `tests/world_test.py` (port 4823) tests the world features of section 3a: hidden exits (both ways of finding them, who sees what, saved across logout, a clean restart and a kill), `search` and its timing, danger bands, patrols (route, there and back, loop, real exits only, talk pause, defending, dying and returning, dormancy), nodes, the wizard sandbox, the docs' examples and Elder Lane in Oakenfell.

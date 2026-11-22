@@ -13,7 +13,7 @@ public class GvTobiahRue : Npc
         ShortDesc = "Tobiah Rue, the caretaker";
         LongDesc = "A stooped old man in a coat the color of moss, a rake in one hand and a sack at his hip. He moves slowly and quietly, as if afraid of waking something, and his eyes, when they meet yours, are mild and entirely unsurprised.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Mm.");
         AddChat("You found it. They mostly do, in the end.");

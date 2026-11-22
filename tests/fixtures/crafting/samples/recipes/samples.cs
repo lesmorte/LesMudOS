@@ -26,7 +26,7 @@ public class CtSampleRecipes : RecipeSet
             .Makes("/domains/crafttest/obj/hunters_poultice")
             .Discovery("rare");
         // A secret: no trainer or book can teach it.
-        Recipe("stamina_tonic", "Minor Stamina Tonic")
+        Recipe("stamina_tonic", "Minor Endurance Tonic")
             .Needs("blueberries").Needs("honey")
             .At("herbalist table").Skill("herbalism", "novice")
             .Makes("/domains/crafttest/obj/stamina_tonic")

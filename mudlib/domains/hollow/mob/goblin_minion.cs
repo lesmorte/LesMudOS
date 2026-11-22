@@ -19,7 +19,7 @@ public class GoblinMinion : Monster
         BaseReaction = 2.5;
         AddCombatAction("stab", "Stab", preparation: 0, recovery: 0.5);
         Level = 2;
-        MaxHp = 20;
+        MaxVitality = 20;
         DamageMin = 2;
         DamageMax = 4;
         Armor = 1;

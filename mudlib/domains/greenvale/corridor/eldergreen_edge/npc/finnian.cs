@@ -12,7 +12,7 @@ public class EeFinnian : Npc
         ShortDesc = "Finnian, a woodcutter";
         LongDesc = "A big fair-haired man in a sweat-dark shirt and leather apron, with a felling axe in his hand and sawdust in his hair. His forearms are corded with muscle and his grin is broad and unhurried.";
         Level = 4;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Timber! Ha. Never get tired of saying it.");
         AddChat("Alwin blazes, I cut. We've never fallen out, and we've never been rich.");

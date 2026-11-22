@@ -11,7 +11,7 @@ public class EeAlwin : Npc
         ShortDesc = "Alwin the forester";
         LongDesc = "A weathered man in a leather jerkin and a green wool cap, with a felling axe on his shoulder and a pot of white paint hanging at his belt. His beard is grey, his forearms are scarred with old branch-whip, and he looks at trees, not at you, when he talks.";
         Level = 4;
-        MaxHp = 50;
+        MaxVitality = 50;
 
         AddChat("Mind the blazes. A white mark means the tree is spoken for, and I'll know if you've touched it.");
         AddChat("I've walked this wood thirty years. It's never twice the same, and it's never done with surprising me.");

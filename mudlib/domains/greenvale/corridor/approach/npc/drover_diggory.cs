@@ -13,7 +13,7 @@ public class OaDroverDiggory : Npc
         ShortDesc = "Diggory Marsh, a drover";
         LongDesc = "A lanky young man with a goad over his shoulder, straw in his hair and a sleepy ox's patience in his expression. His boots are cracked past mending, and his hands are enormous.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("Gee up, Duke. Not you, miss, I'm talking to the ox.");
         AddChat("Eight oxen, two hands, one road. That's a drover's life.");

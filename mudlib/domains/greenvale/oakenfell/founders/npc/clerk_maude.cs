@@ -12,7 +12,7 @@ public class FdClerkMaude : Npc
         ShortDesc = "Maude Tarrow, a clerk";
         LongDesc = "A broad, cheerful woman with grey-streaked hair in a net and a pointer of polished ash in her hand. She has answered the question 'Where do I go?' so many times that she has begun to enjoy it.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("New to Oakenfell? Ask me about the districts, and I will tell you where to go and where not to bother.");
         AddChat("There are five districts. Everyone forgets one. It is usually the Founder's.");

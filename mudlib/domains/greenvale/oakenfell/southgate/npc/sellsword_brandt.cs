@@ -12,7 +12,7 @@ public class SgSellswordBrandt : Npc
         ShortDesc = "Brandt Ketch, an off-duty sellsword";
         LongDesc = "A stocky, sandy-haired man with a crooked grin and a shirt open at the neck. His sword lies across the table beside a tankard, and his knuckles are scarred.";
         Level = 4;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Sit down, stranger. The first story's free. The second costs a drink.");
         AddChat("I fought at the Watchfort bridge once. Or someone did. I was there for the pay.");

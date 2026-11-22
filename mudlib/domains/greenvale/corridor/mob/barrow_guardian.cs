@@ -9,7 +9,7 @@ public class CmBarrowGuardian : Monster
 {
     private readonly string[] opening = new string[0];
     private readonly string[] cycle = { "slam", "slam", "quake" };
-    private readonly int[] triggerHp = { 50 };
+    private readonly int[] triggerVitality = { 50 };
     private readonly string[] triggerAction = { "stone" };
     private int step;
     private int fired;
@@ -35,7 +35,7 @@ public class CmBarrowGuardian : Monster
         ShortDesc = "a barrow guardian";
         LongDesc = "A massive figure of weathered grey stone, vaguely like a man, stands against the barrow wall with its fists resting on the pommel of a stone sword as long as a door. Chipped runes glow faintly across its chest. It does not breathe, and yet it seems to watch.";
         Level = 10;
-        MaxHp = 150;
+        MaxVitality = 150;
         DamageMin = 10;
         DamageMax = 15;
         ToHit = 3;
@@ -51,12 +51,12 @@ public class CmBarrowGuardian : Monster
         AddCombatAction("stone", "Stone Skin", preparation: 0.5, recovery: 0.5, windUp: "lets the runes on its chest flare", kind: "buff");
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
-        for (var i = 0; i < triggerHp.Length; i++)
+        for (var i = 0; i < triggerVitality.Length; i++)
         {
-            if ((fired & (1 << i)) == 0 && Hp * 100 <= triggerHp[i] * QueryMaxHp())
+            if ((fired & (1 << i)) == 0 && Vitality * 100 <= triggerVitality[i] * QueryMaxVitality())
             {
                 fired |= 1 << i;
                 chosen = triggerAction[i];

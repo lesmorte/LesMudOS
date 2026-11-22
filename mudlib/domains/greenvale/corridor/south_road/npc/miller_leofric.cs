@@ -13,7 +13,7 @@ public class SrMillerLeofric : Npc
         ShortDesc = "Old Leofric, the miller";
         LongDesc = "A bent old man dusted white from cap to boots, with forearms like knotted rope and eyes the pale blue of skimmed milk. He has ground this district's grain for sixty years, and he still cocks his head at the sails every time the wind changes.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Mind the dog. She's not vicious, but she's thorough. Welcome to the mill farm, traveler.");
         AddChat("Sixty years I've ground corn for this vale, and I never yet saw a wind I could not read.");

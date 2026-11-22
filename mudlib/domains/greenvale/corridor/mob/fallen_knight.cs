@@ -26,7 +26,7 @@ public class CmFallenKnight : Monster
         ShortDesc = "the Fallen Knight";
         LongDesc = "A knight in a tarnished suit of ancient plate kneels beside a long stone bier, a notched greatsword in his gauntlets and the cracked remains of a faded blue tabard hanging from his shoulders. His helmet is closed, and the darkness inside is full of pale light. When he rises it is slowly, as one obeying a long-given order.";
         Level = 10;
-        MaxHp = 155;
+        MaxVitality = 155;
         DamageMin = 6;
         DamageMax = 10;
         ToHit = 5;
@@ -43,7 +43,7 @@ public class CmFallenKnight : Monster
         AddLoot("/domains/hollow/obj/healing_potion", 50);
     }
 
-    /// <summary>The once-only triggers first (by HP), then the opening actions, then the cycle, round and round.</summary>
+    /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         var n = step++;

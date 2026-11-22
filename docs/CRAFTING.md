@@ -262,17 +262,17 @@ public class HcMinorHealingSalve : Crafted
         Plural = "pots of minor healing salve";
         Value = 3;
         UseVerb = "apply";            // "eat", "drink" or "apply"
-        HealPerTick = 3;              // healing over time: 3 hit points
+        HealPerTick = 3;              // healing over time: 3 Vitality
         Ticks = 6;                    // six times
         TickSeconds = 5;              // every 5 seconds
-        // RestoreVitality = 8;       hit points at once
-        // RestoreStamina = 20;       Stamina at once
+        // RestoreVitality = 8;       Vitality at once
+        // RestoreEndurance = 20;       Endurance at once
         // QualityScale = new[] { 0.5, 1.0, 1.5, 2.0, 2.5, 3.0 };   this item's own scaling, instead of numbers.cs
     }
 }
 ```
 
-Vitality is hit points. A character has one healing over time at a time; a new one replaces the old; it shows in `score` under its name. Use is an action on the combat clock (Recovery 0.5, like a potion). Why effects live in the output's file and not in the recipe: an output made by two recipes, bought from a vendor or found as loot behaves the same, and the file is the one place its value and effect are read.
+`RestoreVitality` is Vitality restored at once. A character has one healing over time at a time; a new one replaces the old; it shows in `score` under its name. Use is an action on the combat clock (Recovery 0.5, like a potion). Why effects live in the output's file and not in the recipe: an output made by two recipes, bought from a vendor or found as loot behaves the same, and the file is the one place its value and effect are read.
 
 A wearable with a recorded but inert property is ordinary armor with `CarryBonus = 1` (new on `/std/armor`): appraise and `stat` show it, a later carry limit can read `QueryCarryBonus()`, nothing uses it now (owner's decision 5).
 
@@ -430,7 +430,7 @@ public class HcLaunchRecipes : RecipeSet
             .At("herbalist table").Skill("herbalism", "novice").Makes("/domains/hollow/obj/craft/herbal_bandage");
         Recipe("minor_healing_salve", "Minor Healing Salve").Needs("healing_herb").Needs("wildflower")
             .At("herbalist table").Skill("herbalism", "novice").Makes("/domains/hollow/obj/craft/minor_healing_salve");
-        Recipe("minor_stamina_tonic", "Minor Stamina Tonic").Needs("blueberries").Needs("honey")
+        Recipe("minor_stamina_tonic", "Minor Endurance Tonic").Needs("blueberries").Needs("honey")
             .At("herbalist table").Skill("herbalism", "novice").Makes("/domains/hollow/obj/craft/minor_stamina_tonic");
         Recipe("treated_leather", "Treated Leather").Needs("rabbit_skin").Needs("wolf_blood")
             .At("tanning rack").Skill("tanning", "novice").Makes("treated_leather");
@@ -449,11 +449,11 @@ public class HcLaunchRecipes : RecipeSet
 | Output | Base | Value | Effect fields |
 |---|---|---|---|
 | berry_juice | `/std/crafted`, drink | 1 | `RestoreVitality = 8` (minor Vitality) |
-| sweet_berry_juice | `/std/crafted`, drink | 2 | `RestoreVitality = 10; RestoreStamina = 10` |
+| sweet_berry_juice | `/std/crafted`, drink | 2 | `RestoreVitality = 10; RestoreEndurance = 10` |
 | simple_bandage | `/std/crafted`, apply | 1 | `RestoreVitality = 6` (minor healing) |
 | herbal_bandage | `/std/crafted`, apply | 3 | `RestoreVitality = 12` (moderate healing) |
 | minor_healing_salve | `/std/crafted`, apply | 3 | `HealPerTick = 3; Ticks = 6; TickSeconds = 5` (18 over 30 s) |
-| minor_stamina_tonic | `/std/crafted`, drink | 3 | `RestoreStamina = 25` |
+| minor_stamina_tonic | `/std/crafted`, drink | 3 | `RestoreEndurance = 25` |
 | treated_leather | `/std/material` | 4 | a component; more than a rabbit skin (3) |
 | travelers_leather_wrap | `/std/armor`, trinket | 3 | `ArmorValue = 0; CarryBonus = 1` (recorded, inert) |
 | blood_ink | `/std/material` | 6 | a component for scribes, scholars and rune crafters |
@@ -465,7 +465,7 @@ public class HcLaunchRecipes : RecipeSet
 - **Tool wear and tool crafting:** tools do not wear out; there is no recipe output that is a tool of chosen quality other than by inheritance.
 - **Legendary** never comes from harvesting and crafting is capped at Masterwork (`craft.max_quality`); the `item.legendary` Chronicle event is not wired.
 - **Rumors, guilds and achievements** as discovery sources, and Renown beyond the event service's own award: not built. Discovery achievements are the Chronicle's firsts.
-- **Effects** are vitality now, stamina now and healing over time; buffs (timed `AddEffect` mods) from food are not yet data fields. The carry bonus is inert (no carry limit).
+- **Effects** are vitality now, endurance now and healing over time; buffs (timed `AddEffect` mods) from food are not yet data fields. The carry bonus is inert (no carry limit).
 - **Recipes with the same ingredients and different stations** count as a clash (one set of materials makes one thing). Station-aware matching is a possible extension.
 - **Batch crafting** at a station that is removed mid-batch stops at the next step; fine. Crafting at a station does not reserve it; any number may work at one.
 - **The 1,000-recipe test** uses materials whose files do not exist (the daemon does not open files at load; the simulator checks files).

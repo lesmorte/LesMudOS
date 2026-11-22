@@ -13,7 +13,7 @@ public class SgInnkeeperOrla : Shopkeeper
         ShortDesc = "Orla Penhallow, the innkeeper";
         LongDesc = "A broad-shouldered woman of fifty, with iron-grey hair under a white cap and sleeves rolled to the elbow. She runs the Silver Stag like a captain, and her glance finds a dirty tankard at forty paces.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Welcome to the Silver Stag. Food's hot, ale's cold, beds are clean. Everything else is your own business.");
         AddChat("Try {cmd}browse{/} if you're hungry, and {cmd}buy bed{/} if you're weary.");

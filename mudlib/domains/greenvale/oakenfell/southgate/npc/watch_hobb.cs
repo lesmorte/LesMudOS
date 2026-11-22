@@ -14,7 +14,7 @@ public class SgWatchHobb : Npc
         ShortDesc = "Hobb Tarrow, a gate watchman";
         LongDesc = "A heavyset man of fifty in a grey tabard with a green oak badge. He leans on his spear with the comfort of long practice, and he has the face of someone who is always about to say something.";
         Level = 4;
-        MaxHp = 50;
+        MaxVitality = 50;
 
         AddChat("Welcome to Oakenfell! Mind your purse in the Row, mind your head in the Lane, and mind your manners everywhere, and you'll do fine.");
         AddChat("Thirty years on this gate, and I've seen every sort come through. Heroes, mostly, and the rest were liars who wanted to be.");

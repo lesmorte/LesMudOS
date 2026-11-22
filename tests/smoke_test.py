@@ -33,7 +33,7 @@ failures = []
 # plain text; the raw text is kept in Client.raw for the colour checks.
 DEFAULT_ARCHETYPE = "adventurer"
 
-# The tests written before classes existed assume a bare character: 30 HP, 25 gold, no kit, unarmed 2-5, no
+# The tests written before classes existed assume a bare character: 30 Vitality, 25 gold, no kit, unarmed 2-5, no
 # equipment limits, nothing that changes timing. They get one as a test-only archetype in their temporary mudlib.
 NOVICE_CLASS = """// @inherit /std/pclass
 public class NoviceClass : PlayerClass
@@ -44,7 +44,7 @@ public class NoviceClass : PlayerClass
         Tagline = "A bare test character."; Description = "Test only.";
         StartReaction = 2.5; VitalityBase = 12; VitalityPerLevel = 8; EnduranceBase = 55; EndurancePerLevel = 0; FocusBase = 55; FocusPerLevel = 0;
         // Attributes 5 each (no derived effect), and class modifiers that keep the bare character's regeneration exactly as before
-        // the attribute system: 1 Vitality, 6 Stamina and 5 Mana per 10 s (the formulas give 0.8, 6.3 and 3.5).
+        // the attribute system: 1 Vitality, 6 Endurance and 5 Focus per 10 s (the formulas give 0.8, 6.3 and 3.5).
         Modifiers["vitality_regen"] = 25; Modifiers["endurance_regen"] = -100.0 / 21; Modifiers["focus_regen"] = 300.0 / 7;
         AttackRate = 1.0; StartGold = 25;
         Weapons.Add("*"); ArmorTypes.AddRange(new[] { "light", "medium", "heavy" }); Shield = true;
@@ -67,7 +67,7 @@ ANSI_TAIL = re.compile("\x1b(\\[[0-9;]*)?$")
 
 
 PROMPT = re.compile(r"(?<!-)> ")
-# A prompt on a line of its own: the plain "> " or the default "Name (hp/max) (stamina/max) (mana/max) > ".
+# A prompt on a line of its own: the plain "> " or the default "Name (vit/max) (endurance/max) (focus/max) > ".
 PROMPT_LINE = re.compile(r"(?m)^(?:[A-Za-z]+ \(\d+/\d+\) \(\d+/\d+\) \(\d+/\d+\) )?> ?(?=\r?\n|$)")
 
 

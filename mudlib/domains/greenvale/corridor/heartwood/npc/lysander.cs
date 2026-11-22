@@ -13,7 +13,7 @@ public class HwLysander : Npc
         ShortDesc = "Lysander, a hurrying traveler";
         LongDesc = "A thin man in a dusty coat with a pack cinched tight across his shoulders and a walking staff in his fist. He is standing on the old paving with one foot already pointed up the road, and he looks over his shoulder at each pause in the wind.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("I can't stop. I have to be through before dark. Nobody should be in here after dark.");
         AddChat("Walk on the stone if you can. It feels safer, and I don't know why.");

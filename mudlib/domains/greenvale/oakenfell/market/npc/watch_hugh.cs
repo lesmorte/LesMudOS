@@ -13,7 +13,7 @@ public class MkWatchHugh : Npc
         ShortDesc = "Hugh Bellamy, a Westgate watchman";
         LongDesc = "A grim, middle-aged man in a grey tabard and a dented helm, a crossbow slung across his shoulder. His eyes keep returning to the western road, as if expecting something.";
         Level = 4;
-        MaxHp = 50;
+        MaxVitality = 50;
 
         AddChat("Westgate's quiet. Too quiet, if you ask me.");
         AddChat("The road beyond is not open to travelers. Not yet. Not to those who value their skins.");

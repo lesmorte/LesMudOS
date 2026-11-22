@@ -13,7 +13,7 @@ public class RvBessaCrane : Shopkeeper
         ShortDesc = "Bessa Crane, the fishmonger";
         LongDesc = "A wide, red-armed woman in a scaly leather apron, with a gutting knife on her belt and a voice that carries across the whole market. She weighs fish with one hand and counts coins with the other, and has never been known to get either wrong.";
         Level = 2;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("Smoked eel, perch pie, fresh from the Mere! Try {cmd}browse{/} and see for yourself.");
         AddChat("I do not haggle and I do not give credit. I do give a very fair price.");

@@ -15,7 +15,7 @@ public class SgStreetSeller : Shopkeeper
         ShortDesc = "Nan Tuppence, a street food seller";
         LongDesc = "A short, round woman with flour in her hair and a leather apron over a bright patched skirt. She presides over a smoking cart with a ladle in one hand and a wooden spoon in the other, and her voice carries over the whole street.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("Hot pies! Hot pies and honeyed nuts! Fresh from the griddle, still too hot to hold!");
         AddChat("Try {cmd}browse{/} to see what's in the cart, dear, and {cmd}buy pie{/} if you've coin.");

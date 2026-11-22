@@ -14,7 +14,7 @@ public class VhCraftsman : Trainer
         ShortDesc = "Tobin Fettle the craftsman";
         LongDesc = "A stocky, bald man with sawdust on his shoulders and a pencil stub behind each ear. His apron pockets bulge with nails, pegs and string, and he looks at everything you carry as if it might need mending.";
         Level = 2;
-        MaxHp = 24;
+        MaxVitality = 24;
 
         AddChat("If it's broken, bring it here. If it isn't broken yet, bring it here and I'll tell you when.");
         AddChat("Joiner by training, tinker by temper, and mender of everything by accident. Mind the chair, it's not finished.");

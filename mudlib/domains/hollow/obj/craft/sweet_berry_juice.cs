@@ -14,6 +14,6 @@ public class CrSweetBerryJuice : Crafted
         UseVerb = "drink";
         UseMessage = "You drink the sweet juice and feel the strength come back into your legs.";
         RestoreVitality = 10;
-        RestoreStamina = 10;
+        RestoreEndurance = 10;
     }
 }

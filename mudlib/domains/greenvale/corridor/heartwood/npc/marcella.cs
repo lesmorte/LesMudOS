@@ -12,7 +12,7 @@ public class HwMarcella : Npc
         ShortDesc = "Marcella, a scholar of the Athenaeum";
         LongDesc = "A woman in her thirties in a sensible brown travelling coat, with ink on her cuffs and a drawing board strapped across her knees. She sits on a camp stool before the wall, a satchel of pencils beside her, and looks from the stone to the paper and back with a frown that suggests the two refuse to agree.";
         Level = 3;
-        MaxHp = 30;
+        MaxVitality = 30;
 
         AddChat("I have drawn this gateway eleven times and I will draw it again. Each time I find something I got wrong.");
         AddChat("I am from the Athenaeum in Oakenfell. They sent me to see what is here. I have yet to tell them what it is.");

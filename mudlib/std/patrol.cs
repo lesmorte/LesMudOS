@@ -225,7 +225,7 @@ public class Patrol : Npc
         if (Environment() is { } room) TellRoom(room, FallLine.Replace("{name}", Cap(QueryLabel())) + "\n", Self);
         ClearEnemies();
         ResetCombat();
-        Hp = QueryMaxHp();
+        Vitality = QueryMaxVitality();
         FillResources();
         MoveObject(LoadObject("/std/void"));
         Schedule(Return, ReturnSeconds);

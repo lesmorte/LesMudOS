@@ -22,7 +22,7 @@ public class CmGreyFox : Monster
         ShortDesc = "a grey fox";
         LongDesc = "A lean grey fox with a rust-coloured throat and a black-tipped brush slips along the hedgerow. Its narrow yellow eyes follow every movement and its feet barely trouble the grass. It darts and snaps rather than standing to fight.";
         Level = 4;
-        MaxHp = 26;
+        MaxVitality = 26;
         DamageMin = 2;
         DamageMax = 4;
         ToHit = 1;

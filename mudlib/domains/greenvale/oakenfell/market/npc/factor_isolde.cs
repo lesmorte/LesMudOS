@@ -13,7 +13,7 @@ public class MkFactorIsolde : Npc
         ShortDesc = "Isolde Marrin, a Consortium factor";
         LongDesc = "A poised woman of forty-five, in a blue wool gown with a silver scale at the throat. Her dark hair is wound in a tight coil, and her smile is warm, friendly, and exactly as deep as it needs to be.";
         Level = 5;
-        MaxHp = 60;
+        MaxVitality = 60;
 
         AddChat("Trade Builds Tomorrow. It's our motto, and we mean it.");
         AddChat("The Merchant Consortium is the commerce of Greenvale. If you buy it, sell it or carry it, we had a hand in it.");

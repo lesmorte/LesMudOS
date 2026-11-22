@@ -397,7 +397,7 @@ public class Player : Adventurer
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
             "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
-            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}hp{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
+            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}vitality{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "Names:     where a command takes a name you can say which one: {cmd}rat 2{/}, {cmd}2.rat{/}, {cmd}second rat{/}\n" +
@@ -440,10 +440,10 @@ public class Player : Adventurer
               "          {cmd}rmdir{/} <dir>                remove an empty directory\n" +
               "                                     (those seven need level 5 outside your home, and in other wizards' homes;\n" +
               "                                     level 10 for /secure, /std, /wiz itself and the home directories)\n");
-        if (level >= 5) Write("          {cmd}restore{/} [<target>]         restore a creature (or yourself) to full HP, Stamina and Mana\n");
+        if (level >= 5) Write("          {cmd}restore{/} [<target>]         restore a creature (or yourself) to full Vitality, Endurance and Focus\n");
         if (level >= 5) Write("          {cmd}speed{/} <target> <percent> [<seconds>]  haste (positive) or slow (negative) a creature's Reaction Time; 0 clears\n");
         if (level >= 10) Write("          {cmd}slay{/} <target>              kill a creature at once, with kill credit\n");
-        if (level >= 10) Write("          {cmd}setlevel{/} <1-100>           set your level (experience, HP and resources follow)\n");
+        if (level >= 10) Write("          {cmd}setlevel{/} <1-100>           set your level (experience, Vitality and resources follow)\n");
         if (level >= LevelUpdate) Write("          {cmd}update{/} <path>              recompile a file and replace the loaded object\n");
         if (level >= LevelShutdown) Write("          {cmd}shutdown{/}                   stop the driver\n");
         return true;

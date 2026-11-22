@@ -13,7 +13,7 @@ public class MkArmorerBrann : Npc
         ShortDesc = "Brann Iveson, an armorer";
         LongDesc = "A thick-chested, soot-grimed man with a bald head and a leather apron full of tools. He stands behind a stall with an empty rack and a single polished shield, looking like a man whose cart has not yet arrived.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Come back later, friend. New stock's still being unloaded.");
         AddChat("The best armor in Greenvale is made in the Guild Quarter. I'm just the fellow who sells it.");

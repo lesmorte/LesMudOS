@@ -13,7 +13,7 @@ public class MkSmithKessa : Npc
         ShortDesc = "Kessa Dunmore, a weaponsmith";
         LongDesc = "A short, strong woman with burn-scarred forearms, a leather apron and a pair of tongs always in her hand. Her black hair is bound under a scarf, and her portable anvil rings with each stroke.";
         Level = 3;
-        MaxHp = 40;
+        MaxVitality = 40;
 
         AddChat("Not much on the rack yet. The new blades are still being unloaded from the cart. Come back soon.");
         AddChat("A good blade is balance first, edge second, and price last.");

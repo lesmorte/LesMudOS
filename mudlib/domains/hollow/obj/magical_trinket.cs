@@ -1,6 +1,6 @@
 // @inherit /std/armor
 
-/// <summary>A worn charm from the hidden cache. Its only numbers are the extra hit points it gives its wearer.</summary>
+/// <summary>A worn charm from the hidden cache. Its only numbers are the extra Vitality it gives its wearer.</summary>
 public class MagicalTrinket : Armor
 {
     public override void Create()
@@ -12,8 +12,8 @@ public class MagicalTrinket : Armor
         Slot = "trinket";
         ReactionMod = 0.0;
         ArmorValue = 0;
-        MaxHpBonus = 5;
-        Magic = "raises your maximum HP by 5";
+        MaxVitalityBonus = 5;
+        Magic = "raises your maximum Vitality by 5";
         Value = 40;
     }
 }

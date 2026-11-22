@@ -7,8 +7,8 @@ Shows "the actual damage done to and by you" as a parenthetical after the combat
 
 ## 2. `prompt`
 `prompt` alone shows the current prompt and the tokens; `prompt <text>` sets it; `prompt default` restores the default; `prompt off` gives the plain `> `. Default:
-`{name} ({hp}/{maxhp}) ({stamina}/{maxstamina}) ({mana}/{maxmana}) > `
-which the owner described as "{PlayerName} (Vit Current/Vit Max) (Stamina Current/Stamina Max) (Mana Current/Mana Max) >". It "should display after you take an action of any sort": after every command's output, and after unprompted output (a combat round, someone arriving) so the player always ends on a current prompt. Saved with the character. Length-limited; no colour tags or control characters from the player's text other than the listed tokens. The editor and login prompts are untouched. Token names will be renamed by the attribute build (Vitality, Endurance, Focus); keep the token table in one place.
+`{name} ({vitality}/{maxvitality}) ({endurance}/{maxendurance}) ({focus}/{maxfocus}) > ` (as first written, the tokens were `{hp} {maxhp} {stamina} {maxstamina} {mana} {maxmana}`; they still work as silent aliases)
+which the owner described as "{PlayerName} (Vit Current/Vit Max) (Stamina Current/Stamina Max) (Mana Current/Mana Max) >". It "should display after you take an action of any sort": after every command's output, and after unprompted output (a combat round, someone arriving) so the player always ends on a current prompt. Saved with the character. Length-limited; no colour tags or control characters from the player's text other than the listed tokens. The editor and login prompts are untouched. The token names are Vitality, Endurance and Focus; keep the token table in one place.
 
 ## 3. Combat restrictions and `flee`
 - While fighting: picking things up from the floor (or from a corpse or container on the floor) is refused, and so is ordinary movement. Say why and point to `flee`.

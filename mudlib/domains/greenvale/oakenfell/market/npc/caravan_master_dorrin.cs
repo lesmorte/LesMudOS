@@ -13,7 +13,7 @@ public class MkCaravanMasterDorrin : Npc
         ShortDesc = "Dorrin Stavely, the caravan master";
         LongDesc = "A stern woman of fifty, with a bunch of heavy keys at her belt and a face weathered by sun and sleeplessness. She wears a plain blue coat with a scale badge, and she looks at everything as if counting it.";
         Level = 4;
-        MaxHp = 50;
+        MaxVitality = 50;
 
         AddChat("Keep clear of the wagons. Mind the hooves.");
         AddChat("Four wagons held at the Westgate, two turned back, one burned. I've lost count of the rest.");

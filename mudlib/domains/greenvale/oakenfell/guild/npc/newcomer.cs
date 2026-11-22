@@ -12,7 +12,7 @@ public class GqNewcomer : Npc
         ShortDesc = "Wick, a nervous newcomer";
         LongDesc = "A lanky young traveler in a road-stained cloak, standing very straight and clutching the strap of a pack that is clearly too new. He keeps looking up the Row toward the Hall, drawing breath as though to start, and letting it go.";
         Level = 3;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("That is the Hall of Legends, is it not? I had pictured it smaller. Or no, I had pictured it bigger, and now it is bigger than that.");
         AddChat("I am only going to look. I am nowhere near ready to choose anything. I only want to see the doors, and then I will go and find an inn.");

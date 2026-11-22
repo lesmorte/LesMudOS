@@ -35,7 +35,7 @@ public class {cls} : Monster
     public override void Create()
     {{
         Name = "{name}"; Ids.Add("{ident}"); ShortDesc = "a {ident}"; LongDesc = "A creature made for the class test.";
-        Level = {level}; MaxHp = {hp}; DamageMin = {dmg[0]}; DamageMax = {dmg[1]}; Armor = {armor}; ToHit = {tohit};
+        Level = {level}; MaxVitality = {hp}; DamageMin = {dmg[0]}; DamageMax = {dmg[1]}; Armor = {armor}; ToHit = {tohit};
         Dodge = {dodge}; BlockNatural = {block}; BaseReaction = {react}; Aggressive = false;
         {act}
     }}
@@ -151,7 +151,7 @@ public class TFlashSkill : Skill
     "test_zap": '''// @inherit /std/skill
 public class TZapSpell : Skill
 {
-    public override void Create() { Title = "Test Zap"; Command = "zap"; Kind = "spell"; Summary = "5 damage (test)."; ManaCost = 10; Recovery = 0.5; Target = "enemy"; }
+    public override void Create() { Title = "Test Zap"; Command = "zap"; Kind = "spell"; Summary = "5 damage (test)."; FocusCost = 10; Recovery = 0.5; Target = "enemy"; }
     public override void Resolve(ObjectRef user, ObjectRef? target)
     {
         if (target == null) return;
@@ -237,14 +237,14 @@ def num(pattern, text, default=None):
 
 
 def res(c):
-    """(hp, stamina, mana) from the hp command."""
+    """(hp, endurance, focus) from the vitality command."""
     t = ""
     for _ in range(4):
-        t += c.command("hp")
-        if "Mana " in t and re.search(r"HP \d+/\d+   Stamina", t):
+        t += c.command("vitality")
+        if "Focus " in t and re.search(r"Vitality \d+/\d+   Endurance", t):
             break
         time.sleep(0.3)
-    return (num(r"HP (\d+)/", t), num(r"Stamina (\d+)/", t), num(r"Mana (\d+)/", t))
+    return (num(r"Vitality (\d+)/", t), num(r"Endurance (\d+)/", t), num(r"Focus (\d+)/", t))
 
 
 def give(wiz, c, path, word):
@@ -363,7 +363,7 @@ def run(work, mudlib):
     c.read_until("Goodbye")
 
     # ===== the five archetypes: starting numbers and kit =====
-    expect = {  # HP as docs/ATTRIBUTES.md section 8 sets it (Warrior 35, Scout 20, Mage 20 at level 1)
+    expect = {  # Vitality as docs/ATTRIBUTES.md section 8 sets it (Warrior 35, Scout 20, Mage 20 at level 1)
         "warrior": ("35", "100", "20", "10", ["rusty sword", "small shield"], "weapon: a rusty sword", "shield: a small shield"),
         "scout": ("20", "100", "20", "10", ["hunting bow", "iron dagger"], "weapon: a hunting bow", "Armor 0"),
         "priest": ("26", "40", "100", "15", ["novice's mace", "minor healing potion"], "weapon: a novice's mace", "Armor 0"),
@@ -376,7 +376,7 @@ def run(work, mudlib):
         chars[arch] = c
         hp, st, ma, gold, kit, eq1, eq2 = expect[arch]
         s = a.score_of(c)["text"]
-        check(f"{arch}: HP {hp}, Stamina {st}, Mana {ma}, gold {gold}", s, f"HP {hp}/{hp}", f"Stamina {st}/{st}", f"Mana {ma}/{ma}", f"Gold {gold}",
+        check(f"{arch}: Vitality {hp}, Endurance {st}, Focus {ma}, gold {gold}", s, f"Vitality {hp}/{hp}", f"Endurance {st}/{st}", f"Focus {ma}/{ma}", f"Gold {gold}",
               f"Calling {arch.capitalize()}")
         inv = c.command("i")
         check(f"{arch}: the starting kit", inv, *kit)
@@ -389,10 +389,10 @@ def run(work, mudlib):
         c = chars[arch]
         text = c.command("skills")
         wanted = {"warrior": ["bash", "Defensive Training", "Weapon Proficiency"], "scout": ["track", "strike", "Evasion"],
-                  "priest": ["heal", "bless", "Divine Knowledge"], "mage": ["bolt", "lore", "Mana Efficiency"],
+                  "priest": ["heal", "bless", "Divine Knowledge"], "mage": ["bolt", "lore", "Focus Efficiency"],
                   "adventurer": ["appraise", "Survival Training", "Improvised Combat", "Traveler's Instinct"]}[arch]
         check(f"{arch}: the skills list names the skills and traits with costs", text, *wanted)
-    check("skills show cost and timing", chars["warrior"].command("skills"), "15 Stamina", " s]")
+    check("skills show cost and timing", chars["warrior"].command("skills"), "15 Endurance", " s]")
     check("a non-priest has no heal command", chars["warrior"].command("heal"), "What?")
 
     # ===== existing character asked at login =====
@@ -416,7 +416,7 @@ def run(work, mudlib):
     old.send("mage")
     text = old.read_until("> ")
     s = a.score_of(old)
-    check("the existing character keeps level and gold, gets the new HP and no kit",
+    check("the existing character keeps level and gold, gets the new Vitality and no kit",
           f"{s['level']} {s['gold']} {s['max']}", "3 77 32")  # docs/ATTRIBUTES.md section 8: 4 + 6 x 3 + Vigor 5 x 2
     check("no second starting kit for an existing character", str(old.command("i").count("rusty sword")), "1")
     old.command("quit")
@@ -469,15 +469,15 @@ def run(work, mudlib):
     out = mage.command("bolt dummy")
     time.sleep(1.2)
     hp, st, ma = res(mage)
-    check("a spell costs Mana when it begins (20 less 20% = 16)", str(82 <= ma <= 90), "True")
+    check("a spell costs Focus when it begins (20 less 20% = 16)", str(82 <= ma <= 90), "True")
     mage.command("stop")
     mage.command("drain")
     a.drain(mage, 0.6)
     out = mage.command("bolt dummy")
-    check("a spell that cannot be paid for is refused and not queued", out, "You do not have the mana for that.")
+    check("a spell that cannot be paid for is refused and not queued", out, "You do not have the focus for that.")
     time.sleep(10)
     hp, st, ma = res(mage)
-    check("mana regenerates (3.4 per 10 s for a mage at level 1, docs/ATTRIBUTES.md section 8; stamina 2.7)", str(2 <= ma <= 7 and 1 <= st <= 5), "True")
+    check("focus regenerates (3.4 per 10 s for a mage at level 1, docs/ATTRIBUTES.md section 8; endurance 2.7)", str(2 <= ma <= 7 and 1 <= st <= 5), "True")
     mage.command("goto") if False else None
     setroom(wiz, "twarrior")
     wiz.command("clone " + TEST + "dummy")
@@ -490,7 +490,7 @@ def run(work, mudlib):
     adv.command("drain")
     time.sleep(10)
     hp, st, ma = res(adv)
-    check("Survival Training: out of combat Stamina comes back 50% faster (6 -> 9 per 10 s)", str(7 <= st <= 12), "True")
+    check("Survival Training: out of combat Endurance comes back 50% faster (6 -> 9 per 10 s)", str(7 <= st <= 12), "True")
     wiz.command("goto " + TEST + "calm")
     pr = chars["priest"]
     wiz.command("goto " + ROOM["v"])
@@ -517,7 +517,7 @@ def run(work, mudlib):
     w.send("stop")
     time.sleep(0.5)
     st1 = res(w)[1]
-    check("Shield Bash costs 15 Stamina and attacks", str(st0 - st1 in (14, 15, 16)), "True")
+    check("Shield Bash costs 15 Endurance and attacks", str(st0 - st1 in (14, 15, 16)), "True")
     bashed = out
     w.command("speed me 90 600")
     for _ in range(10):
@@ -557,7 +557,7 @@ def run(work, mudlib):
     so = sc.command("strike dummy")
     time.sleep(1.2)
     stn = res(sc)[1]
-    check("Precision Strike costs 25 Stamina and winds up", ("True" if stn <= st0 - 22 else f"{st0} {stn} {so!r}"), "True")
+    check("Precision Strike costs 25 Endurance and winds up", ("True" if stn <= st0 - 22 else f"{st0} {stn} {so!r}"), "True")
     sc.command("stop")
     for _ in range(3):
         wiz.command("slay dummy")
@@ -583,8 +583,8 @@ def run(work, mudlib):
     time.sleep(3)
     out = p.command("heal")
     out += a.quiet(p, 5)
-    check("Minor Heal restores 8 HP plus 25% (Divine Knowledge) and 9% (Healing Power: Spirit 9, Insight 6): 11", out, "restoring 11 hit points")
-    check("Minor Heal costs 25 Mana", str(res(p)[2] <= 90), "True")
+    check("Minor Heal restores 8 Vitality plus 25% (Divine Knowledge) and 9% (Healing Power: Spirit 9, Insight 6): 11", out, "restoring 11 Vitality")
+    check("Minor Heal costs 25 Focus", str(res(p)[2] <= 90), "True")
     s0 = a.score_of(p)["text"]
     time.sleep(3)
     out = p.command("bless")
@@ -623,7 +623,7 @@ def run(work, mudlib):
             out = m.command("bolt dodger")
             # The bolt lands after its cast time: wait for the result, not for a fixed second (a busy machine is slower).
             waited = time.time() + 10
-            while time.time() < waited and not re.search(r"dodges your bolt|strikes a dodger|for \d+ damage|enough mana|cannot", out):
+            while time.time() < waited and not re.search(r"dodges your bolt|strikes a dodger|for \d+ damage|enough focus|cannot", out):
                 out += a.quiet(m, 0.25)
             out += a.quiet(m, 0.3)
             last_out = out
@@ -838,7 +838,7 @@ def run(work, mudlib):
     check("level 100 is the highest", a.score_of(ma)["text"], f"Level 100   Experience {xp_for(100)} (highest level)")
     check("above the cap is refused", ma.command("setlevel 101"), "Usage")
     ma.command("setlevel 1")
-    check("the renamed wizard command: restore", ma.command("restore"), "You are restored to full health.")
+    check("the renamed wizard command: restore", ma.command("restore"), "You are restored to full Vitality.")
     check("the old wizard command heal does not exist for a mage", ma.command("heal"), "What?")  # mage has no heal spell either
     check("the old wizard command smite does not exist", ma.command("smite dummy"), "What?")
     wiz.command("clone " + TEST + "dummy")
@@ -878,7 +878,7 @@ def run(work, mudlib):
     ar.command("restore")
     out = ar.command("zap dummy")
     out += a.quiet(ar, 3)
-    check("the granted spell works and costs its Mana", out, "ZAPPED")
+    check("the granted spell works and costs its Focus", out, "ZAPPED")
     ar.command("stop")
     wiz.command("slay dummy")
 
@@ -914,7 +914,20 @@ def run(work, mudlib):
     wiz.command("goto " + HOLLOW + "village/guild")
     check("no pass before the quest", wiz.command("i"), absent=("travel pass",))
     wiz.command("goto " + HOLLOW + "village/north_road")
-    out = wiz.command("north")
+
+    def go_north(client):
+        """Walk north. The North Road's random Wandering Wolf is aggressive and now engages on arrival; a character in a fight
+        cannot walk, so the wizard (who stands in the room) slays the wolf and the walk is tried again. Only the fight is cleared, the
+        check on the pass is the test's own."""
+        out = client.command("north")
+        for _ in range(4):
+            if "in the middle of a fight" not in out:
+                break
+            wiz.command("slay wolf")
+            out = client.command("north")
+        return out
+
+    out = go_north(wiz)
     check("the road north is closed without the pass", out, "need a travel pass", absent=("Vale Road",))
     pilgrim = h.Client("pilgrim", archetype="warrior")
     pilgrim.read_until("> ")
@@ -924,7 +937,7 @@ def run(work, mudlib):
         if "North Road" in text:
             break
     check("a new character walks to the North Road", text, "North Road")
-    check("a new character is refused too", pilgrim.command("north"), "need a travel pass")
+    check("a new character is refused too", go_north(pilgrim), "need a travel pass")
     wiz.command("goto " + HOLLOW + "cellars/overseer_chamber")
     wiz.command("restore")
     wiz.command("slay overseer")
@@ -933,14 +946,14 @@ def run(work, mudlib):
     check("Rowan gives the pass with the rewards of Clear the Cellar", text, "Quest complete: Clear the Cellar!", "Rowan gives you a travel pass.")
     check("the pass is in the inventory", wiz.command("i"), "a travel pass")
     wiz.command("goto " + HOLLOW + "village/north_road")
-    out = wiz.command("north")
+    out = go_north(wiz)
     check("with the pass the road north is open: the Vale Road", out, "The Vale Road", "Oakenfell")
     s = a.score_of(wiz)["text"]
     check("score shows the area and the region of the Vale Road", s, "Area The Vale Road   Region Greenvale")
     check("the road runs on north", wiz.command("look"), "north")
     wiz.command("south")
     wiz.command("drop pass")
-    check("the pass can be lost; the road closes again", wiz.command("north"), "need a travel pass")
+    check("the pass can be lost; the road closes again", go_north(wiz), "need a travel pass")
     wiz.command("goto " + HOLLOW + "village/guild")
     text = wiz.command("talk rowan")
     check("talking to Rowan re-issues a lost pass", text, "Rowan gives you a travel pass.")

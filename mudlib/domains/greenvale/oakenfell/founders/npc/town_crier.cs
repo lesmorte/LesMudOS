@@ -12,7 +12,7 @@ public class FdTownCrier : Npc
         ShortDesc = "Alaric Voss, the town crier";
         LongDesc = "A barrel-chested man in a green coat with brass buttons and a tall hat with an oak leaf pinned to it. A handbell hangs from his belt on a leather thong, and his face has the permanently startled look of someone who has been shouting for thirty years.";
         Level = 2;
-        MaxHp = 25;
+        MaxVitality = 25;
 
         AddChat("Hear ye, hear ye! No, that is only my greeting. How may I help you, friend?");
         AddChat("If it matters in Oakenfell, I have cried it. If it does not matter, I have cried it twice.");

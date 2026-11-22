@@ -12,7 +12,7 @@ public class GrIsabeau : Npc
         ShortDesc = "Isabeau, a pilgrim";
         LongDesc = "A young woman in a plain brown cloak with a pack on her back, a walking staff and a long red ribbon wound round her wrist. Her boots are muddy to the knee, and her face is tired and a little hopeful.";
         Level = 1;
-        MaxHp = 15;
+        MaxVitality = 15;
 
         AddChat("I am walking to Oakenfell to find my brother. He took this road in the spring, and I have had no letter.");
         AddChat("I tied my ribbon to the rail. I do not know who it is for, but it feels right.");
