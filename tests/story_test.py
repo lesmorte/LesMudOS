@@ -96,8 +96,8 @@ READABLES = [
     ("greenvale/oakenfell/southgate/silver_stag", "toasts", ["Resolve", "Vigor", "Might"]),
     ("greenvale/oakenfell/guild/proving_yard", "slate", ["Might", "Grace", "Resolve"]),
     # existing readables, reworded
-    ("greenvale/oakenfell/grove/great_stump", "hale plaque", ["remembered for his Resolve"]),
-    ("greenvale/oakenfell/grove/great_stump", "rowan plaque", ["remembered for her Resolve"]),
+    ("greenvale/oakenfell/grove/great_stump", "hale plaque", ["remembered for his Vigor"]),
+    ("greenvale/oakenfell/grove/great_stump", "rowan plaque", ["remembered for her Spirit"]),
     ("greenvale/corridor/heartwood/m07", "slab", ["Edric Vane", "Resolve", "Room left"]),
 ]
 FORBIDDEN = ["Circle of Ash", "Philippa", "Reeve", "Goblin Blood", "goblin blood", "Stamina", "Mana", " HP", "HP ", "hit points", "Hit points"]
@@ -287,7 +287,7 @@ def run(work, mudlib):
 
     # ===== the Chronicle and Renown =====
     for needle, f in (("a feat of Resolve", "events/boss.cs"), ("a discovery of Insight", "events/discover.cs"), ("a feat of Insight", "events/craft.cs"),
-                      ("Some sound like feats of Resolve", "secure/renown.cs"), ("brought down the Goblin Overseer in the tunnels beneath Vincent's Hollow", "events/boss.cs")):
+                      ("Some sound like feats of Vigor", "secure/renown.cs"), ("brought down the Goblin Overseer in the tunnels beneath Vincent's Hollow", "events/boss.cs")):
         truth(f"{f} says '{needle}'", needle in source(f))
     for f in os.listdir(os.path.join(MUDLIB_SRC, "events")):
         s = source("events/" + f)
