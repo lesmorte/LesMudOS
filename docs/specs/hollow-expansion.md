@@ -1,5 +1,7 @@
 # Vincent's Hollow expansion: archery, weapon ladders, armour, a bigger village
 
+**Built so far (22 November 2026): section 1, archery (the ranged opening and Aimed Shot, with ranks IV and V by the continuation docs/CLASS_SYSTEM.md section 14 states).**
+
 Owner's requests (19 November 2026): "A scout should be able to play as a sniper archer type. Maybe a bow skill." "The starting village needs to be bigger; there should be advanced versions of each starting weapon, some loot, some at shops." Every number here is a starting value for `tests/balance_sim.py`; none is tested.
 
 ## Why

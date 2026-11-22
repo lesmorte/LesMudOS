@@ -383,3 +383,8 @@ Levels 2, 3, 4 come at about 29 / 44 / 57 minutes at RestFactor 5 (35 / 53 / 70 
 ### 10.9 Run times
 
 `rest grid` 3000: about 50 minutes (320 cells of 3000 / 1500 runs); `rest sens`: 10 minutes; `rest options`: 25 minutes; `rest perfect`: 8 minutes; `rest harvest`: 4 minutes; `rest pace`: 18 minutes. Everything printed before this section is unchanged (300-run default output compared byte for byte).
+
+## Aimed Shot, the archer Scout and the large Minor Heal (22 November 2026)
+
+`python3 tests/balance_sim.py ranks 3000 aim` adds the archer Scout (a Scout with the Hunting Bow, or the Yew Longbow in the best-gear tables, that opens with Aimed Shot where it may and then aims whenever it can pay; a blow that lands during the 2-second wind-up spoils the shot) beside the five callings. Both player models are in it; the numbers and what would change them are in [CLASS_SYSTEM.md](CLASS_SYSTEM.md) section 14. The simulator now counts Minor Heal's 15-second wait in real time across fights (before, it was kept as a time inside one fight and carried into the next, which blocked heals for tens of seconds in the next room and made the Priest look 18 points lower than it is): with the owner's heal the Priest is 100 at the standard test, 18.6 above the mean at rank I and 10.1 at rank II (`ranks wait`: 15 s changes nothing, 60 s gives +13.9 and +9.1). Table entries above that used Minor Heal 7 or 8 are history.
+

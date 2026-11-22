@@ -755,6 +755,12 @@ public class ExampleArea : Area
 
 Read every number through the helper, never with your own arithmetic: `RankInt("min", RankOf(user))` in `Resolve` (the engine already reads `focus`, `endurance`, `tohit` (ToHitBonus), `crit` (CritChance), `factor` (DamageFactor) and `hits` (Hits, the separate blows of an attack skill) at the user's rank). Override `QuerySummaryAt(rank)` so `skills` shows the rank's numbers. `FixedKeys.Add("seconds")` keeps a number (a duration, a count) the same at every rank unless a row names it; `hits` is fixed already. `RankRow(3, "hits=3;factor=0.6", "Triple Strike")` renames the skill from that rank on. `MaxRank = 1` makes a skill rank I only; `MaxRank = 2` stops it at II. `python3 tests/balance_sim.py check` compares the fighting skills' tables with the simulator's `SKILL_RANKS`, so change both.
 
+Three more things a skill's data can say (docs/CLASS_SYSTEM.md section 14):
+- **A wait between uses:** `Effect("wait", 15)` (name the number once, as Minor Heal's `HealWait`). The wait is on the creature that used the skill, not on the target, is not saved, and is started by the engine when the action begins; a use during it is refused before anything is paid, with the seconds left, and `skills` shows it. `wait` is a fixed key (a rank does not change it).
+- **A bigger blow as the action that starts the fight:** `Effect("opener", 2.5)` names the damage factor (rows may name `opener=` too). It applies only when the character's own command started the fight with that very action (`UseSkill(skill, target, opening: true)` from the player's `CmdSkill`); Aimed Shot (`aim`) is the one skill that has it.
+- **A preparation that a blow spoils:** set `Spoilable = true`. Being hit while the action is in its Preparation cancels it and gives nothing back (Stagger gives half back); half the Recovery is still paid. Only the creature that struck the blow can cause it (`Living.SpoilPreparation(attacker)` checks `PreviousObject()`).
+- A skill may demand a bow (`WeaponCategories.Add("bow")`) and refuse in `Check` (return the text; nothing is spent and no fight begins).
+
 **A trainer of ranks** inherits `/std/trainer` (and may sell and teach recipes as well). Its players get `ranks` and `train SKILL`; every check and the change to the character are the rank daemon's (`/secure/ranks`), and the trainer must live in a trusted tree (`/domains`, not `/wiz`).
 
 ```

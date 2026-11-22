@@ -42,6 +42,10 @@ public class CombatAction
     public ObjectRef? Item;
     /// <summary>Blows an attack action makes, each with its own dodge, hit, critical and block rolls (Double Strike: 2).</summary>
     public int Hits = 1;
+    /// <summary>Seconds after this action begins before the same skill may be used again by the same creature (Minor Heal: 15); 0: no wait. Set by UseSkill from the skill's data.</summary>
+    public int WaitSeconds;
+    /// <summary>Being hit while this action's Preparation runs spoils it and the cost stays spent (Aimed Shot). Set by UseSkill from the skill's data.</summary>
+    public bool Spoilable;
 }
 
 /// <summary>
@@ -959,21 +963,44 @@ public abstract class Living : Thing
         return null;
     }
 
-    /// <summary>Begin fighting. Both sides add each other as enemies. False if it is not allowed.</summary>
-    public bool StartFight(ObjectRef enemy) => BeginFight(enemy, false);
+    /// <summary>
+    /// Begin fighting. Both sides add each other as enemies. False if it is not allowed. A player's fight is started only by the player's own
+    /// commands (kill, a skill): no other object can start a fight on a player's behalf, so none can claim the ranged opening for them either.
+    /// </summary>
+    public bool StartFight(ObjectRef enemy) => !IsPlayerCharacter() && BeginFight(enemy, false, false);
+
+    /// <summary>
+    /// The player's own choice to start a fight (the kill and skill commands). The one who starts it acts as soon as it is ready; a bow in
+    /// their hands also delays the target's first action by RangedOpening seconds (docs/specs/hollow-expansion.md section 1).
+    /// </summary>
+    protected bool OpenFight(ObjectRef enemy) => BeginFight(enemy, false, true);
 
     /// <summary>
     /// Start a fight. The one who starts it acts as soon as it is ready. A creature that is drawn in (drawn is
     /// true: it joins a fight someone else started) and the one attacked cannot begin their first action
     /// until their own Reaction Time x 2 seconds have passed.
     /// </summary>
-    protected bool BeginFight(ObjectRef enemy, bool drawn)
+    protected bool BeginFight(ObjectRef enemy, bool drawn) => BeginFight(enemy, drawn, false);
+
+    /// <summary>Seconds added to the first action of a creature that is attacked by someone with a bow in their hands, on top of its Reaction Time. Never when the creature starts the fight.</summary>
+    protected const int RangedOpening = 2;
+
+    // True only for the moment BeginFight asks the target to add this creature as an enemy, when this creature chose the fight with a bow.
+    private bool openingShot;
+
+    /// <summary>Is this creature, at this very moment, starting a fight by its own choice with a bow? Read by the target while it is being drawn in; always false otherwise.</summary>
+    public bool QueryOpeningShot() => openingShot;
+
+    private bool BeginFight(ObjectRef enemy, bool drawn, bool chosen)
     {
         if (CanFight(enemy) != null) return false;
         var fresh = !enemies.Contains(enemy);
-        if (drawn && !QueryInCombat()) DelayFirstAction();
+        var wasInCombat = QueryInCombat();
+        if (drawn && !wasInCombat) DelayFirstAction();
         AddEnemyCore(enemy);
-        enemy.Call("AddEnemy", Self);
+        openingShot = chosen && !drawn && fresh && !wasInCombat && QueryWeaponCategory() == "bow";
+        try { enemy.Call("AddEnemy", Self); }
+        finally { openingShot = false; }
         if (!fresh) return true;
 
         var room = Environment()!;
@@ -994,6 +1021,7 @@ public abstract class Living : Thing
         if (!enemies.Contains(enemy) && !QueryInCombat())
         {
             DelayFirstAction();
+            if (enemy.Call<bool>("QueryOpeningShot")) DelayActionBy(RangedOpening); // a bow in the attacker's hands: this one has to close the distance first
             Ambushed(enemy);
         }
         AddEnemyCore(enemy);
@@ -1204,6 +1232,11 @@ public abstract class Living : Thing
             Tell("You no longer have what you meant to use.\n");
             action = null;
         }
+        if (action != null && action.WaitSeconds > 0 && action.Skill != null && QuerySkillWaitLeft(action.Id) > 0)
+        {
+            Tell(SkillWaitRefusal(action.Id, action.Name) + "\n");
+            action = null;
+        }
         if (action != null && !CanPay(action))
         {
             Tell($"You no longer have the strength or the focus for {action.Name}.\n");
@@ -1235,6 +1268,7 @@ public abstract class Living : Thing
             paidFocus = action.FocusCost;
         }
         var now = TimeMs();
+        if (action.WaitSeconds > 0 && action.Skill != null) skillWaits[action.Id] = now + action.WaitSeconds * 1000L;
         var prep = PrepMs(action);
         current = action;
         currentTarget = target;
@@ -1358,6 +1392,7 @@ public abstract class Living : Thing
         TellObject(target, $"{label} {themWord} you{how}." + (critical ? " A critical hit!" : "") + (blocked ? " You block part of the blow." : "") + theirNote + "\n");
         TellRoom(room, $"{label} {themWord} {theirs}{how}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n", Self, target);
         target.Call("FinishDamage", Self);
+        if (target.IsAlive && !target.Call<bool>("IsDead")) target.Call("SpoilPreparation", Self); // a shot being aimed at this moment is spoiled
         action.Skill?.Call("OnHit", Self, target, damage);
     }
 
@@ -1400,6 +1435,51 @@ public abstract class Living : Thing
         return false;
     }
 
+    /// <summary>
+    /// Being hit spoils a shot being aimed: an action in its Preparation that its skill declares spoilable is cancelled, nothing of its cost
+    /// comes back (unlike a stagger) and half its Recovery is still paid. Only the creature that landed the blow, an enemy of this one, may
+    /// call it, from its own attack. Returns true if a shot was spoiled.
+    /// </summary>
+    public bool SpoilPreparation(ObjectRef by)
+    {
+        if (Dead || !Self.IsAlive || by == Self || PreviousObject() != by || !by.IsAlive || !by.Call<bool>("IsCreature") || !enemies.Contains(by)) return false;
+        if (phase != "preparing" || current == null || !current.Spoilable) return false;
+        var name = current.Name;
+        var halfRecovery = Math.Max(0, readyAt - resolveAt) / 2;
+        paidEndurance = 0;
+        paidFocus = 0;
+        phase = "recovering";
+        current = null;
+        currentTarget = null;
+        readyAt = TimeMs() + halfRecovery;
+        Tell($"The blow throws off your aim: your {name.ToLowerInvariant()} is spoiled.\n");
+        if (Environment() is { } room) TellRoom(room, $"{Cap(QueryLabel())}'s aim is spoiled by the blow.\n", Self);
+        Schedule(readyAt);
+        return true;
+    }
+
+    // ---- Combat: skill waits ----
+    // A skill may name a wait (Minor Heal: 15 seconds) before the same creature may use it again. The wait is kept here, on the creature that
+    // used it (not on the target, not saved, so it ends when the character leaves), and only Begin sets it: no other object can set or clear it.
+
+    private readonly Dictionary<string, long> skillWaits = new();
+
+    /// <summary>Whole seconds (rounded up) until this creature may use the skill again; 0 if it may now.</summary>
+    public int QuerySkillWaitLeft(string skillId)
+    {
+        if (!skillWaits.TryGetValue(skillId ?? "", out var until)) return 0;
+        var left = until - TimeMs();
+        if (left <= 0) { skillWaits.Remove(skillId ?? ""); return 0; }
+        return (int)((left + 999) / 1000);
+    }
+
+    private string? SkillWaitRefusal(string skillId, string title)
+    {
+        var left = QuerySkillWaitLeft(skillId);
+        if (left <= 0) return null;
+        return $"You cannot cast {title} again so soon: {left} second{(left == 1 ? "" : "s")} left before you may.";
+    }
+
     // ---- Combat: skills ----
 
     /// <summary>Can this action be paid for right now?</summary>
@@ -1413,9 +1493,10 @@ public abstract class Living : Thing
     /// Use a skill or spell as an action on the clock. The skill file supplies the numbers (Preparation, Recovery, the costs,
     /// the attack modifiers). Returns a refusal, or null if the action began or was queued. Costs are paid when it begins.
     /// </summary>
-    protected string? UseSkill(ObjectRef skill, ObjectRef? target)
+    protected string? UseSkill(ObjectRef skill, ObjectRef? target, bool opening = false)
     {
         if (Dead) return "You are in no state to do that.";
+        if (SkillWaitRefusal(skill.Call<string>("QueryId") ?? "", skill.Call<string>("QueryTitle") ?? "that") is { } waiting) return waiting;
         var isSpell = skill.Call<string>("QueryKind") == "spell";
         if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
         // Every number comes from the skill at the rank this creature holds (docs/specs/skill-ranks.md): the skill's one helper reads it.
@@ -1432,7 +1513,10 @@ public abstract class Living : Thing
             ToHitBonus = skill.Call<int>("QueryToHitBonusFor", Self), CritChance = skill.Call<int>("QueryCritChanceFor", Self),
             DamageFactor = skill.Call<double>("QueryDamageFactorFor", Self), DamageMultiplier = Math.Max(1, skill.Call<int>("QueryDamageMultiplier")),
             Hits = Math.Max(1, skill.Call<int>("QueryHitsFor", Self)), Skill = skill,
+            WaitSeconds = skill.Call<int>("QueryWaitSeconds", skill.Call<int>("QueryRankFor", Self)), Spoilable = skill.Call<bool>("QuerySpoilable"),
         };
+        // The action that starts a fight may hit harder (Aimed Shot x2.5): the skill's own opener factor replaces its usual one.
+        if (opening && skill.Call<double>("QueryOpenerFactorFor", Self) is > 0 and var openerFactor) action.DamageFactor = openerFactor;
         if (!CanPay(action))
             return QueryEndurance() < action.EnduranceCost ? "You are too tired for that." : "You do not have the focus for that.";
         if (QueryReady())

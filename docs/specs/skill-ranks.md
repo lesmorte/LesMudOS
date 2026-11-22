@@ -1,6 +1,6 @@
 # Skill and spell ranks
 
-**Status (22 November 2026): built**, except where marked below. Minor Heal's numbers are PROVISIONAL pending the owner's choice; Double Strike ships the spec's numbers and is flagged. Implementation notes: docs/CLASS_SYSTEM.md section 13; the builder's side: docs/BUILDING.md. See "As built" at the end.
+**Status (22 November 2026): built**, including the owner's decisions after the build (Minor Heal 20 / 38 / 60 with a 15-second wait; Double Strike 35 Endurance) and Aimed Shot's ranks (docs/CLASS_SYSTEM.md section 14). Implementation notes: docs/CLASS_SYSTEM.md section 13; the builder's side: docs/BUILDING.md. See "As built" at the end.
 
 Owner's decision (November 2026): skills and spells do not improve with use. A better version is bought from a trainer as a rank, and the rank a character may hold is capped by level.
 
@@ -72,10 +72,10 @@ Decisions where this spec was silent:
 - **When an unlock is recorded**: at `ranks` or `train` at that trainer, once every requirement holds, whether or not the gold is there.
 - **Prices** are the daemon's table (II 40, III 150, IV 400, V 900); the hallmasters offer III to V; rank VI and beyond have no price and are not offered yet.
 - **Several trainers in one room** (the Hall of Callings): each answers only the calling it teaches.
-- **Aimed Shot** (docs/specs/hollow-expansion.md section 1) is not in the mudlib yet, so it has no ranks; Wenna Farrow still says that lesson is not ready.
+- **Aimed Shot** (docs/specs/hollow-expansion.md section 1) was not built then; it is now (see the end of this document): it has ranks I to V and Wenna Farrow teaches rank II.
 
-Provisional, for the owner:
-- **Minor Heal** ships option (b): 7 / 9 / 11 / 13 / 15 Vitality for 25 / 32 / 40 / 44 / 48 Focus (rank I 7, later ranks by the default step from it, the spec's costs). The spec's 20 / 38 / 60 (option a) puts the Priest about 18 points above the mean at rank I and 9 at rank II. Option (c): the spec's 20 / 38 / 60 with no heal for 15 seconds after a heal lands within 2 points at both; it needs a new engine rule (a lockout), which is not built. A higher Focus cost alone does not fit both (60 / 75 / 95 is +11 at rank I and +2 at rank II; 75 / 95 / 120 is +3 and -10), and a longer Preparation changes nothing (the wind-up is inside the delay, and nothing at the Overseer interrupts it). Table: `python3 tests/balance_sim.py ranks heal`.
+Provisional, for the owner (SUPERSEDED by the owner's decisions below; kept as the record of the options):
+- **Minor Heal** shipped option (b): 7 / 9 / 11 / 13 / 15 Vitality for 25 / 32 / 40 / 44 / 48 Focus (rank I 7, later ranks by the default step from it, the spec's costs). The spec's 20 / 38 / 60 (option a) puts the Priest about 18 points above the mean at rank I and 9 at rank II. Option (c): the spec's 20 / 38 / 60 with no heal for 15 seconds after a heal lands within 2 points at both; it needs a new engine rule (a lockout), which is not built. A higher Focus cost alone does not fit both (60 / 75 / 95 is +11 at rank I and +2 at rank II; 75 / 95 / 120 is +3 and -10), and a longer Preparation changes nothing (the wind-up is inside the delay, and nothing at the Overseer interrupts it). Table: `python3 tests/balance_sim.py ranks heal`.
 - **Double Strike** ships the spec's 2 x 60% / 2 x 75% / 3 x 60% / 4 x 55%, flagged: at rank I it puts the Adventurer about 8 points above the mean (74 to 87). Numbers that would not: 2 x 50% (+3), or 2 x 60% for 35 Endurance (+4) or 50 (+1). Table: `ranks double`.
 
 Balance requirement, as measured (`ranks level5 gap bolt focus climb`):
@@ -88,3 +88,26 @@ Balance requirement, as measured (`ranks level5 gap bolt focus climb`):
 1. **Minor Heal** is the large heal: 20 / 38 / 60 Vitality for 25 / 32 / 40 Focus at ranks I / II / III (later ranks by the default step), with **no second Minor Heal for 15 seconds after one** (a named number; the wait is on the caster, shown in the refusal and in `skills`). This replaces the provisional heal of 7. Simulated: Priest within 2 points of the mean.
 2. **Double Strike** keeps two hits at 60% and costs **35 Endurance** at rank I (was 20); later ranks' costs follow the default step from 35.
 3. The uneven gains from rank II (Mage +19, Warrior +13, Priest +10, Adventurer +6, Scout +4 at level 5) are left until Aimed Shot is built, then measured again.
+
+## Built after the decisions (22 November 2026)
+- **Minor Heal** is 20 / 38 / 60 Vitality for 25 / 32 / 40 Focus, later ranks by the default step (66 for 44, 72 for 48), with a 15-second wait per caster (`HealWait` in `minor_heal.cs`; the wait lives on the caster in `Living`, is not saved, and cannot be set or cleared by another object; a cast during it is refused before any Focus is spent, with the seconds left; `skills` shows it). The wait starts when a cast begins.
+- **Double Strike** costs 35 Endurance at rank I and 40 / 46 / 51 / 56 at ranks II to V (default step from 35); its hits are unchanged.
+- **Simulator correction (important).** The simulator's old option (c) ("no heal for 15 seconds, the Priest within 2 points of the mean") rested on a fault: a heal's lockout was kept as a time inside one fight and carried into the next fight, whose clock starts again at 0, so a heal near the end of one fight blocked heals for tens of seconds in the next. The wait is now counted in real time across fights (the walking and resting between rooms count). With that corrected, the 20 / 38 / 60 heal with a 15-second wait leaves the Priest about 18 points above the mean of the five callings at rank I and about 10 at rank II (3000 runs a cell, `python3 tests/balance_sim.py ranks wait`): a Priest's Focus pays for about three heals, so a 15-second wait is not what limits it. The numbers are shipped as the owner decided; the table is in the simulator for the next decision.
+- **Aimed Shot**: see docs/CLASS_SYSTEM.md section 14 and the measurement in the same place.
+
+## Open decision: the large heal's Focus cost (measured 22 November 2026)
+The Priest against the mean of the five callings, standard test (level 5, starting gear, 4 potions, points placed, middle human, RestFactor 5, Overseer from the cellar entrance), 3000 runs a cell, 15-second wait, `python3 tests/balance_sim.py ranks 3000 healcost`. A level 5 Priest has 120 Focus; "heals" is what the full pool pays for at that rank's cost. Shipped: 20 / 38 / 60 Vitality for 25 / 32 / 40 Focus.
+
+| Minor Heal (Vitality I/II/III; Focus I/II/III) | rank I | vs mean | heals | everyone at II | vs mean | heals |
+|---|---|---|---|---|---|---|
+| 20/38/60, 25/32/40 (shipped) | 99.9 | +18.6 | 4 | 99.9 | +10.1 | 3 |
+| 20/38/60, 35/45/56 | 99.5 | +18.4 | 3 | 99.6 | +9.8 | 2 |
+| 20/38/60, 45/58/72 | 98.1 | +17.3 | 2 | 98.0 | +8.5 | 2 |
+| 20/38/60, 55/70/88 | 94.3 | +14.2 | 2 | 93.5 | +4.9 | 1 |
+| 20/38/60, 70/90/112 | 85.7 | +7.3 | 1 | 81.0 | -5.1 | 1 |
+| 12/23/36, 25/32/40 | 99.1 | +18.0 | 4 | 99.9 | +10.1 | 3 |
+| 15/28/45, 25/32/40 | 99.8 | +18.6 | 4 | 99.9 | +10.0 | 3 |
+| 7/9/11 (the old small heal), 25/32/40 | 76.7 | +0.1 | 4 | 88.4 | +0.9 | 3 |
+
+Reading: the Priest pins near 100 for any heal from 12 upward unless the cost leaves only one or two heals a fight; no cost in the table puts both columns within 5 points (70/90/112 gives +7.3 and -5.1). The cliff is between a heal of 7 and one of 12 (a few Vitality per heal, not the cost). The numbers are unchanged in the game; the choice is the owner's.
+

@@ -175,15 +175,16 @@ Chosen at character creation, after the password, from a short in-character pres
 | Warrior | Weapon Proficiency | trait | | | +2 to hit with any weapon. |
 | Scout | Evasion | trait | | | 5% dodge (8% before docs/ATTRIBUTES.md section 8). |
 | Scout | Tracking (`track`) | skill | 5 Endurance | 0 / 0.5 | Lists the creatures in each room the scout could walk to now (never through a closed door or an unfound hidden way). Rank II, the last, reads two rooms away and senses creatures behind a closed way. |
-| Scout | Precision Strike (`strike`) | skill | 25 Endurance | 0.5 / 1.0 | An attack at +2 to hit with a 15% critical chance. |
-| Priest | Minor Heal (`heal`) | spell | 25 Focus | 0.5 / 1.0 | Restores 7 Vitality (9 with Divine Knowledge) to the caster or a target in the room. PROVISIONAL (was 8; the owner's choice of heal is pending, see section 13). |
+| Scout | Precision Strike (`strike`) | skill | 25 Endurance | 0.5 / 1.0 | An attack at +2 to hit with a 15% critical chance. Works with any weapon. |
+| Scout | Aimed Shot (`aim`) | skill | 30 Endurance | 1.0 / 1.0 | Bow only. +3 to hit, 1.75 times the bow's damage; as the action that starts the fight, 2.5 times. A blow that lands while the shot is being aimed spoils it (the Endurance stays spent; nothing comes back, unlike a stagger). Refused with no bow, no target, or a target already fighting someone else. Section 14. |
+| Priest | Minor Heal (`heal`) | spell | 25 Focus | 0.5 / 1.0 | Restores 20 Vitality (25 with Divine Knowledge, before Healing Power) to the caster or a target in the room. The same caster cannot cast it again for 15 seconds (`HealWait`; section 13). |
 | Priest | Blessing (`bless`) | spell | 25 Focus | 0.5 / 1.0 | +1 to hit and +1 armor for 60 seconds, on the caster or a target. |
 | Priest | Divine Knowledge | trait | | | Healing spells restore 25% more. |
 | Mage | Arcane Bolt (`bolt`) | spell | 20 Focus (16 with Focus Efficiency) | 0.5 / 1.0 | 6-9 damage that ignores armor; needs no hit roll, can be dodged. |
 | Mage | Focus Efficiency | trait | | | Spells cost 20% less Focus. |
 | Mage | Magical Lore (`lore`) | skill | 5 Focus | 0 / 0.5 | Shows an item's exact numbers and any magical property. |
 | Adventurer | Survival Training | trait | | | Vitality, Endurance and Focus regenerate 50% faster out of combat. |
-| Adventurer | Double Strike (`double`) | skill | 20 Endurance | 0.5 / 1.0 | Two blows with the wielded weapon (or fists), each with its own dodge, hit, critical and block rolls, each at 60% of the damage. Triple Strike at rank III, Quadruple Strike at rank IV. |
+| Adventurer | Double Strike (`double`) | skill | 35 Endurance | 0.5 / 1.0 | Two blows with the wielded weapon (or fists), each with its own dodge, hit, critical and block rolls, each at 60% of the damage. Triple Strike at rank III, Quadruple Strike at rank IV. |
 | Adventurer | Appraise (`appraise`) | skill | 5 Endurance | 0 / 0.5 | Shows an item's exact numbers and what shops pay for it. |
 | Adventurer | Jack of All Trades | trait | | | Crafting and gathering proficiency is gained 25% faster in every craft. |
 | Adventurer | Improvised Combat | trait | | | Unarmed damage 2-5, and weapons carry 0.5 less reaction modifier (never below 0). |
@@ -325,12 +326,13 @@ The owner's brief is [specs/skill-ranks.md](specs/skill-ranks.md). Skills do not
 | Skill | I | II | III | IV | V |
 |---|---|---|---|---|---|
 | Arcane Bolt | 6-9, 20 Focus | 8-12, 23 | 10-14, 26 | 12-17, 29 | 14-19, 32 |
-| Minor Heal (PROVISIONAL) | 7, 25 Focus | 9, 32 | 11, 40 | 13, 44 | 15, 48 |
+| Minor Heal (15 s wait) | 20, 25 Focus | 38, 32 | 60, 40 | 66, 44 | 72, 48 |
 | Blessing | +1/+1, 25 Focus | +2/+2, 29 | +3/+3, 33 | +4/+4, 36 | +4/+4, 40 |
 | Shield Bash | 75%, 15 Endurance | 98%, 17 | 120%, 20 | 143%, 22 | 165%, 24 |
 | Precision Strike | +2, 15%, 25 Endurance | +3, 20%, 29 | +4, 25%, 33 | +5, 30%, 36 | +6, 35%, 40 |
 | Tracking | adjacent rooms, 5 Endurance | two rooms away, 6 | (none) | | |
-| Double Strike | 2 x 60%, 20 Endurance | 2 x 75%, 23 | Triple Strike 3 x 60%, 26 | Quadruple Strike 4 x 55%, 29 | 4 x 73%, 32 |
+| Double Strike | 2 x 60%, 35 Endurance | 2 x 75%, 40 | Triple Strike 3 x 60%, 46 | Quadruple Strike 4 x 55%, 51 | 4 x 73%, 56 |
+| Aimed Shot | x1.75 / opener x2.5, 30 Endurance | x2.0 / x3.0, 35 | x2.25 / x3.5, 39 | x2.5 / x4.0, 44 | x2.75 / x4.5, 48 |
 
   Blessing V's +4.3 rounds to +4; Double Strike V is the default step from IV. Durations (Blessing's 60 s) and Shield Bash's 2-second stagger do not change.
 - **The saved data** (`/std/adventurer.cs`): `skillRanks` (skill id to rank, above I only), `rankUnlocks` (offers whose requirements were met, for good), `killsByKind` and `killsWithSkill` (the counters unlocks read, kept from the first kill after this build). Only `/secure/ranks` may change them (`RankSetSkill`, `RankRecordUnlock`, `RankCountKill`, `RankCountKillWith`, `RankPay`, `RankSave` check `PreviousObject()`). An old save loads at rank I with no unlocks and no counts.
@@ -340,3 +342,32 @@ The owner's brief is [specs/skill-ranks.md](specs/skill-ranks.md). Skills do not
 - **Trainers.** `/std/trainer`: `TeachCalling(calling, from, to)` offers every ranked skill of a calling at the default prices (`RankDaemon.RankPrices`: II 40, III 150, IV 400, V 900 gold; a rank with no price is not offered), `AddRankOffer(skill, rank, price, requirements...)` one offer on its own terms, `AddRankLine(requirement, text)` the trainer's words for an unmet one. Rank II: Halbert Quill (Mage; Arcane Bolt II needs ten goblins slain), Sister Merewyn (Priest), Wenna Farrow (Scout), Brann Odell (Warrior and Adventurer), in the new village rooms. Ranks III to V: the five hallmasters of the Hall of Callings (Gorrim, Veyla, Anselm, Ilsabet, Jory).
 - **Jack of All Trades** reaches the crafting daemon's `LearnSpeed` through `QueryClassTraitMod("learn_speed")`: class traits only, so neither a timed effect nor an item can speed learning.
 - **Balance.** `python3 tests/balance_sim.py ranks` prints the tables the spec asks for; the results and the open decisions are in [specs/skill-ranks.md](specs/skill-ranks.md), "As built".
+
+## 14. Aimed Shot, the ranged opening and the skill wait (built November 2026)
+
+The owner's brief is [specs/hollow-expansion.md](specs/hollow-expansion.md) section 1 and [specs/skill-ranks.md](specs/skill-ranks.md), "Owner's decisions after the build".
+
+- **The skill wait.** A skill may name a wait in its data (`Effect("wait", seconds)`, a key that a rank never changes). Minor Heal's is `HealWait` = 15 seconds. The wait is kept on the creature that used the skill (`Living.skillWaits`: not on the target, not saved, so it ends when the character leaves, and with no setter at all, so no other object can set or clear it); only `Living.Begin`, when the cast begins and its cost is paid, starts it. A cast during the wait is refused in `UseSkill` before any Focus is paid ("You cannot cast Minor Heal again so soon: 9 seconds left before you may."), and a queued one is checked again when its turn comes. `skills` shows the wait in the skill's line and, while it runs, the seconds left. A cast that is interrupted still starts the wait (it began).
+- **Minor Heal** is 20 / 38 / 60 Vitality for 25 / 32 / 40 Focus at ranks I / II / III (the default step after: 66 for 44, 72 for 48), Divine Knowledge's +25% and Healing Power on top as before.
+- **Double Strike** costs 35 Endurance at rank I and follows the default step from it (40, 46, 51, 56).
+- **The ranged opening.** `Living.RangedOpening` = 2 seconds. When a character who chose to start a fight (the `kill` command or a skill used on a creature that is not yet fighting them) has a weapon of category `bow` in their hands, the target's first action is delayed by RangedOpening on top of its usual Reaction Time x 2. Once per fight: only when the character is not already fighting (a second creature taken on mid-fight gets no delay) and only when the target was not already in a fight. **It never applies when the creature starts the fight**, which is every aggressive creature that engages on arrival (`Monster.Noticed`): every creature of the Hollow's cellars is aggressive, so the bonus belongs to the hunter who chooses the fight (a creature that is not aggressive, or one met asleep or at a distance), and a Scout walking into the cellars gets none. The engine: `BeginFight(enemy, drawn, chosen)` sets a private flag for the moment it asks the target to add the attacker as an enemy, and the target reads it through `QueryOpeningShot()` (false at every other time). The only callers that pass `chosen` are the player's own commands (`OpenFight`, protected); the public `StartFight` now refuses for a player character, so no other object can start a fight for a player or claim the opening for one.
+- **Aimed Shot** (`aimed_shot.cs`, `aim`; Scout, from level 1, bow only). Rank I: 30 Endurance, Preparation 1.0 (2 seconds), Recovery 1.0, +3 to hit, x1.75 the weapon's damage; as the action that starts the fight, x2.5 (`Effect("opener")`; `UseSkill` is told by the command that the fight began with this action). Ranks: II (level 5) x2.0 / x3.0, III (level 10) x2.25 / x3.5, as the spec says; IV (level 15) x2.5 / x4.0 and V (level 20) x2.75 / x4.5 by the same step (+0.25 and +0.5 a rank; the table does not name them); the cost by the default step (35, 39, 44, 48); rank VI is not offered. Taught: rank II by Wenna Farrow in Vincent's Hollow, III and above by Veyla in the Hall of Callings (both through `TeachCalling`: level and gold only). Existing Scouts have it on their next login: skills are read from the class file, not saved.
+- **A spoiled shot.** Nothing interrupted a preparation by a hit before: the only interrupt was `Stagger` (Shield Bash), which gives half the cost back and is a skill's rider. The smallest hook that lets a skill declare itself spoilable: the skill sets `Spoilable = true`; the engine copies it to the action; and after a blow lands, `Living.Attack` calls `SpoilPreparation(attacker)` on the target. It cancels an action in its preparation whose skill is spoilable, gives nothing back (the Endurance stays spent), and the half of the Recovery is still paid, as for a stagger. It answers only the creature that landed the blow (it checks `PreviousObject()` and that the two are enemies), so no other object can forge a blow. The opening shot is not spoiled in practice: the creature's first action waits its Reaction Time x 2 plus RangedOpening, longer than the 2 seconds of aiming.
+- **Refusals** (plain words): no bow ("Aimed Shot needs a bow in your hands."), no target ("Use it on whom? You are not fighting anyone."), a target already fighting someone else ("The goblin is busy fighting someone else; you cannot take aim at it."). Nothing is spent and no fight begins.
+- **The simulator** (`python3 tests/balance_sim.py ranks aim`) has the archer Scout (a Scout with a bow that opens with Aimed Shot where it may, then aims whenever it can pay) beside the melee line (Precision Strike).
+
+### Measured (22 November 2026; `python3 tests/balance_sim.py ranks 3000 aim`, `aimfix`, `wait`; 3000 runs a cell)
+
+The standard test (level 5, starting gear, 4 potions, points placed, middle human, RestFactor 5, Overseer from the cellar entrance). The "Scout" column is the melee line (Precision Strike, with the Hunting Bow it starts with); "archer" opens with Aimed Shot where it may and then aims whenever it can pay.
+
+| | Warrior | Scout (melee) | Priest | Mage | Adventurer | mean of the five | archer |
+|---|---|---|---|---|---|---|---|
+| everyone at rank I | 81 | 71 | 100 | 73 | 82 | 81.2 | 90 (+8.4) |
+| everyone at rank II | 94 | 75 | 100 | 92 | 88 | 89.8 | 92 (+2.6) |
+| HYPOTHETICAL: the archer opens every fight, rank I / II | | | | | | | 92 (+11.0) / 95 (+4.9) |
+
+The perfect player against the Overseer alone, level 4, 2 potions, best gear (Yew Longbow for the archer): rank I 73 / 80 / 100 / 79 / 79, mean 82.2, archer 97 (+14.8); everyone at rank II (not buyable at level 4, asked for) 91 / 83 / 100 / 98 / 84, mean 91.4, archer 98 (+7.0).
+
+- **How many of the cellar's fights the archer opens: none.** Every creature on the way to the Overseer (and the Overseer) is Aggressive and engages on arrival, so it starts its own fight and the ranged opening and the x2.5 shot never apply there (0.00 of 8 fights a run). The rule is the hunter's: it pays off against creatures that are not aggressive. The rows marked HYPOTHETICAL give the archer the opening in every fight to show what it is worth: about 2 to 3 points.
+- **The archer is above the mean at rank I** (+8.4 against the middle human, +14.8 for the perfect player) and inside 5 points at rank II (+2.6); the melee Scout is 10 to 15 points below it at both. The mean is lifted by the Priest, who pins at 100 (see skill-ranks.md, "Simulator correction").
+- **What would bring the archer within 5 points of the mean** (standard test, one change at a time, nothing applied): damage x1.5 at rank I and x1.75 at II (+3.7 / +0.3); or x1.4 / x1.6 (+1.2 / -1.4); or 40 Endurance at rank I (+4.0 / +0.2); or a wind-up of 3 seconds (Preparation 1.5; +2.7 / -0.2). Not enough or too much: 50 Endurance (+1.6 / -5.8), no bonus to hit (-1.9 / -7.3), x1.25 / x1.5 (-3.6 / -4.9), a plain x1.0 shot (-15.6 / -21.9). For the perfect player's Overseer table no Aimed Shot number is enough: with a plain x1.0 shot the archer is still at 88 (+6): the surplus there is the Yew Longbow itself (11-16, reaction modifier 0.5 against the Fine Longsword's 1.0), so a small change to the bow would be needed as well.

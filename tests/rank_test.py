@@ -109,7 +109,7 @@ public class RkProbe : Thing
     public override void Init()
     {
         foreach (var v in new[] { "rkgold", "rklevel", "rkspawn", "rktele", "rkquest", "rkrenown", "rkstate", "rkvals", "rktitles", "rkcap",
-                                  "rkhurt", "rkmod", "rkhit", "rkgive", "rkfound", "rkrolls", "rkchance", "rkprof", "rkspeed", "rkgrow", "rkslay", "rkdrop" })
+                                  "rkhurt", "rkfill", "rkmod", "rkhit", "rkgive", "rkfound", "rkrolls", "rkchance", "rkprof", "rkspeed", "rkgrow", "rkslay", "rkdrop" })
             AddAction(v, Do);
     }
     private ObjectRef? Named(string name, ObjectRef room) =>
@@ -167,6 +167,7 @@ public class RkProbe : Thing
                 foreach (var l in new[] { 1, 4, 5, 9, 10, 14, 15, 20, 100 }) parts.Add($"L{l}=r{Skill.RankCapForLevel(l)}");
                 Write("CAP " + string.Join(" ", parts) + " step " + Skill.RankLevelStep + "\n"); return true;
             }
+            case "rkfill": me.Call("FillResources"); Write("FILLED\n"); return true;
             case "rkhurt": me.Call("Heal", 99999); me.Call("TakeDamage", int.Parse(w[0]), null); Write("HURT " + me.Call<int>("QueryVitality") + "/" + me.Call<int>("QueryMaxVitality") + "\n"); return true;
             case "rkmod": Write("MOD tohit " + me.Call<double>("QueryMod", "tohit") + " armor " + me.Call<double>("QueryMod", "armor") + "\n"); return true;
             case "rkhit":
@@ -397,11 +398,14 @@ def repeat(c, line, count, gap):
     return data + a.quiet(c, 2.0)
 
 
-def use_until(c, line, marker, count, timeout=60):
-    """Send a skill `count` times, each when the last has resolved (the marker text seen again)."""
+def use_until(c, line, marker, count, timeout=60, fill=False):
+    """Send a skill `count` times, each when the last has resolved (the marker text seen again). fill: Endurance and Focus are filled first
+    (a skill at 35 Endurance would otherwise run a new character dry)."""
     data = ""
     for _ in range(count):
         seen = data.count(marker)
+        if fill:
+            c.command("rkfill")
         c.send(line)
         end = time.time() + timeout / count + 10
         while time.time() < end and data.count(marker) <= seen:
@@ -437,7 +441,7 @@ def step1_engine(chief):
     out = chief.command("rkvals blessing hit,armor,seconds,focus")
     check("Blessing: +1/+1 .. +4/+4, 60 seconds at every rank, cost by the default step", out, "hit1=1/1", "armor2=2/2", "hit3=3/3", "armor4=4/4", "seconds4=60/60", "focus2=28.75/29")
     out = chief.command("rkvals double_strike hits,factor,endurance")
-    check("Double Strike: 2 x 60%, 2 x 75%, 3 x 60%, 4 x 55%; 20 Endurance and the default step", out, "hits1=2/2", "factor1=0.6/1", "factor2=0.75/1", "hits3=3/3", "factor3=0.6/1", "hits4=4/4", "factor4=0.55/1", "endurance1=20/20", "endurance2=23/23")
+    check("Double Strike: 2 x 60%, 2 x 75%, 3 x 60%, 4 x 55%; 35 Endurance and the default step from it", out, "hits1=2/2", "factor1=0.6/1", "factor2=0.75/1", "hits3=3/3", "factor3=0.6/1", "hits4=4/4", "factor4=0.55/1", "endurance1=35/35", "endurance2=40.25/40")
     out = chief.command("rkvals tracking range,endurance")
     check("Tracking: adjacent rooms at I, two rooms away at II", out, "range1=1/1", "range2=2/2")
     # Names by rank.
@@ -461,7 +465,7 @@ def step1_skills_list(work):
     adv = login("rkfirst", "adventurer")
     out = adv.command("skills")
     check("skills: a new Adventurer has Double Strike at rank I and is told the next rank's level", out,
-          "double", "(Double Strike)", "[20 Endurance", "(rank II at level 5)", "Two quick blows, each at 60% of weapon damage")
+          "double", "(Double Strike)", "[35 Endurance", "(rank II at level 5)", "Two quick blows, each at 60% of weapon damage")
     check("skills: a rank I only skill names no next rank", [l for l in out.splitlines() if "(Appraise)" in l][0] if "(Appraise)" in out else out, "(Appraise)", absent=("(rank II",))
     check("skills: Jack of All Trades is among the traits", out, "Jack of All Trades")
     check("help ranks explains ranks, the levels and the trainers", adv.command("help ranks"), "Rank II needs level 5", "ranks", "train", "Hall of Legends")
@@ -489,7 +493,7 @@ def step1_skills_list(work):
     json.dump(saved, open(path, "w"))
     old = login("rkold", "adventurer")
     out = old.command("skills")
-    check("an old save loads with rank I in everything", out, "(Double Strike)", "[20 Endurance", absent=("Double Strike II",))
+    check("an old save loads with rank I in everything", out, "(Double Strike)", "[35 Endurance", absent=("Double Strike II",))
     check("an old save has no unlocks and no counts", state(old)["text"], "ranks[] unlocks[] kills[] with[]")
     to(old, "/domains/hollow/village/practice_yard")
     old.command("rkgold 100")
@@ -758,15 +762,17 @@ def step4_skills(chief):
 
     # Minor Heal: rank I and II amounts (Spirit 9, Insight 6: Healing Power +9%, Divine Knowledge +25%).
     p = login("rkheal", "priest")
+    p.command("rklevel 5")  # a level 1 Priest has 26 Vitality, too few to show a heal of 27; rank II is not bought until below
     for rank in (1, 2):
         if rank == 2:
+            a.drain(p, 16)  # Minor Heal's wait is 15 seconds
             p.command("rklevel 5")
             p.command("rkgold 40")
             to(p, "/domains/hollow/village/shrine")
             p.command("train heal")
             to(p, "arena")
         want = max(1, sim.rnd(sim.rank_int("minor_heal", "heal", rank) * 1.34))
-        p.command("rkhurt 25" if rank == 1 else "rkhurt 50")
+        p.command("rkhurt 40" if rank == 1 else "rkhurt 53")
         p.send("heal")
         text = a.fight_until(p, "restoring", timeout=20) + a.quiet(p, 0.4)
         got = re.search(r"restoring (\d+) Vitality", text)
@@ -881,7 +887,7 @@ def step4_double(chief):
     adv.command("verbose on")
     adv.command("rkspawn dodger")
     windup = "shifts their grip for a quick pair of blows"
-    text = use_until(adv, "double dodger", windup, 10, timeout=120)
+    text = use_until(adv, "double dodger", windup, 10, timeout=120, fill=True)
     pairs = blows_after_windup(text, windup, 2)
     full = [p for p in pairs if len(p) == 2]
     mixed = [p for p in full if any("dodges" in x for x in p) and any("dodges" not in x for x in p)]
@@ -900,11 +906,11 @@ def step4_double(chief):
     out = adv.command("ranks")
     check("Jory lists Triple Strike and Quadruple Strike", out, "Triple Strike", "Quadruple Strike", "150 gold", "400 gold")
     check("Triple Strike from Jory", adv.command("train double"), "You have learned", "Triple Strike", "It answers to double")
-    check("skills: Triple Strike, three blows at 60%", skill_line(adv, "double"), "(Triple Strike)", "Three quick blows, each at 60%", "[26 Endurance")
+    check("skills: Triple Strike, three blows at 60%", skill_line(adv, "double"), "(Triple Strike)", "Three quick blows, each at 60%", "[46 Endurance")
     to(adv, "arena")
     adv.command("rkspawn dodger")
     adv.command("restore")
-    text = use_until(adv, "double dodger", windup, 3, timeout=60)
+    text = use_until(adv, "double dodger", windup, 3, timeout=60, fill=True)
     triples = [p for p in blows_after_windup(text, windup, 3) if len(p) == 3]
     check("Triple Strike: three blows a use", "ok" if triples else text[-400:], "ok")
     adv.command("rkslay")
@@ -913,7 +919,7 @@ def step4_double(chief):
     to(adv, "arena")
     adv.command("rkspawn dodger")
     adv.command("restore")
-    text = use_until(adv, "double dodger", windup, 3, timeout=60)
+    text = use_until(adv, "double dodger", windup, 3, timeout=60, fill=True)
     quads = [p for p in blows_after_windup(text, windup, 4) if len(p) == 4]
     hits = [int(x) for p in quads for line in p for x in re.findall(r"\(\+(\d+) damage\)", line)]
     check("Quadruple Strike: four blows a use", "ok" if quads else text[-400:], "ok")
