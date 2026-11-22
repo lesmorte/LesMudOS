@@ -221,6 +221,8 @@ Every item carries instance state: a **quality** (0 Poor, 1 Common, 2 Fine, 3 Ex
 | Rare Enchanted Dagger | weapon | 7-11, to hit +2, Recovery 0.5 | 80 | Hidden Cache, 25% |
 | Random Gold | coins | 30-60 | | Hidden Cache, always |
 
+Any armour or weapon may also name the callings that can or cannot use it (`WornBy`, `NotWornBy`; BUILDING.md, "Restricting a piece by calling"): `wear` and `wield` refuse in words, `look`, a shop's `browse` and a warning before `buy` show it, and an advanced class counts as its calling. The Leather Jerkin is not worn by a Mage; the Scholar's Robe is worn by Mage and Priest only.
+
 ## 8. Shops and services
 
 `Shopkeeper` (inherits `Npc`):

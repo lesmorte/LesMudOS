@@ -597,8 +597,12 @@ public abstract class Living : Thing
 
     // ---- Equipment ----
 
-    /// <summary>Put an item from this creature's inventory into its slot. Replaces what was there. No messages.</summary>
-    public bool Equip(ObjectRef item)
+    /// <summary>
+    /// Put an item from this creature's inventory into its slot. Replaces what was there. No messages. Not public: only the creature's
+    /// own code (a player's wear and wield, which check who may use the piece; a creature's Create) dresses it, so no other object can
+    /// dress a player in a piece its calling bars.
+    /// </summary>
+    protected bool Equip(ObjectRef item)
     {
         if (!item.IsAlive || Environment(item) != Self) return false;
         var slot = item.Call<string>("QuerySlot");

@@ -1,6 +1,6 @@
 // @inherit /std/armor
 
-/// <summary>Armour 2, body, light. Sold by Oswy Thackett. Spec: all but the Mage. No per-calling restriction exists in /std, so it is in the description only.</summary>
+/// <summary>Armour 2, body, light. Sold by Oswy Thackett. Spec: all but the Mage, enforced by NotWornBy (docs/BUILDING.md).</summary>
 public class LeatherJerkin : Armor
 {
     public override void Create()
@@ -15,6 +15,7 @@ public class LeatherJerkin : Armor
         Slot = "body";
         ReactionMod = 0.0;
         Category = "light";
+        NotWornBy.Add("mage");
         Value = 50;
     }
 }

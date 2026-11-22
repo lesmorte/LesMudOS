@@ -1,6 +1,6 @@
 // @inherit /std/armor
 
-/// <summary>Armour 0, body, light, +1 Insight. Sold by Halbert Quill. Spec: Mage and Priest only. No per-calling restriction exists in /std, so it is in the description only.</summary>
+/// <summary>Armour 0, body, light, +1 Insight. Sold by Halbert Quill. Spec: Mage and Priest only, enforced by WornBy (docs/BUILDING.md).</summary>
 public class ScholarsRobe : Armor
 {
     public override void Create()
@@ -15,6 +15,8 @@ public class ScholarsRobe : Armor
         Slot = "body";
         ReactionMod = 0.0;
         Category = "light";
+        WornBy.Add("mage");
+        WornBy.Add("priest");
         AttributeBonus["insight"] = 1;
         Magic = "ink-black runes in the hems: +1 Insight while worn";
         Value = 40;

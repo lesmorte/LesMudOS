@@ -87,6 +87,9 @@ public class Shopkeeper : Npc
 
     private Stock? buying;
 
+    // A buyer told that a piece is not for their calling may buy it by saying so again within two minutes (name -> file and deadline).
+    private readonly Dictionary<string, (string path, long until)> warned = new();
+
     protected override void Noticed(ObjectRef other)
     {
         base.Noticed(other);
@@ -118,7 +121,8 @@ public class Shopkeeper : Npc
             {
                 // Padded by the width of the visible text, so markup in a name cannot shift the prices.
                 var item = Cap(sample.Call<string>("Short") ?? "something");
-                text.Append($"  {item}{new string(' ', Math.Max(0, 32 - Markup(item, false).Length))}{UnitPrice(entry),5} gold\n");
+                var tag = sample.Call<string>("QueryCallingTag") ?? ""; // "Mages and Priests only": nobody should buy what they cannot wear
+                text.Append($"  {item}{new string(' ', Math.Max(0, 32 - Markup(item, false).Length))}{UnitPrice(entry),5} gold{(tag == "" ? "" : "  (" + tag + ")")}\n");
             }
         Write(text.ToString());
         return true;
@@ -134,6 +138,20 @@ public class Shopkeeper : Npc
         if (count > 1 && !sample.Call<bool>("QueryStackable")) { Write("You can buy that only one at a time.\n"); return true; }
         if (count > MaxPurchase) { Write($"{Name} cannot sell more than {MaxPurchase} at once.\n"); return true; }
         var total = (long)UnitPrice(entry) * count;
+        // A piece the buyer's calling bars: say so before taking any gold, and sell it only when asked a second time.
+        var barred = buyer.Call<string>("QueryCallingRefusal", sample);
+        if (barred != null)
+        {
+            var who = buyer.Call<string>("QueryName") ?? "";
+            if (!warned.TryGetValue(who, out var told) || told.path != entry.Path || told.until < TimeMs())
+            {
+                if (warned.Count > 200) warned.Clear();
+                warned[who] = (entry.Path, TimeMs() + 120000);
+                Write($"{barred} No gold has been taken. Say {{cmd}}buy {Esc(args)}{{/}} again if you want it anyway.\n");
+                return true;
+            }
+            warned.Remove(who);
+        }
         if (total > int.MaxValue || !buyer.Call<bool>("AddGold", -(int)total))
         {
             Write(count == 1 ? $"You cannot afford that. It costs {total} gold.\n" : $"You cannot afford that. {count} cost {total} gold.\n");

@@ -694,10 +694,28 @@ public abstract class Adventurer : Living
 
     // ---- Equipment access (docs/CLASS_SYSTEM.md section 5) ----
 
-    /// <summary>Why this character may not wield or wear the item, or null. An item without a category is for anyone.</summary>
-    private string? AccessRefusal(ObjectRef item)
+    /// <summary>The calling and class ids of this character: the calling first, then the advanced class, subclass and prestige class. An advanced class counts as the calling it grew from because the calling is always in the list.</summary>
+    private List<string> CallingIds() => new[] { archetype, advancedClass, subclass, prestigeClass }.Where(i => i != "").ToList();
+
+    /// <summary>
+    /// Why this character's calling bars the piece (its WornBy and NotWornBy), in words, or null. Asking changes nothing; the shop
+    /// asks it before taking gold, and wear asks it before anything else.
+    /// </summary>
+    public string? QueryCallingRefusal(ObjectRef item)
+    {
+        if (unrestricted || item == null || !item.IsAlive || item.Call<bool>("QueryAllowsCalling", CallingIds())) return null;
+        var verb = item.Call<string>("QuerySlot") == "weapon" ? "wield" : "wear";
+        return $"You cannot {verb} {item.Call<string>("Short")}. {item.Call<string>("QueryCallingNote")}";
+    }
+
+    /// <summary>
+    /// Why this character may not wield or wear the item, or null. An item without a category is for anyone. Fresh from a save
+    /// (restoring) a piece already worn stays worn whatever its calling rule says, until it is taken off.
+    /// </summary>
+    private string? AccessRefusal(ObjectRef item, bool restoring = false)
     {
         if (unrestricted) return null;
+        if (!restoring && QueryCallingRefusal(item) is { } barred) return barred;
         var category = item.Call<string>("QueryCategory") ?? "";
         var slot = item.Call<string>("QuerySlot") ?? "";
         var who = Cap(archetypeName) + "s";
@@ -797,7 +815,7 @@ public abstract class Adventurer : Living
                 if (item == null) continue;
                 var slot = item.Call<string>("QuerySlot") ?? "";
                 var put = carriedEquipped.Contains(i) || (equipKit && (slot == "weapon" || slot == "shield") && QueryEquipped(slot) == null);
-                if (put && AccessRefusal(item) == null) Equip(item);
+                if (put && AccessRefusal(item, restoring: true) == null) Equip(item);
             }
             catch (MudRuntimeException)
             {

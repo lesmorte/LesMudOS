@@ -23,6 +23,8 @@ public class Armor : Item
 
     public override string QuerySlot() => Slot;
 
+    // WornBy and NotWornBy (callings that may or may not wear this piece) are fields of Item.
+
     public int QueryArmorValue() => ArmorValue;
 
     /// <summary>The access category: "shield" and "trinket" by slot, otherwise light, medium or heavy.</summary>
