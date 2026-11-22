@@ -101,18 +101,116 @@ internal sealed class Kernel : IDriverServices
         _masterDepth = 0;
     }
 
+    private string TopDomain => _callStack.Count > 0 ? _callStack[^1].Domain : "";
+
     private void In(ObjectRef ob, Action work)
     {
+        var below = TopDomain;
         Push(ob);
         try { work(); }
+        catch (Exception error) when (ob.Domain != below && IsMudlibType(error.GetType()))
+        {
+            throw new MudRuntimeException(SafeMessage(error)); // read while this object's frame is still on the stack
+        }
         finally { Pop(); }
     }
 
     private T In<T>(ObjectRef ob, Func<T> work)
     {
+        var below = TopDomain;
         Push(ob);
         try { return work(); }
+        catch (Exception error) when (ob.Domain != below && IsMudlibType(error.GetType()))
+        {
+            throw new MudRuntimeException(SafeMessage(error));
+        }
         finally { Pop(); }
+    }
+
+    // ---- Values that cross between domains (docs/SANDBOX.md) ----
+    // A value made by one domain's code must not carry that code into another domain, where it would run with the other's
+    // call stack: an object whose ToString, Equals or comparer is mudlib code, an exception whose Message is, an enumerator.
+    // So arguments and results that cross go as plain data: scalars, strings, handles, and copies of arrays, lists, sets and
+    // dictionaries (with the default comparer) of those. Anything else does not cross. An exception of a mudlib type crosses
+    // as a plain MudRuntimeException with its message, read before the frame that threw it is left.
+
+    private static bool IsMudlibType(Type type) => type.Assembly.GetName().Name?.StartsWith(ProgramCompiler.AssemblyPrefix, StringComparison.Ordinal) == true;
+
+    private static string SafeMessage(Exception error)
+    {
+        try { return error.Message ?? "error"; }
+        catch (EvalCostExceededException) { throw; }
+        catch (Exception) { return "error"; }
+    }
+
+    private static readonly HashSet<Type> PlainTypes = new()
+    {
+        typeof(string), typeof(bool), typeof(char), typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint),
+        typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal), typeof(ObjectRef),
+    };
+
+    private static bool PlainElement(Type type, int depth = 0)
+    {
+        if (depth > 6) return false;
+        if (PlainTypes.Contains(type) || type.IsEnum || type == typeof(object)) return true;
+        if (type.IsArray) return PlainElement(type.GetElementType()!, depth + 1);
+        if (!type.IsGenericType) return false;
+        var definition = type.GetGenericTypeDefinition();
+        if (definition == typeof(List<>) || definition == typeof(HashSet<>) || definition == typeof(Dictionary<,>) || definition == typeof(Nullable<>)
+            || (type.IsValueType && definition.FullName?.StartsWith("System.ValueTuple`", StringComparison.Ordinal) == true))
+            return type.GetGenericArguments().All(a => a != typeof(object) || !type.IsValueType) && type.GetGenericArguments().All(a => PlainElement(a, depth + 1));
+        return false;
+    }
+
+    /// <summary>A copy of a value that may cross between domains, or false if it may not cross.</summary>
+    private static bool TryCross(object? value, out object? copy, int depth = 0)
+    {
+        copy = value;
+        if (value == null) return true;
+        if (depth > 6) return false;
+        var type = value.GetType();
+        if (PlainTypes.Contains(type) || type.IsEnum) return true;
+        if (type.IsArray)
+        {
+            var element = type.GetElementType()!;
+            if (!PlainElement(element)) return false;
+            var source = (Array)value;
+            var array = Array.CreateInstance(element, source.Length);
+            for (var i = 0; i < source.Length; i++)
+            {
+                if (!TryCross(source.GetValue(i), out var item, depth + 1)) return false;
+                array.SetValue(item, i);
+            }
+            copy = array;
+            return true;
+        }
+        if (!type.IsGenericType || !PlainElement(type)) return false;
+        var definition = type.GetGenericTypeDefinition();
+        if (type.IsValueType) return true; // a value tuple or nullable of plain types (no object fields: PlainElement refused those)
+        if (definition == typeof(List<>) || definition == typeof(HashSet<>))
+        {
+            var result = Activator.CreateInstance(type)!;
+            var add = type.GetMethod("Add")!;
+            foreach (var item in (System.Collections.IEnumerable)value)
+            {
+                if (!TryCross(item, out var plain, depth + 1)) return false;
+                add.Invoke(result, [plain]);
+            }
+            copy = result;
+            return true;
+        }
+        if (definition == typeof(Dictionary<,>))
+        {
+            var result = (System.Collections.IDictionary)Activator.CreateInstance(type)!; // the default comparer, whatever the original had
+            foreach (System.Collections.DictionaryEntry entry in (System.Collections.IDictionary)value)
+            {
+                if (!TryCross(entry.Key, out var key, depth + 1) || key == null || !TryCross(entry.Value, out var item, depth + 1)) return false;
+                result[key] = item;
+            }
+            copy = result;
+            return true;
+        }
+        return false;
     }
 
     // ---- Restricted code (docs/SANDBOX.md): objects with a domain, and the master's ValidCall ----
@@ -460,6 +558,7 @@ internal sealed class Kernel : IDriverServices
         {
             outer = new List<ObjectRef>(_callStack);
             ClearStack();
+            _thisPlayer = null; // Instantiate gives the creator's back afterwards
         }
         try
         {
@@ -472,7 +571,9 @@ internal sealed class Kernel : IDriverServices
             catch (TargetInvocationException wrapped) when (wrapped.InnerException is not null)
             {
                 handle.Target = null;
-                throw wrapped.InnerException;
+                var inner = wrapped.InnerException;
+                if (handle.Domain.Length > 0 && IsMudlibType(inner.GetType())) throw new MudRuntimeException(SafeMessage(inner));
+                throw inner;
             }
             finally
             {
@@ -576,9 +677,26 @@ internal sealed class Kernel : IDriverServices
             methods[(function, args.Length)] = method;
         }
         if (method is null) return null;
+        // Across a domain boundary only plain data goes in and comes out (see TryCross).
+        var crossing = TopDomain != target.Domain;
+        if (crossing)
+        {
+            var plain = new object?[args.Length];
+            for (var i = 0; i < args.Length; i++)
+                if (!TryCross(args[i], out plain[i]))
+                {
+                    Log.Info($"sandbox: refused {function} on {target.Name}: argument {i + 1} ({args[i]!.GetType().Name}) cannot cross between domains");
+                    return null;
+                }
+            args = plain;
+        }
         try
         {
-            return In(target, () => method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, args, null));
+            var result = In(target, () => method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, args, null));
+            if (!crossing) return result;
+            if (TryCross(result, out var copy)) return copy;
+            Log.Info($"sandbox: dropped the result of {function} on {target.Name} ({result!.GetType().Name}): it cannot cross between domains");
+            return null;
         }
         catch (ArgumentException mismatch)
         {
@@ -707,7 +825,12 @@ internal sealed class Kernel : IDriverServices
         return _thisPlayer is { Domain.Length: > 0 } player ? player : null;
     }
 
-    public bool MayView(ObjectRef target) => Permit(target, "As");
+    /// <summary>A typed view is a direct reference: only within one domain, and from restricted code only as the master allows.</summary>
+    public bool MayView(ObjectRef target)
+    {
+        if (_masterDepth > 0 || target.Domain == TopDomain) return Permit(target, "As");
+        return target.Domain.Length == 0 && Permit(target, "As");
+    }
 
     public ObjectRef? ThisPlayer => _thisPlayer;
     public string Verb => _verb;

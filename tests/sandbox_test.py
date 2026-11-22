@@ -49,6 +49,18 @@ public class SbHall : Room
 }
 '''
 
+VAULT = '''// @inherit /std/room
+public class SbVault : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Sandbox Test Vault";
+        LongDesc = "Nobody comes here until sandbox code loads it.";
+        AddSpawn("/domains/sbtest/target");
+    }
+}
+'''
+
 ANNEX = '''// @inherit /std/room
 public class SbAnnex : Room
 {
@@ -92,7 +104,23 @@ INSPECTOR = '''// @inherit /std/item
 public class SbInspector : Item
 {
     public override void Create() { Name = "inspector"; Ids.Add("inspector"); ShortDesc = "an inspector"; LongDesc = "It reads state."; }
-    public override void Init() { base.Init(); AddAction("dump", Dump); }
+    public override void Init() { base.Init(); AddAction("dump", Dump); AddAction("poke", Poke); }
+
+    // Trusted code calling a sandbox object: what comes back is plain data, and no sandbox code runs in this frame.
+    private bool Poke(string args)
+    {
+        var ob = LoadObject(args.Trim());
+        var evil = ob.Call<object>("QueryEvil");
+        var s1 = evil == null ? "null" : evil.ToString();
+        string s2;
+        try { ob.Call("QueryBoom"); s2 = "nothrow"; }
+        catch (MudRuntimeException e) { s2 = e.Message + ":" + (e is MudRuntimeException && e.Message == "boom" ? "plain" : "?"); }
+        var d = ob.Call<Dictionary<string, int>>("QueryRigged");
+        var s3 = d == null ? "null" : d.ContainsKey("a") + ":" + d.Count;
+        var s4 = ob.As<MudObject>() == null ? "noview" : "view";
+        Write($"POKE evil={s1} boom={s2} rigged={s3} view={s4}\\n");
+        return true;
+    }
 
     private static string D(Dictionary<string, int>? d) => d == null ? "-" : string.Join(",", d.OrderBy(k => k.Key, StringComparer.Ordinal).Select(k => k.Key + ":" + k.Value));
     private static string D2(Dictionary<string, string>? d) => d == null ? "-" : string.Join(",", d.OrderBy(k => k.Key, StringComparer.Ordinal).Select(k => k.Key + ":" + k.Value));
@@ -398,7 +426,27 @@ public class WrenLab : Room
 GEM = '''// @inherit /std/item
 public class WrenGem : Item
 {
-    public override void Create() { Name = "gem"; Ids.Add("gem"); ShortDesc = "a sandbox gem"; Value = 100000; }
+    public static ObjectRef? Victim;
+    public override void Create()
+    {
+        Name = "gem"; Ids.Add("gem"); ShortDesc = "a sandbox gem"; Value = 100000;
+        Victim = Users().FirstOrDefault(u => (u.Call<string>("QueryName") ?? "") == "Pat");
+    }
+    // Values whose own code would run later in the caller's domain, if they were let through.
+    public object QueryEvil() => new EvilThing();
+    public string QueryBoom() { throw new EvilError(); }
+    public Dictionary<string, int> QueryRigged() => new Dictionary<string, int>(new EvilComparer()) { ["a"] = 1 };
+}
+public class EvilThing { public override string ToString() { WrenGem.Victim?.Call("AddGold", 77); return "EVIL"; } }
+public class EvilError : MudRuntimeException
+{
+    public EvilError() : base("boom") { }
+    public override string Message { get { WrenGem.Victim?.Call("AddGold", 77); return "boom"; } }
+}
+public class EvilComparer : IEqualityComparer<string>
+{
+    public bool Equals(string? a, string? b) { WrenGem.Victim?.Call("AddGold", 77); return a == b; }
+    public int GetHashCode(string s) { WrenGem.Victim?.Call("AddGold", 77); return s.Length; }
 }
 '''
 
@@ -426,6 +474,14 @@ public class WrenWand : Item
             me.Call("RankCountKill", "goblin");
             MoveObject(CloneObject("/wiz/wren/gem"), me);
             Write("GIVEN gold=" + me.Call<int>("QueryGold") + " level=" + me.Call<int>("QueryLevel") + "\\n");
+            return true;
+        });
+        AddAction("wandload", a =>
+        {
+            // A real room loaded for the first time by sandbox code is loaded as anyone would load it: its spawns are real.
+            var vault = LoadObject("/domains/sbtest/vault");
+            var mob = Present("target", vault);
+            Write("LOADED " + (mob == null ? "none" : mob.Domain == "" ? "real" : mob.Domain) + "\\n");
             return true;
         });
         AddAction("wandsmite", a => { ThisPlayer()!.Call("Die", Self); return true; });
@@ -643,7 +699,7 @@ def main():
     mudlib = os.path.join(work, "mudlib")
     h.copy_mudlib(mudlib)
     os.makedirs(os.path.join(mudlib, "domains", "sbtest"), exist_ok=True)
-    for name, src in (("hall", HALL), ("annex", ANNEX), ("target", TARGET), ("relic", RELIC), ("base", BASE), ("inspector", INSPECTOR), ("sentinel", SENTINEL)):
+    for name, src in (("hall", HALL), ("vault", VAULT), ("annex", ANNEX), ("target", TARGET), ("relic", RELIC), ("base", BASE), ("inspector", INSPECTOR), ("sentinel", SENTINEL)):
         h.write(mudlib, T + name, src)
     os.makedirs(os.path.join(mudlib, "wiz", "wren", "area"), exist_ok=True)
     os.makedirs(os.path.join(mudlib, "wiz", "rev", "nook"), exist_ok=True)
@@ -791,6 +847,13 @@ def main():
         check("boundary: a sandbox object cannot be put in a real room", wren.command("wandfling"), "FLING ERR:Things made in the workshop cannot leave it.")
         check("boundary: sandbox code cannot pull a real thing into the workshop", wren.command("wandsteal"), "STEAL ERR:")
         same("boundary: the relic is still in the hall", base_relic, chief.command("dump relic"))
+        check("driver: a real room first loaded by sandbox code spawns real creatures", wren.command("wandload"), "LOADED real")
+        got = chief.command("poke " + W + "gem")
+        check("crossing: an object made by sandbox code does not reach trusted code", got, "evil=null")
+        check("crossing: a sandbox exception reaches trusted code as plain text, read inside the sandbox frame", got, "boom=boom:plain")
+        check("crossing: a dictionary from sandbox code arrives as a plain copy", got, "rigged=True:1")
+        check("crossing: trusted code gets no typed view of a sandbox object", got, "view=noview")
+        same("crossing: no sandbox code ran in trusted frames (the player is unchanged)", base_pat, chief.command("dump pat"))
         check("driver: a delegate of another object cannot be scheduled", wren.command("wandpass"), "PASS ERR:CallOut:", "may only use its own code")
 
         # ---- the same attacks against a wizard in the workshop succeed

@@ -68,9 +68,9 @@ The handle to an object. Store and pass handles, never `this`.
 | `bool IsClone` | |
 | `string Domain` | Given by the master when the object is created (`IMaster.ObjectDomain`) and never changed. `""` is the unrestricted world; any other value makes the object *restricted* (section 5, and SANDBOX.md). The sample mudlib uses `wiz:<name>` for the wizard sandbox. |
 | `bool IsAlive` | False once destructed |
-| `object? Call(string function, params object?[] args)` | Late-bound call to a public method (`call_other`). Returns null if the object is dead or has no public method with that name and argument count. |
+| `object? Call(string function, params object?[] args)` | Late-bound call to a public method (`call_other`). Returns null if the object is dead or has no public method with that name and argument count. Between objects of different domains only plain data crosses: null, numbers, strings, `ObjectRef`, enums, value tuples of those, and arrays, `List`, `HashSet` and `Dictionary` (copied, with the default comparer) of those and of `object` holding those. An argument of any other type refuses the call (null); a result of any other type arrives as null. An exception of a mudlib-defined type thrown across the boundary arrives as a plain `MudRuntimeException` with its message. |
 | `T? Call<T>(string function, params object?[] args)` | Same, with a typed result. Returns `default(T)` if the function is missing or returns another type. |
-| `T? As<T>()` | Typed view, or null. Safe for interfaces in `LesMudOS.Api`. For mudlib types it returns null once caller and target are on different program versions. Null too while restricted code runs, for any unrestricted object the master's `ValidCall(target, "As")` refuses (the sample master refuses every one). Do not store the result. |
+| `T? As<T>()` | Typed view, or null. Safe for interfaces in `LesMudOS.Api`. For mudlib types it returns null once caller and target are on different program versions. Only within one domain: null for a target whose domain differs from the running code's, except that restricted code may view an unrestricted object if the master's `ValidCall(target, "As")` allows it (the sample master never does). Do not store the result. |
 
 `==` on two handles tests object identity.
 

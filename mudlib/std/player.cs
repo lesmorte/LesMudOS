@@ -704,7 +704,9 @@ public class Player : Adventurer
         var segs = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var inWiz = segs.Length > 0 && string.Equals(segs[0], "wiz", StringComparison.OrdinalIgnoreCase);
         var needed = inWiz && segs.Length >= 3 ? LevelUpdate : LevelSystemFiles;
-        return level >= needed ? null : $"You need wizard level {needed} to update {(inWiz ? "anything outside your own home directory" : "the game's own code outside /wiz")}, {Esc(HomePath)} being yours.";
+        return level >= needed ? null : inWiz
+            ? $"You need wizard level {needed} to update anything outside your own home directory, {Esc(HomePath)}."
+            : $"You need wizard level {needed} to update the game's own code (anything outside /wiz). Your own home is {Esc(HomePath)}.";
     }
 
     /// <summary>True if the path is a file or directory inside this wizard's own home (not the home directory itself).</summary>
@@ -1102,7 +1104,7 @@ public class Player : Adventurer
         if (args == "") { NotifyFail("Usage: {cmd}clone{/} <path>"); return false; }
         var path = ResolvePath(args);
         // In the workshop anything may be cloned: what is made there is a sandbox object (docs/SANDBOX.md).
-        if (!IsWizard(LevelClone) && !InOwnHome(path) && !inWorkshop) { Write($"You need wizard level {LevelClone} to clone anything outside your own home directory, {Esc(HomePath)} (anything at all inside your workshop).\n"); return true; }
+        if (!IsWizard(LevelClone) && !InOwnHome(path) && !inWorkshop) { Write($"You need wizard level {LevelClone} to clone anything outside your own home directory, {Esc(HomePath)}. In your workshop you may clone anything.\n"); return true; }
         var ob = CloneObject(path);
         var room = Environment();
         try { MoveObject(ob, ob.Call<bool>("CanGet") || room == null ? Self : room); }
