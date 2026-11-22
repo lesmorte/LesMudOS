@@ -95,3 +95,19 @@ Balance requirement, as measured (`ranks level5 gap bolt focus climb`):
 - **Simulator correction (important).** The simulator's old option (c) ("no heal for 15 seconds, the Priest within 2 points of the mean") rested on a fault: a heal's lockout was kept as a time inside one fight and carried into the next fight, whose clock starts again at 0, so a heal near the end of one fight blocked heals for tens of seconds in the next. The wait is now counted in real time across fights (the walking and resting between rooms count). With that corrected, the 20 / 38 / 60 heal with a 15-second wait leaves the Priest about 18 points above the mean of the five callings at rank I and about 10 at rank II (3000 runs a cell, `python3 tests/balance_sim.py ranks wait`): a Priest's Focus pays for about three heals, so a 15-second wait is not what limits it. The numbers are shipped as the owner decided; the table is in the simulator for the next decision.
 - **Aimed Shot**: see docs/CLASS_SYSTEM.md section 14 and the measurement in the same place.
 
+## Open decision: the large heal's Focus cost (measured 22 November 2026)
+The Priest against the mean of the five callings, standard test (level 5, starting gear, 4 potions, points placed, middle human, RestFactor 5, Overseer from the cellar entrance), 3000 runs a cell, 15-second wait, `python3 tests/balance_sim.py ranks 3000 healcost`. A level 5 Priest has 120 Focus; "heals" is what the full pool pays for at that rank's cost. Shipped: 20 / 38 / 60 Vitality for 25 / 32 / 40 Focus.
+
+| Minor Heal (Vitality I/II/III; Focus I/II/III) | rank I | vs mean | heals | everyone at II | vs mean | heals |
+|---|---|---|---|---|---|---|
+| 20/38/60, 25/32/40 (shipped) | 99.9 | +18.6 | 4 | 99.9 | +10.1 | 3 |
+| 20/38/60, 35/45/56 | 99.5 | +18.4 | 3 | 99.6 | +9.8 | 2 |
+| 20/38/60, 45/58/72 | 98.1 | +17.3 | 2 | 98.0 | +8.5 | 2 |
+| 20/38/60, 55/70/88 | 94.3 | +14.2 | 2 | 93.5 | +4.9 | 1 |
+| 20/38/60, 70/90/112 | 85.7 | +7.3 | 1 | 81.0 | -5.1 | 1 |
+| 12/23/36, 25/32/40 | 99.1 | +18.0 | 4 | 99.9 | +10.1 | 3 |
+| 15/28/45, 25/32/40 | 99.8 | +18.6 | 4 | 99.9 | +10.0 | 3 |
+| 7/9/11 (the old small heal), 25/32/40 | 76.7 | +0.1 | 4 | 88.4 | +0.9 | 3 |
+
+Reading: the Priest pins near 100 for any heal from 12 upward unless the cost leaves only one or two heals a fight; no cost in the table puts both columns within 5 points (70/90/112 gives +7.3 and -5.1). The cliff is between a heal of 7 and one of 12 (a few Vitality per heal, not the cost). The numbers are unchanged in the game; the choice is the owner's.
+
