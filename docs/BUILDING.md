@@ -137,6 +137,85 @@ public class ExampleVault : Room
 
 `BlockExit(direction, message)` is the same idea for a way nobody can use yet (a road into the wilderness): the direction is not listed among the obvious exits, and typing it shows the message.
 
+### A room with a door
+
+A door is a closed (or open) barrier on an ordinary exit that players open and close with words. `AddDoor(direction, name, closed, keyId, closesOnReset, description)` goes in `Create()`, **after** `Exits[direction]` is set (a door needs an exit to stand on). Every part but the direction has a default: `AddDoor("east")` is a closed, unlocked door named "door" that is shut again at every reset. **The room on the other side declares the matching door on its own exit back**, in the same way; the two halves are one door and share one state.
+
+```csharp
+// File: /domains/example/gatehouse.cs
+// @inherit /std/room
+public class ExampleGatehouse : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Gatehouse";
+        LongDesc = "A cold stone gatehouse. A plank door in the east wall leads out to the courtyard.";
+        Exits["east"] = "/domains/example/courtyard";
+        AddDoor("east", "plank door", description: "Grey planks bound in black iron, and an iron ring for a handle.");
+    }
+}
+```
+
+```csharp
+// File: /domains/example/courtyard.cs
+// @inherit /std/room
+public class ExampleCourtyard : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Courtyard";
+        LongDesc = "A bare courtyard behind the gatehouse.";
+        Exits["west"] = "/domains/example/gatehouse";
+        AddDoor("west", "plank door", closesOnReset: false);
+    }
+}
+```
+
+What players get, with no more work from you:
+
+- `open DOOR`, `close DOOR`, `unlock DOOR`, `lock DOOR`, where DOOR is the name you gave it ("door", "plank door", "gate"), a direction ("east", "e") or both ("east door"). With one door in the room the name can be left out. `look` shows the door on the exits line ("east (closed plank door)", "(open ...)", "(locked ...)"), and `look at door` describes it with your `description` and says whether it is open.
+- A **closed door stops everything that uses the exit**: walking, `flee`, a patrol on its route, and Tracking (which does not read through it; at rank II a creature behind a closed door is the one "Something is close by" line). A locked door is closed too. An open door is an ordinary exit.
+- Opening or closing is heard: the room on the other side is told ("The plank door to the west swings open."), and so is the room itself. **Opening a door is loud** for a sneaking Scout (see "Placing a door against sneaking" below).
+- The **key**: `keyId` is the id of an item (a "key" such as the Locked exit's); a closed door with a key starts locked, and `unlock` and `lock` need the key in the character's inventory (`unlock` opens nothing: it only turns the lock). A door with no key has no lock.
+- **Reset**: unless `closesOnReset: false`, the room's reset shuts the door again (and locks it, if it has a key). Either room's reset does it, for both halves, and the room that shuts it tells both rooms.
+
+How the two halves stay in agreement: neither room keeps the door's state. The register `/secure/doors` does, under the name of the pair of rooms (so **two rooms can share one door only**), and every question a room asks about its door (open? locked?) goes there. Reloading (`update`) either room, or a reset of one, therefore cannot make the two sides disagree. The register accepts a change only from one of the two rooms of that door: no other object (a creature, an item, a wizard's tool in another room) can open, close, lock, unlock or reset anyone's door, and a room in your own home can change only the doors that have it as one end. A door declared on only one side leaves the other room's exit as an open way: declare both. `tests/lint_area.py` reports a door whose partner does not declare it.
+
+`description` is shown by `look at door`. A door shows in a room only through `look` and the exits line: if the door is a feature of the room, give the room a detail for it as well, as for any scenery. Existing locked exits (`LockExit`) are not doors and stay as they are.
+
+#### Placing a door against sneaking
+
+A Scout who is sneaking can slip past creatures that do not notice, in and out of a room, and a door in the way undoes that: **opening a door is loud**. It ends the Scout's sneaking and wakes the room, so every aggressive creature in it engages at once. Use a door when the way beyond should have to be earned by facing what guards it: put it on the exit **behind** the guards (the Overseer Hall's east door has the Elite Guards in front of it), never on an exit that a creature stands behind alone. A door is not needed to stop a Scout in front of a `Boss`: a creature flagged `Boss` always notices a sneaking Scout. See "Sneaking" under Creatures for the `Alert` and `Boss` flags.
+
+#### Sneaking: the `Alert` and `Boss` flags
+
+A Scout who has `sneak` on rolls against every **aggressive** creature (`Aggressive = true`) of a room as they enter, and again as they leave. Two flags in a creature's `Create()` change that creature's roll:
+
+- `Alert = true`: a sentry or guard. +30 points to its chance to notice. Set it on anything that stands watch (the Hollow's guards, the Elite Guards, the corridor's lookouts).
+- `Boss = true`: always notices; it never rolls, so it cannot be sneaked past or ambushed. Set it on every boss, whatever else it is.
+
+```csharp
+// @inherit /std/monster
+public class ExampleSentry : Monster
+{
+    public override void Create()
+    {
+        Name = "Gate Sentry";
+        Ids.Add("sentry");
+        ShortDesc = "a gate sentry";
+        LongDesc = "He watches the road and not much else.";
+        Level = 3;
+        MaxVitality = 30;
+        DamageMin = 2;
+        DamageMax = 4;
+        Aggressive = true;
+        Alert = true;
+    }
+}
+```
+
+A creature that is not `Aggressive` is never rolled for. The chance is 50% - 5% for each point of the Scout's Grace above 5 + 5% for each level the creature is above the Scout, kept between 10% and 90%, + 30% if `Alert`, less the Scout's Sneak rank (0 / 10 / 20 points), and never below 5%. Where an unnoticed Scout should not slip past, put a door (above); where he should not be able to ambush, set `Boss`. Creatures written under a wizard's home directory have no standing to be rolled for and always notice, as every creature did before sneaking.
+
 ### A room with random encounters
 
 `AddEncounter(path, percent)`: each time a player walks in there is that chance that the creature wanders in, if none from this room is still alive and a minute has passed since the last. The same rule holds for corpses: no new encounter while the corpse of this room's previous one still lies here. An encounter that is not fighting wanders off at the next reset.
@@ -284,7 +363,7 @@ public class ExampleVillager : Npc
 
 `/std/patrol` is an `Npc` that walks. `SetRoute(rooms, paceSeconds, loop)` gives it an ordered list of room paths and the seconds between steps; with `loop` false it walks the route there and back, with `loop` true the last room must lead on to the first. Put it in the first room of its route with `AddSpawn`. The people in the rooms read an arrival line and a departure line (`ArriveLine` with `{name}` and `{from}`, `LeaveLine` with `{name}` and `{dir}`; the defaults read "A ranger arrives from the south." and "A ranger leaves north."). The rules:
 
-- It walks only through **real exits**: an ordinary exit in the room it is in that leads to the next room of the route. A missing exit, a locked exit it has no key for, and a hidden exit all stop it (it stays where it is and tries again at the next step; `stat` counts the blocked steps).
+- It walks only through **real exits**: an ordinary exit in the room it is in that leads to the next room of the route. A missing exit, a locked exit it has no key for, a closed door, and a hidden exit all stop it (it stays where it is and tries again at the next step; `stat` counts the blocked steps).
 - It does not walk while it is **fighting**, and it stands still for `TalkPauseSeconds` (default 20) after a player uses `talk` or `ask` on it.
 - `DefendPlayers = true`: if a creature is fighting a player in the room the patrol is in (or the patrol arrives where one is), the patrol joins against the creature. A patrol is peaceful (it cannot be attacked) unless you set `Peaceful = false`; give it `Level`, `MaxVitality`, damage and, if you like, combat actions as for any creature.
 - If it **dies** it leaves the world and comes back after `ReturnSeconds` (default 300) in the first room of its route, at full health. It leaves no corpse.

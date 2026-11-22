@@ -109,7 +109,7 @@ public class RkProbe : Thing
     public override void Init()
     {
         foreach (var v in new[] { "rkgold", "rklevel", "rkspawn", "rktele", "rkquest", "rkrenown", "rkstate", "rkvals", "rktitles", "rkcap",
-                                  "rkhurt", "rkfill", "rkmod", "rkhit", "rkgive", "rkfound", "rkrolls", "rkchance", "rkprof", "rkspeed", "rkgrow", "rkslay", "rkdrop" })
+                                  "rkhurt", "rkfill", "rkmod", "rkhit", "rkgive", "rkfound", "rkrolls", "rkchance", "rkprof", "rkspeed", "rkgrow", "rkslay", "rkdrop", "rkself" })
             AddAction(v, Do);
     }
     private ObjectRef? Named(string name, ObjectRef room) =>
@@ -166,6 +166,11 @@ public class RkProbe : Thing
                 for (var r = 1; r <= 6; r++) parts.Add($"r{r}=L{Skill.LevelForRank(r)}");
                 foreach (var l in new[] { 1, 4, 5, 9, 10, 14, 15, 20, 100 }) parts.Add($"L{l}=r{Skill.RankCapForLevel(l)}");
                 Write("CAP " + string.Join(" ", parts) + " step " + Skill.RankLevelStep + "\n"); return true;
+            }
+            case "rkself":
+            {
+                var heal = LoadObject("/skills/minor_heal");
+                Write("SELF " + string.Join(",", Enumerable.Range(1, 5).Select(r => heal.Call<int>("RankInt", "heal", r) + ">" + heal.Call<int>("QuerySelfHealAt", r))) + "\n"); return true;
             }
             case "rkfill": me.Call("FillResources"); Write("FILLED\n"); return true;
             case "rkhurt": me.Call("Heal", 99999); me.Call("TakeDamage", int.Parse(w[0]), null); Write("HURT " + me.Call<int>("QueryVitality") + "/" + me.Call<int>("QueryMaxVitality") + "\n"); return true;
@@ -442,6 +447,8 @@ def step1_engine(chief):
     check("Blessing: +1/+1 .. +4/+4, 60 seconds at every rank, cost by the default step", out, "hit1=1/1", "armor2=2/2", "hit3=3/3", "armor4=4/4", "seconds4=60/60", "focus2=28.75/29")
     out = chief.command("rkvals double_strike hits,factor,endurance")
     check("Double Strike: 2 x 60%, 2 x 75%, 3 x 60%, 4 x 55%; 35 Endurance and the default step from it", out, "hits1=2/2", "factor1=0.6/1", "factor2=0.75/1", "hits3=3/3", "factor3=0.6/1", "hits4=4/4", "factor4=0.55/1", "endurance1=35/35", "endurance2=40.25/40")
+    check("Minor Heal on the caster: half of 20 / 38 / 60 / 66 / 72 rounded half up (10 / 19 / 30 / 33 / 36), before Divine Knowledge",
+          chief.command("rkself"), "SELF 20>10,38>19,60>30,66>33,72>36")
     out = chief.command("rkvals tracking range,endurance")
     check("Tracking: adjacent rooms at I, two rooms away at II", out, "range1=1/1", "range2=2/2")
     # Names by rank.
@@ -771,12 +778,12 @@ def step4_skills(chief):
             to(p, "/domains/hollow/village/shrine")
             p.command("train heal")
             to(p, "arena")
-        want = max(1, sim.rnd(sim.rank_int("minor_heal", "heal", rank) * 1.34))
+        want = max(1, sim.rnd(((sim.rank_int("minor_heal", "heal", rank) + 1) // 2) * 1.34))  # on the caster: half, rounded half up, then Divine Knowledge
         p.command("rkhurt 40" if rank == 1 else "rkhurt 53")
         p.send("heal")
         text = a.fight_until(p, "restoring", timeout=20) + a.quiet(p, 0.4)
         got = re.search(r"restoring (\d+) Vitality", text)
-        check(f"Minor Heal {ROMAN[rank]}: restores {want} (the table's {sim.rank_int('minor_heal', 'heal', rank)} x 1.34)", got.group(1) if got else text[-200:], str(want))
+        check(f"Minor Heal {ROMAN[rank]}: restores {want} (half of the table's {sim.rank_int('minor_heal', 'heal', rank)}, x 1.34)", got.group(1) if got else text[-200:], str(want))
         check(f"Minor Heal {ROMAN[rank]}: costs {sim.rank_int('minor_heal', 'focus', rank)} Focus", skill_line(p, "Minor Heal"), f"[{sim.rank_int('minor_heal', 'focus', rank)} Focus")
         # Blessing at the same rank (rank I here, the heal was bought at II; Blessing II is bought below).
     p.command("restore")

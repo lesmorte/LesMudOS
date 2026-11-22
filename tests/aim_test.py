@@ -214,6 +214,12 @@ def damages(text):
 
 # ---------------------------------------------------------------- 1. Minor Heal
 
+def wait_over(p):
+    deadline = time.time() + 30
+    while stat(p)["wait"] > 0 and time.time() < deadline:
+        time.sleep(0.5)
+
+
 def step_heal(chief):
     pa = login("aimpria", "priest")
     pb = login("aimprib", "priest")
@@ -221,15 +227,19 @@ def step_heal(chief):
         p.command("alevel 5")
         p.command("agold 500")
         to(p, "arena")
-    # Rank I: 20 x 1.34 (Spirit 9 and Insight 6: Healing Power +9%, Divine Knowledge +25%) = 27 and 25 Focus.
+    # The owner's decision of 22 November 2026: on another 20 / 38 / 60, on the caster half of that, rounded half up (10 / 19 / 30), and the
+    # half comes BEFORE Divine Knowledge and Healing Power (Spirit 9 and Insight 6: +9% and +25% = x1.34).
+    # Rank I on the caster: 10 x 1.34 = 13 (not 20 x 1.34 = 27 halved to 14), and 25 Focus.
     pa.command("ahurt 40")
     s0 = stat(pa)
     pa.send("heal")
     text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
     got = re.search(r"restoring (\d+) Vitality", text)
-    check("Minor Heal I restores 27 (20 x 1.34)", got.group(1) if got else text[-200:], "27")
+    check("Minor Heal I on the caster restores 13 (half of 20 = 10, x 1.34; not 27 halved to 14)", got.group(1) if got else text[-200:], "13")
+    check("the message to the caster says the smaller amount plainly", text, "The light comes slowly to your own hurts, restoring 13 Vitality.")
+    check("and the room is told it as before", a.quiet(pb, 0.3), "heals themselves.")
     s1 = stat(pa)
-    check("Minor Heal I costs 25 Focus", str(s0["focus"] - s1["focus"] in (24, 25, 26)), "True")
+    check("Minor Heal I costs 25 Focus (the cost is not halved)", str(s0["focus"] - s1["focus"] in (24, 25, 26)), "True")
     check("the wait is on: 15 seconds or a little less are left", str(1 <= s1["wait"] <= 15), "True")
     # The refusal: before any Focus is spent, with the time left.
     pa.command("ahurt 40")
@@ -241,6 +251,8 @@ def step_heal(chief):
     check("and no Focus is spent by the refusal", str(f1 >= f0), "True")
     check("and nothing is cast", a.quiet(pa, 2.5), absent=("restoring",))
     check("skills shows the wait: 15 seconds, and the seconds left", skill_line(pa, "Minor Heal"), "You cannot cast it again for 15 seconds", "you may cast it again in ")
+    check("skills says what it gives another and what it gives you, and why", skill_line(pa, "Minor Heal"), "Restores 20 Vitality to someone in the room, or 10 to you",
+          "gives freely to the one who reaches for another and sparingly to the one who reaches for himself")
     # Per caster, not per target: the same wait for a heal on someone else.
     out = pa.command("heal aimprib")
     check("the wait is the caster's: no heal on another either", out, "You cannot cast Minor Heal again so soon")
@@ -248,47 +260,68 @@ def step_heal(chief):
     pb.command("ahurt 40")
     pb.send("heal")
     text = a.fight_until(pb, "restoring", timeout=20)
-    check("another Priest casts at once, the wait is not shared", text, "restoring 27 Vitality")
+    check("another Priest casts at once, the wait is not shared (on itself: 13)", text, "restoring 13 Vitality")
     # Over after 15 seconds (counted from the cast, the time already waited included).
     time.sleep(max(0.0, 16.0 - 8.0))
-    deadline = time.time() + 20
-    while stat(pa)["wait"] > 0 and time.time() < deadline:
-        time.sleep(0.5)
+    wait_over(pa)
     check("the wait ends: nothing left", str(stat(pa)["wait"]), "0")
+    # On another: the full 20 x 1.34 = 27; the target is told too.
+    pb.command("afill")
+    pb.command("ahurt 40")
+    a.quiet(pb, 0.3)
+    pa.command("ahurt 40")
+    pa.send("heal aimprib")
+    text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
+    check("Minor Heal I on another restores the full 27 (20 x 1.34)", text, "Warm light flows from you to Aimprib, restoring 27 Vitality.")
+    check("the one healed is told the same amount", a.quiet(pb, 0.5), "heals you for 27 Vitality")
+    wait_over(pa)
     pa.command("ahurt 40")
     pa.send("heal")
     text = a.fight_until(pa, "restoring", timeout=20)
-    check("after the wait a second Minor Heal is cast", text, "restoring 27 Vitality")
-    # Rank II and III: 38 x 1.34 = 51 (32 Focus), 60 x 1.34 = 80 (40 Focus).
+    check("after the wait a second Minor Heal is cast", text, "restoring 13 Vitality")
+    # Rank II: on another 38 x 1.34 = 51 (32 Focus), on the caster 19 x 1.34 = 25 (51 halved would give 26).
     to(pa, VILLAGE + "shrine")
     check("Minor Heal II bought", pa.command("train heal"), "Minor Heal II")
     to(pa, "arena")
-    while stat(pa)["wait"] > 0:
-        time.sleep(0.5)
+    wait_over(pa)
     pa.command("afill")
     pa.command("ahurt 53")
     s0 = stat(pa)
     pa.send("heal")
     text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
     got = re.search(r"restoring (\d+) Vitality", text)
-    check("Minor Heal II restores 51 (38 x 1.34)", got.group(1) if got else text[-200:], "51")
+    check("Minor Heal II on the caster restores 25 (half of 38 = 19, x 1.34; 51 halved would give 26)", got.group(1) if got else text[-200:], "25")
     check("Minor Heal II costs 32 Focus", str(s0["focus"] - stat(pa)["focus"] in (31, 32, 33)), "True")
-    check("skills: Minor Heal II in numbers", skill_line(pa, "Minor Heal"), "Minor Heal II", "Restores 38 Vitality", "[32 Focus")
+    check("skills: Minor Heal II in numbers", skill_line(pa, "Minor Heal"), "Minor Heal II", "Restores 38 Vitality", "or 19 to you", "[32 Focus")
+    wait_over(pa)
+    pb.command("afill")
+    pb.command("ahurt 53")
+    a.quiet(pb, 0.3)
+    pa.send("heal aimprib")
+    text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
+    check("Minor Heal II on another restores the full 51 (38 x 1.34)", text, "restoring 51 Vitality")
     pa.command("alevel 10")
     to(pa, HALL)
     check("Minor Heal III bought from Anselm", pa.command("train heal"), "Minor Heal III")
     to(pa, "arena")
-    while stat(pa)["wait"] > 0:
-        time.sleep(0.5)
+    wait_over(pa)
     pa.command("afill")
     pa.command("ahurt 85")
     s0 = stat(pa)
     pa.send("heal")
     text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
     got = re.search(r"restoring (\d+) Vitality", text)
-    check("Minor Heal III restores 80 (60 x 1.34)", got.group(1) if got else text[-200:], "80")
+    check("Minor Heal III on the caster restores 40 (half of 60 = 30, x 1.34)", got.group(1) if got else text[-200:], "40")
     check("Minor Heal III costs 40 Focus", str(s0["focus"] - stat(pa)["focus"] in (39, 40, 41)), "True")
-    check("skills: Minor Heal III names its wait too", skill_line(pa, "Minor Heal"), "Minor Heal III", "Restores 60 Vitality", "cast it again for 15 seconds")
+    check("skills: Minor Heal III names its wait too", skill_line(pa, "Minor Heal"), "Minor Heal III", "Restores 60 Vitality", "or 30 to you", "cast it again for 15 seconds")
+    wait_over(pa)
+    pb.command("alevel 10")
+    pb.command("afill")
+    pb.command("ahurt 85")
+    a.quiet(pb, 0.3)
+    pa.send("heal aimprib")
+    text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
+    check("Minor Heal III on another restores the full 80 (60 x 1.34)", text, "restoring 80 Vitality")
     # Logout ends the wait: it is not saved.
     pa.command("ahurt 40")
     pa.command("quit")

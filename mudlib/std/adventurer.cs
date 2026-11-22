@@ -227,6 +227,7 @@ public abstract class Adventurer : Living
         ("endurance", "your current Endurance"), ("maxendurance", "your maximum Endurance"),
         ("focus", "your current Focus"), ("maxfocus", "your maximum Focus"),
         ("rest", "\"(resting) \" while you rest, otherwise nothing"),
+        ("sneak", "\"(sneaking) \" while you sneak, otherwise nothing"),
     };
 
     /// <summary>
@@ -252,6 +253,7 @@ public abstract class Adventurer : Living
         "focus" => QueryFocus().ToString(),
         "maxfocus" => QueryMaxFocus().ToString(),
         "rest" => QueryResting() ? "(resting) " : "",
+        "sneak" => sneaking ? "(sneaking) " : "",
         _ => "",
     };
 
@@ -623,6 +625,7 @@ public abstract class Adventurer : Living
     {
         var skill = FindSkillByCommand(QueryVerb());
         if (skill == null) return false;
+        if (skill.Call<string>("QueryId") == "sneak") return CmdSneak(skill, args);
         args = args.Trim();
         var room = Environment();
         ObjectRef? target = null;
@@ -647,6 +650,7 @@ public abstract class Adventurer : Living
         if (refusal != null) { Write(refusal + "\n"); return true; }
         LeaveRest();
         var opening = false;
+        var ambush = false;
         if (kind == "enemy" && target != null)
         {
             if (!QueryFightingWith(target))
@@ -654,11 +658,13 @@ public abstract class Adventurer : Living
                 var no = CanFight(target);
                 if (no != null) { Write(no + "\n"); return true; }
                 opening = !QueryInCombat(); // the shot that starts this character's fight; one aimed at a second creature mid-fight is an ordinary shot
+                ambush = opening && sneaking; // the blow that starts the fight from hiding
                 OpenFight(target);
             }
             Focus(target);
         }
-        refusal = UseSkill(skill, target, opening);
+        if (skill.Call<string>("QueryId") != "tracking") EndSneakLoud(); // every skill but Tracking is loud
+        refusal = UseSkill(skill, target, opening, ambush);
         if (refusal != null) Write(refusal + "\n");
         return true;
     }
@@ -1098,6 +1104,7 @@ public abstract class Adventurer : Living
     /// <summary>A creature that has just attacked a seated character: they scramble up and lose RestSurprise seconds more. Only a creature's own attack counts.</summary>
     protected override void Ambushed(ObjectRef enemy)
     {
+        if (sneaking) { sneaking = false; Tell("You are no longer sneaking.\n"); }
         if (!resting) return;
         var attacker = PreviousObject();
         if (RestEnded() || attacker != enemy || !enemy.Call<bool>("IsCreature") || Environment(enemy) != Environment()) { if (RestEnded()) EndRest(); return; }
@@ -1121,6 +1128,175 @@ public abstract class Adventurer : Living
         EndRest();
     }
 
+    // ---- Sneaking (docs/specs/sneak.md) ----
+    // Not saved. The state changes only through the character's own commands and the game's trusted paths: a creature's own notice roll
+    // (SneakNotice), the room the character leaves (SneakDeparts), a trusted object in the room reporting a loud deed (Disturbed). The
+    // numbers and the dice are in /secure/sneak, the numbers by rank in /skills/sneak.
+
+    private const string SneakDaemon = "/secure/sneak";
+    private static readonly string[] SneakTrusted = { "/std/", "/secure/", "/domains/", "/classes/", "/skills/", "/events/" };
+
+    private bool sneaking;
+    /// <summary>Creatures in the current room that have seen this character, while they live and the character stays.</summary>
+    private readonly List<ObjectRef> spotters = new();
+    /// <summary>Aggressive creatures in the current room that have not noticed this character yet.</summary>
+    private readonly List<ObjectRef> unaware = new();
+    private ObjectRef? sneakRoom;
+    private bool sneakBeatOn;
+
+    public bool QuerySneaking() => sneaking;
+
+    protected override bool OpeningUnseen() => sneaking;
+
+    private static bool TrustedCaller(ObjectRef? caller) =>
+        caller != null && SneakTrusted.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal));
+
+    /// <summary>The lists belong to one room: a new room starts them empty.</summary>
+    private void SyncSneakRoom()
+    {
+        var room = Environment();
+        if (room != sneakRoom) { sneakRoom = room; spotters.Clear(); unaware.Clear(); }
+        spotters.RemoveAll(c => !c.IsAlive || Environment(c) != room);
+        unaware.RemoveAll(c => !c.IsAlive || Environment(c) != room);
+    }
+
+    private bool NoticeRoll(ObjectRef creature, bool half)
+    {
+        var daemon = LoadObject(SneakDaemon);
+        var skill = LoadObject("/skills/sneak");
+        var adjust = skill.Call<int>("QueryNoticeAt", Math.Max(1, QuerySkillRank("sneak")));
+        var chance = daemon.Call<int>("NoticeChance", QueryAttribute("grace"), Level, creature.Call<int>("QueryLevel"), creature.Call<bool>("QueryAlert"), adjust);
+        return daemon.Call<bool>("Notices", chance, half);
+    }
+
+    /// <summary>A creature has seen the character: they stop sneaking, and it is the creature's to attack.</summary>
+    private void Spotted(ObjectRef creature)
+    {
+        unaware.Remove(creature);
+        if (!spotters.Contains(creature)) spotters.Add(creature);
+        sneaking = false;
+        Tell($"{Cap(creature.Call<string>("QueryLabel") ?? "it")} has noticed you!\n");
+        creature.Call("Engage");
+    }
+
+    /// <summary>
+    /// A creature that has come within reach of a sneaking character asks whether it notices them. Only the creature itself may ask, from a
+    /// trusted tree, while it is in the character's room: 1 it notices (a Boss always does), 0 it does not (and may roll again every ten
+    /// seconds, at half the chance), -1 it has no standing to ask (the creature then acts as it always did).
+    /// </summary>
+    public int SneakNotice(ObjectRef creature)
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller != creature || !TrustedCaller(caller) || !creature.IsAlive || !creature.Call<bool>("IsMonster") ||
+            !creature.Call<bool>("QueryAggressive") || Dead || !Interactive(Self) || Environment(creature) != Environment() || Environment() == null) return -1;
+        if (!sneaking) return -1;
+        SyncSneakRoom();
+        if (spotters.Contains(creature)) return 1;
+        if (creature.Call<bool>("QueryBoss") || NoticeRoll(creature, false)) { Spotted(creature); return 1; }
+        if (!unaware.Contains(creature)) unaware.Add(creature);
+        ArmSneakBeat();
+        CallOut(() => { if (!Dead && unaware.Contains(creature)) Tell($"{Cap(creature.Call<string>("QueryLabel") ?? "it")} has not noticed you.\n"); }, 0);
+        return 0;
+    }
+
+    private void ArmSneakBeat()
+    {
+        if (sneakBeatOn) return;
+        sneakBeatOn = true;
+        CallOut(SneakBeat, 10); // seconds between the re-rolls (/secure/sneak)
+    }
+
+    /// <summary>Every ten seconds, each creature that has not noticed the character rolls again, at half the chance.</summary>
+    private void SneakBeat()
+    {
+        sneakBeatOn = false;
+        if (Dead) return;
+        SyncSneakRoom();
+        foreach (var creature in unaware.ToList())
+            if (creature.IsAlive && NoticeRoll(creature, true)) Spotted(creature);
+        if (unaware.Count > 0) ArmSneakBeat();
+    }
+
+    /// <summary>
+    /// The room the character is in asks leave for them to go to another: each creature here that has not noticed them rolls at the entry
+    /// chance, and one that notices starts the fight and the character stays (false). Otherwise the room is paid for in Endurance (false
+    /// if they are too tired: sneaking ends and they go openly, true). Only the character's own room, from a trusted tree, may ask.
+    /// </summary>
+    public bool SneakDeparts(ObjectRef destination)
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller != Environment() || !TrustedCaller(caller) || !sneaking || Dead) return true;
+        SyncSneakRoom();
+        var stays = false;
+        foreach (var creature in unaware.ToList())
+            if (creature.IsAlive && NoticeRoll(creature, false)) { Spotted(creature); stays = true; }
+        if (stays) return false;
+        var cost = LoadObject("/skills/sneak").Call<int>("QueryRoomCostAt", Math.Max(1, QuerySkillRank("sneak")));
+        if (!SpendResources(cost, 0))
+        {
+            sneaking = false;
+            Tell("You are too tired to keep sneaking, and go on openly.\n");
+        }
+        return true;
+    }
+
+    /// <summary>The character did something loud: sneaking ends, and every creature that had not noticed them now has.</summary>
+    protected void EndSneakLoud()
+    {
+        SyncSneakRoom();
+        var was = sneaking;
+        sneaking = false;
+        var woken = unaware.ToList();
+        unaware.Clear();
+        foreach (var creature in woken)
+        {
+            if (!spotters.Contains(creature)) spotters.Add(creature);
+            creature.Call("Engage");
+        }
+        if (was) Tell("You are no longer sneaking.\n");
+    }
+
+    /// <summary>
+    /// A trusted object in the character's room (a door, a chest) says that what they just did there, with this very verb, was loud. Only
+    /// for the character's own command; no other object can end anyone's sneaking with it.
+    /// </summary>
+    public void Disturbed(string verb)
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller == Self || Self != ThisPlayer() || !TrustedCaller(caller) || Environment() == null) return;
+        if (caller != Environment() && Environment(caller) != Environment()) return;
+        if (verb != QueryVerb() || verb is "look" or "l" or "rest" or "tell" or "track" or "sneak") return;
+        EndSneakLoud();
+    }
+
+    private bool CmdSneak(ObjectRef skill, string args)
+    {
+        var rank = Math.Max(1, QuerySkillRank("sneak"));
+        args = args.Trim().ToLowerInvariant();
+        var turnOn = args == "on" || (args == "" && !sneaking);
+        if (args != "" && args != "on" && args != "off") { Write("Sneak on, or sneak off.\n"); return true; }
+        if (!turnOn)
+        {
+            if (!sneaking) { Write("You are not sneaking.\n"); return true; }
+            sneaking = false;
+            Write("You stop sneaking.\n");
+            return true;
+        }
+        if (sneaking) { Write("You are already sneaking.\n"); return true; }
+        SyncSneakRoom();
+        if (spotters.FirstOrDefault(c => c.IsAlive) is { } seen)
+        {
+            Write($"{Cap(seen.Call<string>("QueryLabel") ?? "it")} has seen you; there is no hiding from it here.\n");
+            return true;
+        }
+        if (QueryInCombat()) { Write("You cannot slip out of sight while you are fighting.\n"); return true; }
+        LeaveRest();
+        sneaking = true;
+        var cost = skill.Call<int>("QueryRoomCostAt", rank);
+        Write($"You begin to move quietly. Each room you enter costs {cost} Endurance.\n");
+        return true;
+    }
+
     // ---- Death ----
 
     /// <summary>
@@ -1133,6 +1309,9 @@ public abstract class Adventurer : Living
         if (dying) return;
         dying = true;
         EndRest();
+        sneaking = false;
+        unaware.Clear();
+        spotters.Clear();
         try
         {
             Tell("You have died!\n");
@@ -1242,6 +1421,7 @@ public abstract class Adventurer : Living
         var held = MovePortion(item, n, Self);
         if (held == null) { Write($"You cannot take {description}.\n"); return; }
         LeaveRest();
+        EndSneakLoud();
         Write($"You take {description}.\n");
         Say($"{Name} takes {description}.\n");
         held.Call("Taken", Self);
@@ -1303,7 +1483,7 @@ public abstract class Adventurer : Living
         if (corpse == null || what == "") { NotifyFail("Get what from what?"); return false; }
         var refusal = what == "all" ? corpse.Call<string>("TakeAll") : corpse.Call<string>("Take", what);
         if (refusal != null) Write(refusal + "\n");
-        else LeaveRest();
+        else { LeaveRest(); EndSneakLoud(); }
         return true;
     }
 
@@ -1318,7 +1498,7 @@ public abstract class Adventurer : Living
         {
             found = true;
             var result = ob.Call<string>("TakeAll");
-            if (result == null) { LeaveRest(); return true; }
+            if (result == null) { LeaveRest(); EndSneakLoud(); return true; }
             refusal ??= result;
         }
         if (!found) { NotifyFail("There is nothing here to {cmd}loot{/}."); return false; }
@@ -1435,6 +1615,7 @@ public abstract class Adventurer : Living
         LeaveRest();
         OpenFight(target);
         Focus(target);
+        EndSneakLoud();
         return true;
     }
 
@@ -1688,6 +1869,13 @@ public abstract class Adventurer : Living
         catch (MudRuntimeException) { }
         text.Append($"Vitality {Vitality}/{QueryMaxVitality()}   Endurance {QueryEndurance()}/{QueryMaxEndurance()}   Focus {QueryFocus()}/{QueryMaxFocus()}   Gold {Gold}\n");
         if (QueryResting()) text.Append($"You are resting: Vitality, Endurance and Focus return {RestFactor:0.#} times as fast. ({{cmd}}stand{{/}} to get up)\n");
+        if (sneaking)
+        {
+            var sneakRank = Math.Max(1, QuerySkillRank("sneak"));
+            var sneakSkill = LoadObject("/skills/sneak");
+            var notice = sneakSkill.Call<int>("QueryNoticeAt", sneakRank);
+            text.Append($"You are sneaking (rank {Skill.Roman(sneakRank)}): each room costs {sneakSkill.Call<int>("QueryRoomCostAt", sneakRank)} Endurance" + (notice != 0 ? $", and creatures notice you {-notice} points less often" : "") + ". ({{cmd}}sneak off{{/}} to stop)\n");
+        }
         var power = QueryStat("physical_power");
         text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}" + (power != 0 ? $" ({(power > 0 ? "+" : "")}{Pct(power)}%)" : "") +
                     $"   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}   Dodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {Pct(QueryCrit())}%\n");

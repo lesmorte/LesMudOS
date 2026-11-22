@@ -991,6 +991,16 @@ public abstract class Living : Thing
     /// <summary>Is this creature, at this very moment, starting a fight by its own choice with a bow? Read by the target while it is being drawn in; always false otherwise.</summary>
     public bool QueryOpeningShot() => openingShot;
 
+    // True only for the moment BeginFight asks the target to add this creature as an enemy, when this creature chose the fight while unnoticed
+    // (a sneaking Scout: docs/specs/sneak.md). The target then loses a second Reaction Time before its first action.
+    private bool surprising;
+
+    /// <summary>Is this creature, at this very moment, starting a fight from hiding? Read by the target while it is being drawn in; always false otherwise.</summary>
+    public bool QuerySurprising() => surprising;
+
+    /// <summary>Is this creature unnoticed as it chooses to attack (sneaking)? Only a player character can be.</summary>
+    protected virtual bool OpeningUnseen() => false;
+
     private bool BeginFight(ObjectRef enemy, bool drawn, bool chosen)
     {
         if (CanFight(enemy) != null) return false;
@@ -999,8 +1009,9 @@ public abstract class Living : Thing
         if (drawn && !wasInCombat) DelayFirstAction();
         AddEnemyCore(enemy);
         openingShot = chosen && !drawn && fresh && !wasInCombat && QueryWeaponCategory() == "bow";
+        surprising = chosen && !drawn && fresh && !wasInCombat && OpeningUnseen();
         try { enemy.Call("AddEnemy", Self); }
-        finally { openingShot = false; }
+        finally { openingShot = false; surprising = false; }
         if (!fresh) return true;
 
         var room = Environment()!;
@@ -1022,6 +1033,7 @@ public abstract class Living : Thing
         {
             DelayFirstAction();
             if (enemy.Call<bool>("QueryOpeningShot")) DelayActionBy(RangedOpening); // a bow in the attacker's hands: this one has to close the distance first
+            if (enemy.Call<bool>("QuerySurprising")) readyAt += (long)Math.Round(QueryReaction() * UnitMs); // surprised: the first-action delay is doubled
             Ambushed(enemy);
         }
         AddEnemyCore(enemy);
@@ -1493,7 +1505,7 @@ public abstract class Living : Thing
     /// Use a skill or spell as an action on the clock. The skill file supplies the numbers (Preparation, Recovery, the costs,
     /// the attack modifiers). Returns a refusal, or null if the action began or was queued. Costs are paid when it begins.
     /// </summary>
-    protected string? UseSkill(ObjectRef skill, ObjectRef? target, bool opening = false)
+    protected string? UseSkill(ObjectRef skill, ObjectRef? target, bool opening = false, bool ambush = false)
     {
         if (Dead) return "You are in no state to do that.";
         if (SkillWaitRefusal(skill.Call<string>("QueryId") ?? "", skill.Call<string>("QueryTitle") ?? "that") is { } waiting) return waiting;
@@ -1517,6 +1529,8 @@ public abstract class Living : Thing
         };
         // The action that starts a fight may hit harder (Aimed Shot x2.5): the skill's own opener factor replaces its usual one.
         if (opening && skill.Call<double>("QueryOpenerFactorFor", Self) is > 0 and var openerFactor) action.DamageFactor = openerFactor;
+        // From hiding, as the blow that starts the fight (Precision Strike): the skill's own ambush factor replaces its usual one.
+        if (ambush && skill.Call<double>("QueryAmbushFactorFor", Self) is > 0 and var ambushFactor) action.DamageFactor = ambushFactor;
         if (!CanPay(action))
             return QueryEndurance() < action.EnduranceCost ? "You are too tired for that." : "You do not have the focus for that.";
         if (QueryReady())

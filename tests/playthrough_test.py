@@ -317,10 +317,18 @@ class Hero:
         """One step. (Creatures ambush after their Reaction Time, 3 to 9 seconds; a player who walks through a room is not caught by an
         ambush that was prepared for an earlier visit unless he is still there when it falls, which the fight loop handles.)"""
         text = self.cmd(direction)
+        # A closed door (the Overseer Hall's east door; docs/BUILDING.md, "A room with a door") is opened, as a player would, and the way tried again.
+        if re.search(r"The [\w ]+ (to the \w+|above|below) is closed\.", text):
+            self.stats["doors"] = self.stats.get("doors", 0) + 1
+            self.cmd("open door")
+            text = self.cmd(direction)
         # A creature that attacked on arrival holds the hero: walking is refused, fleeing is not (and may take a few tries).
         tries = 0
-        while ("middle of a fight" in text or "cannot get away" in text) and tries < 12 and not self.died:
+        while ("middle of a fight" in text or "cannot get away" in text or "no usable exit" in text or "no way out" in text) and tries < 12 and not self.died:
             tries += 1
+            if "no usable exit" in text or "no way out" in text:  # a door that is closed (it shuts again at the room's reset): open it, then through
+                self.stats["doors"] = self.stats.get("doors", 0) + 1
+                self.cmd("open door")
             text = self.cmd("flee " + direction)
         return text
 
@@ -456,7 +464,10 @@ class Run:
                     continue
                 check(f"{target}: description word for word", flat(text), ROOMS[target]["desc"])
                 exits = re.search(r"Obvious exits: (.*)", text)
-                check(f"{target}: exits are those of the brief", ",".join(sorted(re.sub(r" ?\(to [^)]*\)", "", exits.group(1)).split(", "))), ",".join(sorted(ROOMS[target]["exits"])))
+                check(f"{target}: exits are those of the brief", ",".join(sorted(re.sub(r" ?\((?:to [^)]*|(?:open|closed|locked) [^)]*)\)", "", exits.group(1)).split(", "))), ",".join(sorted(ROOMS[target]["exits"])))
+                if target in ("Overseer Hall", CHAMBER):
+                    check(f"{target}: the door between the Hall and the chamber is on the exits line ({'closed, until the hero opens it' if target != CHAMBER else 'open, the hero has just opened it'})", exits.group(1),
+                          "east (closed door)" if target != CHAMBER else "west (open door)")
                 for line in occupants.get(target, []):
                     check(f"{target}: '{line}'", text, line)
                 if target in ("Guest Rooms", "Smuggler Hall"):
@@ -921,6 +932,9 @@ class Run:
                     break
                 if "cannot get away" in text:
                     self.stats["flee_fails"] = self.stats.get("flee_fails", 0) + 1
+                if "no way out" in text or "no usable exit" in text:  # the door shut again at the room's reset: open it, as a player would
+                    self.stats["doors"] = self.stats.get("doors", 0) + 1
+                    hero.cmd("open door")
         if not left:
             hero.cmd(route(room, TAVERN)[0])
         self.heal_up()
@@ -1299,6 +1313,7 @@ class Run:
         if s.get("rest_s"):
             print(f"Resting in the Guest Rooms: {s['rest_hp']} Vitality in {s['rest_s']:.0f} s ({s['rest_hp'] / s['rest_s'] * 10:.1f} Vitality per 10 s; the rules: 3 standing in a safe room, 5 times that seated)")
         print(f"Fled with the flee command: {s.get('flees', 0)} times")
+        print(f"Doors opened (the Overseer Hall's, and again after a reset): {s.get('doors', 0)} times")
         print(f"Wizard help used: {'YES, from the finding below' if self.fallback else 'no'}")
         for note in s["notes"]:
             print("  note:", note)

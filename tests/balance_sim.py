@@ -64,6 +64,7 @@ BOLT_COST, BOLT_PREP, BOLT_REC, BOLT_DMG = 20, 0.5, 1.0, (6, 9)
 HEAL_COST, HEAL_PREP, HEAL_REC = 25, 0.5, 1.0
 AIM_PREP, AIM_REC = 1.0, 1.0   # Aimed Shot (mudlib/skills/aimed_shot.cs)
 RANGED_OPENING_MS = 2000       # std/living.cs RangedOpening: the target's first action is delayed this much when a bow starts the fight
+SELF_HEAL_HALF = True   # the solo Priest heals itself, and Minor Heal gives the caster half of what it gives another, rounded half up (the owner's decision, 22 November 2026; mudlib/skills/minor_heal.cs SelfShare)
 HEAL_AMOUNT = None   # None: the Minor Heal of the rank table (SKILL_RANKS); a number overrides every rank (the old recommendations' tweaks)
 DOUBLE_STRIKE = True # False: the Adventurer as before ranks (no Double Strike), for comparison tables only
 BLESS_COST = 25
@@ -82,7 +83,11 @@ SKILL_RANKS = {
     "minor_heal": dict(base=dict(focus=25, heal=20, wait=15), rows={2: dict(heal=38, focus=32), 3: dict(heal=60, focus=40)}),
     "blessing": dict(base=dict(focus=25, hit=1, armor=1, seconds=60), rows={2: dict(hit=2, armor=2), 3: dict(hit=3, armor=3), 4: dict(hit=4, armor=4)}),
     "shield_bash": dict(base=dict(endurance=15, factor=0.75, stagger=2.0), rows={2: dict(factor=0.98), 3: dict(factor=1.2)}),
-    "precision_strike": dict(base=dict(endurance=25, tohit=2, crit=15), rows={2: dict(tohit=3, crit=20), 3: dict(tohit=4, crit=25), 4: dict(tohit=5, crit=30)}),
+    # Precision Strike's ambush factor (docs/specs/sneak.md): the damage factor of the blow that starts the fight from hiding, x1.5 / 1.75 / 2.0 / 2.25.
+    "precision_strike": dict(base=dict(endurance=25, tohit=2, crit=15, ambush=1.5),
+                             rows={2: dict(tohit=3, crit=20, ambush=1.75), 3: dict(tohit=4, crit=25, ambush=2.0), 4: dict(tohit=5, crit=30, ambush=2.25)}, fixed={"ambush"}),
+    # Sneak (docs/specs/sneak.md): Endurance a room 5 / 4 / 3, and the change to a creature's chance to notice 0 / -10 / -20 points.
+    "sneak": dict(base=dict(room=5, notice=0), rows={2: dict(room=4, notice=-10), 3: dict(room=3, notice=-20)}, max=3, fixed={"room", "notice"}),
     "double_strike": dict(base=dict(endurance=35, hits=2, factor=0.6), rows={2: dict(factor=0.75), 3: dict(hits=3, factor=0.6), 4: dict(hits=4, factor=0.55)}),
     "tracking": dict(base=dict(endurance=5, range=1), rows={2: dict(range=2)}, max=2),
     # Aimed Shot (docs/specs/hollow-expansion.md section 1): x1.75 / 2.0 / 2.25 (IV 2.5, V 2.75 by +0.25) and, as the shot that starts the fight,
@@ -96,7 +101,7 @@ SKILL_PREP = {"minor_heal": 0.5}
 # Which act of the simulator is which skill, and the skill each calling uses in a fight.
 SKILL_OF = {"bash": "shield_bash", "strike": "precision_strike", "bolt": "arcane_bolt", "heal": "minor_heal", "bless": "blessing", "double": "double_strike",
             "aim": "aimed_shot"}
-CALLING_SKILLS = {"warrior": ("shield_bash",), "scout": ("precision_strike", "tracking", "aimed_shot"), "priest": ("minor_heal", "blessing"),
+CALLING_SKILLS = {"warrior": ("shield_bash",), "scout": ("precision_strike", "tracking", "sneak", "aimed_shot"), "priest": ("minor_heal", "blessing"),
                   "mage": ("arcane_bolt",), "adventurer": ("double_strike",)}
 # How ranks are held: "cap" = every skill at the highest rank the level allows (the character buys a rank when level and gold allow; at levels
 # 5 and 10 the gold is in hand, see `ranks`), "none" = rank I in everything (nobody buys), or a number = that rank where the level allows it.
@@ -126,7 +131,8 @@ def rank_value(skill, key, rank):
 
 
 def rank_int(skill, key, rank):
-    return rnd(rank_value(skill, key, rank))
+    v = rank_value(skill, key, rank)
+    return -rnd(-v) if v < 0 else rnd(v)   # half away from zero, as RankInt (Sneak's notice change is negative)
 
 
 def default_ranks(arch_name, level, mode=None):
@@ -366,6 +372,7 @@ class Fighter:
         self.weapon = ""
         self.cur_act = None         # the action in progress (a shot being aimed is spoiled by a blow)
         self.aim_opening = False    # the Aimed Shot in progress is the action that starts the fight
+        self.strike_ambush = False  # the Precision Strike in progress is the blow that starts the fight from hiding
 
     def rank(self, skill):
         return self.ranks.get(skill, 1)
@@ -447,6 +454,17 @@ def set_level_resources(p, level):
 def make_monster(name):
     k = CKINDS[name] if name in CKINDS else KINDS[name]
     return Fighter(k.level, k.hp, k.dmg, k.to_hit, k.armor, k.reaction, k.acts, k)
+
+
+SNEAKING = False   # True: the Scout and the archer sneak into every room they can afford (docs/specs/sneak.md); see run_approach
+SNEAK_ALERT = ("Goblin Guard", "Goblin Elite Guard")   # creatures flagged Alert in the mudlib (mudlib/domains/hollow/mob)
+SNEAK_BOSS = ("Goblin Overseer",)                      # flagged Boss: always notices
+
+
+def notice_chance(grace, scout_level, creature_level, alert, adjust):
+    """mudlib/secure/sneak.cs NoticeChance, in percent."""
+    c = max(10, min(90, 50 - 5 * (grace - 5) + 5 * (creature_level - scout_level)))
+    return max(5, min(100, c + (30 if alert else 0) + adjust))
 
 
 ARCHER = "archer"   # the archer Scout: a name for run_approach, boss_stats and make_player (a Scout with a bow that opens with Aimed Shot), not a calling
@@ -572,7 +590,7 @@ def player_choice(p, t, living, potions, hard, state):
     return "attack"
 
 
-def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human=None, start=None, stop_at_boss=False, opens=False, heal_carry=0):
+def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human=None, start=None, stop_at_boss=False, opens=False, heal_carry=0, ambush=False):
     """Fight until one side is dead. Mutates player and enemies. Returns a dict: alive, ms, actions, potions,
     boss_ms and lost_at_kill.
     The perfect player (human None) decides at every Ready Time. A HumanPolicy (see "the human player" below) types its
@@ -581,7 +599,9 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
     waits its Reaction Time x 2 s". stop_at_boss ends the fight the moment enemies[0] dies (what the human approach asks).
     opens: the player chose the fight (a creature that is not aggressive, or hypothetically): the player's first action is the one that starts it
     (Aimed Shot x opener), and a bow in the hands delays each creature's first action a further RANGED_OPENING_MS. Never set where the creatures are
-    aggressive and engage on arrival (every creature of the cellars): they start those fights. heal_carry: ms of Minor Heal's wait still to run."""
+    aggressive and engage on arrival (every creature of the cellars): they start those fights. heal_carry: ms of Minor Heal's wait still to run.
+    ambush: the player starts the fight from hiding (a sneaking Scout nobody noticed): the first action is the opener (Aimed Shot x opener, Precision
+    Strike x ambush); `start` already holds the surprised target's doubled delay and the woken creatures' own (see run_approach)."""
     heap = []
     seq = 0
     if hard is None:
@@ -604,7 +624,8 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
         start = (0, [round(e.reaction * UNIT_MS) for e in enemies])
     if opens and player.weapon in BOWS:
         start = (start[0], [x + RANGED_OPENING_MS for x in start[1]])
-    state["opening"] = opens
+    state["opening"] = opens or ambush
+    state["ambush"] = ambush
     player.ready_at = start[0]
     push(start[0], "ready", player)
     for e, first in zip(enemies, start[1]):
@@ -658,7 +679,9 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
                 out["actions"] += 1
                 ent.cur_act = act
                 ent.aim_opening = choice == "aim" and bool(state.get("opening"))
+                ent.strike_ambush = choice == "strike" and bool(state.get("ambush"))
                 state["opening"] = False
+                state["ambush"] = False
                 ent.paid = (0, 0)
                 if choice == "potion":
                     potions -= 1
@@ -735,6 +758,8 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
         return
     if act.id == "heal":
         amount = HEAL_AMOUNT if HEAL_AMOUNT is not None else ent.skill_int("minor_heal", "heal")
+        if SELF_HEAL_HALF:
+            amount = (amount + 1) // 2   # on the caster: half, rounded half up, before Divine Knowledge and Healing Power
         ent.hp = min(ent.max_hp, ent.hp + max(1, rnd(amount * (100 + ent.arch.healing_pct + stat(ent.attrs, "healing_power")) / 100.0)))
         return
     if act.id == "bless":
@@ -767,6 +792,9 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
             kw = dict(to_hit_bonus=ent.skill_int("aimed_shot", "tohit"), factor=rank_value("aimed_shot", "opener" if ent.aim_opening else "factor", rk))
         if act.id == "strike":
             kw = dict(to_hit_bonus=ent.skill_int("precision_strike", "tohit"), crit=ent.skill_int("precision_strike", "crit"))
+            if ent.strike_ambush:
+                kw["factor"] = rank_value("precision_strike", "ambush", ent.rank("precision_strike"))
+                ent.strike_ambush = False
         if act.id == "bash":
             kw = dict(factor=rank_value("shield_bash", "factor", ent.rank("shield_bash")))
         dmg, _ = do_hit(ent, target, t, **kw)
@@ -813,12 +841,15 @@ def room_stats(arch, creatures, level, weapon, extra_hp=0, runs=1500, potions=0,
     return wins / runs, lost / n, ms_total / n / 1000.0, actions_total / n
 
 
-def boss_stats(arch, level, weapon, potions, extra_hp=0, runs=1500, shield=None, opens=False):
+def boss_stats(arch, level, weapon, potions, extra_hp=0, runs=1500, shield=None, opens=False, sneak=False):
     """The perfect player against the Overseer alone. The perfect model's player acts at once and the Overseer waits its Reaction Time x 2 s (the model's
-    own assumption; the real Overseer is aggressive and starts the fight). opens: the player really chose the fight (hypothetical)."""
+    own assumption; the real Overseer is aggressive and starts the fight). opens: the player really chose the fight (hypothetical). sneak: a Scout who
+    sneaked into the chamber: the Overseer is a Boss and always notices, so the fight is the same, but the room has cost the Scout its Endurance."""
     kills = survive = lost = ms = actions = 0
     for _ in range(runs):
         p = make_player(arch, level, weapon, shield, extra_hp)
+        if sneak:
+            p.stamina -= p.skill_int("sneak", "room")
         r = fight(p, [make_monster("Goblin Overseer")], potions, boss=True, opens=opens)
         if r["lost_at_kill"] is not None:
             kills += 1
@@ -1080,7 +1111,19 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
     left = potions if pack_at == "entrance" else 99
     used = {}
     t = {"fight": 0.0, "walk": 0.0, "rest": 0.0}
-    res = {"outcome": "kill", "room": "Overseer Chamber", "used": used, "door": None, "t": t, "refills": 0, "opened": 0, "fights": 0}
+    res = {"outcome": "kill", "room": "Overseer Chamber", "used": used, "door": None, "t": t, "refills": 0, "opened": 0, "fights": 0,
+           "sneak_spent": 0, "sneak_rooms": 0, "sneak_opened": 0, "sneak_seen": 0}
+    sneak_on = SNEAKING and arch_name in ("scout", ARCHER)   # sneaks into every room it can afford (docs/specs/sneak.md)
+
+    def sneak_pay():
+        """The room's Endurance, if the Scout has it (else he goes in openly)."""
+        cost = p.skill_int("sneak", "room")
+        if p.stamina + 1e-9 < cost:
+            return False
+        p.stamina -= cost
+        res["sneak_spent"] += cost
+        res["sneak_rooms"] += 1
+        return True
 
     def heal_left():
         """Minor Heal's wait still running when the next fight begins: what was left, less the walking and resting since."""
@@ -1095,6 +1138,8 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
     for room, creatures in APPROACH:
         moves += 1
         if not creatures:
+            if sneak_on:
+                sneak_pay()
             continue
         boss = room == "Overseer Chamber"
         if room == "Overseer Hall" and pack_at == "hall":
@@ -1163,6 +1208,17 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
         enemies = [make_monster(c) for c in creatures]
         policy = start = None
         opens = False
+        hidden = False   # sneaking, and no creature of the room has noticed: the Scout opens the fight
+        if sneak_on and sneak_pay():
+            grace = attrs_at(p.arch, level)[ATTR.index("grace")]
+            adjust = p.skill_int("sneak", "notice")
+            seen = False
+            for c in creatures:
+                if c in SNEAK_BOSS or rng.random() * 100 < notice_chance(grace, level, KINDS[c].level, c in SNEAK_ALERT, adjust):
+                    seen = True
+                    break
+            hidden = not seen
+            res["sneak_seen"] += seen
         if model is not None:
             policy = HumanPolicy(model, rng)
             typed = policy.delay()
@@ -1174,9 +1230,16 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
                 opens = True   # the old game: the player typed before any creature noticed him, and starts the fight
         else:
             opens = force_open
+        if hidden:
+            # The Scout opens (docs/specs/sneak.md): he acts when his command arrives; the target, surprised, waits twice its Reaction Time x 2 s (and a
+            # bow's 2 s more); the other creatures wake and wait their own. Where one creature of a room noticed him, the whole room fights at once.
+            at = typed if model is not None else 0
+            ranged = RANGED_OPENING_MS if p.archer else 0
+            start = (at, [at + 2 * round(enemies[0].reaction * UNIT_MS) + ranged] + [at + round(e.reaction * UNIT_MS) for e in enemies[1:]])
+            res["sneak_opened"] += 1
         res["fights"] += 1
-        res["opened"] += opens
-        r = fight(p, enemies, left, boss=boss, human=policy, start=start, stop_at_boss=True, opens=opens, heal_carry=heal_left())
+        res["opened"] += opens or hidden
+        r = fight(p, enemies, left, boss=boss, human=policy, start=start, stop_at_boss=True, opens=opens, heal_carry=heal_left(), ambush=hidden)
         fought(r)
         p.regen(r["ms"])
         t["fight"] += r["ms"] / 1000.0
@@ -1208,9 +1271,12 @@ def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting",
     tsum = {"fight": 0.0, "walk": 0.0, "rest": 0.0}   # seconds, over the runs that killed the Overseer
     allpots = refills = 0.0
     opened = fights = 0
+    sneak = dict(spent=0.0, rooms=0.0, opened=0.0, seen=0.0)
     for _ in range(runs):
         r = run_approach(arch_name, level, potions, model, rng, gear, aggro, pack_at, force_open)
         opened += r["opened"]
+        for k in sneak:
+            sneak[k] += r["sneak_" + k]
         fights += r["fights"]
         u = r["used"]
         allpots += sum(u.values())
@@ -1236,7 +1302,7 @@ def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting",
                 hall=hall / runs, chamber=chamber / runs, hall3=hall3 / runs, hall_hist=hall_hist, ends={k: v / runs for k, v in ends.items()},
                 door=door / reached if reached else 0.0, runs=runs, potions=allpots / runs, refills=refills / runs,
                 minutes={k: v / kills / 60.0 if kills else 0.0 for k, v in tsum.items()},
-                opened=opened / runs, fights=fights / runs)
+                opened=opened / runs, fights=fights / runs, sneak={k: v / runs for k, v in sneak.items()})
 
 
 REQUIRED_LEVEL = {"Tavern Cellar": 1, "Collapsed Passage": 1, "Storage Chamber": 2, "Guard Post": 2,
@@ -2618,11 +2684,11 @@ def stage_weapon(arch, level):
 # ---- skill ranks (docs/specs/skill-ranks.md; python3 tests/balance_sim.py ranks [runs] [part ...])
 
 @contextmanager
-def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore_cap=None):
+def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore_cap=None, selfhalf=None):
     """Temporarily change how ranks are held (RANK_MODE), Double Strike on or off, a skill's rank table (skill -> dict(base=..., rows=...)
     merged over the current one), the Minor Heal's Preparation and the heal lockout (option c). Nothing here is applied to the game."""
-    global RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, RANK_IGNORE_CAP
-    saved_cap = RANK_IGNORE_CAP
+    global RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, RANK_IGNORE_CAP, SELF_HEAL_HALF
+    saved_cap, saved_half = RANK_IGNORE_CAP, SELF_HEAL_HALF
     saved_tables = {k: dict(base=dict(v["base"]), rows={r: dict(x) for r, x in v["rows"].items()}, **({"max": v["max"]} if "max" in v else {}))
                     for k, v in SKILL_RANKS.items()}
     saved = (RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, saved_tables, dict(SKILL_PREP))
@@ -2637,6 +2703,8 @@ def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore
                 SKILL_RANKS[sk]["rows"] = {r: dict(x) for r, x in t["rows"].items()}
         if ignore_cap is not None:
             RANK_IGNORE_CAP = ignore_cap
+        if selfhalf is not None:
+            SELF_HEAL_HALF = selfhalf
         if prep is not None:
             SKILL_PREP["minor_heal"] = prep
         if lockout_s is not None:
@@ -2644,7 +2712,7 @@ def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore
         yield
     finally:
         RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS = saved[0], saved[1], saved[2]
-        RANK_IGNORE_CAP = saved_cap
+        RANK_IGNORE_CAP, SELF_HEAL_HALF = saved_cap, saved_half
         SKILL_RANKS.clear()
         SKILL_RANKS.update(saved[3])
         SKILL_PREP.clear()
@@ -3022,12 +3090,128 @@ def ranks_healcost(runs=3000):
         dump_json(dict(kind="healcost", label=label, rank1=out["none"], rank2=out["cap"]))
 
 
+def ranks_selfheal(runs=3000):
+    """The owner's decision of 22 November 2026: Minor Heal gives the caster half (10 / 19 / 30). The standard test for the five callings and the archer
+    Scout at rank I and with everyone at rank II (the shipped game), then the self-heal that would leave the Priest within 5 points of the mean of the
+    five callings (rank I value s; II and III at the spec's ratio 38/20 and 60/20, rounded). Nothing here is applied to the game."""
+    rows = (("rank I (nobody has bought a rank)", "none"), ("everyone holds rank II (bought at level 5)", "cap"))
+    aim_head("SELFHEAL. Standard test, Minor Heal on the caster at half (10 / 19 / 30), 15 s wait: level 5, starting gear, 4 potions, points placed, middle human, RestFactor 5, Overseer from the cellar entrance", runs)
+    for label, mode in rows:
+        with ranked(mode=mode):
+            five = l5_kills(runs=runs)
+            archer = l5_kills([ARCHER], runs)[ARCHER]
+        aim_line(label, five, archer)
+    with ranked(mode="none", selfhalf=False):
+        five = l5_kills(runs=runs)
+    aim_line("for comparison: the self-heal at full (20 / 38 / 60), rank I", five, 0)
+    print()
+    print("Self-heal that would be level (Priest within 5 points of the mean of the five callings, 15 s wait, Focus 25 / 32 / 40):")
+    others = {}
+    for mode in ("none", "cap"):
+        with ranked(mode=mode):
+            others[mode] = l5_kills([c for c in ARCHS if c != "priest"], runs)
+    for s_value in (0, 1, 2, 3, 4, 5, 6, 7, 8, 10):
+        line = f"  rank I self-heal {s_value:>2}"
+        for mode in ("none", "cap"):
+            r2, r3 = round(s_value * 38 / 20 + 1e-9), round(s_value * 60 / 20 + 1e-9)
+            with ranked(mode=mode, selfhalf=False, table=heal_table(s_value, rows={2: dict(heal=r2), 3: dict(heal=r3)}), lockout_s=HEAL_WAIT_S):
+                pr = l5_kills(["priest"], runs)["priest"]
+            mean = (sum(others[mode].values()) + pr) / 5
+            line += f"   [{'rank I' if mode == 'none' else 'rank II'}: II={r2} priest {pr:5.1f} ({pr - mean:+5.1f})]"
+        print(line, flush=True)
+        dump_json(dict(kind="selfheal", value=s_value, line=line))
+
+
+@contextmanager
+def sneaking(on=True):
+    """Temporarily make the Scout and the archer sneak (SNEAKING). Nothing here is applied to the game."""
+    global SNEAKING
+    saved = SNEAKING
+    SNEAKING = on
+    try:
+        yield
+    finally:
+        SNEAKING = saved
+
+
+def strike_table(r1, r2, r3, r4=None):
+    """Precision Strike's table with these ambush factors (the other numbers as shipped)."""
+    return {"precision_strike": dict(base=dict(ambush=r1), rows={2: dict(tohit=3, crit=20, ambush=r2), 3: dict(tohit=4, crit=25, ambush=r3),
+                                                                  4: dict(tohit=5, crit=30, ambush=r4 if r4 is not None else r3 + 0.25)})}
+
+
+def sneak_table(room1, room2, room3, notice2=-10, notice3=-20):
+    return {"sneak": dict(base=dict(room=room1, notice=0), rows={2: dict(room=room2, notice=notice2), 3: dict(room=room3, notice=notice3)})}
+
+
+def sneak_sample(calling, runs, mode):
+    """The standard test for one Scout (melee `scout` or the ARCHER) sneaking: kill%, fights opened per run, Endurance spent, rooms sneaked, rooms where a creature noticed."""
+    m = rest_human("mid", 5)
+    with ranked(mode=mode), sneaking():
+        r = approach_stats(calling, 5, 4, m, runs, "starting", True, 1)
+    return r
+
+
+def ranks_sneak(runs=3000):
+    """Sneaking measured (docs/specs/sneak.md): the standard test for the five callings and the archer, the Scouts sneaking into every room they can afford,
+    at rank I and with everyone at rank II; fights opened and Endurance spent; the perfect player against the Overseer alone; then what would bring each Scout
+    within 5 points of the mean of the five callings. Nothing here is applied to the game."""
+    aim_head("SNEAK. Standard test, the Scouts sneak (melee Scout: Precision Strike from hiding; archer: Aimed Shot from hiding): level 5, starting gear, 4 potions, points placed, middle human, RestFactor 5, Overseer from the cellar entrance", runs)
+    seen = {}
+    for label, mode in (("rank I (nobody has bought a rank)", "none"), ("everyone holds rank II (bought at level 5)", "cap")):
+        with ranked(mode=mode):
+            plain5 = l5_kills(runs=runs)
+            plain_archer = l5_kills([ARCHER], runs)[ARCHER]
+        aim_line(label + ": nobody sneaks (before this change)", plain5, plain_archer)
+        with ranked(mode=mode), sneaking():
+            five = l5_kills(runs=runs)
+            archer = l5_kills([ARCHER], runs)[ARCHER]
+        aim_line(label + ": the Scouts sneak", five, archer)
+        seen[mode] = (five, archer)
+    print()
+    print("Fights opened and Endurance spent on sneaking, per run from the cellar entrance (middle human, the whole way, killed or not):")
+    for label, mode in (("rank I", "none"), ("rank II", "cap")):
+        for name, calling in (("melee Scout", "scout"), ("archer", ARCHER)):
+            r = sneak_sample(calling, runs, mode)
+            sn = r["sneak"]
+            print(f"  {label:<8}{name:<12} kill {r['kill'] * 100:5.1f}%   fights {r['fights']:4.2f}   opened by the Scout {sn['opened']:4.2f}   rooms where a creature noticed {sn['seen']:4.2f}"
+                  f"   Endurance spent on rooms {sn['spent']:5.1f}", flush=True)
+            dump_json(dict(kind="sneak", label=f"{label} {name}", kill=r["kill"], fights=r["fights"], **sn))
+    print()
+    print("The perfect player against the Overseer alone (level 5, starting gear, 4 potions; the Overseer is a Boss: it always notices, so he fights as ever but has paid for the room):")
+    for label, mode in (("rank I", "none"), ("rank II", "cap")):
+        for name, calling, weapon in (("melee Scout", "scout", "fine longsword"), ("archer", ARCHER, "hunting bow")):
+            with ranked(mode=mode):
+                plain = boss_stats(calling, 5, weapon, 4, runs=runs)
+                paid = boss_stats(calling, 5, weapon, 4, runs=runs, sneak=True)
+            print(f"  {label:<8}{name:<12} kill {plain[0] * 100:5.1f}% -> {paid[0] * 100:5.1f}% sneaking in (the room cost {5 if mode == 'none' else 4} Endurance; opened 0 fights, the Overseer notices)", flush=True)
+    print()
+    print("What would bring each Scout within 5 points of the mean of the five callings (a lever tried alone, the rest as shipped):")
+    for label, mode in (("rank I", "none"), ("rank II", "cap")):
+        with ranked(mode=mode):
+            others = l5_kills([c for c in ARCHS if c != "scout"], runs)
+        five, archer = seen[mode]
+        mean = sum(five.values()) / 5
+        print(f"  {label}: mean of the five {mean:.1f}; melee Scout {five['scout']:.1f} ({five['scout'] - mean:+.1f}); archer {archer:.1f} ({archer - mean:+.1f})", flush=True)
+        for amb in (1.5, 2.0, 2.5, 3.0, 3.5, 4.0):
+            with ranked(mode=mode, table=strike_table(amb, amb + 0.25, amb + 0.5)), sneaking():
+                sc = l5_kills(["scout"], runs)["scout"]
+            m5 = (sum(others.values()) + sc) / 5
+            print(f"    Precision Strike ambush factor {amb:.2f} / {amb + .25:.2f} / {amb + .5:.2f}: melee Scout {sc:5.1f} ({sc - m5:+5.1f} from the mean)", flush=True)
+        for rooms in ((5, 4, 3), (10, 8, 6), (15, 12, 9), (20, 16, 12)):
+            with ranked(mode=mode, table=sneak_table(*rooms)), sneaking():
+                ar = l5_kills([ARCHER], runs)[ARCHER]
+                sc = l5_kills(["scout"], runs)["scout"]
+            m5a = (sum(others.values()) + sc) / 5
+            print(f"    Endurance a room {rooms[0]} / {rooms[1]} / {rooms[2]}: melee Scout {sc:5.1f} ({sc - m5a:+5.1f}), archer {ar:5.1f} ({ar - m5a:+5.1f})", flush=True)
+
+
 def ranks_report(runs=3000, parts=()):
     parts = parts or ("level5", "heal", "double", "gap", "bolt", "focus", "climb")
     for part in parts:
         {"level5": lambda: ranks_level5(runs), "heal": lambda: ranks_heal(runs), "double": lambda: ranks_double(runs),
          "gap": lambda: ranks_gap(max(100, runs // 8)), "bolt": ranks_bolt, "focus": lambda: ranks_focus(max(200, runs // 3)),
-         "climb": lambda: ranks_climb(max(100, runs // 10)), "aim": lambda: ranks_aim(runs), "wait": lambda: ranks_wait(runs), "aimfix": lambda: ranks_aimfix(runs), "healcost": lambda: ranks_healcost(runs)}[part]()
+         "climb": lambda: ranks_climb(max(100, runs // 10)), "aim": lambda: ranks_aim(runs), "wait": lambda: ranks_wait(runs), "aimfix": lambda: ranks_aimfix(runs), "healcost": lambda: ranks_healcost(runs), "selfheal": lambda: ranks_selfheal(runs), "sneak": lambda: ranks_sneak(runs)}[part]()
 
 
 def main():

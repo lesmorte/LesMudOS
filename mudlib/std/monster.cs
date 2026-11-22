@@ -11,6 +11,10 @@ public class Monster : Npc
 {
     /// <summary>Attacks any player who enters, as soon as the arrival is complete: the fight begins then (the player cannot walk on, only flee), and the creature's first action waits its Reaction Time.</summary>
     protected bool Aggressive;
+    /// <summary>Always notices a sneaking Scout: it never rolls (docs/specs/sneak.md). Set on the bosses.</summary>
+    protected bool Boss;
+    /// <summary>Keeps watch: +30 points to its chance to notice a sneaking Scout. Set on guards and sentries.</summary>
+    protected bool Alert;
     /// <summary>Joins a fight when another monster in the room is attacked.</summary>
     protected bool Assist = true;
     protected int XpValue;
@@ -39,7 +43,25 @@ public class Monster : Npc
     protected override void Noticed(ObjectRef other)
     {
         base.Noticed(other);
-        if (Aggressive && Interactive(other)) CallOut(() => Ambush(other), 0); // after the arrival has finished, so the room is described first
+        if (!Aggressive || !Interactive(other)) return;
+        // A sneaking character is asked once, at the entry: the creature may not notice them (0). -1: no standing to ask, it acts as always.
+        if (other.Call<bool>("QuerySneaking") && other.Call<int>("SneakNotice", Self) == 0) return;
+        CallOut(() => Ambush(other), 0); // after the arrival has finished, so the room is described first
+    }
+
+    public bool QueryBoss() => Boss;
+    public bool QueryAlert() => Alert;
+    public bool QueryAggressive() => Aggressive;
+
+    /// <summary>
+    /// A character has been noticed (or has made a noise) and asks this creature to attack them. Only the character's own object may ask,
+    /// of an aggressive creature in the same room; no other object can set a creature on anyone.
+    /// </summary>
+    public void Engage()
+    {
+        var target = PreviousObject();
+        if (target == null || !Aggressive || Dead || !Interactive(target) || !target.IsAlive || Environment(target) != Environment()) return;
+        CallOut(() => Ambush(target), 0);
     }
 
     private void Ambush(ObjectRef target)

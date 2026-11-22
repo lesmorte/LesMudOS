@@ -40,6 +40,7 @@ public class CmForestPanther : Monster
         Dodge = 15;
         XpValue = 1550;
         Aggressive = true;
+        Boss = true;
         BaseReaction = 2;
         AddCombatAction("claw", "Claw", preparation: 0, recovery: 1);
         AddCombatAction("pounce", "Pouncing Leap", preparation: 0.5, recovery: 1, windUp: "gathers itself on the ledge", damageMultiplier: 2, strike: "launches itself from the ledge in a pouncing leap!");

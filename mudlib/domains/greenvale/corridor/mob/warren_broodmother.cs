@@ -42,6 +42,7 @@ public class CmWarrenBroodmother : Monster
         Armor = 3;
         XpValue = 1550;
         Aggressive = true;
+        Boss = true;
         DeathMessage = "The Warren Broodmother shudders, curls her legs inward, and goes still.";
         BaseReaction = 4;
         AddCombatAction("fang", "Venom Fang", preparation: 0, recovery: 1);
