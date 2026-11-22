@@ -428,10 +428,12 @@ def run(work, mudlib, logpath, driver_box):
     truth("a client that never answers is sent no GMCP message either", hank.offers == 1 and hank.frames == [] and b"\xff\xfa" not in hank.stream)
 
     # ---- the same play, with and without GMCP, gives the same text ----
-    script = ["look", "tp /domains/gmcptest/hub", "north", "south", "lane", "out", "east", "open door", "close door", "say hello there", "rest", "stand", "tp " + SQUARE]
+    # (in the test rooms only: the village's people chatter at random, and the two texts would differ by that)
+    script = ["look", "north", "south", "lane", "out", "east", "open door", "close door", "say hello there", "rest", "stand", "look"]
     texts = {}
     for name, answer in (("Gina", "do"), ("Gwen", "dont")):
         c = login(name, answer=answer)
+        c.command("tp /domains/gmcptest/hub")
         c.pump(0.5)
         start = len(c.clean)
         for line in script:
@@ -641,6 +643,7 @@ def run(work, mudlib, logpath, driver_box):
     bob.command("shout hello vale")
     shout = alice.wait("Comm.Channel.Text", lambda v: v["channel"] == "shout", m)
     truth("a shout arrives with the channel shout", shout == {"channel": "shout", "talker": "Bob", "text": "hello vale"}, shout)
+    example("Comm.Channel.Text (shout)", shout)
     m = mina.mark()
     warden.command("wizard a line for the wizards")
     chan = mina.wait("Comm.Channel.Text", lambda v: v["channel"] == "wizard", m)
