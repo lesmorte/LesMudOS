@@ -62,6 +62,8 @@ BASH_COST, BASH_REC, BASH_FACTOR = 15, 1.5, 0.75
 STRIKE_COST, STRIKE_PREP, STRIKE_REC, STRIKE_HIT, STRIKE_CRIT = 25, 0.5, 1.0, 2, 15
 BOLT_COST, BOLT_PREP, BOLT_REC, BOLT_DMG = 20, 0.5, 1.0, (6, 9)
 HEAL_COST, HEAL_PREP, HEAL_REC = 25, 0.5, 1.0
+AIM_PREP, AIM_REC = 1.0, 1.0   # Aimed Shot (mudlib/skills/aimed_shot.cs)
+RANGED_OPENING_MS = 2000       # std/living.cs RangedOpening: the target's first action is delayed this much when a bow starts the fight
 HEAL_AMOUNT = None   # None: the Minor Heal of the rank table (SKILL_RANKS); a number overrides every rank (the old recommendations' tweaks)
 DOUBLE_STRIKE = True # False: the Adventurer as before ranks (no Double Strike), for comparison tables only
 BLESS_COST = 25
@@ -72,28 +74,37 @@ DOUBLE_PREP, DOUBLE_REC = 0.5, 1.0
 # the rank I value for an effect, COST_STEP for a cost, nothing for a fixed key). "base" is rank I. Costs: "endurance" / "focus".
 RANK_LEVEL_STEP = 5
 EFFECT_STEP, COST_STEP = 0.30, 0.15
-RANK_FIXED = {"hits", "range", "seconds", "stagger"}
+RANK_FIXED = {"hits", "range", "seconds", "stagger", "wait"}
 SKILL_RANKS = {
     "arcane_bolt": dict(base=dict(focus=20, min=6, max=9), rows={2: dict(min=8, max=12, focus=23), 3: dict(min=10, max=14, focus=26)}),
-    # PROVISIONAL (owner's choice pending): option (b) of `ranks heal`, 7 at rank I and the default step; the spec's 20 / 38 / 60 is option (a).
-    "minor_heal": dict(base=dict(focus=25, heal=7), rows={2: dict(focus=32), 3: dict(focus=40)}),
+    # The owner's table (docs/specs/skill-ranks.md, "Owner's decisions after the build"): 20 / 38 / 60 for 25 / 32 / 40 Focus, then the default step;
+    # the wait between two casts is HEAL_WAIT_S below.
+    "minor_heal": dict(base=dict(focus=25, heal=20, wait=15), rows={2: dict(heal=38, focus=32), 3: dict(heal=60, focus=40)}),
     "blessing": dict(base=dict(focus=25, hit=1, armor=1, seconds=60), rows={2: dict(hit=2, armor=2), 3: dict(hit=3, armor=3), 4: dict(hit=4, armor=4)}),
     "shield_bash": dict(base=dict(endurance=15, factor=0.75, stagger=2.0), rows={2: dict(factor=0.98), 3: dict(factor=1.2)}),
     "precision_strike": dict(base=dict(endurance=25, tohit=2, crit=15), rows={2: dict(tohit=3, crit=20), 3: dict(tohit=4, crit=25), 4: dict(tohit=5, crit=30)}),
-    "double_strike": dict(base=dict(endurance=20, hits=2, factor=0.6), rows={2: dict(factor=0.75), 3: dict(hits=3, factor=0.6), 4: dict(hits=4, factor=0.55)}),
+    "double_strike": dict(base=dict(endurance=35, hits=2, factor=0.6), rows={2: dict(factor=0.75), 3: dict(hits=3, factor=0.6), 4: dict(hits=4, factor=0.55)}),
     "tracking": dict(base=dict(endurance=5, range=1), rows={2: dict(range=2)}, max=2),
+    # Aimed Shot (docs/specs/hollow-expansion.md section 1): x1.75 / 2.0 / 2.25 (IV 2.5, V 2.75 by +0.25) and, as the shot that starts the fight,
+    # x2.5 / 3.0 / 3.5 (IV 4.0, V 4.5 by +0.5). Costs by the default step. The to-hit bonus is +3 at every rank. Rank VI is not offered.
+    "aimed_shot": dict(base=dict(endurance=30, tohit=3, factor=1.75, opener=2.5),
+                       rows={2: dict(factor=2.0, opener=3.0), 3: dict(factor=2.25, opener=3.5), 4: dict(factor=2.5, opener=4.0), 5: dict(factor=2.75, opener=4.5)},
+                       max=5, fixed={"tohit"}),
 }
 # The preparation of each ranked skill (never changed by a rank; option (c) of the Minor Heal table tries a longer one).
 SKILL_PREP = {"minor_heal": 0.5}
 # Which act of the simulator is which skill, and the skill each calling uses in a fight.
-SKILL_OF = {"bash": "shield_bash", "strike": "precision_strike", "bolt": "arcane_bolt", "heal": "minor_heal", "bless": "blessing", "double": "double_strike"}
-CALLING_SKILLS = {"warrior": ("shield_bash",), "scout": ("precision_strike", "tracking"), "priest": ("minor_heal", "blessing"),
+SKILL_OF = {"bash": "shield_bash", "strike": "precision_strike", "bolt": "arcane_bolt", "heal": "minor_heal", "bless": "blessing", "double": "double_strike",
+            "aim": "aimed_shot"}
+CALLING_SKILLS = {"warrior": ("shield_bash",), "scout": ("precision_strike", "tracking", "aimed_shot"), "priest": ("minor_heal", "blessing"),
                   "mage": ("arcane_bolt",), "adventurer": ("double_strike",)}
 # How ranks are held: "cap" = every skill at the highest rank the level allows (the character buys a rank when level and gold allow; at levels
 # 5 and 10 the gold is in hand, see `ranks`), "none" = rank I in everything (nobody buys), or a number = that rank where the level allows it.
 RANK_MODE = "cap"
-# The heal of option (c) of the Minor Heal table: seconds after a heal before the next may begin (0 = none, the game).
-HEAL_LOCKOUT_MS = 0
+RANK_IGNORE_CAP = False   # True: a rank is held whatever the level (rank II at level 4: the `ranks aim` table of the Overseer at level 4 asks for it)
+# Minor Heal's wait (mudlib/skills/minor_heal.cs HealWait): seconds after a heal begins before the same caster may begin another. The game: 15.
+HEAL_WAIT_S = 15
+HEAL_LOCKOUT_MS = HEAL_WAIT_S * 1000
 
 
 def rank_cap(level):
@@ -106,7 +117,7 @@ def rank_value(skill, key, rank):
     base = t["base"].get(key, 0)
     if key == "crit" and base < 0:
         return base
-    step = 0 if key in RANK_FIXED else COST_STEP if key in ("endurance", "focus") else EFFECT_STEP
+    step = 0 if key in RANK_FIXED or key in t.get("fixed", ()) else COST_STEP if key in ("endurance", "focus") else EFFECT_STEP
     value = base
     for r in range(2, rank + 1):
         row = t["rows"].get(r, {})
@@ -123,7 +134,7 @@ def default_ranks(arch_name, level, mode=None):
     out = {}
     for sk in CALLING_SKILLS.get(arch_name, ()):
         top = SKILL_RANKS[sk].get("max", 99)
-        r = 1 if mode == "none" else rank_cap(level) if mode == "cap" else min(int(mode), rank_cap(level))
+        r = 1 if mode == "none" else rank_cap(level) if mode == "cap" else int(mode) if RANK_IGNORE_CAP else min(int(mode), rank_cap(level))
         out[sk] = max(1, min(top, r))
     return out
 
@@ -196,6 +207,7 @@ WEAPONS = {
     "novice mace": ((9, 13), 0, 0.5, 1.0),
     "apprentice staff": ((7, 11), 1, 0.5, 1.0),
     "hunting bow": ((8, 12), 1, 0.5, 1.0),
+    "yew longbow": ((11, 16), 1, 0.5, 1.0),   # sold at the Strung Yew, 60 gold (the best bow there is)
     "iron dagger": ((6, 9), 1, 0.0, 0.5),
     "enchanted dagger": ((7, 11), 2, 0.0, 0.5),
     "training spear": ((8, 12), 1, 0.5, 1.0),
@@ -206,6 +218,7 @@ WEAPONS = {
 }
 # armor pieces: (armor value, reaction modifier)
 SHIELD, HELM, VEST = (1, 0.5), (1, 0.0), (3, 0.0)
+BOWS = ("hunting bow", "yew longbow")
 
 
 @dataclass(frozen=True)
@@ -348,7 +361,11 @@ class Fighter:
         self.armor_extra = 0
         self.ranks = {}
         self.bless_bonus = (1, 1)   # to hit and armor of the Blessing on this fighter
-        self.heal_ready = 0         # option (c): the next heal may not begin before this
+        self.heal_ready = 0         # Minor Heal's wait: the next heal may not begin before this (ms in the current fight)
+        self.archer = False         # the archer Scout: opens with Aimed Shot, then aims whenever it can pay
+        self.weapon = ""
+        self.cur_act = None         # the action in progress (a shot being aimed is spoiled by a blow)
+        self.aim_opening = False    # the Aimed Shot in progress is the action that starts the fight
 
     def rank(self, skill):
         return self.ranks.get(skill, 1)
@@ -432,7 +449,13 @@ def make_monster(name):
     return Fighter(k.level, k.hp, k.dmg, k.to_hit, k.armor, k.reaction, k.acts, k)
 
 
+ARCHER = "archer"   # the archer Scout: a name for run_approach, boss_stats and make_player (a Scout with a bow that opens with Aimed Shot), not a calling
+
+
 def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True, armor_extra=0, ranks=None):
+    archer = arch == ARCHER
+    if archer:
+        arch = "scout"
     """arch: an Arch or its name. weapon: a key of WEAPONS. shield: None means the archetype's own habit.
     armor_extra: armor from worn pieces other than the shield (vest, helm)."""
     if isinstance(arch, str):
@@ -446,6 +469,8 @@ def make_player(arch, level, weapon, shield=None, extra_hp=0, full=True, armor_e
     p = Fighter(level, player_max_hp(arch, level, extra_hp), dmg, to_hit, armor, reaction, (Act("attack", 0, rec),),
                 arch=arch, shield=has_shield, rate=arch.rate)
     p.extra_hp = extra_hp
+    p.archer = archer
+    p.weapon = weapon
     p.ranks = dict(ranks) if ranks is not None else default_ranks(arch.name, level)
     set_level_resources(p, level)
     p.stamina, p.mana = float(p.max_stamina), float(p.max_mana)
@@ -463,6 +488,7 @@ def player_acts(p):
     a["heal"] = Act("heal", SKILL_PREP.get("minor_heal", HEAL_PREP), HEAL_REC)
     a["bless"] = Act("bless", 0.5, 1.0)
     a["double"] = Act("double", DOUBLE_PREP, DOUBLE_REC)
+    a["aim"] = Act("aim", AIM_PREP, AIM_REC)
     return a
 
 
@@ -535,7 +561,9 @@ def player_choice(p, t, living, potions, hard, state):
             return "bash"
         if p.stamina >= 60:
             return "bash"
-    if arch.name == "scout" and can_pay(p, "strike"):
+    if arch.name == "scout" and p.archer and can_pay(p, "aim"):
+        return "aim"
+    if arch.name == "scout" and not p.archer and can_pay(p, "strike"):
         return "strike"
     if arch.name == "mage" and can_pay(p, "bolt"):
         return "bolt"
@@ -544,13 +572,16 @@ def player_choice(p, t, living, potions, hard, state):
     return "attack"
 
 
-def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human=None, start=None, stop_at_boss=False):
+def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human=None, start=None, stop_at_boss=False, opens=False, heal_carry=0):
     """Fight until one side is dead. Mutates player and enemies. Returns a dict: alive, ms, actions, potions,
     boss_ms and lost_at_kill.
     The perfect player (human None) decides at every Ready Time. A HumanPolicy (see "the human player" below) types its
     commands with a delay, which arrive as events of their own, and may flee (out["fled"]). start = (the player's first
     Ready Time, [each enemy's first Ready Time]) in ms, or None for the perfect model's "the player starts at once, a creature
-    waits its Reaction Time x 2 s". stop_at_boss ends the fight the moment enemies[0] dies (what the human approach asks)."""
+    waits its Reaction Time x 2 s". stop_at_boss ends the fight the moment enemies[0] dies (what the human approach asks).
+    opens: the player chose the fight (a creature that is not aggressive, or hypothetically): the player's first action is the one that starts it
+    (Aimed Shot x opener), and a bow in the hands delays each creature's first action a further RANGED_OPENING_MS. Never set where the creatures are
+    aggressive and engage on arrival (every creature of the cellars): they start those fights. heal_carry: ms of Minor Heal's wait still to run."""
     heap = []
     seq = 0
     if hard is None:
@@ -567,8 +598,13 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
     acts = player_acts(player)
     player.last_t = 0
     player.ready_at = 0
+    player.heal_ready = heal_carry
+    player.cur_act = None
     if start is None:
         start = (0, [round(e.reaction * UNIT_MS) for e in enemies])
+    if opens and player.weapon in BOWS:
+        start = (start[0], [x + RANGED_OPENING_MS for x in start[1]])
+    state["opening"] = opens
     player.ready_at = start[0]
     push(start[0], "ready", player)
     for e, first in zip(enemies, start[1]):
@@ -620,6 +656,9 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
                 act = acts[choice]
                 target = living[0]
                 out["actions"] += 1
+                ent.cur_act = act
+                ent.aim_opening = choice == "aim" and bool(state.get("opening"))
+                state["opening"] = False
                 ent.paid = (0, 0)
                 if choice == "potion":
                     potions -= 1
@@ -723,6 +762,9 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
         return
     if ent.is_player:
         kw = {}
+        if act.id == "aim":
+            rk = ent.rank("aimed_shot")
+            kw = dict(to_hit_bonus=ent.skill_int("aimed_shot", "tohit"), factor=rank_value("aimed_shot", "opener" if ent.aim_opening else "factor", rk))
         if act.id == "strike":
             kw = dict(to_hit_bonus=ent.skill_int("precision_strike", "tohit"), crit=ent.skill_int("precision_strike", "crit"))
         if act.id == "bash":
@@ -740,6 +782,20 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
     dmg, _ = do_hit(ent, target, t, mult=act.mult, bonus=bonus)
     if dmg > 0:
         target.hp -= dmg
+        spoil(target, t, push)
+
+
+def spoil(e, now, push):
+    """Being hit while a shot is being aimed spoils it (Living.SpoilPreparation): the action is cancelled, nothing of its cost comes back, half
+    its Recovery is still paid."""
+    if e.hp <= 0 or not e.is_player or e.resolve_at is None or e.resolve_at <= now or e.cur_act is None or e.cur_act.id != "aim":
+        return
+    e.gen += 1
+    half = (e.ready_at - e.resolve_at) // 2
+    e.resolve_at = None
+    e.ready_at = now + half
+    e.cur_act = None
+    push(e.ready_at, "ready", e)
 
 
 def room_stats(arch, creatures, level, weapon, extra_hp=0, runs=1500, potions=0, shield=None):
@@ -757,11 +813,13 @@ def room_stats(arch, creatures, level, weapon, extra_hp=0, runs=1500, potions=0,
     return wins / runs, lost / n, ms_total / n / 1000.0, actions_total / n
 
 
-def boss_stats(arch, level, weapon, potions, extra_hp=0, runs=1500, shield=None):
+def boss_stats(arch, level, weapon, potions, extra_hp=0, runs=1500, shield=None, opens=False):
+    """The perfect player against the Overseer alone. The perfect model's player acts at once and the Overseer waits its Reaction Time x 2 s (the model's
+    own assumption; the real Overseer is aggressive and starts the fight). opens: the player really chose the fight (hypothetical)."""
     kills = survive = lost = ms = actions = 0
     for _ in range(runs):
         p = make_player(arch, level, weapon, shield, extra_hp)
-        r = fight(p, [make_monster("Goblin Overseer")], potions, boss=True)
+        r = fight(p, [make_monster("Goblin Overseer")], potions, boss=True, opens=opens)
         if r["lost_at_kill"] is not None:
             kills += 1
             lost += r["lost_at_kill"]
@@ -901,7 +959,9 @@ class HumanPolicy:
                 return "bless"
         elif a == "warrior" and p.shield and can_pay(p, "bash"):
             return "bash"
-        elif a == "scout" and can_pay(p, "strike"):
+        elif a == "scout" and p.archer and can_pay(p, "aim"):
+            return "aim"
+        elif a == "scout" and not p.archer and can_pay(p, "strike"):
             return "strike"
         elif a == "mage" and can_pay(p, "bolt"):
             return "bolt"
@@ -938,6 +998,8 @@ def gear_for(arch_name, gear):
     """(weapon, shield, extra Vitality, armour from worn pieces). gear: "starting" (the calling's own kit: no armour, no trinket),
     "best" (the best weapon and the shield the Hollow sells, with the trinket from the Hidden Cache; no body armour is sold), or a
     tuple (weapon, shield, trinket, armour) as given, which is how the table of recommendations tries armour."""
+    if arch_name == ARCHER:   # a Scout with a bow: the Hunting Bow it starts with, or the best bow the Hollow sells
+        return ("hunting bow", False, 0, 0) if gear == "starting" else ("yew longbow", False, TRINKET_HP, 0) if gear == "best" else gear
     a = ARCHS[arch_name]
     if gear == "starting":
         return a.weapons[0], a.shield and arch_name == "warrior", 0, 0
@@ -1000,21 +1062,34 @@ def start_times(p, enemies, delay_ms, aggro, surprise_ms=0):
     return max(delay_ms, call + own), [call if i == first else call + r for i, r in enumerate(react)]
 
 
-def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=True, pack_at="hall"):
+def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=True, pack_at="hall", force_open=False):
     """One run from the Tavern Cellar to the Overseer. model None is the perfect player: full Vitality, Endurance and Focus for
     every fight, no typing, the existing rules. Returns a dict: outcome ("kill", "died", "fled"), room of the end, potions used by
     room, potions left, Vitality share at the Overseer's door, and "t": seconds spent fighting, walking and looting, and resting (waiting
     at the ordinary rate for rest_to, or seated with the `rest` command); "refills": rests cut short by creatures coming back.
+    force_open (hypothetical, the archer only): every fight is the player's choice, as if no creature were aggressive: the player acts as soon as his
+    typed command arrives, the creatures wait their Reaction Time x 2 s and a bow in his hands delays them a further 2 s ("opens" in fight()). res["opened"]
+    counts the fights the player opened: always 0 where the creatures are aggressive and engage on arrival, which is every cellar creature.
     pack_at: "hall" = the player enters the Overseer Hall with `potions` in the pack (the rooms before it use a spare supply, which
     is reported as used "on the way" but does not count against the pack: a player restocks at the merchant); "entrance" = the
     pack is `potions` from the first room on and the rooms before the Hall draw on it."""
-    arch = ARCHS[arch_name]
+    arch = ARCHS["scout" if arch_name == ARCHER else arch_name]
     weapon, shield, extra_hp, armor = gear_for(arch_name, gear)
-    p = make_player(arch, level, weapon, shield, extra_hp, armor_extra=armor)
+    p = make_player(ARCHER if arch_name == ARCHER else arch, level, weapon, shield, extra_hp, armor_extra=armor)
+    wait_carry = [0, 0.0]   # Minor Heal's wait left at the end of the last fight (ms), and the walking and resting seconds counted then
     left = potions if pack_at == "entrance" else 99
     used = {}
     t = {"fight": 0.0, "walk": 0.0, "rest": 0.0}
-    res = {"outcome": "kill", "room": "Overseer Chamber", "used": used, "door": None, "t": t, "refills": 0}
+    res = {"outcome": "kill", "room": "Overseer Chamber", "used": used, "door": None, "t": t, "refills": 0, "opened": 0, "fights": 0}
+
+    def heal_left():
+        """Minor Heal's wait still running when the next fight begins: what was left, less the walking and resting since."""
+        gone = (t["walk"] + t["rest"] - wait_carry[1]) * 1000
+        return max(0, round(wait_carry[0] - gone))
+
+    def fought(r):
+        wait_carry[0] = max(0, getattr(p, "heal_ready", 0) - r["ms"])
+        wait_carry[1] = t["walk"] + t["rest"]
     moves, looted = 0, 0
     prev_room, prev_creatures, prev_ms = None, None, 0
     for room, creatures in APPROACH:
@@ -1026,6 +1101,7 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
             left = potions
         if model is None or not model.carry_over:
             p.hp, p.stamina, p.mana = p.max_hp, float(p.max_stamina), float(p.max_mana)
+            wait_carry[0] = 0
         elif room != ROOM_NAMES[0] and model.rest_cmd:
             # the `rest` command: loot and look round (ordinary rate), sit in the room just cleared (RestFactor), then walk on (ordinary rate)
             wait = looted * LOOT_SECONDS + model.pause_s
@@ -1045,7 +1121,8 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
                     enemies = [make_monster(c) for c in prev_creatures]
                     policy = HumanPolicy(model, rng)
                     start = start_times(p, enemies, policy.delay(), aggro, round(model.rest_surprise_s * 1000))
-                    r = fight(p, enemies, left, boss=False, human=policy, start=start, stop_at_boss=True)
+                    r = fight(p, enemies, left, boss=False, human=policy, start=start, stop_at_boss=True, heal_carry=heal_left())
+                    fought(r)
                     p.regen(r["ms"])
                     t["fight"] += r["ms"] / 1000.0
                     used[prev_room] = used.get(prev_room, 0) + r.get("potions_used", 0)
@@ -1085,10 +1162,22 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
             res["door"] = p.hp / p.max_hp
         enemies = [make_monster(c) for c in creatures]
         policy = start = None
+        opens = False
         if model is not None:
             policy = HumanPolicy(model, rng)
-            start = start_times(p, enemies, policy.delay(), aggro)
-        r = fight(p, enemies, left, boss=boss, human=policy, start=start, stop_at_boss=True)
+            typed = policy.delay()
+            start = start_times(p, enemies, typed, aggro)
+            if force_open:
+                opens = True
+                start = (typed, [round(e.reaction * UNIT_MS) for e in enemies])
+            elif not aggro and min(round(e.reaction * UNIT_MS) for e in enemies) > typed:
+                opens = True   # the old game: the player typed before any creature noticed him, and starts the fight
+        else:
+            opens = force_open
+        res["fights"] += 1
+        res["opened"] += opens
+        r = fight(p, enemies, left, boss=boss, human=policy, start=start, stop_at_boss=True, opens=opens, heal_carry=heal_left())
+        fought(r)
         p.regen(r["ms"])
         t["fight"] += r["ms"] / 1000.0
         used[room] = used.get(room, 0) + r.get("potions_used", 0) + topped
@@ -1104,7 +1193,7 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
     return res
 
 
-def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting", aggro=True, seed=1, pack_at="hall"):
+def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting", aggro=True, seed=1, pack_at="hall", force_open=False):
     """Many runs of run_approach. Returns kill share, outcomes by room, potions used before the Hall / in the Hall / at the
     Overseer, the share that reached the Overseer, the kill share of those that did, the share that used three or more potions
     on the guards, and the mean Vitality share at the Overseer's door."""
@@ -1118,8 +1207,11 @@ def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting",
     hall_hist = {}
     tsum = {"fight": 0.0, "walk": 0.0, "rest": 0.0}   # seconds, over the runs that killed the Overseer
     allpots = refills = 0.0
+    opened = fights = 0
     for _ in range(runs):
-        r = run_approach(arch_name, level, potions, model, rng, gear, aggro, pack_at)
+        r = run_approach(arch_name, level, potions, model, rng, gear, aggro, pack_at, force_open)
+        opened += r["opened"]
+        fights += r["fights"]
         u = r["used"]
         allpots += sum(u.values())
         refills += r["refills"]
@@ -1143,7 +1235,8 @@ def approach_stats(arch_name, level, potions, model, runs=1000, gear="starting",
     return dict(kill=kills / runs, reached=reached / runs, kill_if_reached=kills / reached if reached else 0.0, before=before / runs,
                 hall=hall / runs, chamber=chamber / runs, hall3=hall3 / runs, hall_hist=hall_hist, ends={k: v / runs for k, v in ends.items()},
                 door=door / reached if reached else 0.0, runs=runs, potions=allpots / runs, refills=refills / runs,
-                minutes={k: v / kills / 60.0 if kills else 0.0 for k, v in tsum.items()})
+                minutes={k: v / kills / 60.0 if kills else 0.0 for k, v in tsum.items()},
+                opened=opened / runs, fights=fights / runs)
 
 
 REQUIRED_LEVEL = {"Tavern Cellar": 1, "Collapsed Passage": 1, "Storage Chamber": 2, "Guard Post": 2,
@@ -1855,8 +1948,9 @@ def check_skills(read_root, problems):
         for key, field in SKILL_FIELDS.items():
             m = re.search(rf"\b{field} = (-?[\d.]+);", text)
             have[key] = float(m.group(1)) if m else SKILL_DEFAULTS[field]
-        for k, v in re.findall(r'Effect\("(\w+)", (-?[\d.]+)\)', text):
-            have[k] = float(v)
+        consts = {n: float(v) for n, v in re.findall(r"const (?:int|double) (\w+) = ([\d.]+);", text)}
+        for k, v in re.findall(r'Effect\("(\w+)", (-?[\w.]+)\)', text):
+            have[k] = consts[v] if v in consts else float(v)
         for key, value in t["base"].items():
             if have.get(key) != value:
                 problems.append(f"skill {name}: rank I {key} is {have.get(key)} in the mudlib, {value} in the simulation")
@@ -1870,7 +1964,8 @@ def check_skills(read_root, problems):
         if (int(m.group(1)) if m else 0) != t.get("max", 0):
             problems.append(f"skill {name}: MaxRank {m.group(1) if m else 0} in the mudlib, {t.get('max', 0)} in the simulation")
     for name, prep, rec in (("arcane_bolt", BOLT_PREP, BOLT_REC), ("minor_heal", HEAL_PREP, HEAL_REC), ("shield_bash", 0, BASH_REC),
-                            ("precision_strike", STRIKE_PREP, STRIKE_REC), ("double_strike", DOUBLE_PREP, DOUBLE_REC)):
+                            ("precision_strike", STRIKE_PREP, STRIKE_REC), ("double_strike", DOUBLE_PREP, DOUBLE_REC),
+                            ("aimed_shot", AIM_PREP, AIM_REC)):
         with open(os.path.join(root, name + ".cs"), encoding="utf-8") as f:
             text = f.read()
         for field, value in (("Preparation", prep), ("Recovery", rec)):
@@ -1881,6 +1976,15 @@ def check_skills(read_root, problems):
         text = f.read()
     if '"double_strike"' not in text or '"jack_of_all_trades"' not in text:
         problems.append("class adventurer: Double Strike or Jack of All Trades is not granted")
+    with open(os.path.join(read_root, "classes", "scout.cs"), encoding="utf-8") as f:
+        text = f.read()
+    if '"aimed_shot"' not in text:
+        problems.append("class scout: Aimed Shot is not granted")
+    with open(os.path.join(read_root, "std", "living.cs"), encoding="utf-8") as f:
+        text = f.read()
+    m = re.search(r"const int RangedOpening = (\d+);", text)
+    if m is None or int(m.group(1)) * 1000 != RANGED_OPENING_MS:
+        problems.append(f"std/living.cs: RangedOpening is {m.group(1) if m else None}, {RANGED_OPENING_MS // 1000} in the simulation")
 
 
 def check_classes(read_root, problems, num):
@@ -2514,10 +2618,11 @@ def stage_weapon(arch, level):
 # ---- skill ranks (docs/specs/skill-ranks.md; python3 tests/balance_sim.py ranks [runs] [part ...])
 
 @contextmanager
-def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None):
+def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore_cap=None):
     """Temporarily change how ranks are held (RANK_MODE), Double Strike on or off, a skill's rank table (skill -> dict(base=..., rows=...)
     merged over the current one), the Minor Heal's Preparation and the heal lockout (option c). Nothing here is applied to the game."""
-    global RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS
+    global RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, RANK_IGNORE_CAP
+    saved_cap = RANK_IGNORE_CAP
     saved_tables = {k: dict(base=dict(v["base"]), rows={r: dict(x) for r, x in v["rows"].items()}, **({"max": v["max"]} if "max" in v else {}))
                     for k, v in SKILL_RANKS.items()}
     saved = (RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, saved_tables, dict(SKILL_PREP))
@@ -2530,6 +2635,8 @@ def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None):
             SKILL_RANKS[sk]["base"].update(t.get("base", {}))
             if "rows" in t:
                 SKILL_RANKS[sk]["rows"] = {r: dict(x) for r, x in t["rows"].items()}
+        if ignore_cap is not None:
+            RANK_IGNORE_CAP = ignore_cap
         if prep is not None:
             SKILL_PREP["minor_heal"] = prep
         if lockout_s is not None:
@@ -2537,17 +2644,18 @@ def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None):
         yield
     finally:
         RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS = saved[0], saved[1], saved[2]
+        RANK_IGNORE_CAP = saved_cap
         SKILL_RANKS.clear()
         SKILL_RANKS.update(saved[3])
         SKILL_PREP.clear()
         SKILL_PREP.update(saved[4])
 
 
-def l5_kills(callings=None, runs=3000, seed=1):
+def l5_kills(callings=None, runs=3000, seed=1, force_open=False):
     """Kill% against the Overseer from the cellar entrance: level 5, starting gear, 4 potions, points placed, middle human with the rest
     command at RestFactor 5 (the owner's standing target). One number per calling."""
     m = rest_human("mid", 5)
-    return {c: approach_stats(c, 5, 4, m, runs, "starting", True, seed)["kill"] * 100 for c in (callings or ARCHS)}
+    return {c: approach_stats(c, 5, 4, m, runs, "starting", True, seed, force_open=force_open)["kill"] * 100 for c in (callings or ARCHS)}
 
 
 def band_line(label, v, note=""):
@@ -2579,7 +2687,7 @@ SPEC_HEAL_ROWS = {2: dict(heal=38), 3: dict(heal=60)}
 
 def ranks_level5(runs=3000):
     band_head("RK1. Level 5 and skill ranks: Overseer kill% from the cellar entrance, starting gear, 4 potions, points placed, middle human, RestFactor 5", runs)
-    with ranked(mode="none", double=False, table=heal_table(8)):
+    with ranked(mode="none", double=False, table=heal_table(8), lockout_s=0):
         band_line("before ranks (rank I, no Double Strike, Minor Heal 8)", l5_kills(runs=runs))
     with ranked(mode="none"):
         base = l5_kills(runs=runs)
@@ -2597,7 +2705,7 @@ def heal_search(rank_mode, others, runs, lo=6, hi=24, costs=(25, 32, 40), **extr
     """The largest rank I heal whose Priest stays within 5 points of the five-calling mean (the other four given). Returns (h, priest%)."""
     best = None
     for h in range(lo, hi + 1):
-        with ranked(mode=rank_mode, table=heal_table(h, costs), **extra):
+        with ranked(mode=rank_mode, table=heal_table(h, costs), **{"lockout_s": 0, **extra}):
             pr = l5_kills(["priest"], runs)["priest"]
         mean = (sum(others.values()) + pr) / 5
         ok = abs(pr - mean) <= 5
@@ -2621,12 +2729,14 @@ def ranks_heal(runs=3000):
     band_head("RK2. Minor Heal options, level 5 Overseer as RK1. [rank I] = nobody has bought a rank; [rank II] = every calling holds rank II", runs)
 
     def row(label, mode, **kw):
+        kw.setdefault("lockout_s", 0)   # the options of the provisional table had no wait; (c3) and the shipped row name theirs
         with ranked(mode=mode, **kw):
             pr = l5_kills(["priest"], runs)["priest"]
         return band_line(label + f"  [{'rank I' if mode == 'none' else 'rank II'}]", {**others[mode], "priest": pr})
 
     for mode in ("none", "cap"):
-        row("(a) spec: 20 / 38 / 60 for 25 / 32 / 40 Focus", mode, table=heal_table(20, rows=SPEC_HEAL_ROWS))
+        row("(shipped) 20 / 38 / 60 for 25 / 32 / 40 Focus, no heal for 15 s after a heal", mode, table=heal_table(20, rows=SPEC_HEAL_ROWS), lockout_s=HEAL_WAIT_S)
+        row("(a) spec: 20 / 38 / 60 for 25 / 32 / 40 Focus, no wait", mode, table=heal_table(20, rows=SPEC_HEAL_ROWS))
         row("    8 (today), later ranks by the default step, spec costs", mode, table=heal_table(8))
     print("  (b) search: rank I heal h, II and III by the default step from h, costs 25 / 32 / 40")
     b1 = heal_search("none", others["none"], runs)
@@ -2656,8 +2766,10 @@ def ranks_double(runs=3000):
     with ranked(mode="none", double=False):
         band_line("no Double Strike (Minor Heal as shipped) [rank I]", {**base1, "adventurer": l5_kills(["adventurer"], runs)["adventurer"]})
     for label, base, rows, mode in (
-            ("spec: 2 x 60%, 20 Endurance [rank I]", dict(factor=0.6, endurance=20), None, "none"),
-            ("spec: rank II 2 x 75% [rank II]", dict(factor=0.6, endurance=20), None, "cap"),
+            ("shipped: 2 x 60%, 35 Endurance [rank I]", dict(factor=0.6, endurance=35), None, "none"),
+            ("shipped: rank II 2 x 75%, 40 Endurance [rank II]", dict(factor=0.6, endurance=35), None, "cap"),
+            ("(the first spec) 2 x 60%, 20 Endurance [rank I]", dict(factor=0.6, endurance=20), None, "none"),
+            ("(the first spec) rank II 2 x 75%, 23 [rank II]", dict(factor=0.6, endurance=20), None, "cap"),
             ("2 x 50%, 20 Endurance [rank I]", dict(factor=0.5, endurance=20), None, "none"),
             ("2 x 45%, 20 Endurance [rank I]", dict(factor=0.45, endurance=20), None, "none"),
             ("2 x 40%, 20 Endurance [rank I]", dict(factor=0.4, endurance=20), None, "none"),
@@ -2693,7 +2805,7 @@ def ranks_gap(runs=400):
     for level, keys, potions in ((5, LEVEL5C, 0), (10, LEVEL10, 0), (10, LEVEL10B, CORRIDOR_POTIONS), (5, ["overseer"], 2)):
         print(f"-- level {level}: {', '.join(keys)}" + (f" ({potions} potions)" if potions else "")
               + (": the Goblin Overseer alone, best Hollow gear, the +5 Vitality trinket (table 2 of the default output)" if keys == ["overseer"] else ""))
-        for label, kw in (("today (rank I, no Double Strike, Minor Heal 8)", dict(mode="none", double=False, table=heal_table(8))), ("rank I, with Double Strike I", dict(mode="none")),
+        for label, kw in (("today (rank I, no Double Strike, Minor Heal 8)", dict(mode="none", double=False, table=heal_table(8), lockout_s=0)), ("rank I, with Double Strike I", dict(mode="none")),
                           (f"every skill at the rank level {level} allows ({'II' if level == 5 else 'III'})", dict(mode="cap"))):
             with ranked(**kw):
                 if keys == ["overseer"]:
@@ -2780,12 +2892,142 @@ def ranks_climb(runs=300):
         print(f"  {c:<11} median {g[len(g) // 2]:>3}, 10th percentile {g[len(g) // 10]:>3}, share with 10 or more {sum(x >= 10 for x in g) * 100 / len(g):4.0f}%", flush=True)
 
 
+def aim_line(label, five, archer, note=""):
+    vals = [five[c] for c in ARCHS]
+    mean = sum(vals) / 5
+    print(f"{label:<70}" + "".join(f"{x:6.0f}" for x in vals) + f"{archer:7.0f}{mean:7.1f}{max(vals) - min(vals):7.0f}   archer {archer - mean:+5.1f}, melee scout {five['scout'] - mean:+5.1f}"
+          + (f"   {note}" if note else ""), flush=True)
+    dump_json(dict(kind="aim", label=label, kills=vals, archer=archer))
+
+
+def aim_head(title, runs):
+    print("=" * 150)
+    print(title + f" ({runs} runs a cell)")
+    print("=" * 150)
+    print(f"{'':<70}" + "".join(f"{c[:5]:>6}" for c in ARCHS) + f"{'archer':>7}{'mean5':>7}{'spread':>7}   distance from the mean of the five callings")
+
+
+def ranks_wait(runs=3000):
+    """Minor Heal's wait: the Priest against the mean of the five callings (level 5 Overseer as RK1), for waits of 0 to 90 s, rank I and rank II. The
+    wait is counted in real time across fights (the walking and resting between rooms count), as the game keeps it."""
+    others = {}
+    for mode in ("none", "cap"):
+        with ranked(mode=mode):
+            others[mode] = l5_kills([c for c in ARCHS if c != "priest"], runs)
+    band_head("WAIT. Minor Heal 20 / 38 / 60 for 25 / 32 / 40 Focus with a wait after each cast, level 5 Overseer as RK1", runs)
+    for wait in (0, 15, 30, 45, 60, 90):
+        for mode in ("none", "cap"):
+            with ranked(mode=mode, lockout_s=wait):
+                pr = l5_kills(["priest"], runs)["priest"]
+            band_line(f"wait {wait:>2} s  [{'rank I' if mode == 'none' else 'rank II'}]" + ("  (shipped: 15)" if wait == HEAL_WAIT_S else ""), {**others[mode], "priest": pr})
+
+
+def ranks_aim(runs=3000):
+    """The archer Scout beside the five callings (the melee Scout is the Scout column: Precision Strike, the Hunting Bow it starts with, no Aimed
+    Shot). Standard test and the perfect player against the Overseer alone. The cellar's creatures are all aggressive and engage on arrival, so the
+    archer opens nothing there (`opened` below); the rows marked HYPOTHETICAL give it the opening in every fight to show what the rule is worth."""
+    rows = (("rank I (nobody has bought a rank)", "none"), ("everyone holds rank II (bought at level 5)", "cap"))
+    aim_head("AIM1. Standard test: level 5, starting gear, 4 potions, points placed, middle human, RestFactor 5, Overseer from the cellar entrance", runs)
+    for label, mode in rows:
+        with ranked(mode=mode):
+            five = l5_kills(runs=runs)
+            archer = l5_kills([ARCHER], runs)[ARCHER]
+        aim_line(label, five, archer)
+        with ranked(mode=mode):
+            st = approach_stats(ARCHER, 5, 4, rest_human("mid", 5), max(300, runs // 10), "starting", True, 1)
+        print(f"    the archer opened {st['opened']:.2f} of {st['fights']:.1f} fights a run on the way (every creature on the way is aggressive and starts its fight)", flush=True)
+    for label, mode in rows:
+        with ranked(mode=mode):
+            five = l5_kills(runs=runs)
+            archer = l5_kills([ARCHER], runs, force_open=True)[ARCHER]
+        aim_line("HYPOTHETICAL, the archer opens every fight: " + label, five, archer)
+    print()
+    aim_head("AIM2. The perfect player against the Overseer alone: level 4, 2 potions, best gear the Hollow sells (Yew Longbow for the archer), +5 Vitality trinket", runs)
+    for label, mode in (("rank I", "none"), ("everyone holds rank II (not buyable at level 4: asked for)", 2)):
+        with ranked(mode=mode, ignore_cap=True):
+            random.seed(20260101)
+            five = {c: boss_stats(c, 4, ARCHS[c].weapons[-1], 2, TRINKET_HP, runs)[0] * 100 for c in ARCHS}
+            archer = boss_stats(ARCHER, 4, "yew longbow", 2, TRINKET_HP, runs)[0] * 100
+            hyp = boss_stats(ARCHER, 4, "yew longbow", 2, TRINKET_HP, runs, opens=True)[0] * 100
+        aim_line(label + " (the Overseer is aggressive and starts the fight)", five, archer)
+        aim_line("HYPOTHETICAL, the archer opens: " + label, five, hyp)
+
+
+def ranks_aimfix(runs=3000):
+    """What would bring the archer Scout within 5 points of the mean of the five callings (standard test, rank I and everyone at rank II)? One
+    change at a time to Aimed Shot, each against the unchanged five. Nothing here is applied to the game."""
+    global AIM_PREP
+    mean, base = {}, {}
+    for mode in ("none", "cap"):
+        with ranked(mode=mode):
+            five = l5_kills(runs=runs)
+        mean[mode] = sum(five.values()) / 5
+    print("=" * 150)
+    print(f"AIMFIX. Archer Scout against the mean of the five callings, standard test ({runs} runs a cell): mean {mean['none']:.1f} at rank I, {mean['cap']:.1f} with everyone at rank II")
+    print("=" * 150)
+    print(f"{'Aimed Shot, one change at a time':<62}{'rank I':>8}{'vs mean':>9}{'rank II':>9}{'vs mean':>9}")
+    variants = [
+        ("as shipped: x1.75 / x2.0, +3 to hit, 30 Endurance, wind-up 2 s", {}, {}, 1.0),
+        ("damage x1.5 at I, x1.75 at II", dict(factor=1.5), {2: dict(factor=1.75)}, 1.0),
+        ("damage x1.4 at I, x1.6 at II", dict(factor=1.4), {2: dict(factor=1.6)}, 1.0),
+        ("damage x1.25 at I, x1.5 at II", dict(factor=1.25), {2: dict(factor=1.5)}, 1.0),
+        ("damage x1.0 (a plain shot) at both ranks", dict(factor=1.0), {2: dict(factor=1.0)}, 1.0),
+        ("Endurance 40 at I (II 46)", dict(endurance=40), {}, 1.0),
+        ("Endurance 50 at I (II 58)", dict(endurance=50), {}, 1.0),
+        ("no bonus to hit (+0)", dict(tohit=0), {}, 1.0),
+        ("wind-up 3 s (Preparation 1.5)", {}, {}, 1.5),
+        ("wind-up 4 s (Preparation 2.0)", {}, {}, 2.0),
+    ]
+    for label, base_over, rows, prep in variants:
+        got = {}
+        for mode in ("none", "cap"):
+            saved_prep = AIM_PREP
+            AIM_PREP = prep
+            try:
+                table = {"aimed_shot": dict(base=base_over)}
+                if rows:
+                    table["aimed_shot"]["rows"] = {**{r: dict(x) for r, x in SKILL_RANKS["aimed_shot"]["rows"].items()}, **{r: {**SKILL_RANKS["aimed_shot"]["rows"].get(r, {}), **x} for r, x in rows.items()}}
+                with ranked(mode=mode, table=table):
+                    got[mode] = l5_kills([ARCHER], runs)[ARCHER]
+            finally:
+                AIM_PREP = saved_prep
+        print(f"{label:<62}{got['none']:8.1f}{got['none'] - mean['none']:+9.1f}{got['cap']:9.1f}{got['cap'] - mean['cap']:+9.1f}", flush=True)
+        dump_json(dict(kind="aimfix", label=label, rank1=got["none"], rank2=got["cap"], mean1=mean["none"], mean2=mean["cap"]))
+
+
+def ranks_healcost(runs=3000):
+    """The owner's open decision on the large heal: the Priest against the mean of the other four, standard test, for other Focus costs and smaller
+    heals, with the 15 s wait. Also how many heals a level 5 Priest's full Focus pays for. Nothing here is applied to the game."""
+    others = {}
+    for mode in ("none", "cap"):
+        with ranked(mode=mode):
+            others[mode] = l5_kills([c for c in ARCHS if c != "priest"], runs)
+    mana = resources(ARCHS["priest"], 5)[2]
+    print("=" * 150)
+    print(f"HEALCOST. Priest vs the mean of the five callings (standard test, {runs} runs a cell, wait 15 s); level 5 Priest has {mana} Focus. Rank I = nobody bought a rank, rank II = everyone holds II")
+    print("=" * 150)
+    print(f"{'Minor Heal (Vitality I/II/III; Focus I/II/III)':<56}{'rank I':>8}{'vs mean':>9}{'heals':>7}{'rank II':>9}{'vs mean':>9}{'heals':>7}")
+    rows = [("20/38/60, 25/32/40 (as shipped)", 20, (25, 32, 40), SPEC_HEAL_ROWS), ("20/38/60, 35/45/56", 20, (35, 45, 56), SPEC_HEAL_ROWS),
+            ("20/38/60, 45/58/72", 20, (45, 58, 72), SPEC_HEAL_ROWS), ("20/38/60, 55/70/88", 20, (55, 70, 88), SPEC_HEAL_ROWS),
+            ("20/38/60, 70/90/112", 20, (70, 90, 112), SPEC_HEAL_ROWS), ("12/23/36, 25/32/40", 12, (25, 32, 40), {2: dict(heal=23), 3: dict(heal=36)}),
+            ("15/28/45, 25/32/40", 15, (25, 32, 40), {2: dict(heal=28), 3: dict(heal=45)}), ("7/9/11 (the old small heal), 25/32/40", 7, (25, 32, 40), None)]
+    for label, h, costs, hr in rows:
+        out = {}
+        for mode in ("none", "cap"):
+            with ranked(mode=mode, table=heal_table(h, costs, hr), lockout_s=HEAL_WAIT_S):
+                pr = l5_kills(["priest"], runs)["priest"]
+            mean = (sum(others[mode].values()) + pr) / 5
+            out[mode] = (pr, pr - mean, mana // costs[0 if mode == "none" else 1])
+        print(f"{label:<56}{out['none'][0]:8.1f}{out['none'][1]:+9.1f}{out['none'][2]:7d}{out['cap'][0]:9.1f}{out['cap'][1]:+9.1f}{out['cap'][2]:7d}", flush=True)
+        dump_json(dict(kind="healcost", label=label, rank1=out["none"], rank2=out["cap"]))
+
+
 def ranks_report(runs=3000, parts=()):
     parts = parts or ("level5", "heal", "double", "gap", "bolt", "focus", "climb")
     for part in parts:
         {"level5": lambda: ranks_level5(runs), "heal": lambda: ranks_heal(runs), "double": lambda: ranks_double(runs),
          "gap": lambda: ranks_gap(max(100, runs // 8)), "bolt": ranks_bolt, "focus": lambda: ranks_focus(max(200, runs // 3)),
-         "climb": lambda: ranks_climb(max(100, runs // 10))}[part]()
+         "climb": lambda: ranks_climb(max(100, runs // 10)), "aim": lambda: ranks_aim(runs), "wait": lambda: ranks_wait(runs), "aimfix": lambda: ranks_aimfix(runs), "healcost": lambda: ranks_healcost(runs)}[part]()
 
 
 def main():

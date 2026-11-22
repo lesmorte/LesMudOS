@@ -42,6 +42,11 @@ public abstract class Skill : MudObject
     protected bool NeedsUnarmed;
     /// <summary>Separate weapon blows one use of an attack skill makes, each with its own hit roll (Double Strike: 2).</summary>
     protected int Hits = 1;
+    /// <summary>
+    /// True if being hit while this skill's Preparation runs spoils it (Aimed Shot): the action is cancelled and what it cost stays spent.
+    /// Nothing else interrupts a preparation but a stagger, which gives half the cost back.
+    /// </summary>
+    protected bool Spoilable;
 
     // ---- Ranks (docs/specs/skill-ranks.md) ----
     // Every active skill has ranks I, II, III ... The rank I numbers are the fields above (and Effect lines for numbers of the skill's
@@ -183,6 +188,12 @@ public abstract class Skill : MudObject
 
     /// <summary>Seconds the caster must wait after one use before using this skill again (the "wait" Effect; 0: no wait).</summary>
     public int QueryWaitSeconds(int rank) => Math.Max(0, RankInt("wait", rank));
+
+    /// <summary>The damage factor when the skill is the action that starts the fight (the "opener" Effect), or 0 if it has no such bonus.</summary>
+    public double QueryOpenerFactorFor(ObjectRef? user) => RankValue("opener", RankOf(user));
+
+    /// <summary>Does being hit while preparing spoil this skill (Aimed Shot)?</summary>
+    public bool QuerySpoilable() => Spoilable;
 
     /// <summary>The summary at a rank. A skill whose summary quotes numbers overrides it.</summary>
     public virtual string QuerySummaryAt(int rank) => Summary;

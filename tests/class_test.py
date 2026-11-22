@@ -583,7 +583,7 @@ def run(work, mudlib):
     time.sleep(3)
     out = p.command("heal")
     out += a.quiet(p, 5)
-    check("Minor Heal restores 20 Vitality plus 25% (Divine Knowledge) and 9% (Healing Power: Spirit 9, Insight 6): 27", out, "restoring 27 Vitality")
+    check("Minor Heal restores 20 Vitality plus 25% (Divine Knowledge) and 9% (Healing Power) = 27, more than the level 1 Priest (26 Vitality, at 7 or 8) was missing: it restores all of it (tests/aim_test.py shows the 27)", out, "restoring 1", "Vitality.", "(26/26)")
     check("Minor Heal costs 25 Focus", str(res(p)[2] <= 90), "True")
     s0 = a.score_of(p)["text"]
     time.sleep(3)

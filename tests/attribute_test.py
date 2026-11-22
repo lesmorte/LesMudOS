@@ -542,9 +542,9 @@ def run(work, mudlib):
     check("now 6-9 becomes 9, 10, 12 or 13", str(bool(bolts) and set(bolts) <= {9, 10, 12, 13}), "True")
     end_fight(mg, chief, "dummy")
     pr = wizzes["priest"]
-    pr.command("setlevel 1")
+    pr.command("setlevel 5")  # a level 1 Priest has 26 Vitality, too few to show a heal of 27
     pr.command("atele " + T + "arena")
-    pr.command("ahurt 15")
+    pr.command("ahurt 40")
     out = a.quiet(pr, 0.1) + (pr.send("heal") or "") + pr.read_until("Vitality", timeout=12)
     check("Spirit 9 and Insight 6: Healing Power +9% with Divine Knowledge's 25%: Minor Heal restores 27 (20 x 1.34)", out, "restoring 27 Vitality")
     a.drain(pr, 16)  # Minor Heal's wait is 15 seconds

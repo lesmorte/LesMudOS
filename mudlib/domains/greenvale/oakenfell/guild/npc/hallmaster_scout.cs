@@ -34,7 +34,7 @@ public class GqHallmasterScout : Trainer
         AddTopic("scout,scouts,calling,agility,precision", "Scouts are speed and sight. Agility, precision, the shot or blow that lands where it must. You begin with Evasion, Tracking and Precision Strike. The three paths are where you may take them.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "Read the banners on the east wall for a line on every path. The Chronicle Gallery is east of here and the Envoys' Gallery west.");
         AddTopic("attributes,attribute,grace,insight,resolve,quickness,lean,leans,stats,points", "A Scout is Grace: the hand that finds the mark, and the blow that lands where it counts. Insight to read the ground, and Resolve to keep going when others stop. You will hear nothing of my Grace. That is the point of it.");
-        AddTopic("ranks,rank,train,training,teach,teaching,trainer,third,third rank", "Behind you. The third rank of a scout's strike is taught here, by me, and what follows it. Tracking stops at the second; the Hollow's bowyer teaches that. Say {cmd}ranks{/}, then {cmd}train strike{/}.");
+        AddTopic("ranks,rank,train,training,teach,teaching,trainer,third,third rank", "Behind you. The third rank of a scout's strike and of the aimed shot is taught here, by me, and what follows them. Tracking stops at the second; the Hollow's bowyer teaches that. Say {cmd}ranks{/}, then {cmd}train strike{/} or {cmd}train aim{/}.");
         TeachCalling("scout", 3, 5);
         ElsewhereLine = "The second rank is taught in Vincent's Hollow.";
         AddEmote("Veyla turns a hawk's feather between her fingers and watches the doors.", 8);

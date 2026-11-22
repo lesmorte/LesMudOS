@@ -216,6 +216,7 @@ public class Lantern : Item
 | `tests/city_test.py` | Walk-through of Oakenfell (the city and the two Vale Road rooms that remain): the map against its build document, every detail, person and shop, a new character walking from the Southgate Approach to the Hall of Callings (about 7 minutes) |
 | `tests/corridor_test.py` | Walk-through of the Greenvale Transit Corridor (122 rooms): map, bands, areas, creatures per zone, hidden ways and the Chronicle, resource nodes, patrols, every detail, person and shop, and a new character walking from the Village Square to Oakenfell (port 4828, about 9 minutes; `corridor_test.py static` needs no game) |
 | `tests/playfeel_test.py` | Numbered targets, inventory and list format, corpses, combat restrictions and flee, aggressive creatures engaging on arrival, rooms not refilling while the corpse lies there, shared experience, verbose, prompt, idle and timeout (port 4831, about 8 minutes) |
+| `tests/aim_test.py` | The large Minor Heal and its 15-second wait (amounts at ranks I to III, the refusal and `skills` line, per caster, another Priest unaffected, gone on logout), Double Strike's 35 / 40 / 46 Endurance, the ranged opening (a creature's first action with and without a bow, once per fight, absent when the creature starts the fight), Aimed Shot (damage as the opener and mid-fight at ranks I and II, the spoiled shot, the refusals, training at Wenna Farrow and the hallmaster, an existing Scout gaining it) and a wizard-written probe. Port 4838. |
 | `tests/rank_test.py` | Skill and spell ranks: every ranked skill's numbers at ranks I to V against the data, names by rank, the level cap, `skills`, an old save; each unlock requirement kind met, unmet, its progress and its permanence; the kill counters; `ranks` and `train` at the village trainers and the hallmasters with every refusal; each skill in play at rank I and II, Tracking's four cases, Double Strike's separate rolls and Triple and Quadruple Strike, Jack of All Trades through fixed dice; a wizard's probe that tries every new public method (port 4837, about 13 minutes) |
 | `tests/rest_test.py` | The `rest` command: what ends resting and what does not, the five-times rate for Vitality, Endurance and Focus, the refusal in a fight, the surprise when a seated character is attacked, the idle timer, and probe objects that try to put a player into or out of resting (port 4835, about 4 minutes) |
 | `tests/rename_test.py` | Vitality, Endurance and Focus: the old prompt tokens, a save from before the rename, content written against the old names, and a scan that no player-visible text says HP, hit points, Mana or Stamina (port 4850, about 2 minutes) |
@@ -237,6 +238,7 @@ LESMUDOS_TEST_PORT=4831 python3 tests/playfeel_test.py
 LESMUDOS_TEST_PORT=4850 python3 tests/rename_test.py
 LESMUDOS_TEST_PORT=4835 python3 tests/rest_test.py
 LESMUDOS_TEST_PORT=4837 python3 tests/rank_test.py
+LESMUDOS_TEST_PORT=4838 python3 tests/aim_test.py
 LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
 LESMUDOS_TEST_PORT=4832 python3 tests/comm_test.py
 LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py

@@ -646,17 +646,19 @@ public abstract class Adventurer : Living
         var refusal = skill.Call<string>("CanUse", Self, target) ?? SkillRefusal(skill);
         if (refusal != null) { Write(refusal + "\n"); return true; }
         LeaveRest();
+        var opening = false;
         if (kind == "enemy" && target != null)
         {
             if (!QueryFightingWith(target))
             {
                 var no = CanFight(target);
                 if (no != null) { Write(no + "\n"); return true; }
-                StartFight(target);
+                opening = !QueryInCombat(); // the shot that starts this character's fight; one aimed at a second creature mid-fight is an ordinary shot
+                OpenFight(target);
             }
             Focus(target);
         }
-        refusal = UseSkill(skill, target);
+        refusal = UseSkill(skill, target, opening);
         if (refusal != null) Write(refusal + "\n");
         return true;
     }
@@ -1431,7 +1433,7 @@ public abstract class Adventurer : Living
         var refusal = CanFight(target);
         if (refusal != null) { Write(refusal + "\n"); return true; }
         LeaveRest();
-        StartFight(target);
+        OpenFight(target);
         Focus(target);
         return true;
     }
