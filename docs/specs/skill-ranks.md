@@ -1,5 +1,7 @@
 # Skill and spell ranks
 
+**Status (22 November 2026): built**, except where marked below. Minor Heal's numbers are PROVISIONAL pending the owner's choice; Double Strike ships the spec's numbers and is flagged. Implementation notes: docs/CLASS_SYSTEM.md section 13; the builder's side: docs/BUILDING.md. See "As built" at the end.
+
 Owner's decision (November 2026): skills and spells do not improve with use. A better version is bought from a trainer as a rank, and the rank a character may hold is capped by level.
 
 ## Rule
@@ -57,3 +59,27 @@ Skills not listed use the default (+30% effect, +15% cost per rank). Resource na
 - **Jack of All Trades**: new Adventurer trait (no ranks). Crafting and gathering proficiency is gained 25% faster in every craft. One named number.
 ## Open
 - Unlocks for the other rank II skills and for rank III in Oakenfell (a Hall of Legends trial quest, Renown, or Assembly standing are the natural candidates).
+
+## As built (22 November 2026)
+
+Built as written: the rule and the cap (`Skill.RankLevelStep` = 5), the shared helper (`Skill.RankValue`), rank tables in each skill file, `ranks` and `train` on `/std/trainer`, unlocks with the seven kinds, the counters, the rank II trainers in the new village rooms (Arcane Bolt II at the Hedge-Scholar's Loft: level 5, 40 gold, 10 goblins), ranks III to V by the five hallmasters of the Hall of Callings, Tracking's rules, Double Strike, Jack of All Trades, the simulator (`python3 tests/balance_sim.py ranks`) and `tests/rank_test.py`.
+
+Decisions where this spec was silent:
+- **The default step** is cumulative from the rank before: each rank adds 30% (effect) or 15% (cost) of the rank I value to the previous rank's number, so a rank a table does not name continues from the last one it does (Arcane Bolt IV 12-17 for 29, from III's 10-14 for 26). Numbers are rounded half away from zero when used.
+- **"default cost steps"** in the Blessing and Precision Strike rows: the cost follows the default step at every rank, and the IV column continues the table's own step (+4 / +4; +5 / 30%).
+- **Creature kind** for `kills`: the beast-table kind (the creature's `Skin`, else its `Blood`; every goblin is `goblin`), else its `ChronicleKind` (by default its file name). No third naming.
+- **Wizards**: the kill credit does not exclude wizards (they earn experience), so their kills count; only the Chronicle ignores them. A death forced by a wizard's object (from `/wiz`) counts for nobody.
+- **When an unlock is recorded**: at `ranks` or `train` at that trainer, once every requirement holds, whether or not the gold is there.
+- **Prices** are the daemon's table (II 40, III 150, IV 400, V 900); the hallmasters offer III to V; rank VI and beyond have no price and are not offered yet.
+- **Several trainers in one room** (the Hall of Callings): each answers only the calling it teaches.
+- **Aimed Shot** (docs/specs/hollow-expansion.md section 1) is not in the mudlib yet, so it has no ranks; Wenna Farrow still says that lesson is not ready.
+
+Provisional, for the owner:
+- **Minor Heal** ships option (b): 7 / 9 / 11 / 13 / 15 Vitality for 25 / 32 / 40 / 44 / 48 Focus (rank I 7, later ranks by the default step from it, the spec's costs). The spec's 20 / 38 / 60 (option a) puts the Priest about 18 points above the mean at rank I and 9 at rank II. Option (c): the spec's 20 / 38 / 60 with no heal for 15 seconds after a heal lands within 2 points at both; it needs a new engine rule (a lockout), which is not built. A higher Focus cost alone does not fit both (60 / 75 / 95 is +11 at rank I and +2 at rank II; 75 / 95 / 120 is +3 and -10), and a longer Preparation changes nothing (the wind-up is inside the delay, and nothing at the Overseer interrupts it). Table: `python3 tests/balance_sim.py ranks heal`.
+- **Double Strike** ships the spec's 2 x 60% / 2 x 75% / 3 x 60% / 4 x 55%, flagged: at rank I it puts the Adventurer about 8 points above the mean (74 to 87). Numbers that would not: 2 x 50% (+3), or 2 x 60% for 35 Endurance (+4) or 50 (+1). Table: `ranks double`.
+
+Balance requirement, as measured (`ranks level5 gap bolt focus climb`):
+- **The gap at level 5** (middle human, resting, 4 potions, starting gear): wider with ranks if every calling buys rank II (spread 13 today, about 19 with rank II; mean 76 to about 89). Against the Overseer alone for the perfect player (2 potions, best gear) it narrows (8 to 5). **At level 10** the ordinary corridor creatures are won about 100% by everyone with or without ranks; against the five level 10 bosses (5 potions) the spread narrows from 28 to 11 with rank III. So the requirement fails only for the human at level 5, where rank II lifts everyone and the Scout least.
+- **Arcane Bolt against the best staff** (per action): it beats the staff against an armoured creature at every rank (x1.7, 2.1, 3.7, 6.7), but it also beats it against an unarmoured one by far more than a small margin (x1.4 at rank I already, 1.6, 2.3, 3.3), because a Mage's staff gains nothing from Might and nothing better than the Staff of the Hollow Oak exists. Not changed: the failure is in rank I too.
+- **The Priest's Focus** runs out before a creature of the Priest's own level does: against a level 5 or level 10 creature that does not die, the Priest dies every time (in about 4 to 6 minutes); a full Focus pool pays for 4 to 5 heals at rank I and 3 at rank II or III.
+- **Arcane Bolt II's ten goblins**: every calling has killed 13 goblins on the way to level 5 in the simulator's whole run.

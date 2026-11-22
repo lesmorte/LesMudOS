@@ -146,7 +146,7 @@ Introduce a syntax error and update again: the error comes back with file and li
 
 New characters now start in the Village Square of Vincent's Hollow (the start room is the `StartRoom` constant in `mudlib/std/player.cs`; `/domains/town` stays as the small technical demo). The gameplay systems are described in [docs/GAME_SYSTEMS.md](docs/GAME_SYSTEMS.md), and builders should read [docs/BUILDING.md](docs/BUILDING.md).
 
-Player commands: `say`, `tell`, `reply`, `whisper`, `shout`, `ignore`, `channels` (see [Talking to others](#talking-to-others)), `ansi`, `verbose`, `prompt`, `kill`/`attack`, `flee [DIRECTION]`, `rest`/`sit` and `stand`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `vitality`, `skills`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`. Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
+Player commands: `say`, `tell`, `reply`, `whisper`, `shout`, `ignore`, `channels` (see [Talking to others](#talking-to-others)), `ansi`, `verbose`, `prompt`, `kill`/`attack`, `flee [DIRECTION]`, `rest`/`sit` and `stand`, `stop`, `consider`, `wield`, `unwield`, `wear`, `remove`, `eat`/`drink`, `talk`, `ask NPC about TOPIC`, `read`, `loot`, `get THING from CORPSE`, `look in CORPSE`, `score`, `vitality`, `skills`, `quests`, and in town `browse`, `buy`, `sell`, `value`, `accept`, `report`; at a trainer of your calling `ranks` and `train SKILL` (skill and spell ranks: rank II in Vincent's Hollow from level 5, rank III and above at the Hall of Legends in Oakenfell; `help ranks`). Death costs 10% of your gold and leaves a corpse with your belongings where you fell; you wake in the Guest Rooms and must fetch it.
 
 Combat has no rounds. Each fighter acts when its own Reaction Time and the Recovery of its last action have passed (an unarmed player strikes every 6 seconds, one with a sword every 8), and `score`, `consider` and `stat` show the numbers. Drinking a potion mid-fight is queued for your next ready moment; `stop` cancels it. See docs/COMBAT_TIMING.md.
 
@@ -216,6 +216,7 @@ public class Lantern : Item
 | `tests/city_test.py` | Walk-through of Oakenfell (the city and the two Vale Road rooms that remain): the map against its build document, every detail, person and shop, a new character walking from the Southgate Approach to the Hall of Callings (about 7 minutes) |
 | `tests/corridor_test.py` | Walk-through of the Greenvale Transit Corridor (122 rooms): map, bands, areas, creatures per zone, hidden ways and the Chronicle, resource nodes, patrols, every detail, person and shop, and a new character walking from the Village Square to Oakenfell (port 4828, about 9 minutes; `corridor_test.py static` needs no game) |
 | `tests/playfeel_test.py` | Numbered targets, inventory and list format, corpses, combat restrictions and flee, aggressive creatures engaging on arrival, rooms not refilling while the corpse lies there, shared experience, verbose, prompt, idle and timeout (port 4831, about 8 minutes) |
+| `tests/rank_test.py` | Skill and spell ranks: every ranked skill's numbers at ranks I to V against the data, names by rank, the level cap, `skills`, an old save; each unlock requirement kind met, unmet, its progress and its permanence; the kill counters; `ranks` and `train` at the village trainers and the hallmasters with every refusal; each skill in play at rank I and II, Tracking's four cases, Double Strike's separate rolls and Triple and Quadruple Strike, Jack of All Trades through fixed dice; a wizard's probe that tries every new public method (port 4837, about 13 minutes) |
 | `tests/rest_test.py` | The `rest` command: what ends resting and what does not, the five-times rate for Vitality, Endurance and Focus, the refusal in a fight, the surprise when a seated character is attacked, the idle timer, and probe objects that try to put a player into or out of resting (port 4835, about 4 minutes) |
 | `tests/rename_test.py` | Vitality, Endurance and Focus: the old prompt tokens, a save from before the rename, content written against the old names, and a scan that no player-visible text says HP, hit points, Mana or Stamina (port 4850, about 2 minutes) |
 | `tests/load_check.py` | Quick check that every area file compiles and loads (port 4821, under a minute) |
@@ -235,10 +236,12 @@ LESMUDOS_TEST_PORT=4821 python3 tests/load_check.py
 LESMUDOS_TEST_PORT=4831 python3 tests/playfeel_test.py
 LESMUDOS_TEST_PORT=4850 python3 tests/rename_test.py
 LESMUDOS_TEST_PORT=4835 python3 tests/rest_test.py
+LESMUDOS_TEST_PORT=4837 python3 tests/rank_test.py
 LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
 LESMUDOS_TEST_PORT=4832 python3 tests/comm_test.py
 LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
 python3 tests/balance_sim.py
+python3 tests/balance_sim.py ranks [runs] [level5 heal double gap bolt focus climb]
 ```
 
 The test client (`Client` in `tests/smoke_test.py`, imported by the other suites) ends a reply at the game's answer to `sync TOKEN`, a second line it sends right behind every command, with a token unique to the call: reading to the prompt cannot tell the prompt that ends a reply from one that follows unprompted output (a combat line, another player's action), and on a busy machine that left every later reply one step late. `command(line, sync=False)`, or `Client.sync_default = False`, gives the raw mode that reads to the prompt; use it for checks of the prompt itself, the login sequence, and the idle timer (the sync line counts as input, so `playfeel_test` reads its idle checks raw).

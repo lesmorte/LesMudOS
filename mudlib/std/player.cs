@@ -393,6 +393,22 @@ public class Player : Adventurer
     {
         // Crafting and gathering topics ("help crafting", "help skin"): answered by the crafting daemon.
         if (args.Trim() != "" && CraftHelp(args) is { } craftTopic) { Write(craftTopic); return true; }
+        if (args.Trim().ToLowerInvariant() is "ranks" or "rank" or "train" or "training")
+        {
+            Write("Ranks: every skill and spell with a command word has ranks, I, II, III and on. A higher rank is stronger and costs a
+" +
+                  "little more; the command word stays the same. Rank II needs level 5, rank III level 10, IV level 15, V level 20.
+" +
+                  "A rank is bought with gold from a trainer of your calling: in Vincent's Hollow for rank II (the loft, the shrine, the
+" +
+                  "Strung Yew and the Practice Yard), at the Hall of Legends in Oakenfell for rank III and above. At a trainer,
+" +
+                  "{cmd}ranks{/} shows what you can learn, the price and anything else a rank asks (Arcane Bolt II asks for ten goblins slain);
+" +
+                  "{cmd}train{/} SKILL buys the next rank. Ranks cannot be skipped. {cmd}skills{/} shows your rank in each and the next rank's level.
+");
+            return true;
+        }
         Write(
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
             "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
@@ -413,6 +429,7 @@ public class Player : Adventurer
             "           {cmd}give{/} [N|all] THING {cmd}to{/} PLAYER, {cmd}search{/} (for hidden ways)\n" +
             "Crafting:  {cmd}skin{/}, {cmd}bleed{/}, {cmd}harvest{/}, {cmd}craft{/}, {cmd}combine{/}, {cmd}recipes{/}, {cmd}recipe{/}, {cmd}proficiencies{/},\n" +
             "           {cmd}apply{/} THING; with a trainer: {cmd}lessons{/}, {cmd}learn{/} NAME ({cmd}help crafting{/}, or help with one of those words)\n" +
+            "Ranks:     with a trainer of your calling: {cmd}ranks{/} (what you can learn and what it asks), {cmd}train{/} SKILL (buy the next rank; {cmd}help ranks{/})\n" +
             "Town:      {cmd}browse{/}, {cmd}buy{/} THING, {cmd}sell{/} THING, {cmd}value{/} THING (in a shop), {cmd}quests{/},\n" +
             "           {cmd}accept{/} QUEST and {cmd}report{/} (in the Adventurers Guild)\n" +
             "Colour:    command names like these are highlighted; {cmd}ansi off{/} turns colour off, {cmd}ansi on{/} turns it on.\n");

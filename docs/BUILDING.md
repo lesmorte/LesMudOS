@@ -742,6 +742,31 @@ public class ExampleArea : Area
 
 **A skill, spell or trait** is one file in `/skills`, found by the registry without any list to edit. It inherits `/std/skill` (a `Command` word, `EnduranceCost` or `FocusCost`, `Preparation`, `Recovery`, `Target` of `enemy`, `friend` or `item`, and `Resolve(user, target)`) or `/std/trait` (`Mods["armor"] = 1;` and the other modifier keys listed in CLASS_SYSTEM.md section 12). Items grant skills by overriding `QueryGrantedSkills()`.
 
+**A skill's ranks** (docs/specs/skill-ranks.md; CLASS_SYSTEM.md section 13). Every skill with a command word has ranks without any work: rank r needs level 5 x (r - 1), and a rank you do not describe adds 30% of the rank I value to each effect and 15% of the rank I cost to each cost. Write a table only where you want other numbers, in the skill's own `Create()`:
+
+```
+// Path: /skills/arcane_bolt.cs (the real one, shortened)
+        FocusCost = 20;                              // rank I's cost (key "focus"; "endurance" for EnduranceCost)
+        Effect("min", 6);                            // rank I numbers of the skill's own, by name
+        Effect("max", 9);
+        RankRow(2, "min=8;max=12;focus=23");         // rank II; a key left out takes the default step
+        RankRow(3, "min=10;max=14;focus=26");        // rank IV and on: the default step from rank III
+```
+
+Read every number through the helper, never with your own arithmetic: `RankInt("min", RankOf(user))` in `Resolve` (the engine already reads `focus`, `endurance`, `tohit` (ToHitBonus), `crit` (CritChance), `factor` (DamageFactor) and `hits` (Hits, the separate blows of an attack skill) at the user's rank). Override `QuerySummaryAt(rank)` so `skills` shows the rank's numbers. `FixedKeys.Add("seconds")` keeps a number (a duration, a count) the same at every rank unless a row names it; `hits` is fixed already. `RankRow(3, "hits=3;factor=0.6", "Triple Strike")` renames the skill from that rank on. `MaxRank = 1` makes a skill rank I only; `MaxRank = 2` stops it at II. `python3 tests/balance_sim.py check` compares the fighting skills' tables with the simulator's `SKILL_RANKS`, so change both.
+
+**A trainer of ranks** inherits `/std/trainer` (and may sell and teach recipes as well). Its players get `ranks` and `train SKILL`; every check and the change to the character are the rank daemon's (`/secure/ranks`), and the trainer must live in a trusted tree (`/domains`, not `/wiz`).
+
+```
+// Path: /domains/hollow/npc/halbert_quill.cs (the rank lines)
+        TeachCalling("mage", 2, 2);                                  // rank II of every ranked Mage skill, on level and the default price
+        AddRankOffer("arcane_bolt", 2, 40, "kills goblin 10");       // this offer on its own terms: price and requirement lines
+        AddRankLine("kills goblin 10", "Ten goblins, and then we will talk about the second working.");
+        ElsewhereLine = "The third rank and beyond are taught in Oakenfell, at the Hall of Legends.";
+```
+
+Requirement lines, all of which must hold (the level line is added from the cap rule): `quest QUEST-ID` (completed), `kills KIND N` (creatures of a kind slain: the beast-table kind, `Skin` or `Blood`, else `ChronicleKind`, else the file name), `kills_with SKILL-ID N` (killing blows struck with that skill), `renown N`, `standing FACTION N` (always unmet until factions exist), `item /path/of/item` (shown) or `item /path/of/item take` (handed over). Default prices are `RankDaemon.RankPrices` (II 40, III 150, IV 400, V 900); a price of -1 in `AddRankOffer` uses them. Several trainers may share a room: each answers only the callings it teaches.
+
 **A class** is one file in `/classes` inheriting `/std/pclass`: tier, parent, `Require("level", "5")`, `ExpModifier`, `AttackRate`, `Skills`, `Traits`, `Weapons`, `ArmorTypes`, `Enabled`. Advanced classes are given with `player.Call<string>("ApplyClass", id)`. CLASS_SYSTEM.md section 12 has the full story.
 
 ## Vitality, Endurance and Focus in content
