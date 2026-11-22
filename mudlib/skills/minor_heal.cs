@@ -2,7 +2,7 @@
 
 /// <summary>
 /// Priest spell. Restores Vitality to the caster or to someone in the room (Divine Knowledge and Healing Power add their share on top).
-/// The rank table is below. PROVISIONAL: see the note on the numbers.
+/// The large heal: 20 / 38 / 60 Vitality at ranks I / II / III, and the caster cannot cast it again for HealWait seconds.
 /// </summary>
 public class MinorHealSpell : Skill
 {
@@ -11,22 +11,24 @@ public class MinorHealSpell : Skill
         Title = "Minor Heal";
         Command = "heal";
         Kind = "spell";
-        Summary = "Restores 7 Vitality to you or to someone in the room.";
+        Summary = "Restores 20 Vitality to you or to someone in the room. You cannot cast it again for 15 seconds.";
         FocusCost = 25;
         Preparation = 0.5;
         Recovery = 1.0;
         WindUp = "murmurs a prayer";
         Target = "friend";
-        // PROVISIONAL, pending the owner's choice (docs/specs/skill-ranks.md, "Minor Heal"; the options are in `python3 tests/balance_sim.py
-        // ranks heal`). The spec's table is 20 / 38 / 60 Vitality for 25 / 32 / 40 Focus. Shipped is the simulator's option (b): the largest
-        // rank I heal that keeps the Priest within 5 points of the five callings' mean (level 5 Overseer, middle human, resting), with the
-        // spec's costs, and the later ranks by the default step from it: 7 / 9 / 11 / 13 Vitality for 25 / 32 / 40 / 44 Focus.
-        Effect("heal", 7);
-        RankRow(2, "focus=32");
-        RankRow(3, "focus=40");
+        // The owner's table (docs/specs/skill-ranks.md, "Owner's decisions after the build"): 20 / 38 / 60 Vitality for 25 / 32 / 40 Focus,
+        // later ranks by the default step from rank III's numbers, and no second Minor Heal by the same caster for HealWait seconds.
+        Effect("heal", 20);
+        Effect("wait", HealWait);
+        RankRow(2, "heal=38;focus=32");
+        RankRow(3, "heal=60;focus=40");
     }
 
-    public override string QuerySummaryAt(int rank) => $"Restores {RankInt("heal", rank)} Vitality to you or to someone in the room.";
+    /// <summary>Seconds after a Minor Heal begins during which the same caster cannot cast another (per caster, not per target). The one place it is named.</summary>
+    private const int HealWait = 15;
+
+    public override string QuerySummaryAt(int rank) => $"Restores {RankInt("heal", rank)} Vitality to you or to someone in the room. You cannot cast it again for {RankInt("wait", rank)} seconds.";
 
     public override void Resolve(ObjectRef user, ObjectRef? target)
     {

@@ -61,7 +61,7 @@ public abstract class Skill : MudObject
     /// <summary>The skill's own rank I numbers by name ("min" 6, "max" 9, "heal" 8), for what the fields above do not hold.</summary>
     protected readonly Dictionary<string, double> Effects = new();
     /// <summary>Numbers that a rank does not change unless a row names them ("hits", "range", "seconds").</summary>
-    protected readonly HashSet<string> FixedKeys = new() { "hits" };
+    protected readonly HashSet<string> FixedKeys = new() { "hits", "wait" };
     private readonly Dictionary<int, Dictionary<string, double>> rankRows = new();
     private readonly Dictionary<int, string> rankTitles = new();
 
@@ -177,6 +177,12 @@ public abstract class Skill : MudObject
     public int QueryCritChanceFor(ObjectRef? user) => RankInt("crit", RankOf(user));
     public double QueryDamageFactorFor(ObjectRef? user) => RankValue("factor", RankOf(user));
     public int QueryHitsFor(ObjectRef? user) => Math.Max(1, RankInt("hits", RankOf(user)));
+
+    /// <summary>The rank this user holds, for the engine.</summary>
+    public int QueryRankFor(ObjectRef? user) => RankOf(user);
+
+    /// <summary>Seconds the caster must wait after one use before using this skill again (the "wait" Effect; 0: no wait).</summary>
+    public int QueryWaitSeconds(int rank) => Math.Max(0, RankInt("wait", rank));
 
     /// <summary>The summary at a rank. A skill whose summary quotes numbers overrides it.</summary>
     public virtual string QuerySummaryAt(int rank) => Summary;

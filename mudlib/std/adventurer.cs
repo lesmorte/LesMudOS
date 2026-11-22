@@ -689,6 +689,7 @@ public abstract class Adventurer : Living
         var id = skill.Call<string>("QueryId") ?? "";
         var rank = QuerySkillRank(id);
         var line = skill.Call<string>("LineAt", delay, Math.Max(1, rank)) ?? "";
+        if (QuerySkillWaitLeft(id) is > 0 and var waitLeft) line += $" (you may cast it again in {waitLeft} second{(waitLeft == 1 ? "" : "s")})";
         if (!skill.Call<bool>("QueryHasRanks") || rank < 1) return line;
         var next = rank + 1;
         if (!skill.Call<bool>("QueryRankExists", next)) return line + " (the highest rank)";

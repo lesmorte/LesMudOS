@@ -42,6 +42,8 @@ public class CombatAction
     public ObjectRef? Item;
     /// <summary>Blows an attack action makes, each with its own dodge, hit, critical and block rolls (Double Strike: 2).</summary>
     public int Hits = 1;
+    /// <summary>Seconds after this action begins before the same skill may be used again by the same creature (Minor Heal: 15); 0: no wait. Set by UseSkill from the skill's data.</summary>
+    public int WaitSeconds;
 }
 
 /// <summary>
@@ -1204,6 +1206,11 @@ public abstract class Living : Thing
             Tell("You no longer have what you meant to use.\n");
             action = null;
         }
+        if (action != null && action.WaitSeconds > 0 && action.Skill != null && QuerySkillWaitLeft(action.Id) > 0)
+        {
+            Tell(SkillWaitRefusal(action.Id, action.Name) + "\n");
+            action = null;
+        }
         if (action != null && !CanPay(action))
         {
             Tell($"You no longer have the strength or the focus for {action.Name}.\n");
@@ -1235,6 +1242,7 @@ public abstract class Living : Thing
             paidFocus = action.FocusCost;
         }
         var now = TimeMs();
+        if (action.WaitSeconds > 0 && action.Skill != null) skillWaits[action.Id] = now + action.WaitSeconds * 1000L;
         var prep = PrepMs(action);
         current = action;
         currentTarget = target;
@@ -1400,6 +1408,28 @@ public abstract class Living : Thing
         return false;
     }
 
+    // ---- Combat: skill waits ----
+    // A skill may name a wait (Minor Heal: 15 seconds) before the same creature may use it again. The wait is kept here, on the creature that
+    // used it (not on the target, not saved, so it ends when the character leaves), and only Begin sets it: no other object can set or clear it.
+
+    private readonly Dictionary<string, long> skillWaits = new();
+
+    /// <summary>Whole seconds (rounded up) until this creature may use the skill again; 0 if it may now.</summary>
+    public int QuerySkillWaitLeft(string skillId)
+    {
+        if (!skillWaits.TryGetValue(skillId ?? "", out var until)) return 0;
+        var left = until - TimeMs();
+        if (left <= 0) { skillWaits.Remove(skillId ?? ""); return 0; }
+        return (int)((left + 999) / 1000);
+    }
+
+    private string? SkillWaitRefusal(string skillId, string title)
+    {
+        var left = QuerySkillWaitLeft(skillId);
+        if (left <= 0) return null;
+        return $"You cannot cast {title} again so soon: {left} second{(left == 1 ? "" : "s")} left before you may.";
+    }
+
     // ---- Combat: skills ----
 
     /// <summary>Can this action be paid for right now?</summary>
@@ -1416,6 +1446,7 @@ public abstract class Living : Thing
     protected string? UseSkill(ObjectRef skill, ObjectRef? target)
     {
         if (Dead) return "You are in no state to do that.";
+        if (SkillWaitRefusal(skill.Call<string>("QueryId") ?? "", skill.Call<string>("QueryTitle") ?? "that") is { } waiting) return waiting;
         var isSpell = skill.Call<string>("QueryKind") == "spell";
         if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
         // Every number comes from the skill at the rank this creature holds (docs/specs/skill-ranks.md): the skill's one helper reads it.
@@ -1432,6 +1463,7 @@ public abstract class Living : Thing
             ToHitBonus = skill.Call<int>("QueryToHitBonusFor", Self), CritChance = skill.Call<int>("QueryCritChanceFor", Self),
             DamageFactor = skill.Call<double>("QueryDamageFactorFor", Self), DamageMultiplier = Math.Max(1, skill.Call<int>("QueryDamageMultiplier")),
             Hits = Math.Max(1, skill.Call<int>("QueryHitsFor", Self)), Skill = skill,
+            WaitSeconds = skill.Call<int>("QueryWaitSeconds", skill.Call<int>("QueryRankFor", Self)),
         };
         if (!CanPay(action))
             return QueryEndurance() < action.EnduranceCost ? "You are too tired for that." : "You do not have the focus for that.";

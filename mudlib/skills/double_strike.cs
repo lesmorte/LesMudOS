@@ -12,7 +12,7 @@ public class DoubleStrikeSkill : Skill
         Title = "Double Strike";
         Command = "double";
         Summary = "Two quick blows, each at 60% of weapon damage and each with its own hit roll.";
-        EnduranceCost = 20;
+        EnduranceCost = 35;
         Preparation = 0.5;
         Recovery = 1.0;
         WindUp = "shifts their grip for a quick pair of blows";
