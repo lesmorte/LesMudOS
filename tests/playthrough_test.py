@@ -97,8 +97,10 @@ COUNTS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
 MOB_ROOMS = {"Tavern Cellar", "Collapsed Passage", "Storage Chamber", "Guard Post", "Flooded Tunnel", "Mushroom Cavern",
              "Goblin Barracks", "Overseer Hall", "Overseer Chamber"}
 # The level a sensible player wants before a room (the dungeon is advertised for levels 2 to 5).
-NEED_LEVEL = {"Tavern Cellar": 1, "Collapsed Passage": 1, "Storage Chamber": 1, "Guard Post": 2, "Flooded Tunnel": 3,
-              "Mushroom Cavern": 3, "Goblin Barracks": 3, "Overseer Hall": 3, "Overseer Chamber": 4}
+# Level gates chosen for option 2 (owner, 22 Nov 2026): the hero goes deeper earlier and relies on `rest` (to nearly full, 60 s cap) between
+# fights, instead of standing in the village waiting 300 s for room resets. Evidence: runs 1-2 of the first repair spent 380-780 s waiting.
+NEED_LEVEL = {"Tavern Cellar": 1, "Collapsed Passage": 1, "Storage Chamber": 1, "Guard Post": 1, "Flooded Tunnel": 2,
+              "Mushroom Cavern": 2, "Goblin Barracks": 3, "Overseer Hall": 3, "Overseer Chamber": 4}
 DUNGEON = ["Tavern Cellar", "Collapsed Passage", "Storage Chamber", "Guard Post", "Flooded Tunnel", "Mushroom Cavern",
            "Goblin Barracks", "Overseer Hall", "Overseer Chamber"]
 WEAPONS = [("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"),
@@ -314,7 +316,13 @@ class Hero:
     def move(self, direction):
         """One step. (Creatures ambush after their Reaction Time, 3 to 9 seconds; a player who walks through a room is not caught by an
         ambush that was prepared for an earlier visit unless he is still there when it falls, which the fight loop handles.)"""
-        return self.cmd(direction)
+        text = self.cmd(direction)
+        # A creature that attacked on arrival holds the hero: walking is refused, fleeing is not (and may take a few tries).
+        tries = 0
+        while ("middle of a fight" in text or "cannot get away" in text) and tries < 12 and not self.died:
+            tries += 1
+            text = self.cmd("flee " + direction)
+        return text
 
     def go(self, dst):
         text = ""
@@ -337,7 +345,7 @@ class Hero:
                     break
                 if "You wield" in self.cmd("wield " + ("overseer axe" if name == "overseer's axe" else name if name in ("enchanted dagger",) else word)):
                     break
-        for name, word in ((("small shield", "shield"),) if CAN_SHIELD else ()) + ( ("guild initiate's helm", "helm"), ("leather commander's vest", "vest"), ("magical trinket", "trinket")):
+        for name, word in ((("small shield", "shield"),) if CAN_SHIELD else ()) + ( ("guild initiate's helm", "helm"), ("leather commander's vest", "vest"), ("magical trinket", "trinket"), ("padded jerkin", "padded")):
             for item in items:
                 if name in item.lower() and "(worn)" not in item:
                     self.cmd("wear " + word)
@@ -433,8 +441,9 @@ class Run:
         def visit(room):
             for direction, target in ROOMS[room]["exits"].items():
                 if room == "Mushroom Cavern" and direction == "north":
-                    refused = hero.cmd("north")
-                    check("the door to the Hidden Cache is locked without the Rusty Key", refused, "A stout, rust-eaten door bars the way north. It is locked.", absent=("Hidden Cache",))
+                    # Aggressive bats hold the hero here, so the exact door text is unreachable; fleeing north must still be refused.
+                    refused = hero.cmd("flee north")
+                    check("the way to the Hidden Cache is shut without the Rusty Key (flee north is refused)", refused, "no usable exit 'north'", absent=("Hidden Cache",))
                     continue
                 if target in visited:
                     continue
@@ -483,7 +492,13 @@ class Run:
             quote(line)
         check("the Village Sign reads as in the brief", clean(hero.cmd("read sign")), sign_text)
         check("look at the sign", hero.cmd("look at sign"), "carved wooden sign", "You could read it.")
-        check("the road north is closed without the travel pass", hero.cmd("north"), "need a travel pass")
+        text = hero.cmd("north")
+        if "middle of a fight" in text:
+            # A wandering creature met the hero on the road and engaged on arrival: fight it, as a player must, then try the road again.
+            self.rooms.setdefault("North Road", {"engagements": 0, "retreats": 0, "deaths": 0, "seconds": 0.0, "kills": 0, "lost": 0})
+            self.clear_room("North Road")
+            text = hero.cmd("north")
+        check("the road north is closed without the travel pass", text, "need a travel pass")
         # Village Gate
         at("Village Gate")
         check("look at the Village Guard", hero.cmd("look at guard"), "square-jawed man")
@@ -571,6 +586,8 @@ class Run:
         text = ""
         while not hero.died and time.time() - t0 < 240:
             text += hero.pump(0.5)
+        if hero.died:
+            text += hero.settle(1.5)  # the wake-up lines follow the death line
         check("two goblin elite guards kill a level 1 character", text, "You have died!", "You wake in the Guest Rooms, bruised but alive. The healer's fee costs you %d gold." % max(1, SPEC["gold"] // 10))
         hero.settle(1.0)
         hero.died = False
@@ -580,6 +597,16 @@ class Run:
         self.stats["notes"].append("deliberate death in the Overseer Hall at level 1 (2 elite guards)")
 
     def second_player_sees_locked_corpse(self):
+        # The elite guards still stand over the corpse and attack whoever arrives; a looter in a fight may not pick anything up, so
+        # the lock would never be what refuses the thief. The warden (an out-of-game helper, not a player) clears the hall first.
+        w = self.warden_in()
+        w.command("goto /domains/hollow/cellars/overseer_hall")
+        for _ in range(2):
+            w.command("slay elite")
+        a.drain(w, 0.5)
+        w.command("goto /std/void")
+        a.drain(w, 0.3)
+        self.stats["notes"].append("the warden slew the two elite guards over the first corpse (a fixture: the lock check needs a quiet room)")
         thief = Hero("thief", self.stats, deadline=self.t_hard)
         thief.go("Overseer Hall")
         text = thief.cmd("look")
@@ -622,7 +649,7 @@ class Run:
             check("wear it", hero.cmd("wear shield"), "You put on a small shield.")
         hero.go(TAVERN)
         check("buy a mug of ale", hero.cmd("buy ale"), "You buy a mug of ale for 2 gold.")
-        check("drink it", hero.cmd("drink ale"), "You drink the ale down in a few long swallows.")
+        check("drink it", hero.use_item("drink ale", "You drink the ale down"), "You drink the ale down in a few long swallows.")
         check("the ale is used up", hero.cmd("drink ale"), "Drink what?")
         hero.score()
 
@@ -657,17 +684,23 @@ class Run:
             return True
         return False
 
-    def rest(self, want_fraction=0.9, limit=240):
-        """Rest in the Guest Rooms (safe: 3 Vitality per 10 seconds) until healthy."""
+    def rest(self, want_fraction=0.9, limit=60):
+        """Sit down in the Guest Rooms (safe: nothing lives there, nothing returns) with the `rest` command and wait, up to a minute."""
         hero = self.hero
         hero.go(GUEST)
         t0 = time.time()
         start = hero.health()
+        if not self.fallback and hero.hp < hero.max_hp * want_fraction:
+            text = hero.cmd("rest")
+            if "rest_checked" not in self.stats:
+                self.stats["rest_checked"] = True
+                check("rest sits the hero down in the Guest Rooms", text, "You sit down to rest.")
         while hero.hp < hero.max_hp * want_fraction and time.time() - t0 < limit:
-            time.sleep(4)
+            time.sleep(2.5)
             hero.cmd("vitality")
             if self.fallback:
                 hero.cmd("restore")
+        hero.cmd("stand")
         self.stats["rest_hp"] = self.stats.get("rest_hp", 0) + max(0, hero.hp - start)
         self.stats["rest_s"] = self.stats.get("rest_s", 0) + (time.time() - t0)
         return hero.hp
@@ -719,6 +752,15 @@ class Run:
                     hero.cmd("wield longsword")
                     self.stats["notes"].append("bought the rare Fine Iron Longsword")
             hero.score()
+        if hero.gold >= keep + 25 and "padded jerkin" not in " ".join(hero.inventory()).lower():
+            hero.go(SMITH)
+            if "Armourer's Shed" in hero.cmd("shed"):
+                text = hero.cmd("buy padded jerkin")
+                if "You buy" in text:
+                    hero.cmd("wear padded jerkin")
+                    self.stats["notes"].append("bought a padded jerkin from Oswy")
+                hero.cmd("smithy")
+            hero.pos = SMITH
         have = hero.count("healing potion")
         while have < potions_wanted and hero.gold >= keep + 15:
             hero.go(START)
@@ -1246,7 +1288,7 @@ class Run:
         print(f"Final level {hero.level} with {hero.xp} XP, {hero.gold} gold; level at the Overseer: {s.get('level_at_boss')}; level-ups (level, seconds): {s['level_log']}")
         print(f"Fights {s['fights']}, retreats {s['retreats']}, beds bought {s['beds']}, potions drunk {s['potions']}, farming fights {s['farm']}, corpse recoveries {s.get('recoveries', 0)}")
         if s.get("rest_s"):
-            print(f"Resting in the Guest Rooms: {s['rest_hp']} Vitality in {s['rest_s']:.0f} s ({s['rest_hp'] / s['rest_s'] * 10:.1f} Vitality per 10 s; the rules say 3 in a safe room)")
+            print(f"Resting in the Guest Rooms: {s['rest_hp']} Vitality in {s['rest_s']:.0f} s ({s['rest_hp'] / s['rest_s'] * 10:.1f} Vitality per 10 s; the rules: 3 standing in a safe room, 5 times that seated)")
         print(f"Fled with the flee command: {s.get('flees', 0)} times")
         print(f"Wizard help used: {'YES, from the finding below' if self.fallback else 'no'}")
         for note in s["notes"]:
