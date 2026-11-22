@@ -267,6 +267,19 @@ public class SiteTests
     }
 
     [Fact]
+    public async Task The_play_page_points_to_the_mudlet_guide_and_links_it_only_when_configured()
+    {
+        using var without = Open("empty");
+        var (_, plain, _) = await without.Get("/play");
+        Assert.Contains("docs/MUDLET.md", plain);
+        Assert.DoesNotContain("how to install the Mudlet map", plain);
+        using var with = Open("empty", new() { ["Site:MudletDocsUrl"] = "https://docs.example/MUDLET.md" });
+        var (_, linked, _) = await with.Get("/play");
+        Assert.Contains("href=\"https://docs.example/MUDLET.md\"", linked);
+        Assert.Contains("how to install the Mudlet map", linked);
+    }
+
+    [Fact]
     public async Task Play_page_uses_the_configured_address_and_port()
     {
         using var site = Open("empty", new() { ["Site:GameHost"] = "play.example", ["Site:GamePort"] = "4242" });
