@@ -186,3 +186,14 @@ The simulator showed the formulas above make most callings much stronger once a 
 Priest and Adventurer tables are unchanged. Known consequences: a character who places no points is weak (61 / 63 / 60 / 35 / 59), the Mage most of all; level 5 remains easy for everyone (93-98%). `tests/balance_sim.py` must model placed points (2 a level, in the calling's obvious attributes) as its main table and keep the unspent case as a second table. Skill ranks and the larger heal will need a second pass.
 
 **A person is not the simulator (added 21 November 2026).** The 71% above is for a player who acts the instant he can, drinks at exactly 35% and starts every fight at full Vitality. `docs/BALANCE_HUMAN.md` adds a human player model (typing delays, skipped skills, late potions, fleeing, resources carried from room to room), the whole approach from the cellar through the two Elite Guards to the Overseer, a calibration against the owner's evening, and what the current numbers mean for a person. Short version: for that human a level 5 character in starting gear with 4 potions wins far less often than 71%; the table 2 numbers here are unchanged and still say what the perfect player does.
+
+## 9. Rest revision (owner-approved 21 November 2026; overrides section 8 where they differ)
+
+`docs/BALANCE_HUMAN.md` showed that a real player, who arrives at each fight hurt, beat the Overseer far less often than the perfect player the tables above were tuned with. The owner approved the `rest` command (`docs/specs/rest.md`, recovery five times faster while seated) and, with it:
+
+| What | Section 8 | Now |
+|---|---|---|
+| Mage Vitality | 4 base, 6 a level | 4 base, **7** a level |
+| Scout Vitality | 3 base, 7 a level | 3 base, **8** a level |
+
+Simulated result for a level 5 character in starting gear with 4 potions and points placed, middle human model, with these two changes and resting: about 81 / 71 / 84 / 73 / 74 (the Priest stays high until Minor Heal is settled in the skill ranks work). Rooms refill whether or not someone is resting in them: that risk is intended.

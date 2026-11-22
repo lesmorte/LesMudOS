@@ -31,3 +31,8 @@ Details in `docs/BALANCE_HUMAN.md` section 10. Numbers to use: **RestFactor 5, R
 - The perfect player's quoted level 4, 2-potion table stays at 72 to 73 on average.
 - Safe places: every cellar room is safe to sit in for about 5 minutes after its fight (a creature cannot return before its corpse is gone, 420 to 600 s); Smuggler Hall has no spawn at all. If corpses are taken away at once (skinning, bleeding, looting), creatures return within 0 to 300 s and about one rest in four is interrupted; the game would need a rule (no refill while someone sits in the room, or corpses stay while someone sits) to keep resting safe.
 - The pace of levels 1 to 5 shortens by about 25% to 35% (87 to 94 minutes without, 62 to 69 with RestFactor 5, farming limited by respawns).
+
+## Owner's decisions (21 November 2026)
+1. **RestFactor 5**, RestSurprise 2.
+2. With it, two class numbers change: **Mage Vitality 4 base + 7 a level** (was 6 a level) and **Scout Vitality 3 base + 8 a level** (was 7). The Priest's Minor Heal is NOT changed here: it is settled in the skill ranks work, where the simulator sets it together with the larger heal already approved there.
+3. **Rooms refill as they do now, resting or not.** Resting is a risk and reward action: a player who strips every corpse at once and then sits down may be caught by the room's creatures returning. No protection for a resting player is to be added.
