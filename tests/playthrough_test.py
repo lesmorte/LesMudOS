@@ -1144,9 +1144,11 @@ class Run:
         if hero.died:
             self.after_death(CHAMBER)
             hero.go(CHAMBER)
+        boss_mark = len(hero.log_text)
         loot = self.clear_room(CHAMBER, boss=True, use_potions=True)
         self.rooms[CHAMBER]["kills"] += 0
-        text = self.boss_text
+        # everything the hero was sent during the fight, including the replies to skill and potion commands (boss_text holds only some)
+        text = self.boss_text + hero.log_text[boss_mark:]
         check("the Overseer's Battle Cry", text, "BATTLE CRY")
         check("the Overseer summons a Goblin Minion once his Vitality falls to half", text, "snarls an order, and a goblin minion scrambles out of the shadows!")
         if "POWER STRIKE" in text:
@@ -1208,15 +1210,22 @@ class Run:
         check("the board shows both contracts done", hero.cmd("read board"), "Clear the Cellar (done)", "Recover the Overseer's Orders (done)")
         check("report again: nothing left to do", hero.cmd("report"), "You have done everything I asked.")
         hero.go("North Road")
+        if hero.enemies():  # a wandering creature engaged on arrival: fight it first, as a player must
+            self.clear_room("North Road")
         text = hero.cmd("north")
+        for _ in range(3):
+            if "middle of a fight" not in text:
+                break
+            self.clear_room("North Road")
+            text = hero.cmd("north")
         check("with the pass the road north is open: the hero walks out onto the Vale Road", text, "The Vale Road")
         check("score names the new area and the region", hero.score(), "Area The Vale Road   Region Greenvale")
         check("the road runs on north", hero.cmd("look"), "north")
-        text = hero.cmd("north")
+        text = hero.move("north")
         check("the Vale Road's north exit leads into the corridor: the first room of the South Road", text, "The South Road, Beyond the Hollow")
         check("score names the corridor's first area", hero.score(), "Area The South Road   Region Greenvale")
-        check("and the way back to the Vale Road", hero.cmd("south"), "The Vale Road")
-        hero.cmd("south")
+        check("and the way back to the Vale Road", hero.move("south"), "The Vale Road")
+        hero.move("south")
         hero.go(GUILD)
         check("score at the end", hero.score(), "Completed quests: Clear the Cellar, Recover the Overseer's Orders", "weapon:", "head: a Guild Initiate's helm")
         # the village after the first quest
