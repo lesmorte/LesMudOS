@@ -4,7 +4,7 @@
 Standalone: it does not talk to the driver. It plays the combat rules of /std/living with the numbers of the creatures,
 items and class files in the mudlib, and prints tables for a solo player of each archetype:
 
-  1. room by room: win rate, HP lost, fight length in seconds, at the level a sensible player has
+  1. room by room: win rate, Vitality lost, fight length in seconds, at the level a sensible player has
   2. the Goblin Overseer against prepared level 4-5 characters
   3. a whole run through the cellars with level-ups, rests, purchases and farming, per archetype
   4. damage per second of every weapon, and a summary of how far each archetype is from the average
@@ -1398,7 +1398,7 @@ def cplayer(arch, level):
 
 def cfight(arch, level, key, potions=0, runs=600, start=None, seed=None):
     """Fight creature `key` one-on-one `runs` times from full HP. start = (stamina, mana) at the start, or full.
-    Returns means: win rate, seconds, net HP lost in won fights, potions drunk, total damage taken, end resources."""
+    Returns means: win rate, seconds, net Vitality lost in won fights, potions drunk, total damage taken, end resources."""
     wins = 0
     sec_w = sec_l = 0.0
     lost = used = dtot = 0.0
@@ -1535,7 +1535,7 @@ def check_mudlib():
     problems = []
     for name, f in files.items():
         k, text = KINDS[name], read(f"mob/{f}.cs")
-        want = {"Level": k.level, "MaxHp": k.hp, "DamageMin": k.dmg[0], "DamageMax": k.dmg[1], "ToHit": k.to_hit,
+        want = {"Level": k.level, "MaxVitality": k.hp, "DamageMin": k.dmg[0], "DamageMax": k.dmg[1], "ToHit": k.to_hit,
                 "Armor": k.armor, "XpValue": k.xp, "BaseReaction": k.reaction}
         for field, value in want.items():
             have = num(text, field)
@@ -1597,7 +1597,7 @@ def check_corridor(problems):
             problems.append(f"{k.id}: file missing")
             continue
         text = open(path, encoding="utf-8").read()
-        want = {"Level": k.level, "MaxHp": k.hp, "DamageMin": k.dmg[0], "DamageMax": k.dmg[1], "ToHit": k.to_hit,
+        want = {"Level": k.level, "MaxVitality": k.hp, "DamageMin": k.dmg[0], "DamageMax": k.dmg[1], "ToHit": k.to_hit,
                 "Armor": k.armor, "XpValue": k.xp, "BaseReaction": k.reaction, "Dodge": k.dodge,
                 "GoldMin": k.gold[0], "GoldMax": k.gold[1]}
         for field, value in want.items():
@@ -1618,7 +1618,7 @@ def check_corridor(problems):
         have = {a.id: [a.name, a.prep, a.rec, a.mult, a.kind, a.factor, a.hit] for a in k.acts}
         if got != have:
             problems.append(f"{k.id}: actions {got} in the file, {have} in the simulation")
-        opening, cycle, trig = arr(text, "opening"), arr(text, "cycle"), arr(text, "triggerHp")
+        opening, cycle, trig = arr(text, "opening"), arr(text, "cycle"), arr(text, "triggerVitality")
         tact = arr(text, "triggerAction")
         first, cyc, at = k.pattern
         if not cycle and not opening and len(k.acts) == 1:
@@ -1649,7 +1649,7 @@ def corridor_table(runs=400, only=()):
     """Win rate (percent) of each calling against each corridor creature at the low, middle and high level of its band, with the
     gap of the furthest calling from the five-calling average. Bosses are fought with CORRIDOR_POTIONS potions."""
     random.seed(11)
-    print(f"{'creature':22}{'L':>3} {'pl':>3}  " + "".join(f"{a[:3]:>5}" for a in ARCHS) + f" {'avg':>5} {'spread':>7} {'sec':>5} {'hp lost':>8}")
+    print(f"{'creature':22}{'L':>3} {'pl':>3}  " + "".join(f"{a[:3]:>5}" for a in ARCHS) + f" {'avg':>5} {'spread':>7} {'sec':>5} {'Vitality lost':>14}")
     worst = 0.0
     for k in CORRIDOR:
         if only and k.id not in only:
@@ -2378,7 +2378,7 @@ def main():
     print("=" * 118)
     print("1. Room by room, solo, rested, no potions, at the level the room asks for (REQUIRED_LEVEL), the +5 HP trinket from the")
     print("   Mushroom Cavern on. Gear by level: the archetype's weapon progression (see ARCHS), shield where it carries one.")
-    print("   Each cell: win% / HP lost in won fights.")
+    print("   Each cell: win% / Vitality lost in won fights.")
     print("=" * 118)
     print(f"{'Room':<19}{'Lvl':>3}  " + "".join(f"{n:>16}" for n in names))
     rooms = dict(ROOMS)
@@ -2399,7 +2399,7 @@ def main():
     print("2. The Goblin Overseer, solo, from full HP, best gear the archetype can buy in the village (+5 HP trinket), potions at 35% HP.")
     print("   Kill% = the Overseer dies before the player. Survive% = the player is alive at the end of the whole fight.")
     print("=" * 118)
-    print(f"{'Archetype':<12}{'Lvl':>4}{'Potions':>8}{'Kill%':>7}{'Survive%':>10}{'HP lost':>9}{'Seconds':>9}{'Actions':>9}")
+    print(f"{'Archetype':<12}{'Lvl':>4}{'Potions':>8}{'Kill%':>7}{'Survive%':>10}{'Vitality lost':>14}{'Seconds':>9}{'Actions':>9}")
     boss = {}
     for n in names:
         a = ARCHS[n]
@@ -2407,7 +2407,7 @@ def main():
             for potions in (0, 2):
                 kill, survive, lost, secs, acts = boss_stats(n, level, a.weapons[-1], potions, TRINKET_HP, runs)
                 boss[(n, level, potions)] = kill
-                print(f"{n:<12}{level:>4}{potions:>8}{kill * 100:>6.0f}%{survive * 100:>9.0f}%{lost:>9.1f}{secs:>9.1f}{acts:>9.1f}")
+                print(f"{n:<12}{level:>4}{potions:>8}{kill * 100:>6.0f}%{survive * 100:>9.0f}%{lost:>14.1f}{secs:>9.1f}{acts:>9.1f}")
     print()
     print("2b. The same, for a character who has placed none of its attribute points (2 potions):")
     global PLACE_POINTS

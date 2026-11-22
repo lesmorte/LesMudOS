@@ -242,7 +242,7 @@ village gear, 400 fights per cell. Ordinary creatures: no potions. Bosses: five 
 the five-calling average. `python3 tests/balance_sim.py corridor 400` reproduces the table.
 
 ```
-creature                L  pl    war  sco  pri  mag  adv   avg  spread   sec  hp lost
+creature                L  pl    war  sco  pri  mag  adv   avg  spread   sec  Vitality lost
 field_rabbit            1   5    100  100  100  100  100   100       0     2        0
 field_rabbit            1   6    100  100  100  100  100   100       0     2        0
 roe_deer                3   5    100  100  100  100  100   100       0    17        1
