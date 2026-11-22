@@ -20,6 +20,8 @@ public class Torren : Shopkeeper
         AddTopic("mace,staff,bow,bows,maces,staves", "A mace for the temple folk, a staff for the scholars, a bow for the ones who like their enemies at arm's length. Cheap, all three. Not everyone is trained for every weapon, mind: swords for those who know them, and so on.");
         AddTopic("better,improved,felling,flanged,boar,dirk,upgrade,armour,armor,jerkin,shed", "Once you have a few coins, there is better steel on the rack: a felling axe, a flanged mace, a boar spear and a steel dirk. For armour, go through the door in the north wall to Oswy's shed; he does leather and padding, and I do not. Bows are Wenna's, in Fletcher's Lane, and staves are Halbert's, in the loft above it.");
         AddTopic("goblins,goblin,cellar", "Goblin steel? Scrap. They bring me broken blades sometimes, and I pay by the pound.");
+        AddTopic("might,strength,strong,arm,arms,muscle,power,heavy,swing", "Might is in the arm, and no steel can lend it. The same sword hits harder in a mighty hand, and a rusty blade swung with Might will out-do a fine one swung by a weakling. I make the iron; the arm is your business.");
+        AddTopic("remembered,famous smith,fame", "The smith before me was remembered for his Might. He could bend a horseshoe straight with his hands, and the village still keeps one of his, bent back the wrong way, over the forge door.");
         AddEmote("Torren hammers a glowing blade on the anvil; sparks fly across the smithy.", 8);
         AddEmote("Torren plunges a blade into the quench barrel with a hiss of steam.", 5);
 

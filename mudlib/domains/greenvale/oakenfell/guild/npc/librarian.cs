@@ -24,6 +24,7 @@ public class GqLibrarian : Npc
         AddTopic("archives,archive,records,downstairs", "The archives are kept below and are open by appointment only. I regret that I cannot make exceptions, though many have asked.");
         AddTopic("scholar,visitor,visiting scholar,man at the table", "A visiting scholar. He has been here some weeks, and he is a diligent reader and a courteous guest. He asks a great many questions, mostly of the shelves, and of anyone else who will listen.");
         AddTopic("rules,silence,quiet", "Silence, tidiness, and return what you borrow. Those are all the rules, and I am prepared to enforce them.");
+        AddTopic("insight,study,learning,knowledge,scholars,wisdom", "Insight is the reason there are books. A reader with plenty will find in a short work what another misses in a long one. The Athenaeum is built for the first sort of reader and puts up with the second.");
         AddEmote("Hester slides a returned book onto a cart and straightens its spine.", 8);
         AddEmote("Hester looks over her spectacles at a whispering pair of apprentices, and the whispering stops.", 6);
     }

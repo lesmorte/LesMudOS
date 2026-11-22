@@ -17,6 +17,12 @@ public class AdventurersGuild : Room
         AddDetail("banners,old banners", "Faded banners of companies long disbanded. Several are scorched, and one has a hole the size of a fist.");
         AddDetail("shields,battered shields", "Dented shields hung up in thanks by those who survived behind them.");
         AddDetail("tables,table,adventurers", "Adventurers lean over maps and mugs, trading rumors in low voices. Most of the talk is about the cellar below the Hollowman's Rest.");
+        AddReadable("labels,brass labels,label,names,roll",
+            "The brass labels under the trophies, read in turn:\n" +
+            "  \"Wolf pelt, North Road. Edda Fenn, remembered for her Grace with a spear.\"\n" +
+            "  \"Boar tusks. Marlow Tyke, remembered for his Might; it took him an hour to lift it.\"\n" +
+            "  \"The skull with the teeth. Joss Pender, remembered for his Resolve; he went back for it.\"",
+            "Each trophy has a little brass label. You could {cmd}read{/} the labels.");
         AddReadable("board,quest board,notice board,notices",
             "The Quest Board\n" +
             "  1. CLEAR THE CELLAR. Goblins have made a stronghold in the Forgotten Cellars beneath the Hollowman's Rest, and something is organizing them. Defeat the Goblin Overseer. Reward: experience, gold and a Guild Initiate's Helm. ({cmd}accept cellar{/})\n" +

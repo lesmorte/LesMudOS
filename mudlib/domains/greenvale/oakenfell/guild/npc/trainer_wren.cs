@@ -21,6 +21,7 @@ public class GqTrainerWren : Npc
         AddTopic("archery,bow,bows,arrow,arrows,shooting", "Stand still, breathe slowly, and let go before you decide to. That is the whole of it. It is also the work of a lifetime.");
         AddTopic("footwork,feet,movement,step", "Light on the toes, weight forward, never planted. A foot is a promise: it says where you will be.");
         AddTopic("rurik,weapons,sword", "Rurik? Shouts a good deal. Teaches a great deal more. He is the best I know at making people stand correctly.");
+        AddTopic("grace,steady,steadiness,aim,hand,hands,precision,accuracy", "Grace, the Hall calls it. I call it patience in the hands. With enough of it the arrow goes where the eye went, and now and then somewhere better. Not even Rurik can shout it into anyone.");
         AddEmote("Wren draws and looses an arrow in a single smooth motion.", 9);
         AddEmote("Wren tilts a student's elbow up with two fingers and nods.", 7);
     }

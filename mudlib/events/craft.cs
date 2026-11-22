@@ -20,7 +20,7 @@ discovery=yes
 renown=5
 renown_first=25
 headline={name} Rediscovered
-text=On {date}, {participants} worked out how to make {name}, a recipe thought forgotten.
+text=On {date}, {participants} worked out how to make {name}, a recipe thought forgotten, and it was Insight that found it.
 rumor=They say {participants} has found how to make {name}.",
         @"id=craft.discover_secret
 title=Secret recipe discovered: {name}
@@ -36,7 +36,7 @@ discovery=yes
 renown=10
 renown_first=50
 headline=The Secret of {name}
-text=On {date}, {participants} discovered by their own hand how to make {name}, a secret no trainer teaches.
+text=On {date}, {participants} discovered by their own hand how to make {name}, a secret no trainer teaches, a feat of Insight.
 rumor=They say {participants} has worked out the secret of {name}.",
     };
 }

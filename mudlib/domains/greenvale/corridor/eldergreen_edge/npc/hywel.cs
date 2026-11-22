@@ -26,6 +26,7 @@ public class EeHywel : Npc
         AddTopic("narrows,ambush", "The Narrows is the worst stretch for a carter. Trees close, bank on one side, drop on the other. We watch it more than any other mile.");
         AddTopic("morwenna,hunter", "I taught her to read a track. She was better than me by the end. If she's gone quiet, she's gone somewhere she chose, and she thought she could get back.");
         AddTopic("pact,thorn pact,oak,marks", "I've seen the marks. I've never seen who makes them. Thirty years, never once. That tells you something, but I'll not tell you what.");
+        AddTopic("insight,noticing,patience,reading,sense,instinct,attention,attend", "Thirty years taught me less than one winter of paying attention. Insight, the Hall calls it: seeing the wolf in the shape of the quiet. You do not get it by being clever, only by looking and remembering what you saw.");
         AddEmote("Hywel strings and unstrings his bow, checking the draw.", 6);
         AddEmote("Hywel stares into the trees for a long moment, then looks away.", 6);
         AddEmote("Hywel rubs his bad knee and mutters about weather.", 6);

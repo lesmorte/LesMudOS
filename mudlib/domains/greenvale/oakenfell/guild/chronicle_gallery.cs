@@ -11,6 +11,11 @@ public class GqChronicleGallery : Room
 
         AddDetail("gallery,windows,clerestory,light", "The windows are set high, so that the light falls onto the walls and not the lectern, and the reader is never dazzled.");
         AddDetail("desk,chroniclers desk,chronicler's desk,stair", "A small desk piled with pens, sand and ledgers, tucked under a narrow stair that leads to the upper stacks. The ink is always fresh.");
+        AddReadable("six words,plaque,dedication,bronze plaque,brass plaque",
+            "THE SIX WORDS\n" +
+            "Set beside the lectern by the first keepers of the Chronicle:\n" +
+            "\"Under six words the deeds of Hollowmere are written: Might, Grace, Vigor, Insight, Spirit and Resolve. Write what was done, and which word it took. A name is remembered for one of them, seldom two.\"",
+            "A bronze plaque is set into the floor beside the lectern. You could {cmd}read{/} it.");
         AddReadable("chronicle,grand chronicle,lectern,book,great book",
             "THE GRAND CHRONICLE\n" +
             "A great book of heavy vellum, bound in oak and iron and set on a lectern worn by the hands of generations of keepers. Its first leaves are inscribed with a single page:\n\n" +

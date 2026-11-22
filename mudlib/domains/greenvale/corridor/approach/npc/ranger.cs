@@ -27,6 +27,7 @@ public class OaRanger : Npc
         AddTopic("panther,cat,beast,ledge", "There's a big cat on the rocks above the old cistern. Not many go up there. The ones who did are why I tell you.");
         AddTopic("mere,river,bend", "The Mere's good water and a good road for the barges. Rivermen are a curious breed; they'd tell you the river listens.");
         AddTopic("goblins,goblin,veterans,den", "There is a den of old goblin soldiers in the woods beyond the hamlet's back fields. They're disciplined, which is the worst thing about them. The farmers don't go west of the last hedge, and neither should you without good reason.");
+        AddTopic("grace,graceful,quiet foot,aim,steady,tracking,archery", "A ranger lives on Grace: the quiet foot, the steady draw, the shot that goes where the eye went. I have seen stronger people than me fall short with a bow because they could not hold still. Grace comes of doing it a thousand times badly.");
         AddEmote("Constance Ardley shades her eyes and studies the far hills.", 8);
         AddEmote("The ranger checks the pennants on the signal post and nods to herself.", 6);
     }

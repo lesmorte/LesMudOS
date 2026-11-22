@@ -27,5 +27,6 @@ public class PriestClass : PlayerClass
         Skills.AddRange(new[] { "minor_heal", "blessing" });
         Traits.AddRange(new[] { "divine_knowledge" });
         Kit.AddRange(new[] { "/domains/hollow/obj/novice_mace", "/domains/hollow/obj/healing_potion" });
+        Description += " Leans on Spirit, with Vigor and Insight behind it.";
     }
 }

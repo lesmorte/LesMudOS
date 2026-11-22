@@ -23,6 +23,7 @@ public class HwMarcella : Npc
         AddTopic("stone,masonry,quarry,green,grey", "Not quarried anywhere in Greenvale that I know of. I took a chip, as the Athenaeum asked. It would not burn, would not dissolve in vinegar, and is lighter than it should be. That is all I know.");
         AddTopic("athenaeum,oakenfell,city,sketch,drawings", "The Athenaeum keeps the city's records. They will want my drawings. I would rather bring them an explanation, but I shall have to bring the drawings.");
         AddTopic("danger,bears,goblins,safe,ranger", "The hunter at the memorial looks in on me. The bears keep to the road at dusk, and the goblins come in the mornings. I draw with my back to the wall, and I jump at everything.");
+        AddTopic("insight,study,method,understanding,learn,learning,discovery,discoveries,notes,patience", "Insight is the only tool I carry that is any use here: the patience to see that a stroke is wrong before you know why. Everyone looks at the carving, and now and then someone sees it. I do not yet know which of those I am.");
         AddEmote("Marcella erases a line with her thumb, studies the wall, and draws it again.", 10);
         AddEmote("Marcella measures the gateway with a knotted cord, muttering numbers.", 8);
         AddEmote("Marcella sighs and turns a page, and her pencil begins again.", 6);

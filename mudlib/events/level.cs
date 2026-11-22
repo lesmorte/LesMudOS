@@ -17,7 +17,7 @@ listed=firsts
 renown=10
 renown_first=100
 headline=The First to Reach Level {level}
-text=On {date}, {participants} became the first to reach level {level} in all of Hollowmere.
+text=On {date}, {participants} became the first to reach level {level} in all of Hollowmere, a feat of Resolve.
 significance=Others will follow the road they walked, but no one will walk it first again.",
     };
 }

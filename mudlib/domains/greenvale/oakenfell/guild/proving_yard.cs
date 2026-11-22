@@ -14,6 +14,12 @@ public class GqProvingYard : Room
         AddDetail("earth,ground,yard,court,dirt", "The earth is packed pale and hard, and swept every dawn. In the middle of it, a faint circle has been worn into the ground by countless feet.");
         AddDetail("wall,rail,spectators", "A low wall with a wooden rail along the top, polished by the elbows of those who lean there to watch. A few apprentices are doing so now, and trying to look as if they are not.");
         AddDetail("trainers,trainer,drills", "Trainers move among the posts in their shirt-sleeves, calling corrections and demonstrating strokes. They have the look of people who care very much and show it only by being strict.");
+        AddReadable("slate,champions slate,names,yard slate,champions",
+            "A slate bolted to the wall, chalked and wiped every season. This season's names are:\n" +
+            "  \"For Might: Hanna Stoke, who broke two posts and apologised to both.\"\n" +
+            "  \"For Grace: Pell of the Westwood Road, who put twelve arrows through one ring.\"\n" +
+            "  \"For Resolve: a boy from the river, who did the full drill with a fever and told nobody.\"",
+            "A chalked slate hangs by the wall. You could {cmd}read{/} it.");
         AddReadable("board,notice,notices,sign",
             "THE PROVING YARD\n" +
             "The yard is open to all who wish to watch or to practice on the posts. Formal training with the trainers will be opened at a later date. Please return all practice weapons to their racks. Please do not take the posts home.",

@@ -27,5 +27,6 @@ public class ScoutClass : PlayerClass
         Skills.AddRange(new[] { "tracking", "precision_strike" });
         Traits.AddRange(new[] { "evasion" });
         Kit.AddRange(new[] { "/domains/hollow/obj/hunting_bow", "/domains/hollow/obj/iron_dagger" });
+        Description += " Leans on Grace, with Insight and Resolve behind it.";
     }
 }

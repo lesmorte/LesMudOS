@@ -27,5 +27,6 @@ public class WarriorClass : PlayerClass
         Skills.AddRange(new[] { "shield_bash" });
         Traits.AddRange(new[] { "defensive_training", "weapon_proficiency" });
         Kit.AddRange(new[] { "/domains/hollow/obj/rusty_sword", "/domains/hollow/obj/small_shield" });
+        Description += " Leans on Might, Vigor and Resolve.";
     }
 }

@@ -17,6 +17,7 @@ public class VillageGuard : Npc
         AddTopic("vincent,holloway,founder", "Vincent raised the first stockade just south of here, where the square is now. I stand where his watchmen would have stood, and I keep my eyes open.");
         AddTopic("harland,tavern,rest,hollowman", "Harland keeps the Hollowman's Rest, and the best ale in the valley. Ask him about the cellar, if you've the stomach for it.");
         AddTopic("loot,corpse,corpses,spoils", "Anything that dies down there leaves a corpse. Go through it with {cmd}loot{/}, and be quick about it; they rot.");
+        AddTopic("watch,watchmen,duty,night,nights,resolve,vigil", "A watchman needs Resolve more than a spear. Anyone can stand a watch when it is quiet. The Resolve is for the hour before dawn, when it is not.");
         AddEmote("The guard shifts his spear to his other shoulder and scans the road to the north.", 6);
     }
 }

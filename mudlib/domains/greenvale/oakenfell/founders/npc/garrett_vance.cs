@@ -22,6 +22,7 @@ public class FdJoryVance : Npc
         AddTopic("adventure,adventurers,roads,roads of greenvale,past", "I carried a borrowed sword out of the Southgate with four friends and came back with a name and one friend. It is a good trade, if you count the name.");
         AddTopic("elder lane,lane,houses", "The oldest houses in the city, and the quietest lane. Nobody lives at the end any more except the ivy.");
         AddTopic("city,oakenfell,founders,street", "I have been here all my life, and I still find new things. The old city is hiding in plain sight. You only have to want it.");
+        AddTopic("vigor,vitality,survive,survival,scars,scar,remembered,wounds", "I was remembered, for a short time, for my Vigor. I took more wounds than the other four put together, and kept getting up. It is a poor thing to be remembered for. The ones remembered for their Insight lived longer.");
         AddEmote("Garrett Vance rubs his stiff knee and mutters something about the weather.", 6);
         AddEmote("Garrett Vance taps the pavement with his walking stick and gives the lane to the west a long, thoughtful look.", 5);
     }

@@ -20,6 +20,7 @@ public class Benson : Npc
         AddTopic("vincent,founder,holloway", "Vincent Holloway. Came up from the south with a handful of friends and a wagon of tools. Built the first stockade right where the square is now.");
         AddTopic("well", "Dug in the first winter, when the ground was like iron. They say Vincent himself kept digging after the others gave up.");
         AddTopic("goblins,goblin,cellar", "They came up from below a few years back. Folk say something is organizing them now. I say it's none of my business, and I'm too old to make it so.");
+        AddTopic("resolve,stubborn,stubbornness,remembered,remember,digging", "They say Vincent was remembered for his Resolve, and my grandfather said the same, though he put it plainer: the man would not stop. Dug that well when the ground was iron, and kept at it after the others laid down their spades.");
         AddEmote("Benson leans on the well and squints at the northern sky.", 6);
         AddEmote("Benson mutters something about the price of turnips.", 4);
     }

@@ -25,6 +25,7 @@ public class HwCassian : Npc
         AddTopic("ruins,mossgate,arch,old,builders", "Older than the Riverwatch, older than Oakenfell, older than the Assembly's books. I don't ask who. There's a scholar down the road who asks, and she doesn't enjoy the answers.");
         AddTopic("stones,ritual,ritual stones,pact,thorn pact,thorn,thread", "Someone keeps the stones north of the spring. The thread changes, the ground is swept. I've never seen who. I've never wanted to. I leave the thread as I find it.");
         AddTopic("spring,deer,wolf,wolves", "The animals don't fear the spring, and I don't hunt near it. As for the wolf, if you see tracks as wide as your hand, you've seen enough.");
+        AddTopic("resolve,remembered,vigil,watch,edric,dusk watch", "Edric was remembered by the whole station for his Resolve. He kept the dusk watch here for eleven years and never once left the cairn early. The last time he went out, we kept the watch for him, and we are still keeping it.");
         AddEmote("Cassian turns an arrow over in his fingers, sighting down the shaft at the trees.", 8);
         AddEmote("Cassian sets a small stone on the cairn and rests his hand on it a moment.", 4);
         AddEmote("Cassian stills and listens, then relaxes a little.", 8);

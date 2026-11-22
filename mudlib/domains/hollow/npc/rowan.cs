@@ -33,6 +33,9 @@ public class Rowan : Npc
         AddTopic("cellar,goblins,goblin,overseer", "Goblins have taken the old smugglers' tunnels beneath the Hollowman's Rest. Lately they've grown organized. There's an Overseer down there, and he's the one you want.");
         AddTopic("vincent,holloway,founder", "Vincent Holloway built this village. He vanished decades ago, looking for something under the earth. Nobody believed him then.");
         AddTopic("crow", "The Crow? I have never heard the name. If you find it written down somewhere, bring it to me.");
+        AddTopic("attributes,attribute,improve,points,point,placing,placed,spend,spending,six", "Every level the guild gives you two points to place among six attributes: Might, Grace, Vigor, Insight, Spirit and Resolve. Say {cmd}improve{/} to see them, and {cmd}improve might{/} to place one. A person who never spends their points is a poor risk, and I have buried one or two of those.");
+        AddTopic("callings,calling,warrior,scout,priest,mage,adventurer,class,classes,lean,leans", "A Warrior leans on Might and Vigor, and holds on by Resolve. A Scout is Grace first, with Insight to read the ground. A Priest is Spirit, steadied by Vigor; a Mage is Insight, then Spirit. An Adventurer begins even in all six, and chooses along the road.");
+        AddTopic("remembered,remember,fame,renown,stories,songs,legend,legends", "Folk remember a person for one thing. Vincent is remembered for his Resolve, because he went on digging when the others quit. Do something worth one word, and the guild will find it.");
         AddEmote("Rowan studies a map pinned to the wall and frowns.", 5);
     }
 

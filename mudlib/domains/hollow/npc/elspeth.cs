@@ -25,6 +25,8 @@ public class VhHealer : Trainer
         AddTopic("work,craft,learn,teach,teaching,recipe,recipes,apprentice,lessons,lesson,shop,sell,stock,prices", "The table is set up at last. I teach herbal bandages, minor healing salve, minor endurance tonic and, for anyone who can bring me goblin blood, the hunter's poultice. Type {cmd}lessons{/} to see my prices and {cmd}learn herbal bandage{/} (or any of the others) to be taught. Then {cmd}craft{/} it at my table with the right things in your pack. I also sell what goes into them: {cmd}browse{/}.");
         AddTopic("harland,knees,tavern", "Harland's knees creak louder than his cellar door. I've told him it's the damp. He says it's the goblins.");
         AddTopic("village,hollow,vincent", "I came here as a girl, when the palisade was still new. Vincent's name was already a story by then. The village has never needed a healer more than it does now, though nobody says so.");
+        AddTopic("vigor,vitality,health,body,constitution,strong,tough,toughness,hardy", "Vigor is the body's own stubbornness. Those with plenty of it carry more Vitality and come round faster after a hurt. I can bind a wound, but I cannot give anyone Vigor; that is earned by living, and by what you choose to build in yourself.");
+        AddTopic("remembered,stories,old hob,hob,sickness winter", "Old Hob Marrow was remembered in the Hollow for his Vigor. He walked home from the sickness winter on his own two feet, past every neighbour who did not, and complained all the way about the cold.");
         AddLesson("herbal_bandage", 5);
         AddLesson("minor_healing_salve", 8);
         AddLesson("minor_stamina_tonic", 6);

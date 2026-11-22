@@ -27,5 +27,6 @@ public class AdventurerClass : PlayerClass
         Skills.AddRange(new[] { "appraise" });
         Traits.AddRange(new[] { "survival_training", "improvised_combat", "travelers_instinct" });
         Kit.AddRange(new[] { "/domains/hollow/obj/training_spear", "/domains/hollow/obj/trail_ration", "/domains/hollow/obj/trail_ration" });
+        Description += " Starts even in all six attributes: Might, Grace, Vigor, Insight, Spirit and Resolve.";
     }
 }
