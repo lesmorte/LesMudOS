@@ -115,5 +115,7 @@ Reading: the Priest pins near 100 for any heal from 12 upward unless the cost le
 ## Owner's decision on Minor Heal (22 November 2026, after the corrected measurement)
 The large heal stays for others; **healing yourself gives half** (10 / 19 / 30 at ranks I / II / III, rounded half up, later ranks likewise). The 15-second wait and the costs stay. The skill's description and the shrine's teaching say why in the world's voice: the Quiet Hand gives freely to the one who reaches for another and sparingly to the one who reaches for himself. The simulator must report the solo Priest at half (the earlier table found a heal of 12 already too strong, so half may still leave the Priest ahead): that number goes to the owner; the game ships half as decided.
 
+**Built (22 November 2026):** `MinorHealSpell.SelfShare`, the skill's summary and help line, Sister Merewyn's and Anselm's new topics, the simulator (`python3 tests/balance_sim.py ranks 3000 selfheal`), tests in `tests/aim_test.py` and `tests/rank_test.py`. Measured: with half the solo Priest is still ahead (standard test, 3000 runs a cell: rank I 95 against a mean of the five callings of 80.2, +14.8; everyone at rank II 100 against 89.8, +10.2). A self-heal that would leave the Priest level is about 7 at rank I (II 13) and about 5 at rank II (II 10): no one value is inside 5 points in both columns. Shipped as decided.
+
 ## Doors (owner's decision, 22 November 2026)
 Builders get openable doors: see `docs/specs/sneak.md`, which needs one before the Overseer.

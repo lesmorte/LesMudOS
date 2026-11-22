@@ -411,7 +411,7 @@ public class Player : Adventurer
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "           A bow in your hands gives you a head start when you choose the fight: the target's first action waits two seconds more (never when a creature attacks you first).\n" +
-            "           A Scout's {cmd}aim{/} (Aimed Shot, bow only) hits hardest as the shot that starts a fight, and is spoiled if a blow lands while you aim. A Priest cannot cast {cmd}heal{/} again for 15 seconds after one.\n" +
+            "           A Scout's {cmd}aim{/} (Aimed Shot, bow only) hits hardest as the shot that starts a fight, and is spoiled if a blow lands while you aim. A Priest cannot cast {cmd}heal{/} again for 15 seconds after one, and what it heals in the Priest who casts it is half of what it gives another.\n" +
             "Resting:   {cmd}rest{/} (or {cmd}sit{/}) sits you down: Vitality, Endurance and Focus return five times as fast, until you {cmd}stand{/}, move, fight, pick up, drop, wear, buy, sell or craft;\n" +
             "           a creature that finds you resting gets the first blow in (you lose two seconds more). Not while fighting. The {cmd}prompt{/} token for it is rest.\n" +
             "Names:     where a command takes a name you can say which one: {cmd}rat 2{/}, {cmd}2.rat{/}, {cmd}second rat{/}\n" +

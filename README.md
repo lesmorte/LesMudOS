@@ -243,7 +243,7 @@ LESMUDOS_TEST_PORT=4814 python3 tests/ansi_test.py
 LESMUDOS_TEST_PORT=4832 python3 tests/comm_test.py
 LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
 python3 tests/balance_sim.py
-python3 tests/balance_sim.py ranks [runs] [level5 heal double gap bolt focus climb]
+python3 tests/balance_sim.py ranks [runs] [level5 heal double gap bolt focus climb aim wait aimfix healcost selfheal]
 ```
 
 The test client (`Client` in `tests/smoke_test.py`, imported by the other suites) ends a reply at the game's answer to `sync TOKEN`, a second line it sends right behind every command, with a token unique to the call: reading to the prompt cannot tell the prompt that ends a reply from one that follows unprompted output (a combat line, another player's action), and on a busy machine that left every later reply one step late. `command(line, sync=False)`, or `Client.sync_default = False`, gives the raw mode that reads to the prompt; use it for checks of the prompt itself, the login sequence, and the idle timer (the sync line counts as input, so `playfeel_test` reads its idle checks raw).

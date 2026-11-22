@@ -64,6 +64,7 @@ BOLT_COST, BOLT_PREP, BOLT_REC, BOLT_DMG = 20, 0.5, 1.0, (6, 9)
 HEAL_COST, HEAL_PREP, HEAL_REC = 25, 0.5, 1.0
 AIM_PREP, AIM_REC = 1.0, 1.0   # Aimed Shot (mudlib/skills/aimed_shot.cs)
 RANGED_OPENING_MS = 2000       # std/living.cs RangedOpening: the target's first action is delayed this much when a bow starts the fight
+SELF_HEAL_HALF = True   # the solo Priest heals itself, and Minor Heal gives the caster half of what it gives another, rounded half up (the owner's decision, 22 November 2026; mudlib/skills/minor_heal.cs SelfShare)
 HEAL_AMOUNT = None   # None: the Minor Heal of the rank table (SKILL_RANKS); a number overrides every rank (the old recommendations' tweaks)
 DOUBLE_STRIKE = True # False: the Adventurer as before ranks (no Double Strike), for comparison tables only
 BLESS_COST = 25
@@ -735,6 +736,8 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
         return
     if act.id == "heal":
         amount = HEAL_AMOUNT if HEAL_AMOUNT is not None else ent.skill_int("minor_heal", "heal")
+        if SELF_HEAL_HALF:
+            amount = (amount + 1) // 2   # on the caster: half, rounded half up, before Divine Knowledge and Healing Power
         ent.hp = min(ent.max_hp, ent.hp + max(1, rnd(amount * (100 + ent.arch.healing_pct + stat(ent.attrs, "healing_power")) / 100.0)))
         return
     if act.id == "bless":
@@ -2618,11 +2621,11 @@ def stage_weapon(arch, level):
 # ---- skill ranks (docs/specs/skill-ranks.md; python3 tests/balance_sim.py ranks [runs] [part ...])
 
 @contextmanager
-def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore_cap=None):
+def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore_cap=None, selfhalf=None):
     """Temporarily change how ranks are held (RANK_MODE), Double Strike on or off, a skill's rank table (skill -> dict(base=..., rows=...)
     merged over the current one), the Minor Heal's Preparation and the heal lockout (option c). Nothing here is applied to the game."""
-    global RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, RANK_IGNORE_CAP
-    saved_cap = RANK_IGNORE_CAP
+    global RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, RANK_IGNORE_CAP, SELF_HEAL_HALF
+    saved_cap, saved_half = RANK_IGNORE_CAP, SELF_HEAL_HALF
     saved_tables = {k: dict(base=dict(v["base"]), rows={r: dict(x) for r, x in v["rows"].items()}, **({"max": v["max"]} if "max" in v else {}))
                     for k, v in SKILL_RANKS.items()}
     saved = (RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS, saved_tables, dict(SKILL_PREP))
@@ -2637,6 +2640,8 @@ def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore
                 SKILL_RANKS[sk]["rows"] = {r: dict(x) for r, x in t["rows"].items()}
         if ignore_cap is not None:
             RANK_IGNORE_CAP = ignore_cap
+        if selfhalf is not None:
+            SELF_HEAL_HALF = selfhalf
         if prep is not None:
             SKILL_PREP["minor_heal"] = prep
         if lockout_s is not None:
@@ -2644,7 +2649,7 @@ def ranked(mode=None, double=None, table=None, prep=None, lockout_s=None, ignore
         yield
     finally:
         RANK_MODE, DOUBLE_STRIKE, HEAL_LOCKOUT_MS = saved[0], saved[1], saved[2]
-        RANK_IGNORE_CAP = saved_cap
+        RANK_IGNORE_CAP, SELF_HEAL_HALF = saved_cap, saved_half
         SKILL_RANKS.clear()
         SKILL_RANKS.update(saved[3])
         SKILL_PREP.clear()
@@ -3022,12 +3027,44 @@ def ranks_healcost(runs=3000):
         dump_json(dict(kind="healcost", label=label, rank1=out["none"], rank2=out["cap"]))
 
 
+def ranks_selfheal(runs=3000):
+    """The owner's decision of 22 November 2026: Minor Heal gives the caster half (10 / 19 / 30). The standard test for the five callings and the archer
+    Scout at rank I and with everyone at rank II (the shipped game), then the self-heal that would leave the Priest within 5 points of the mean of the
+    five callings (rank I value s; II and III at the spec's ratio 38/20 and 60/20, rounded). Nothing here is applied to the game."""
+    rows = (("rank I (nobody has bought a rank)", "none"), ("everyone holds rank II (bought at level 5)", "cap"))
+    aim_head("SELFHEAL. Standard test, Minor Heal on the caster at half (10 / 19 / 30), 15 s wait: level 5, starting gear, 4 potions, points placed, middle human, RestFactor 5, Overseer from the cellar entrance", runs)
+    for label, mode in rows:
+        with ranked(mode=mode):
+            five = l5_kills(runs=runs)
+            archer = l5_kills([ARCHER], runs)[ARCHER]
+        aim_line(label, five, archer)
+    with ranked(mode="none", selfhalf=False):
+        five = l5_kills(runs=runs)
+    aim_line("for comparison: the self-heal at full (20 / 38 / 60), rank I", five, 0)
+    print()
+    print("Self-heal that would be level (Priest within 5 points of the mean of the five callings, 15 s wait, Focus 25 / 32 / 40):")
+    others = {}
+    for mode in ("none", "cap"):
+        with ranked(mode=mode):
+            others[mode] = l5_kills([c for c in ARCHS if c != "priest"], runs)
+    for s_value in (0, 1, 2, 3, 4, 5, 6, 7, 8, 10):
+        line = f"  rank I self-heal {s_value:>2}"
+        for mode in ("none", "cap"):
+            r2, r3 = round(s_value * 38 / 20 + 1e-9), round(s_value * 60 / 20 + 1e-9)
+            with ranked(mode=mode, selfhalf=False, table=heal_table(s_value, rows={2: dict(heal=r2), 3: dict(heal=r3)}), lockout_s=HEAL_WAIT_S):
+                pr = l5_kills(["priest"], runs)["priest"]
+            mean = (sum(others[mode].values()) + pr) / 5
+            line += f"   [{'rank I' if mode == 'none' else 'rank II'}: II={r2} priest {pr:5.1f} ({pr - mean:+5.1f})]"
+        print(line, flush=True)
+        dump_json(dict(kind="selfheal", value=s_value, line=line))
+
+
 def ranks_report(runs=3000, parts=()):
     parts = parts or ("level5", "heal", "double", "gap", "bolt", "focus", "climb")
     for part in parts:
         {"level5": lambda: ranks_level5(runs), "heal": lambda: ranks_heal(runs), "double": lambda: ranks_double(runs),
          "gap": lambda: ranks_gap(max(100, runs // 8)), "bolt": ranks_bolt, "focus": lambda: ranks_focus(max(200, runs // 3)),
-         "climb": lambda: ranks_climb(max(100, runs // 10)), "aim": lambda: ranks_aim(runs), "wait": lambda: ranks_wait(runs), "aimfix": lambda: ranks_aimfix(runs), "healcost": lambda: ranks_healcost(runs)}[part]()
+         "climb": lambda: ranks_climb(max(100, runs // 10)), "aim": lambda: ranks_aim(runs), "wait": lambda: ranks_wait(runs), "aimfix": lambda: ranks_aimfix(runs), "healcost": lambda: ranks_healcost(runs), "selfheal": lambda: ranks_selfheal(runs)}[part]()
 
 
 def main():
