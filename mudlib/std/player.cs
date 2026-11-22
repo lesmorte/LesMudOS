@@ -400,6 +400,8 @@ public class Player : Adventurer
             "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}vitality{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
+            "Resting:   {cmd}rest{/} (or {cmd}sit{/}) sits you down: Vitality, Endurance and Focus return five times as fast, until you {cmd}stand{/}, move, fight, pick up, drop, wear, buy, sell or craft;\n" +
+            "           a creature that finds you resting gets the first blow in (you lose two seconds more). Not while fighting. The {cmd}prompt{/} token for it is rest.\n" +
             "Names:     where a command takes a name you can say which one: {cmd}rat 2{/}, {cmd}2.rat{/}, {cmd}second rat{/}\n" +
             "           (while fighting you cannot get, loot or walk away: {cmd}flee{/})\n" +
             "Corpses:   {cmd}loot{/} [CORPSE], {cmd}get{/} THING (or all) from CORPSE, {cmd}look in{/} CORPSE\n" +

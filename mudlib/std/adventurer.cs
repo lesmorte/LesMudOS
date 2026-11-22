@@ -13,6 +13,9 @@ public abstract class Adventurer : Living
     private const int MaxLevel = 100;
     private const int AttributePointsPerLevel = 2; // placed with "improve"; level 10 has 18, level 100 has 198
     private const int RegenBeats = 5; // one regeneration step per 10 seconds
+    // Resting (docs/specs/rest.md): the two numbers of the rule, in one place.
+    private const double RestFactor = 5.0; // Vitality, Endurance and Focus return this many times faster while seated
+    private const int RestSurprise = 2;    // seconds added to the first action of a seated character who is attacked
     private const int LevelGoto = 1;
     private const int LevelStat = 1;
     private const int LevelHeal = 5;
@@ -41,6 +44,10 @@ public abstract class Adventurer : Living
     private bool dying;
     private bool inventoryRestored;
     private double vitalityCarry; // fractions of a point of Vitality regenerated but not yet given
+    private bool resting;          // sitting down to recover; never saved, so a new login starts standing
+    private string restRoom = "";  // where the character sat down: resting ends when they are anywhere else
+    private bool restedTold;       // "You are fully rested." has been said for this rest
+    private int restBeats;         // heartbeats spent resting in the current ten-second regeneration step
     private bool adventureBegun;
     private bool equipKit; // a new character's weapon and shield are put on when the kit is created
 
@@ -210,6 +217,7 @@ public abstract class Adventurer : Living
         ("vitality", "your current Vitality"), ("maxvitality", "your maximum Vitality"),
         ("endurance", "your current Endurance"), ("maxendurance", "your maximum Endurance"),
         ("focus", "your current Focus"), ("maxfocus", "your maximum Focus"),
+        ("rest", "\"(resting) \" while you rest, otherwise nothing"),
     };
 
     /// <summary>
@@ -234,6 +242,7 @@ public abstract class Adventurer : Living
         "maxendurance" => QueryMaxEndurance().ToString(),
         "focus" => QueryFocus().ToString(),
         "maxfocus" => QueryMaxFocus().ToString(),
+        "rest" => QueryResting() ? "(resting) " : "",
         _ => "",
     };
 
@@ -627,6 +636,7 @@ public abstract class Adventurer : Living
         }
         var refusal = skill.Call<string>("CanUse", Self, target) ?? SkillRefusal(skill);
         if (refusal != null) { Write(refusal + "\n"); return true; }
+        LeaveRest();
         if (kind == "enemy" && target != null)
         {
             if (!QueryFightingWith(target))
@@ -740,6 +750,9 @@ public abstract class Adventurer : Living
         AddAction("attack", CmdKill);
         AddAction("flee", CmdFlee);
         AddAction("stop", CmdStop);
+        AddAction("rest", CmdRest);
+        AddAction("sit", CmdRest);
+        AddAction("stand", CmdStand);
         AddAction("consider", CmdConsider);
         AddAction("wield", CmdWield);
         AddAction("unwield", CmdUnwield);
@@ -857,14 +870,116 @@ public abstract class Adventurer : Living
     {
         IdleCheck();
         if (Dead || !Self.IsAlive) return;
+        if (resting) RestBeat();
         if (++regenBeats < RegenBeats) return;
         regenBeats = 0;
+        var seated = restBeats; // beats of this step spent resting: a step half rested gets half the bonus
+        restBeats = 0;
         if (QueryInCombat() || Vitality >= QueryMaxVitality()) { vitalityCarry = 0; return; }
         var room = Environment();
-        vitalityCarry += QueryVitalityRegen() * (room != null && room.Call<bool>("QuerySafe") ? 3 : 1) * (1 + QueryMod("regen_out"));
+        var restBoost = 1 + (RestFactor - 1) * seated / RegenBeats;
+        vitalityCarry += QueryVitalityRegen() * (room != null && room.Call<bool>("QuerySafe") ? 3 : 1) * (1 + QueryMod("regen_out")) * restBoost;
         var whole = (int)Math.Floor(vitalityCarry + 1e-9);
         vitalityCarry -= whole;
         if (whole > 0) Heal(whole);
+    }
+
+    // ---- Resting (docs/specs/rest.md) ----
+    // `rest` sits the character down: Vitality, Endurance and Focus return RestFactor times as fast. Only this character's own
+    // commands start or end it, and nothing public changes it: a probe object can ask QueryResting and nothing else. Whatever ends
+    // it by itself (a fight, a different room, death) is noticed by RestEnded wherever the state is looked at, and the Endurance and
+    // Focus regained up to then are settled at the seated rate first.
+
+    public override bool QueryResting()
+    {
+        if (resting && RestEnded()) EndRest();
+        return resting;
+    }
+
+    protected override double RegenStateFactor() => resting ? RestFactor : 1.0;
+
+    protected override void BeforeSettle()
+    {
+        if (resting && RestEnded()) EndRest();
+    }
+
+    private bool RestEnded() => Dead || QueryInCombat() || Environment()?.Name != restRoom;
+
+    /// <summary>Stand up, quietly: the resources are settled at the seated rate up to this moment.</summary>
+    private void EndRest()
+    {
+        if (!resting) return;
+        SettleCore();
+        resting = false;
+        restBeats = 0;
+    }
+
+    /// <summary>Whatever the character does that is not looking or talking gets them up.</summary>
+    private void LeaveRest()
+    {
+        if (resting) EndRest();
+    }
+
+    /// <summary>Once per heartbeat while resting: keep the resources current and say once when everything is full.</summary>
+    private void RestBeat()
+    {
+        if (RestEnded()) { EndRest(); return; }
+        restBeats++;
+        SettleCore();
+        if (restedTold || Vitality < QueryMaxVitality() || QueryEndurance() < QueryMaxEndurance() || QueryFocus() < QueryMaxFocus()) return;
+        restedTold = true;
+        Tell("You are fully rested.\n");
+    }
+
+    private bool CmdRest(string args)
+    {
+        var room = Environment();
+        if (QueryInCombat()) { Write(FightingNote.Replace("do that", "rest") + "\n"); return true; }
+        if (QueryResting()) { Write("You are already resting.\n"); return true; }
+        if (room == null || Dead) return true;
+        SettleCore(); // what was regained so far was regained standing
+        resting = true;
+        restRoom = room.Name;
+        restedTold = false;
+        restBeats = 0;
+        Write("You sit down to rest.\n");
+        Say($"{Name} sits down to rest.\n");
+        return true;
+    }
+
+    private bool CmdStand(string args)
+    {
+        if (!QueryResting()) { Write("You are already on your feet.\n"); return true; }
+        EndRest();
+        Write("You stand up.\n");
+        Say($"{Name} stands up.\n");
+        return true;
+    }
+
+    /// <summary>A creature that has just attacked a seated character: they scramble up and lose RestSurprise seconds more. Only a creature's own attack counts.</summary>
+    protected override void Ambushed(ObjectRef enemy)
+    {
+        if (!resting) return;
+        var attacker = PreviousObject();
+        if (RestEnded() || attacker != enemy || !enemy.Call<bool>("IsCreature") || Environment(enemy) != Environment()) { if (RestEnded()) EndRest(); return; }
+        EndRest();
+        DelayActionBy(RestSurprise);
+        Tell("You scramble to your feet!\n");
+        TellRoom(Environment()!, $"{Name} scrambles to {QueryPossessive()} feet!\n", Self);
+    }
+
+    /// <summary>
+    /// A shop or a find tells a seated character that what they just did there (buy, sell, get, take, loot) gets them up. It
+    /// works only for the character's own command, with that very verb, from an object standing in their room; anything else
+    /// is ignored, so no other object can end anyone's rest with it.
+    /// </summary>
+    public void RestDisturbed(string verb)
+    {
+        var caller = PreviousObject();
+        if (!resting || caller == null || caller == Self || Self != ThisPlayer() || Environment(caller) != Environment()) return;
+        if (verb != QueryVerb() || verb is not ("buy" or "sell" or "get" or "take" or "loot")) return;
+        if (caller.Call<bool>("IsPlayerCharacter")) return;
+        EndRest();
     }
 
     // ---- Death ----
@@ -878,6 +993,7 @@ public abstract class Adventurer : Living
     {
         if (dying) return;
         dying = true;
+        EndRest();
         try
         {
             Tell("You have died!\n");
@@ -986,6 +1102,7 @@ public abstract class Adventurer : Living
         var description = Describe(item, n);
         var held = MovePortion(item, n, Self);
         if (held == null) { Write($"You cannot take {description}.\n"); return; }
+        LeaveRest();
         Write($"You take {description}.\n");
         Say($"{Name} takes {description}.\n");
         held.Call("Taken", Self);
@@ -1047,6 +1164,7 @@ public abstract class Adventurer : Living
         if (corpse == null || what == "") { NotifyFail("Get what from what?"); return false; }
         var refusal = what == "all" ? corpse.Call<string>("TakeAll") : corpse.Call<string>("Take", what);
         if (refusal != null) Write(refusal + "\n");
+        else LeaveRest();
         return true;
     }
 
@@ -1061,7 +1179,7 @@ public abstract class Adventurer : Living
         {
             found = true;
             var result = ob.Call<string>("TakeAll");
-            if (result == null) return true;
+            if (result == null) { LeaveRest(); return true; }
             refusal ??= result;
         }
         if (!found) { NotifyFail("There is nothing here to {cmd}loot{/}."); return false; }
@@ -1080,6 +1198,7 @@ public abstract class Adventurer : Living
         {
             var description = Describe(item, n);
             if (MovePortion(item, n, room) == null) { Write($"You cannot drop {description}.\n"); continue; }
+            LeaveRest();
             Write($"You drop {description}.\n");
             Say($"{Name} drops {description}.\n");
         }
@@ -1125,6 +1244,7 @@ public abstract class Adventurer : Living
             TellRoom(room, $"{Name} gives {description} to {other}.\n", Self, receiver);
         }
         if (given == 0) return true;
+        LeaveRest();
         PersistNow();
         receiver.Call("SaveAfterTrade");
         return true;
@@ -1173,6 +1293,7 @@ public abstract class Adventurer : Living
         }
         var refusal = CanFight(target);
         if (refusal != null) { Write(refusal + "\n"); return true; }
+        LeaveRest();
         StartFight(target);
         Focus(target);
         return true;
@@ -1185,6 +1306,7 @@ public abstract class Adventurer : Living
     /// <summary>A room tells the character they have just walked through one of its exits into their current room. Only a room may; it is remembered for flee.</summary>
     public void RecordArrival()
     {
+        QueryResting(); // a seated character who has walked away is standing now
         var from = PreviousObject();
         var here = Environment();
         if (from == null || from.IsClone || here == null || from == here) return;
@@ -1338,6 +1460,7 @@ public abstract class Adventurer : Living
             Write($"You stop using {old.Call<string>("Short")}.\n");
         }
         Equip(item);
+        LeaveRest();
         Write($"{you} {description}.\n");
         Say($"{Name} {they} {description}.\n");
         grantedAt = 0;
@@ -1350,6 +1473,7 @@ public abstract class Adventurer : Living
         var weapon = QueryEquipped("weapon");
         if (weapon == null) { Write("You are not wielding anything.\n"); return true; }
         Unequip("weapon");
+        LeaveRest();
         Write($"You stop wielding {weapon.Call<string>("Short")}.\n");
         return true;
     }
@@ -1361,6 +1485,7 @@ public abstract class Adventurer : Living
         var slot = item.Call<string>("QuerySlot");
         if (string.IsNullOrEmpty(slot) || !IsEquipped(item)) { Write("You are not wearing or wielding that.\n"); return true; }
         Unequip(slot);
+        LeaveRest();
         Write($"You {(slot == "weapon" ? "stop wielding" : "take off")} {item.Call<string>("Short")}.\n");
         return true;
     }
@@ -1423,6 +1548,7 @@ public abstract class Adventurer : Living
         try { text.Append(LoadObject("/secure/renown").Call<string>("TierLine", QueryName()) ?? ""); }
         catch (MudRuntimeException) { }
         text.Append($"Vitality {Vitality}/{QueryMaxVitality()}   Endurance {QueryEndurance()}/{QueryMaxEndurance()}   Focus {QueryFocus()}/{QueryMaxFocus()}   Gold {Gold}\n");
+        if (QueryResting()) text.Append($"You are resting: Vitality, Endurance and Focus return {RestFactor:0.#} times as fast. ({{cmd}}stand{{/}} to get up)\n");
         var power = QueryStat("physical_power");
         text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}" + (power != 0 ? $" ({(power > 0 ? "+" : "")}{Pct(power)}%)" : "") +
                     $"   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}   Dodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {Pct(QueryCrit())}%\n");
@@ -1697,6 +1823,7 @@ public abstract class Adventurer : Living
         if (reply.Count >= 8 && reply[1] is "act" && reply[2] is string name && reply[3] is string windUp && reply[4] is double prep && reply[5] is double recovery && reply[6] is double mod && reply[7] is string waiting)
         {
             if (QueryInCombat()) { Write("You cannot do that while you are fighting.\n"); return true; }
+            LeaveRest();
             ActAsAction(CraftAction(name, windUp, prep, recovery, mod), waiting);
         }
         return true;

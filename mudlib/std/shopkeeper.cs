@@ -149,6 +149,7 @@ public class Shopkeeper : Npc
             buyer.Call("AddGold", (int)total);
             return true;
         }
+        buyer.Call("RestDisturbed", "buy");
         Write($"You buy {what} for {total} gold.\n");
         Say($"{buyer.Call<string>("QueryName")} buys {what} from {Name}.\n");
         return true;
@@ -195,6 +196,7 @@ public class Shopkeeper : Npc
             if (!sold.TryGetValue(key, out var g)) { g = (single, 0, 0); order.Add(key); }
             sold[key] = (g.single, g.n + n, g.price + price);
         }
+        if (order.Count > 0) seller.Call("RestDisturbed", "sell");
         foreach (var key in order)
             Write($"You sell {ListName(sold[key].single, sold[key].n)} to {Name} for {sold[key].price} gold.\n");
         return true;

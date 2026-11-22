@@ -386,6 +386,7 @@ public abstract class Room : MudObject
         var counts = new Dictionary<string, int>();
         var order = new List<string>();
         var floor = new Dictionary<string, (string single, int n)>();
+        var sitting = new List<string>();
         foreach (var ob in AllInventory())
         {
             if (ob == viewer) continue;
@@ -400,6 +401,7 @@ public abstract class Room : MudObject
                 floor[key] = (g.single, g.n + Math.Max(1, ob.Call<int>("QueryQuantity")));
                 continue;
             }
+            if (Living(ob) && ob.Call<bool>("QueryResting")) { sitting.Add(desc); continue; } // "Keith is resting here."
             if (!counts.ContainsKey(desc)) { counts[desc] = 0; order.Add(desc); }
             counts[desc]++;
         }
@@ -416,6 +418,7 @@ public abstract class Room : MudObject
             text.Append(n == 1 ? Cap(desc) : $"{(n < CountWords.Length ? CountWords[n] : n.ToString())} {Plural(desc)}");
             text.Append(n == 1 ? " is here.\n" : " are here.\n");
         }
+        foreach (var desc in sitting) text.Append(Cap(desc)).Append(" is resting here.\n");
         return text.ToString();
     }
 
