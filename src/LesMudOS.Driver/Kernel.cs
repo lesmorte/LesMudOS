@@ -21,7 +21,7 @@ internal static class Log
 /// timers and the single-threaded game loop. Everything that touches world
 /// state runs on the game thread; the network layer only posts events to it.
 /// </summary>
-internal sealed class Kernel : IDriverServices
+internal sealed partial class Kernel : IDriverServices
 {
     public const string MasterPath = "/secure/master";
     private static readonly TimeSpan HeartBeatInterval = TimeSpan.FromSeconds(2);
@@ -242,6 +242,7 @@ internal sealed class Kernel : IDriverServices
     public void OnConnect(Connection connection)
     {
         _connections.Add(connection);
+        connection.SendRaw(Gmcp.WillOffer); // the standard offer; a client that does not answer DO sees nothing else of it
         connection.LastInputMs = TimeMs();
         Execute(null, () =>
         {

@@ -94,6 +94,9 @@ internal interface IDriverServices
     void TellRoom(ObjectRef room, string message, ObjectRef[] exclude);
     void Say(ObjectRef caller, string message);
 
+    bool GmcpSend(ObjectRef caller, ObjectRef player, string package, object? value);
+    bool GmcpActive(ObjectRef player);
+
     long TimeMs();
     int IdleSeconds(ObjectRef ob);
     int IdleLimitSeconds();

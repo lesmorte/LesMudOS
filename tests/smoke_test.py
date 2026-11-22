@@ -26,6 +26,8 @@ SECRET = "correct horse battery staple"
 PASSWORD = "Tr0ub4dor&3"
 IAC_WILL_ECHO = bytes([255, 251, 1])
 IAC_WONT_ECHO = bytes([255, 252, 1])
+IAC_WILL_GMCP = bytes([255, 251, 201])  # the server's offer at connect (docs/specs/gmcp.md)
+IAC_DONT_GMCP = bytes([255, 254, 201])  # what a client without GMCP answers
 failures = []
 
 # Colour is on by default, so the game sends ANSI sequences. Client strips them
@@ -84,6 +86,7 @@ class Client:
         self.pending = ""
         self.raw = ""  # everything received since the last raw_reset(), with escape sequences
         self._carry = ""  # an escape sequence cut by the end of a chunk
+        self._bytes_carry = b""  # a telnet offer cut by the end of a chunk
         self.sock = socket.create_connection(("127.0.0.1", PORT), timeout=5)
         self.sock.settimeout(0.2)
         self.read_until("known?")
@@ -112,7 +115,20 @@ class Client:
         self.pending = text
 
     def rx(self, chunk):
-        """Decode a received chunk, keep it in self.raw, and return it without ANSI sequences."""
+        """Decode a received chunk, keep it in self.raw, and return it without ANSI sequences.
+        Like any client without GMCP, this one answers the server's offer (IAC WILL GMCP) with IAC DONT GMCP and does not show it."""
+        chunk = self._bytes_carry + chunk
+        self._bytes_carry = b""
+        while IAC_WILL_GMCP in chunk:
+            chunk = chunk.replace(IAC_WILL_GMCP, b"", 1)
+            try:
+                self.sock.sendall(IAC_DONT_GMCP)
+            except OSError:
+                pass
+        for keep in (2, 1):  # an offer cut by the end of the chunk waits for the rest
+            if len(chunk) >= keep and IAC_WILL_GMCP.startswith(chunk[-keep:]):
+                self._bytes_carry, chunk = chunk[-keep:], chunk[:-keep]
+                break
         text = self._carry + chunk.decode(errors="replace")
         tail = ANSI_TAIL.search(text)
         self._carry = text[tail.start():] if tail else ""

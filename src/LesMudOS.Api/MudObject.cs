@@ -187,6 +187,20 @@ public abstract class MudObject
     /// <summary>Send text to everyone in the same room as ThisPlayer() (or this object), except that object.</summary>
     protected void Say(string message) => D.Say(Self, message);
 
+    // ---- GMCP (telnet option 201; docs/DRIVER_API.md) ----
+
+    /// <summary>
+    /// Send one GMCP package to a player's connection, in order with the text. The value is plain data (string, number, bool, null, a
+    /// list or array of values, a map with string keys); the driver does the JSON encoding and escaping, and game code never passes
+    /// JSON text. True if it was sent; false if the player has no connection, did not ask for GMCP, or does not want this package.
+    /// Throws unless the calling object's program is under /std or /secure. Which player may be sent what is for the caller to decide:
+    /// send a player only data about that player and what that player's text would show.
+    /// </summary>
+    protected bool GmcpSend(ObjectRef player, string package, object? value) => D.GmcpSend(Self, player, package, value);
+
+    /// <summary>True if the player's connection has GMCP switched on. Anyone may ask; there is nothing else to learn.</summary>
+    protected bool GmcpActive(ObjectRef player) => D.GmcpActive(player);
+
     // ---- Time ----
 
     /// <summary>Run a function after a delay in seconds. Returns an id for RemoveCallOut. Skipped if this object is destructed first.</summary>
