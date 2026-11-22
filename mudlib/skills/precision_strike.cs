@@ -1,8 +1,8 @@
 // @inherit /std/skill
 
 /// <summary>
-/// Scout skill. An attack with a bonus to hit and a high critical chance. Ranks: +2 and 15% at I, +3 and 20% at II, +4 and 25% at III,
-/// +5 and 30% at IV (docs/specs/skill-ranks.md). Struck from hiding, as the blow that starts the fight, it deals x1.5 / 1.75 / 2.0 / 2.25 the weapon's damage (docs/specs/sneak.md); the Endurance cost follows the default step.
+/// Scout skill. An attack with a bonus to hit and a high critical chance. Ranks: +4 and 15% at I, +5 and 20% at II, +6 and 25% at III (to hit raised by 2 at every rank by the owner, 22 November 2026),
+/// +7 and 30% at IV (docs/specs/skill-ranks.md). Struck from hiding, as the blow that starts the fight, it deals x1.5 / 1.75 / 2.0 / 2.25 the weapon's damage (docs/specs/sneak.md); the Endurance cost follows the default step.
 /// </summary>
 public class PrecisionStrikeSkill : Skill
 {
@@ -10,20 +10,20 @@ public class PrecisionStrikeSkill : Skill
     {
         Title = "Precision Strike";
         Command = "strike";
-        Summary = "An attack at +2 to hit with a 15% chance of a critical hit; from hiding, as the blow that starts the fight, 1.5 times the damage.";
+        Summary = "An attack at +4 to hit with a 15% chance of a critical hit; from hiding, as the blow that starts the fight, 1.5 times the damage.";
         EnduranceCost = 25;
         Preparation = 0.5;
         Recovery = 1.0;
         WindUp = "takes careful aim";
         IsAttack = true;
-        ToHitBonus = 2;
+        ToHitBonus = 4;
         CritChance = 15;
         Target = "enemy";
         Effect("ambush", 1.5);
         FixedKeys.Add("ambush");
-        RankRow(2, "tohit=3;crit=20;ambush=1.75");
-        RankRow(3, "tohit=4;crit=25;ambush=2.0");
-        RankRow(4, "tohit=5;crit=30;ambush=2.25");
+        RankRow(2, "tohit=5;crit=20;ambush=1.75");
+        RankRow(3, "tohit=6;crit=25;ambush=2.0");
+        RankRow(4, "tohit=7;crit=30;ambush=2.25");
     }
 
     public override string QuerySummaryAt(int rank) => $"An attack at +{RankInt("tohit", rank)} to hit with a {RankInt("crit", rank)}% chance of a critical hit; from hiding, as the blow that starts the fight, {Fmt(RankValue("ambush", rank))} times the damage.";

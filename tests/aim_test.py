@@ -235,8 +235,8 @@ def step_heal(chief):
     pa.send("heal")
     text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
     got = re.search(r"restoring (\d+) Vitality", text)
-    check("Minor Heal I on the caster restores 13 (half of 20 = 10, x 1.34; not 27 halved to 14)", got.group(1) if got else text[-200:], "13")
-    check("the message to the caster says the smaller amount plainly", text, "The light comes slowly to your own hurts, restoring 13 Vitality.")
+    check("Minor Heal I on the caster restores 9 (a third of 20 = 7, x 1.34)", got.group(1) if got else text[-200:], "9")
+    check("the message to the caster says the smaller amount plainly", text, "The light comes slowly to your own hurts, restoring 9 Vitality.")
     check("and the room is told it as before", a.quiet(pb, 0.3), "heals themselves.")
     s1 = stat(pa)
     check("Minor Heal I costs 25 Focus (the cost is not halved)", str(s0["focus"] - s1["focus"] in (24, 25, 26)), "True")
@@ -251,7 +251,7 @@ def step_heal(chief):
     check("and no Focus is spent by the refusal", str(f1 >= f0), "True")
     check("and nothing is cast", a.quiet(pa, 2.5), absent=("restoring",))
     check("skills shows the wait: 15 seconds, and the seconds left", skill_line(pa, "Minor Heal"), "You cannot cast it again for 15 seconds", "you may cast it again in ")
-    check("skills says what it gives another and what it gives you, and why", skill_line(pa, "Minor Heal"), "Restores 20 Vitality to someone in the room, or 10 to you",
+    check("skills says what it gives another and what it gives you, and why", skill_line(pa, "Minor Heal"), "Restores 20 Vitality to someone in the room, or 7 to you",
           "gives freely to the one who reaches for another and sparingly to the one who reaches for himself")
     # Per caster, not per target: the same wait for a heal on someone else.
     out = pa.command("heal aimprib")
@@ -260,7 +260,7 @@ def step_heal(chief):
     pb.command("ahurt 40")
     pb.send("heal")
     text = a.fight_until(pb, "restoring", timeout=20)
-    check("another Priest casts at once, the wait is not shared (on itself: 13)", text, "restoring 13 Vitality")
+    check("another Priest casts at once, the wait is not shared (on itself: 9)", text, "restoring 9 Vitality")
     # Over after 15 seconds (counted from the cast, the time already waited included).
     time.sleep(max(0.0, 16.0 - 8.0))
     wait_over(pa)
@@ -278,7 +278,7 @@ def step_heal(chief):
     pa.command("ahurt 40")
     pa.send("heal")
     text = a.fight_until(pa, "restoring", timeout=20)
-    check("after the wait a second Minor Heal is cast", text, "restoring 13 Vitality")
+    check("after the wait a second Minor Heal is cast", text, "restoring 9 Vitality")
     # Rank II: on another 38 x 1.34 = 51 (32 Focus), on the caster 19 x 1.34 = 25 (51 halved would give 26).
     to(pa, VILLAGE + "shrine")
     check("Minor Heal II bought", pa.command("train heal"), "Minor Heal II")
@@ -290,9 +290,9 @@ def step_heal(chief):
     pa.send("heal")
     text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
     got = re.search(r"restoring (\d+) Vitality", text)
-    check("Minor Heal II on the caster restores 25 (half of 38 = 19, x 1.34; 51 halved would give 26)", got.group(1) if got else text[-200:], "25")
+    check("Minor Heal II on the caster restores 17 (a third of 38 = 13, x 1.34)", got.group(1) if got else text[-200:], "17")
     check("Minor Heal II costs 32 Focus", str(s0["focus"] - stat(pa)["focus"] in (31, 32, 33)), "True")
-    check("skills: Minor Heal II in numbers", skill_line(pa, "Minor Heal"), "Minor Heal II", "Restores 38 Vitality", "or 19 to you", "[32 Focus")
+    check("skills: Minor Heal II in numbers", skill_line(pa, "Minor Heal"), "Minor Heal II", "Restores 38 Vitality", "or 13 to you", "[32 Focus")
     wait_over(pa)
     pb.command("afill")
     pb.command("ahurt 53")
@@ -311,9 +311,9 @@ def step_heal(chief):
     pa.send("heal")
     text = a.fight_until(pa, "restoring", timeout=20) + a.quiet(pa, 0.4)
     got = re.search(r"restoring (\d+) Vitality", text)
-    check("Minor Heal III on the caster restores 40 (half of 60 = 30, x 1.34)", got.group(1) if got else text[-200:], "40")
+    check("Minor Heal III on the caster restores 27 (a third of 60 = 20, x 1.34)", got.group(1) if got else text[-200:], "27")
     check("Minor Heal III costs 40 Focus", str(s0["focus"] - stat(pa)["focus"] in (39, 40, 41)), "True")
-    check("skills: Minor Heal III names its wait too", skill_line(pa, "Minor Heal"), "Minor Heal III", "Restores 60 Vitality", "or 30 to you", "cast it again for 15 seconds")
+    check("skills: Minor Heal III names its wait too", skill_line(pa, "Minor Heal"), "Minor Heal III", "Restores 60 Vitality", "or 20 to you", "cast it again for 15 seconds")
     wait_over(pa)
     pb.command("alevel 10")
     pb.command("afill")
@@ -463,7 +463,7 @@ def step_aim(chief):
     to(s, "arena")
     check("a Scout has Aimed Shot from level 1, with its numbers", skill_line(s, "(Aimed Shot)"), "aim", "(Aimed Shot)", "[30 Endurance", "wind-up 2.0 s",
           "+3 to hit", "1.75 times the bow's damage", "2.5 times as the shot that starts the fight", "(rank II at level 5)")
-    check("the Precision Strike line is as it was", skill_line(s, "Precision Strike"), "+2 to hit with a 15% chance", "[25 Endurance")
+    check("the Precision Strike line is as it was", skill_line(s, "Precision Strike"), "+4 to hit with a 15% chance", "[25 Endurance")
     # Rank I numbers: even bow 10 (Might 5 at level 1: no bonus). Mid-fight 1.75 -> 18 (a critical 27); the opener 2.5 -> 25 (a critical 38).
     s.command("aspawn dummy")
     s.send("kill dummy")

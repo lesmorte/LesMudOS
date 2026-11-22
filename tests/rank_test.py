@@ -442,13 +442,13 @@ def step1_engine(chief):
     check("Shield Bash: 75% / 98% / 120%, cost by the default step (15, 17, 20), the stagger never changes", out,
           "factor1=0.75/1", "factor2=0.98/1", "factor3=1.2/1", "endurance1=15/15", "endurance2=17.25/17", "endurance3=19.5/20", "stagger1=2/2", "stagger5=2/2")
     out = chief.command("rkvals precision_strike tohit,crit,endurance")
-    check("Precision Strike: +2/15%, +3/20%, +4/25%, +5/30%; cost by the default step", out, "tohit1=2/2", "crit1=15/15", "tohit2=3/3", "crit2=20/20", "tohit3=4/4", "crit3=25/25", "tohit4=5/5", "crit4=30/30", "endurance2=28.75/29")
+    check("Precision Strike: +4/15%, +5/20%, +6/25%, +7/30%; cost by the default step", out, "tohit1=4/4", "crit1=15/15", "tohit2=5/5", "crit2=20/20", "tohit3=6/6", "crit3=25/25", "tohit4=7/7", "crit4=30/30", "endurance2=28.75/29")
     out = chief.command("rkvals blessing hit,armor,seconds,focus")
     check("Blessing: +1/+1 .. +4/+4, 60 seconds at every rank, cost by the default step", out, "hit1=1/1", "armor2=2/2", "hit3=3/3", "armor4=4/4", "seconds4=60/60", "focus2=28.75/29")
     out = chief.command("rkvals double_strike hits,factor,endurance")
     check("Double Strike: 2 x 60%, 2 x 75%, 3 x 60%, 4 x 55%; 35 Endurance and the default step from it", out, "hits1=2/2", "factor1=0.6/1", "factor2=0.75/1", "hits3=3/3", "factor3=0.6/1", "hits4=4/4", "factor4=0.55/1", "endurance1=35/35", "endurance2=40.25/40")
-    check("Minor Heal on the caster: half of 20 / 38 / 60 / 66 / 72 rounded half up (10 / 19 / 30 / 33 / 36), before Divine Knowledge",
-          chief.command("rkself"), "SELF 20>10,38>19,60>30,66>33,72>36")
+    check("Minor Heal on the caster: a third of 20 / 38 / 60 / 66 / 72 rounded half up (7 / 13 / 20 / 22 / 24), before Divine Knowledge",
+          chief.command("rkself"), "SELF 20>7,38>13,60>20,66>22,72>24")
     out = chief.command("rkvals tracking range,endurance")
     check("Tracking: adjacent rooms at I, two rooms away at II", out, "range1=1/1", "range2=2/2")
     # Names by rank.
@@ -778,12 +778,12 @@ def step4_skills(chief):
             to(p, "/domains/hollow/village/shrine")
             p.command("train heal")
             to(p, "arena")
-        want = max(1, sim.rnd(((sim.rank_int("minor_heal", "heal", rank) + 1) // 2) * 1.34))  # on the caster: half, rounded half up, then Divine Knowledge
+        want = max(1, sim.rnd(((2 * sim.rank_int("minor_heal", "heal", rank) + 3) // 6) * 1.34))  # on the caster: a third, rounded half up, then Divine Knowledge
         p.command("rkhurt 40" if rank == 1 else "rkhurt 53")
         p.send("heal")
         text = a.fight_until(p, "restoring", timeout=20) + a.quiet(p, 0.4)
         got = re.search(r"restoring (\d+) Vitality", text)
-        check(f"Minor Heal {ROMAN[rank]}: restores {want} (half of the table's {sim.rank_int('minor_heal', 'heal', rank)}, x 1.34)", got.group(1) if got else text[-200:], str(want))
+        check(f"Minor Heal {ROMAN[rank]}: restores {want} (a third of the table's {sim.rank_int('minor_heal', 'heal', rank)}, x 1.34)", got.group(1) if got else text[-200:], str(want))
         check(f"Minor Heal {ROMAN[rank]}: costs {sim.rank_int('minor_heal', 'focus', rank)} Focus", skill_line(p, "Minor Heal"), f"[{sim.rank_int('minor_heal', 'focus', rank)} Focus")
         # Blessing at the same rank (rank I here, the heal was bought at II; Blessing II is bought below).
     p.command("restore")
@@ -836,12 +836,12 @@ def step4_skills(chief):
 
     # Precision Strike: the skills line at I and II.
     s = login("rkstrike", "scout")
-    check("Precision Strike I: +2 to hit, 15%", skill_line(s, "Precision Strike"), "+2 to hit with a 15% chance", "[25 Endurance")
+    check("Precision Strike I: +4 to hit, 15%", skill_line(s, "Precision Strike"), "+4 to hit with a 15% chance", "[25 Endurance")
     s.command("rklevel 5")
     s.command("rkgold 40")
     to(s, "/domains/hollow/village/strung_yew")
     s.command("train strike")
-    check("Precision Strike II: +3 to hit, 20%, cost by the default step", skill_line(s, "Precision Strike"), "Precision Strike II", "+3 to hit with a 20% chance", "[29 Endurance")
+    check("Precision Strike II: +5 to hit, 20%, cost by the default step", skill_line(s, "Precision Strike"), "Precision Strike II", "+5 to hit with a 20% chance", "[29 Endurance")
     s.command("quit")
 
 

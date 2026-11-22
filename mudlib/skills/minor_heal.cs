@@ -3,7 +3,7 @@
 /// <summary>
 /// Priest spell. Restores Vitality to the caster or to someone in the room (Divine Knowledge and Healing Power add their share on top).
 /// The large heal: 20 / 38 / 60 Vitality at ranks I / II / III, and the caster cannot cast it again for HealWait seconds. On the caster
-/// it gives half (10 / 19 / 30, rounded half up; the owner's decision of 22 November 2026): Divine Knowledge applies after the halving.
+/// it gives a third (7 / 13 / 20, rounded half up; the owner's decision of 22 November 2026, after half proved too strong and a quarter too weak at rank I): Divine Knowledge applies afterwards.
 /// </summary>
 public class MinorHealSpell : Skill
 {
@@ -29,10 +29,10 @@ public class MinorHealSpell : Skill
     /// <summary>Seconds after a Minor Heal begins during which the same caster cannot cast another (per caster, not per target). The one place it is named.</summary>
     private const int HealWait = 15;
 
-    /// <summary>What the spell gives the one who casts it on themselves: half of the amount it gives another, rounded half up (20 gives 10, 38 gives 19).</summary>
-    public static int SelfShare(int amount) => (amount + 1) / 2;
+    /// <summary>What the spell gives the one who casts it on themselves: a third of the amount it gives another, rounded half up (20 gives 7, 38 gives 13).</summary>
+    public static int SelfShare(int amount) => (2 * amount + 3) / 6;
 
-    /// <summary>What a rank gives the caster (before Divine Knowledge): 10, 19, 30, 33, 36.</summary>
+    /// <summary>What a rank gives the caster (before Divine Knowledge): 7, 13, 20, 22, 24.</summary>
     public int QuerySelfHealAt(int rank) => SelfShare(RankInt("heal", rank));
 
     public override string QuerySummaryAt(int rank) =>

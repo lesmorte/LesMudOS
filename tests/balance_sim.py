@@ -64,7 +64,7 @@ BOLT_COST, BOLT_PREP, BOLT_REC, BOLT_DMG = 20, 0.5, 1.0, (6, 9)
 HEAL_COST, HEAL_PREP, HEAL_REC = 25, 0.5, 1.0
 AIM_PREP, AIM_REC = 1.0, 1.0   # Aimed Shot (mudlib/skills/aimed_shot.cs)
 RANGED_OPENING_MS = 2000       # std/living.cs RangedOpening: the target's first action is delayed this much when a bow starts the fight
-SELF_HEAL_HALF = True   # the solo Priest heals itself, and Minor Heal gives the caster half of what it gives another, rounded half up (the owner's decision, 22 November 2026; mudlib/skills/minor_heal.cs SelfShare)
+SELF_HEAL_HALF = True   # the solo Priest heals itself, and Minor Heal gives the caster a third of what it gives another, rounded half up (the owner's decision, 22 November 2026; mudlib/skills/minor_heal.cs SelfShare)
 HEAL_AMOUNT = None   # None: the Minor Heal of the rank table (SKILL_RANKS); a number overrides every rank (the old recommendations' tweaks)
 DOUBLE_STRIKE = True # False: the Adventurer as before ranks (no Double Strike), for comparison tables only
 BLESS_COST = 25
@@ -84,8 +84,8 @@ SKILL_RANKS = {
     "blessing": dict(base=dict(focus=25, hit=1, armor=1, seconds=60), rows={2: dict(hit=2, armor=2), 3: dict(hit=3, armor=3), 4: dict(hit=4, armor=4)}),
     "shield_bash": dict(base=dict(endurance=15, factor=0.75, stagger=2.0), rows={2: dict(factor=0.98), 3: dict(factor=1.2)}),
     # Precision Strike's ambush factor (docs/specs/sneak.md): the damage factor of the blow that starts the fight from hiding, x1.5 / 1.75 / 2.0 / 2.25.
-    "precision_strike": dict(base=dict(endurance=25, tohit=2, crit=15, ambush=1.5),
-                             rows={2: dict(tohit=3, crit=20, ambush=1.75), 3: dict(tohit=4, crit=25, ambush=2.0), 4: dict(tohit=5, crit=30, ambush=2.25)}, fixed={"ambush"}),
+    "precision_strike": dict(base=dict(endurance=25, tohit=4, crit=15, ambush=1.5),
+                             rows={2: dict(tohit=5, crit=20, ambush=1.75), 3: dict(tohit=6, crit=25, ambush=2.0), 4: dict(tohit=7, crit=30, ambush=2.25)}, fixed={"ambush"}),
     # Sneak (docs/specs/sneak.md): Endurance a room 5 / 4 / 3, and the change to a creature's chance to notice 0 / -10 / -20 points.
     "sneak": dict(base=dict(room=5, notice=0), rows={2: dict(room=4, notice=-10), 3: dict(room=3, notice=-20)}, max=3, fixed={"room", "notice"}),
     "double_strike": dict(base=dict(endurance=35, hits=2, factor=0.6), rows={2: dict(factor=0.75), 3: dict(hits=3, factor=0.6), 4: dict(hits=4, factor=0.55)}),
@@ -759,7 +759,7 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
     if act.id == "heal":
         amount = HEAL_AMOUNT if HEAL_AMOUNT is not None else ent.skill_int("minor_heal", "heal")
         if SELF_HEAL_HALF:
-            amount = (amount + 1) // 2   # on the caster: half, rounded half up, before Divine Knowledge and Healing Power
+            amount = (2 * amount + 3) // 6   # on the caster: a third, rounded half up, before Divine Knowledge and Healing Power
         ent.hp = min(ent.max_hp, ent.hp + max(1, rnd(amount * (100 + ent.arch.healing_pct + stat(ent.attrs, "healing_power")) / 100.0)))
         return
     if act.id == "bless":
@@ -3136,8 +3136,8 @@ def sneaking(on=True):
 
 def strike_table(r1, r2, r3, r4=None):
     """Precision Strike's table with these ambush factors (the other numbers as shipped)."""
-    return {"precision_strike": dict(base=dict(ambush=r1), rows={2: dict(tohit=3, crit=20, ambush=r2), 3: dict(tohit=4, crit=25, ambush=r3),
-                                                                  4: dict(tohit=5, crit=30, ambush=r4 if r4 is not None else r3 + 0.25)})}
+    return {"precision_strike": dict(base=dict(ambush=r1), rows={2: dict(tohit=5, crit=20, ambush=r2), 3: dict(tohit=6, crit=25, ambush=r3),
+                                                                  4: dict(tohit=7, crit=30, ambush=r4 if r4 is not None else r3 + 0.25)})}
 
 
 def sneak_table(room1, room2, room3, notice2=-10, notice3=-20):

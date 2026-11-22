@@ -48,7 +48,7 @@ Skills not listed use the default (+30% effect, +15% cost per rank). Resource na
 | Priest | Minor Heal | 20 Vitality, 25 Focus | 38, 32 | 60, 40 | half a starting Warrior's Vitality at level 15 |
 | Priest | Blessing | +1 to hit, +1 armour | +2, +2 | +3, +3 | default cost steps |
 | Warrior | Shield Bash | 75% weapon damage, stagger | 98% | 120% | default |
-| Scout | Precision Strike | +2 to hit, 15% critical | +3, 20% | +4, 25% | default cost steps |
+| Scout | Precision Strike | +4 to hit, 15% critical | +5, 20% | +6, 25% | default cost steps |
 | Scout | Tracking | adjacent rooms | two rooms away | rank II is the last | |
 | Adventurer | Double Strike (new) | 2 hits at 60% | 2 hits at 75% | Triple Strike: 3 at 60% | Quadruple Strike: 4 at 55% |
 | Adventurer | Appraise | rank I only | | | |
@@ -119,3 +119,7 @@ The large heal stays for others; **healing yourself gives half** (10 / 19 / 30 a
 
 ## Doors (owner's decision, 22 November 2026)
 Builders get openable doors: see `docs/specs/sneak.md`, which needs one before the Overseer.
+
+## Owner's later decisions (22 November 2026, after sneak was measured)
+- **Minor Heal on the caster gives a third**, rounded half up: 7 / 13 / 20 at ranks I / II / III (then 22, 24). Half left the solo Priest at 95% and 100% in the standard test; a quarter was level at rank II but dropped the rank I Priest to 50%, because the Priest's result falls sharply between a self-heal of 7 and 5. A third measured 76% at rank I (level with the others) and 98% with everyone at rank II (about 6 over). This replaces "half" wherever this document says it.
+- **Precision Strike gains +2 to hit at every rank**: +4 / +5 / +6 / +7 (was +2 / +3 / +4 / +5). Sneak's ambush did not lift the melee Scout, which sat 10 to 15 points under the other callings; with this it measures about 83% at rank I and 87% at rank II with sneaking, within about 5 points.

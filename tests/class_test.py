@@ -583,7 +583,7 @@ def run(work, mudlib):
     time.sleep(3)
     out = p.command("heal")
     out += a.quiet(p, 5)
-    check("Minor Heal on the caster gives half of 20 (10), plus 25% (Divine Knowledge) and 9% (Healing Power) = 13 (the halving comes first; tests/aim_test.py shows the 27 it gives another)", out, "restoring 13 Vitality")
+    check("Minor Heal on the caster gives a third of 20 (7), plus 25% (Divine Knowledge) and 9% (Healing Power) = 9 (the third is taken first; tests/aim_test.py shows the 27 it gives another)", out, "restoring 9 Vitality")
     check("Minor Heal costs 25 Focus", str(res(p)[2] <= 90), "True")
     s0 = a.score_of(p)["text"]
     time.sleep(3)

@@ -546,13 +546,13 @@ def run(work, mudlib):
     pr.command("atele " + T + "arena")
     pr.command("ahurt 40")
     out = a.quiet(pr, 0.1) + (pr.send("heal") or "") + pr.read_until("Vitality", timeout=12)
-    check("Spirit 9 and Insight 6: Healing Power +9% with Divine Knowledge's 25%: Minor Heal on the caster restores 13 (half of 20, then x 1.34)", out, "restoring 13 Vitality")
+    check("Spirit 9 and Insight 6: Healing Power +9% with Divine Knowledge's 25%: Minor Heal on the caster restores 9 (a third of 20, then x 1.34)", out, "restoring 9 Vitality")
     a.drain(pr, 16)  # Minor Heal's wait is 15 seconds
     pr.command("setlevel 10")
     pr.command("improve spirit 18")
     pr.command("ahurt 60")
     out = (pr.send("heal") or "") + pr.read_until("Vitality", timeout=12)
-    check("Spirit 27: +44% +1% +25%: Minor Heal on the caster restores 17 (half of 20, then x 1.70, rank I: no rank was bought)", out, "restoring 17 Vitality")
+    check("Spirit 27: +44% +1% +25%: Minor Heal on the caster restores 12 (a third of 20, then x 1.70, rank I: no rank was bought)", out, "restoring 12 Vitality")
     a.drain(pr, 3.5)
     pr.command("restore")
 
