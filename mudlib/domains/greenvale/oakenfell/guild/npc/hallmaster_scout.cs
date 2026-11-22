@@ -32,6 +32,7 @@ public class GqHallmasterScout : Npc
         AddTopic("level,fifth,five,retain,keep,lose,lost", "At the fifth level a Scout may choose a path. What you were before you keep: Evasion, Tracking, Precision Strike. The path is added to it, not swapped for it.");
         AddTopic("scout,scouts,calling,agility,precision", "Scouts are speed and sight. Agility, precision, the shot or blow that lands where it must. You begin with Evasion, Tracking and Precision Strike. The three paths are where you may take them.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "Read the banners on the east wall for a line on every path. The Chronicle Gallery is east of here and the Envoys' Gallery west.");
+        AddTopic("attributes,attribute,grace,insight,resolve,quickness,lean,leans,stats,points", "A Scout is Grace: the hand that finds the mark, and the blow that lands where it counts. Insight to read the ground, and Resolve to keep going when others stop. You will hear nothing of my Grace. That is the point of it.");
         AddEmote("Veyla turns a hawk's feather between her fingers and watches the doors.", 8);
         AddEmote("Veyla smiles faintly at a visitor who has just realized she was standing there all along.", 6);
     }

@@ -15,6 +15,12 @@ public class SgSilverStag : Room
         AddDetail("tables,benches,corner,seats", "Long tables of black oak scarred with knife-cuts, initials and the rings of a thousand tankards. The corner seats near the fire are always taken by the same three people.");
         AddDetail("stairs,staircase,steps", "A broad staircase of dark wood climbs beside the chimney to the guest rooms. A small painted sign on the post reads \"Guests Only\".");
         AddDetail("travelers,adventurers,sellswords,drovers", "A dozen travelers eat and drink in small groups, and the talk is half boasts and half warnings. Anyone willing to listen might leave with a rumor.");
+        AddReadable("toasts,toast wall,wall,wall of names,regulars,names",
+            "Names are chalked along the wall by the fire, with a word beside each, and the regulars add to it on feast nights:\n" +
+            "  \"DAGNA RUSK, for her Resolve at the gate.\"\n" +
+            "  \"THE BLACK-HEADED DROVER, for his Vigor. Fell in the river and was in the common room before the water dried.\"\n" +
+            "  \"BRANDT KETCH, for his Might, and for finishing the pie.\"",
+            "Names are chalked along the wall by the fire. You could {cmd}read{/} them.");
         AddReadable("board,cork board,notices,notice", "The cork board is crowded with notices:\n \"WANTED: guards for a wagon to Watchfort Crossing, good pay, no questions about the Elderwood.\"\n \"LOST: a brindled hound, one white ear, answers to Biscuit. Two gold. Ask for Marta at the Fish Market.\"\n \"FOUND: a signet ring, engraved with a stag. Ask at the bar.\"\n \"The Free Lodge is hiring steady blades. Coin Before Crown.\"", "A cork board by the stairs is crowded with notices. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/greenvale/oakenfell/southgate/obj/stag_cooking_fire");

@@ -27,5 +27,6 @@ public class MageClass : PlayerClass
         Skills.AddRange(new[] { "arcane_bolt", "magical_lore" });
         Traits.AddRange(new[] { "focus_efficiency" });
         Kit.AddRange(new[] { "/domains/hollow/obj/apprentice_staff", "/domains/hollow/obj/healing_potion" });
+        Description += " Leans on Insight, then Spirit.";
     }
 }

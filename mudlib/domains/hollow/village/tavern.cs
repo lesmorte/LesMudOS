@@ -15,6 +15,12 @@ public class HollowmansRest : Room
         AddDetail("musicians,musician,band,minstrels", "A fiddler and a piper sit on low stools near the hearth, playing a lively tune that has half the room tapping their feet.");
         AddDetail("stairs,staircase,steps", "A narrow wooden staircase climbs to the Guest Rooms above, its treads worn hollow by generations of boots.");
         AddDetail("cellar door,trapdoor,cellar,trap door", "A heavy oak trapdoor set into the floor, with an iron ring for a handle. Cold air seeps up around its edges, smelling of damp earth.");
+        AddReadable("toasts,toast board,wall of toasts,slate,toast slate",
+            "A slate beside the hearth, chalked afresh by Harland whenever someone is toasted:\n" +
+            "  \"To Vincent, for his Resolve.\"\n" +
+            "  \"To Hob Marrow, for his Vigor, and his knees.\"\n" +
+            "  \"To whoever stands the next round, for their open hand.\"",
+            "A slate by the hearth is chalked with toasts. You could {cmd}read{/} it.");
 
         AddSpawn("/domains/hollow/obj/craft/cooking_fire");
         AddSpawn("/domains/hollow/npc/harland");

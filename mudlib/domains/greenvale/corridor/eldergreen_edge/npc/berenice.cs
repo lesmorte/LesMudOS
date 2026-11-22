@@ -22,6 +22,7 @@ public class EeBerenice : Npc
         AddTopic("wolves,wolf,spiders,beasts", "Wolves smell the smoke and stay off, mostly. The spiders don't mind it. That's why we've a bucket by every clamp.");
         AddTopic("forester,alwin,leave", "Alwin gives us leave to burn what the woodcutters leave behind. Offcuts, windfall, branches too crooked to use. Nothing blazed, ever.");
         AddTopic("birch,birches,trail,east,stand", "The trail east goes through the Birch Stand and on into the deep wood. We don't go that way. It gets quiet.");
+        AddTopic("resolve,patience,endurance,burn,long nights", "A charcoal burn takes three days and cannot be left, not for a minute. It wants Resolve, and Endurance after it, and Vigor to bear the smoke. We have all three or we are not burners.");
         AddEmote("Berenice rakes a vent open and a plume of blue smoke curls out.", 6);
         AddEmote("Berenice wipes her forehead with the back of a sooty hand and leaves a black stripe.", 6);
         AddEmote("Berenice sniffs the smoke and nods, content.", 6);

@@ -24,6 +24,7 @@ public class SrMillerLeofric : Npc
         AddTopic("north,road,wood,forest,eldergreen", "Past the bridge it's another country. I went to Oakenfell once, in my youth, for a wedding. I came home in three days and have not left the vale since.");
         AddTopic("hale,hale's acre,well", "Hale's Acre? Gone before my time. Their well failed, the story goes, and they went to the Hollow and never came back. The thorn took the place.");
         AddTopic("thorn,hawthorn,ring", "The hawthorn ring in the brook pasture? It was there before my father. We do not cut it. We do not ask. The cattle keep their own counsel, and the milk is no worse for it.");
+        AddTopic("might,strength,strong,sacks,sack,lift,lifting,arm,arms", "Sixty years of sacks put Might in these arms, and nothing else did. Anyone who carries a thing every day is mighty by the end of it, whatever they were when they started. Ask Hamo; he is only on his second year.");
         AddEmote("Old Leofric tilts his head to the sails and grunts with approval.", 8);
         AddEmote("Leofric brushes flour from his sleeves and raises a white cloud.", 6);
     }

@@ -32,6 +32,7 @@ public class GqHallmasterPriest : Npc
         AddTopic("level,fifth,five,retain,keep,lose,lost", "At the fifth level a Priest may choose a path. Minor Heal, Blessing and Divine Knowledge you keep. The path is built upon them, not in place of them.");
         AddTopic("priest,priests,calling,divine,faith,healing", "Healing, blessings and defensive magic: the work of the Priests. You begin with Minor Heal, Blessing and Divine Knowledge. The three paths show what a Priest may grow into.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "The banners on the east wall name every path. The Chronicle Gallery lies east; the Envoys' Gallery lies west.");
+        AddTopic("attributes,attribute,spirit,focus,lean,leans,stats,points", "A Priest leans on Spirit above all. It deepens every healing and brings the Focus back sooner. Vigor keeps the healer standing, and Insight widens the well. Spirit is not piety, mind. It is how still you can be when everyone around you is not.");
         AddEmote("Anselm bows his head briefly over folded hands.", 7);
         AddEmote("Anselm trims the wick of a small lamp at his station.", 6);
     }

@@ -18,9 +18,10 @@ public class Harland : Trainer
         AddChatAfterQuest("clear-the-cellar", "The cellar is quiet at last, and I have you to thank for it. The Hollowman's Rest will not forget what you did down there, friend.");
         AddTopic("cellar,goblins,goblin,rats,rat", "Rats, then goblins, and now something is organizing the goblins. I've paid two men to look down there, and neither came back up talking.");
         AddTopic("vincent,tunnels,tunnel,underground", "Vincent used to talk about tunnels under the village, always hungry to dig further. Nobody believed him, and I'm not sure I do yet.");
-        AddTopic("bed,room,rest,sleep", "A bed for the night is five gold, and you'll wake up fit as a fiddle. Say the word and I'll show you upstairs myself. Just {cmd}buy bed{/}.");
+        AddTopic("bed,room,rest,sleep", "A bed for the night is five gold, and you'll wake up fit as a fiddle. Say the word and I'll show you upstairs myself. Just {cmd}buy bed{/}. If you only want your breath back, a seat by my fire mends a body faster than walking it off.");
         AddTopic("food,drink,ale,stew", "Hot stew, cold ale, and a warm corner by the fire. Browse my shelves and take your pick. Try {cmd}browse{/}, then {cmd}buy stew{/}.");
         AddTopic("berry,berries,blackberries,blueberries,juice,flour,honey,water,work,craft,learn,teach,teaching,recipe,recipes,lessons,lesson,fire,cooking,kitchen", "The fire is free to anyone who can use it, so long as you stay out of my stew. I'll show you how to press berry juice if you like: {cmd}lessons{/} for the price, {cmd}learn berry juice{/} to be taught, then {cmd}craft berry juice{/} at the hearth. I sell blackberries, blueberries, flour, honey and clean water for it, along with the food and drink. {cmd}browse{/} will show you.");
+        AddTopic("seat,sit,sitting,breath,recover,recovery,mend,mending,vigor,vitality,endurance,focus,resting", "A seat and a breath mend a body faster than walking it off, and a warm hearth does it better than a ditch. Vigor decides how quickly the wounds close, and Resolve how soon the wind returns. The stew is for the rest.");
         AddEmote("Harland polishes a mug with his apron and eyes the trapdoor.", 6);
         AddEmote("Harland calls out to the musicians to play something cheerier.", 4);
 

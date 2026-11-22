@@ -20,9 +20,9 @@ public class RenownLedger : MudObject
     /// <summary>What an NPC says first to a character of this tier, in the bible's spirit. Below Recognized: nothing.</summary>
     private static readonly string[] Recognition =
     {
-        "", "", "You seem familiar.", "I have heard stories about your travels.",
-        "Travelers speak your name on the road.", "Your name is known to most folk in these parts.",
-        "They sing songs about the likes of you.", "I never thought I would meet you.",
+        "", "", "You seem familiar.", "I have heard stories about your travels. Some sound like feats of Vigor.",
+        "Travelers speak your name on the road, and they tell your deeds as feats of Might or Grace.", "Your name is known to most folk in these parts.",
+        "They sing songs about the likes of you, and the best of them are about Spirit.", "I never thought I would meet you.",
         "Stand aside, everyone. It is you. The one from the stories."
     };
 

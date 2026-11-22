@@ -32,6 +32,7 @@ public class GqHallmasterAdventurer : Npc
         AddTopic("level,fifth,five,retain,keep,lose,lost", "At the fifth level an Adventurer may choose a path. Survival Training, Appraise, Improvised Combat and Traveler's Instinct all stay. The path sits on top, like a good coat over a better shirt.");
         AddTopic("adventurer,adventurers,calling,generalist,versatile,travel", "Versatile, adaptable, curious. We give up some of the sharp edge of the specialists for a lot of flexibility. We use most basic weapons, wear light armor, and see a good deal of the world. The three paths are bridges to more specific things, down the road.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "The banners on the east wall have a line for every path. East of here is the Chronicle Gallery, west the Envoys' Gallery.");
+        AddTopic("attributes,attribute,lean,leans,stats,points,all six,six", "An Adventurer begins with six in each of the six, and spends the road deciding. I have known one who put everything in Vigor and outlasted three companies. I have known one who put everything in Insight, and found more than she could carry.");
         AddEmote("Jory fiddles with one of the buttons on his coat and smiles at a private memory.", 8);
         AddEmote("Jory pulls a worn map halfway out of his pocket, glances at it fondly, and puts it back.", 6);
     }

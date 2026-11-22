@@ -25,6 +25,8 @@ public class SrVeteranKenrick : Npc
         AddTopic("heartwood,ruins,old ruins,mossgate,ancient", "Deeper in, past the Green Road, the forest gets old. Not old like a barn: old like a mountain. There are ruins in it, carved stone under moss, older than Greenvale. I did not stay.");
         AddTopic("hand,fingers,scar,scars", "A goblin warrior, in the dark. I lost two fingers, and he lost the rest of himself. Fair trade, the way I tell it.");
         AddTopic("riverwatch,rangers,ranger", "Good folk, the Rangers. They walk the road so we don't have to. If you see one, share your bread.");
+        AddTopic("vigor,toughness,tough,hardy,survive,survived,survival,healing,wounds", "Vigor, they call it in the Hall. I call it being hard to kill. I am two fingers short and still here, because I could take a wound that would have put a better swordsman in the ground.");
+        AddTopic("resolve,nerve,fear,courage,brave,bravery", "The ones who lasted had Resolve. They felt the same fear as the rest and put one foot forward anyway. I have known big men without it and small men with it, and I buried the big ones.");
         AddEmote("Kenrick turns his cup slowly in his scarred fingers.", 8);
         AddEmote("Kenrick glances up at the road and back down.", 6);
     }

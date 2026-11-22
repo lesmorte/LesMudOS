@@ -26,6 +26,7 @@ public class SrInnkeeperAldith : Shopkeeper
         AddTopic("inn,traveler's rest,history", "The Rest has stood here three hundred years, they say. The road was cut around it, not the other way. There's always been someone here, with a lamp lit.");
         AddTopic("riverwatch,rangers,ranger,notice", "The Rangers' notice is by the door. I put it up myself. Heed it. They know what they're writing.");
         AddTopic("safe,log out,logout,leave", "You're safe in this yard. Sleep, stay, or log out. Nobody will trouble you, and your things will be where you left them.");
+        AddTopic("seat,sit,sitting,bench,hearth,breath,recover,recovery,mend,mending,vigor,vitality,endurance,resting", "Take a seat by the hearth and a breath, and you will mend faster than walking it off; every traveler here learns that by the second day. The hardy ones, with plenty of Vigor, are on their feet first. The rest of us wait for the stew.");
         AddEmote("Aldith wipes down the bench under the ash and straightens a stool.", 8);
         AddEmote("Aldith sets a steaming bowl in front of a dozing drover.", 6);
 

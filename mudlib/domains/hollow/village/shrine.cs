@@ -16,6 +16,12 @@ public class VhShrine : Room
         AddDetail("mat,rush mat,floor", "A rush mat, much patched, with a shallow hollow worn into it where people kneel.");
         AddDetail("bowl,offering bowl,stand,coins", "A worn pewter bowl on a stand by the door, a handful of small coins in it. The pilgrims who used to leave offerings at the old cellar door left their silver here instead when the cellar turned dangerous.");
         AddReadable("notice,blessing notice,board", "The notice reads:\n  \"The Quiet Hand asks nothing, and gives what it can.\n  A blessing for those who are weary or hurt: six gold in the bowl, and ask Sister Merewyn. {cmd}buy blessing{/}.\n  The Sister has a small errand for those with a little time: {cmd}ask{/} her about the offering.\"", "A small notice hangs beside the offering bowl. You could {cmd}read{/} it.");
+        AddReadable("names,scratched names,north sill,sill names,scratches",
+            "Under the north sill, scratched small with a pin by many hands:\n" +
+            "  \"YSOLT BRANNOCK. The Spirit to sit with the sick.\"\n" +
+            "  \"OLD MERRIT. His Resolve, in the bad year. He did not ask the Hand for anything.\"\n" +
+            "  \"A CHILD'S NAME, and beneath it: she was brave.\"",
+            "Names are scratched into the stone under the north sill. You could {cmd}read{/} them.");
 
         AddSpawn("/domains/hollow/npc/sister_merewyn");
     }

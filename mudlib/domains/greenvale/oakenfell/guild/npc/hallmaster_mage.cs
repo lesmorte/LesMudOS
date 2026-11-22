@@ -32,6 +32,7 @@ public class GqHallmasterMage : Npc
         AddTopic("level,fifth,five,retain,keep,lose,lost", "At the fifth level a Mage may choose a path. Arcane Bolt, Focus Efficiency and Magical Lore all remain. The path is added, not substituted.");
         AddTopic("calling,arcane,magic,spells,spellcasting,lore", "Spellcasting, utility, magical damage: the calling of the Mages. You begin with Arcane Bolt, Focus Efficiency and Magical Lore. The three paths are where that work leads.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "The banners on the east wall describe every path in a line. The Chronicle Gallery is east and the Envoys' Gallery west.");
+        AddTopic("attributes,attribute,insight,focus,lean,leans,stats,points", "A Mage is Insight first: it is the size of the well and the force of the bolt. Spirit comes second, and fills the well sooner. Vigor a Mage neglects, and the first cold night pays for it. Do not tell Anselm that I said so.");
         AddEmote("Ilsabet turns a page, nods to herself, and underlines something.", 8);
         AddEmote("Ilsabet pushes her spectacles up her nose and peers over them at a visitor.", 6);
     }

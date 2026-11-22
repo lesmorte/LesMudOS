@@ -26,6 +26,8 @@ public class GqChronicler : Npc
         AddTopic("firsts,first,discoveries,discovery,explorers", "The Chronicle records who found a thing first: who first reached a distant wood, who first defeated a great beast, who first mapped a whole region. Those firsts are written down in the person's name, and they stay written. I would dearly like to see the first one. Nothing is entered yet.");
         AddTopic("hall,hall of legends building,building,hallmasters", "The Hall of Legends is the guild confederation's seat. It keeps the Chronicle, oversees advanced training and certifies the guilds. Beyond that, the hallmasters in the chamber to the south will tell you better than I.");
         AddTopic("wall,walls,stone,carvings", "Three walls: Heroes, Legends and Infamy. Look at them, if you like. They are carved to wait.");
+        AddTopic("attributes,attribute,feat,feats,deed,deeds,virtue,virtues,remembered,remember", "A Chronicle entry tells of the deed and not of the one who did it. We write that a feat took Might, or Resolve, or Insight, so that a reader a century on knows what kind of deed it was. Of the person we write only what they did.");
+        AddTopic("might,grace,vigor,insight,spirit,resolve,six words,six", "Six words fill the old chronicles: Might, Grace, Vigor, Insight, Spirit and Resolve. The founders held that a hero is remembered for one of them, seldom two. Mind which you spend yourself on.");
         AddEmote("Perrin sharpens a quill and tests it on the back of his hand.", 8);
         AddEmote("Perrin runs a fingertip along the edge of the lectern, as one would stroke a sleeping cat.", 6);
     }

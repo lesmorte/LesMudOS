@@ -13,7 +13,7 @@ rarity=Uncommon
 first=yes
 renown=10
 headline={name} Falls
-text=On {date}, {name} was defeated by {participants}, ending a period of danger in {area}.",
+text=On {date}, {name} was defeated by {participants}, ending a period of danger in {area}, a feat of Might.",
         @"id=boss.goblin_overseer
 title=Goblin Overseer killed
 kind=Victory
@@ -27,7 +27,7 @@ first=yes
 renown=10
 renown_first=15
 headline=The Quieting of the Cellars
-text=On {date}, {participants} brought down the Goblin Overseer in the tunnels beneath Vincent's Hollow.
+text=On {date}, {participants} brought down the Goblin Overseer in the tunnels beneath Vincent's Hollow, a feat of Resolve.
 significance=The goblins that had plagued the Hollowman's Rest were left leaderless, and the village slept easier.
 rumor=They say {participants} brought down the Goblin Overseer in the tunnels below the village.
 tags=goblin,overseer,boss,vincents-hollow",
@@ -46,6 +46,6 @@ listed=firsts
 renown=50
 renown_first=250
 headline=The Fall of {name}
-text=On {date}, {participants} brought down {name}, the first such beast ever slain, and the roads of {region} were safe again.",
+text=On {date}, {participants} brought down {name}, the first such beast ever slain, a feat of Might and Resolve, and the roads of {region} were safe again.",
     };
 }

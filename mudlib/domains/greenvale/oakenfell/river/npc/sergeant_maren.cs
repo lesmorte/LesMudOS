@@ -24,6 +24,7 @@ public class RvSergeantCalla : Npc
         AddTopic("assembly,allies,consortium,hall of legends,friends", "We work with the Assembly, which gives us our charge, and the Hall of Legends, which gives us recruits. The Consortium pays for the roads they travel, and so we are on good terms.");
         AddTopic("enemies,rivals,raiders,monsters,thorn pact,thorn", "Monsters, raiders and what the old reports call extremists of the Thorn Pact. That last I will not discuss further. Not with strangers.");
         AddTopic("join,recruit,enlist,work,help,quest", "We have no work for strangers at this desk yet. The Rangers know their own, and we will know you when you have earned it. Keep your eyes open on the road and come back.");
+        AddTopic("resolve,vigilance,vigilant,duty,vigil,remembered", "The Rangers say Ever Vigilant, and what they mean is Resolve: a long watch on a quiet road, for years, with nobody to say well done. It is not the glory the Hall carves. It is what the carving is for.");
         AddEmote("Maren Stroud runs a finger down a patrol report and makes a note in the margin.", 6);
         AddEmote("Maren Stroud glances at the door, at the map and back at the door.", 5);
     }

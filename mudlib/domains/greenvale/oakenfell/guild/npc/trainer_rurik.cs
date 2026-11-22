@@ -21,6 +21,7 @@ public class GqTrainerRurik : Npc
         AddTopic("practice,drill,drills,posts,post", "Strike the post. Strike it again. When you are bored, strike it a hundred more. That is the first lesson, the second, and the hundredth.");
         AddTopic("weapons,sword,swords,mace,staff", "A weapon is only as good as the arm that swings it, and the arm is only as good as the legs beneath it. Start with the legs.");
         AddTopic("wren,archery,bow", "Wren? Fine trainer. Knows more about a bow than most know about breakfast. Over there.");
+        AddTopic("might,strength,power,heavy,arm,arms,resolve,endurance,wind", "Might is the arm and Resolve is the wind, and this yard teaches the second more than the first. Strike the post until your arms shake, and then strike it again. The arm you were born with; the Endurance you make.");
         AddEmote("Rurik thumps a post with the flat of his practice sword and shouts a correction.", 10);
         AddEmote("Rurik rubs his bad knee, catches himself doing it, and stands straighter.", 7);
     }

@@ -32,6 +32,7 @@ public class GqHallmasterWarrior : Npc
         AddTopic("level,fifth,five,retain,keep,lose,lost", "At the fifth level a Warrior may choose a path. What you were before, you keep: Shield Bash, Defensive Training, Weapon Proficiency, all of it. The path is added on top.");
         AddTopic("warrior,warriors,calling,front line,fight", "Warriors hold the line. Defense, melee, mastery of the weapon: that is the whole of the calling. Shield Bash, Defensive Training and Weapon Proficiency are what you begin with. The three paths are what you may grow into.");
         AddTopic("hall,hall of legends,banners,chronicle,envoys", "The banners on the east wall name every path. The Chronicle Gallery lies east of this chamber, the Envoys' Gallery west. Go and look.");
+        AddTopic("attributes,attribute,might,vigor,resolve,strength,lean,leans,stats,points", "A Warrior leans on Might and Vigor, and holds on by Resolve. The Knight takes Resolve furthest, the Berserker takes Might, and the Monk takes the stillness between. Place your points where your path leans, and not where your pride does.");
         AddEmote("Gorrim rolls his shoulders and surveys the hall like a man counting the exits.", 8);
         AddEmote("Gorrim straightens a rack of practice shields by an inch.", 6);
     }
