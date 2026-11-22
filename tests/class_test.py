@@ -548,7 +548,7 @@ def run(work, mudlib):
     wiz.command("clone " + TEST + "dummy")
     wiz.command("goto " + ROOM["v"])
     out = sc.command("track")
-    check("Tracking lists the creatures in each adjacent room", out, "east", "a dummy", "north", "nothing stirs")
+    check("Tracking lists the creatures in each adjacent room it could walk to (docs/specs/skill-ranks.md: not through the locked vault door)", out, "east", "a dummy", absent=("north",))
     sc.command("stop")
     wiz.command("clone " + TEST + "dummy")
     time.sleep(3)
