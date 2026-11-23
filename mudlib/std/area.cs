@@ -17,6 +17,11 @@ public abstract class Area : MudObject
     protected int BandLow;
     protected int BandHigh;
 
+    /// <summary>What the ground of this area is like, for clients that draw a map (GMCP): outdoors, indoors, underground, road or water. A room can say otherwise with its own Terrain. Default outdoors.</summary>
+    protected string Terrain = "";
+
+    public string QueryTerrain() => Terrain;
+
     public int QueryBandLow() => BandLow;
 
     public int QueryBandHigh() => BandHigh;

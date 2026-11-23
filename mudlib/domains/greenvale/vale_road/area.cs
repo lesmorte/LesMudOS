@@ -6,5 +6,6 @@ public class ValeRoadArea : Area
     {
         AreaName = "The Vale Road";
         RegionName = "Greenvale";
+        Terrain = "road";
     }
 }

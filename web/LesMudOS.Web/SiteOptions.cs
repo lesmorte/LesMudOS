@@ -23,6 +23,9 @@ public sealed class SiteOptions
     public string GameHost { get; set; } = "play.legendsofhollowmere.com";
     public int GamePort { get; set; } = 4000;
 
+    /// <summary>Where docs/MUDLET.md can be read on the web (the page of the source repository). When empty the Play page names the file and links nothing.</summary>
+    public string MudletDocsUrl { get; set; } = "";
+
     /// <summary>Invite link. When empty the Discord link is not shown anywhere.</summary>
     public string DiscordUrl { get; set; } = "";
 

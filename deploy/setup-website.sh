@@ -219,6 +219,8 @@ Site__GameHost=$GAME_HOST
 Site__GamePort=$GAME_PORT
 # Shown in the footer and on the support page only when filled in:
 Site__DiscordUrl=
+# The page that explains the Mudlet map (docs/MUDLET.md in the source repository); the Play page links to it when filled in:
+Site__MudletDocsUrl=
 Site__SupportContact=
 ENV
 fi

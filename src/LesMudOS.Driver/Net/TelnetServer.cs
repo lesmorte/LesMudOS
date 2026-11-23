@@ -56,6 +56,19 @@ internal sealed class Connection
     /// </summary>
     public void SendRaw(ReadOnlySpan<byte> bytes) => _outbox.Writer.TryWrite(bytes.ToArray());
 
+    /// <summary>GMCP (telnet option 201) state of this connection. Written by the network thread, read by the game thread.</summary>
+    public readonly GmcpState GmcpSession = new();
+
+    /// <summary>
+    /// Queue one GMCP message in order with the text. Game thread. False (and nothing is queued) if the client did not ask for GMCP
+    /// or does not want this package: a client that never negotiated gets no GMCP byte.
+    /// </summary>
+    public bool SendGmcp(string package, byte[] json)
+    {
+        if (!GmcpSession.Enabled || !GmcpSession.Wants(package)) return false;
+        return _outbox.Writer.TryWrite(Net.Gmcp.Frame(package, json));
+    }
+
     /// <summary>Flush what is queued, then close the socket.</summary>
     public void Close() => _outbox.Writer.TryComplete();
 
@@ -91,6 +104,9 @@ internal sealed class Connection
         var buffer = new byte[2048];
         var line = new List<byte>();
         var telnet = TelnetState.Data;
+        byte command = 0;
+        var sub = new List<byte>(); // the body of the subnegotiation being read: option byte first, never more than MaxIncomingBytes + 1
+        var subOverflow = false;
 
         while (true)
         {
@@ -115,18 +131,39 @@ internal sealed class Connection
                         if (line.Count < MaxLineLength && (b >= 32 || b == 9)) line.Add(b);
                         break;
 
-                    // Telnet negotiation is recognised and discarded.
+                    // Telnet negotiation is recognised and, except for GMCP, discarded.
                     case TelnetState.Iac when b == 255: line.Add(255); telnet = TelnetState.Data; break;
-                    case TelnetState.Iac when b is >= 251 and <= 254: telnet = TelnetState.Option; break;
-                    case TelnetState.Iac when b == 250: telnet = TelnetState.Subnegotiation; break;
+                    case TelnetState.Iac when b is >= 251 and <= 254: command = b; telnet = TelnetState.Option; break;
+                    case TelnetState.Iac when b == 250: sub.Clear(); subOverflow = false; telnet = TelnetState.Subnegotiation; break;
                     case TelnetState.Iac: telnet = TelnetState.Data; break;
-                    case TelnetState.Option: telnet = TelnetState.Data; break;
+                    case TelnetState.Option:
+                        if (b == Net.Gmcp.Option && command == Net.Gmcp.Do) GmcpSession.SetEnabled(true);
+                        else if (b == Net.Gmcp.Option && command == Net.Gmcp.Dont) GmcpSession.SetEnabled(false);
+                        telnet = TelnetState.Data;
+                        break;
                     case TelnetState.Subnegotiation when b == 255: telnet = TelnetState.SubnegotiationIac; break;
-                    case TelnetState.Subnegotiation: break;
-                    case TelnetState.SubnegotiationIac: telnet = b == 240 ? TelnetState.Data : TelnetState.Subnegotiation; break;
+                    case TelnetState.Subnegotiation:
+                        if (sub.Count <= Net.Gmcp.MaxIncomingBytes) sub.Add(b); else subOverflow = true;
+                        break;
+                    case TelnetState.SubnegotiationIac when b == 255:
+                        if (sub.Count <= Net.Gmcp.MaxIncomingBytes) sub.Add(255); else subOverflow = true;
+                        telnet = TelnetState.Subnegotiation;
+                        break;
+                    case TelnetState.SubnegotiationIac:
+                        telnet = b == 240 ? TelnetState.Data : TelnetState.Subnegotiation;
+                        if (b == 240) EndSubnegotiation(sub, subOverflow);
+                        break;
                 }
             }
         }
+    }
+
+    /// <summary>A complete subnegotiation arrived. Only GMCP is understood; anything else is dropped as before.</summary>
+    private void EndSubnegotiation(List<byte> sub, bool overflow)
+    {
+        if (sub.Count == 0 || sub[0] != Net.Gmcp.Option) return;
+        var reply = GmcpSession.OnMessage(sub.GetRange(1, sub.Count - 1).ToArray(), overflow, message => Log.Info($"{message} ({RemoteAddress})"));
+        if (reply != null && GmcpSession.Enabled) _outbox.Writer.TryWrite(reply);
     }
 
     private enum TelnetState { Data, Iac, Option, Subnegotiation, SubnegotiationIac }

@@ -6,5 +6,6 @@ public class ForgottenCellarsArea : Area
     {
         AreaName = "The Forgotten Cellars";
         RegionName = "Greenvale";
+        Terrain = "underground";
     }
 }

@@ -42,6 +42,7 @@ Set in `appsettings.json`, by environment variables (`Site__GamePort=4000`), or 
 | `Site:FilterFile` | `publicfilter.json` | The secrets filter |
 | `Site:GameHost`, `Site:GamePort` | `play.legendsofhollowmere.com`, `4000` | Shown on `/play` |
 | `Site:DiscordUrl` | empty | The Discord link in the footer and on `/support`. Empty: no link anywhere |
+| `Site:MudletDocsUrl` | empty | The web address of `docs/MUDLET.md` (the Mudlet map package), linked from `/play`. Empty: `/play` names the file and links nothing |
 | `Site:SupportContact` | empty | The contact line on `/support` (an address, for example). Empty: "A contact address will be posted here soon." |
 | `Site:CacheSeconds` | `45` | How long the game's files are cached (30 to 60 is right) |
 | `Site:ChroniclePageSize` | `12` | Entries per page on `/chronicle` |

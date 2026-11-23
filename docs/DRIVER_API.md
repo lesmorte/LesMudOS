@@ -146,6 +146,22 @@ Protected methods on `MudObject`. `ob` parameters default to this object where m
 
 Messages are not newline-terminated for you; include `\n`.
 
+### GMCP
+
+GMCP (Generic MUD Communication Protocol, telnet option 201) carries structured data to clients that ask for it, such as Mudlet's map. The driver speaks the protocol; the mudlib decides what is sent (`/secure/gmcp`, see GAME_SYSTEMS.md and [MUDLET.md](MUDLET.md)).
+
+| Efun | Description |
+|---|---|
+| `bool GmcpSend(ObjectRef player, string package, object? value)` | Send one package to the player's connection, in the same queue as ordinary text so the two keep their order. `value` is plain data only: a string, number, bool, null, a list or array of values, or a map with string keys (at most 8 levels deep, 16 KB once encoded). The driver does all the JSON encoding and escaping; game code never passes JSON text, and a value of any other type is refused. True if sent; false if the player has no connection, did not answer `DO` to the offer, or has said (Core.Supports) that it does not want the package. `package` is dotted words of letters, digits and underscores, at most 64 characters. **Throws unless the calling object's program is under `/std` or `/secure`**: a wizard's object (anything else, `/wiz` included) cannot send. Sending a player data about someone else is not checked by the driver: the caller must not (the only caller is `/secure/gmcp`, which checks who is asking). |
+| `bool GmcpActive(ObjectRef player)` | True if the player's connection has GMCP switched on. Anyone may ask; it is one bit that every client announces anyway. |
+
+**The protocol.**
+
+- At connect, before anything else, the server sends `IAC WILL 201`. A client that answers `IAC DO 201` gets GMCP. A client that answers `IAC DONT 201`, or does not answer, sees exactly the stream it saw before GMCP existed: no GMCP byte is ever sent to it, and the driver sends no reply to anything else a client negotiates. (The offer is the standard behaviour; clients without GMCP ignore or refuse it.)
+- A message is `IAC SB 201 <package> [SP <json>] IAC SE`. Every 255 byte in the body is doubled in both directions. The server's state machine reads this inside the ordinary telnet reader, so a message split over several packets is put together, and one that is cut off swallows nothing but itself.
+- Incoming, the driver understands `Core.Hello`, `Core.Supports.Set`, `Core.Supports.Add`, `Core.Supports.Remove` and `Core.Ping` (answered with `Core.Ping`). A client that sends `Core.Supports.*` is sent only the packages it listed (`Room 1` also covers `Room.Info`); until it does, it is sent everything. Everything else is ignored. An incoming message is never run as a command, never shown to other players, never passed to the mudlib, and never logged beyond one line per connection when the limits below are hit.
+- Limits: an incoming message body over 4096 bytes is dropped whole (the connection is not closed); at most a burst of 30 incoming messages, refilled at 15 a second, the rest dropped; at most 64 entries in a `Core.Supports` list. A message from a client that did not answer `DO` is ignored.
+
 ### Time
 
 | Efun | Description |

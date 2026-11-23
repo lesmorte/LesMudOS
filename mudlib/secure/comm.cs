@@ -64,6 +64,12 @@ public class Comm : MudObject
     }
 
     /// <summary>The name of a character as this viewer sees it: the capitalised name, or "Someone" for a wizard they cannot see.</summary>
+    /// <summary>Tell the player's client (GMCP, Comm.Channel.Text) about a line that has just been delivered to them, as they saw it. Costs nothing for a client without GMCP.</summary>
+    private void Gmcp(ObjectRef player, string channel, string talker, string text)
+    {
+        if (GmcpActive(player)) LoadObject("/secure/gmcp").Call("Channel", player, channel, talker, text);
+    }
+
     private string NameFor(ObjectRef viewer, ObjectRef who) => CanSee(viewer, who) ? who.Call<string>("QueryName") ?? "Someone" : "Someone";
 
     private ObjectRef? FindPlayer(string name)
@@ -233,6 +239,7 @@ public class Comm : MudObject
         if (target.Call<bool>("QueryIgnores", myName.ToLowerInvariant())) return $"{targetName} is not listening to you.\n";
 
         TellObject(target, $"{NameFor(target, speaker)} tells you: {Esc(text)}\n");
+        Gmcp(target, "tell", NameFor(target, speaker), text);
         target.Call("SetLastTeller", myName);
         TellObject(speaker, $"You tell {targetName}: {Esc(text)}\n");
         // The idle timer (when the game has one) says whether the target will see it soon.
@@ -344,6 +351,7 @@ public class Comm : MudObject
             if (user.Call<bool>("QueryIgnores", myName.ToLowerInvariant())) continue;
             if (RoomFlag(user, "QueryNoShout") && WizLevel(user) < 1) continue;
             TellObject(user, $"{NameFor(user, speaker)} shouts: {Esc(text)}\n");
+            Gmcp(user, "shout", NameFor(user, speaker), text);
         }
         return "";
     }

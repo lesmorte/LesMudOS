@@ -10,7 +10,7 @@ public class Master : MudObject, IMaster
 
     public ObjectRef Connect() => CloneObject("/secure/login");
 
-    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/crafting", "/secure/comm", "/secure/channels", "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
+    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/crafting", "/secure/comm", "/secure/channels", "/secure/roomids", "/secure/gmcp", "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
 
     // Save files: player bodies own /players/*, the wizard registry owns its own file.
     public bool ValidRead(string path, ObjectRef caller) => OwnsSaveFile(path, caller);
@@ -21,7 +21,7 @@ public class Master : MudObject, IMaster
         if (path == WizList) return IsWizList(caller);
         if (path == LostProperty || path == LegacyVault) return !caller.IsClone && caller.ProgramPath == LostProperty;
         // The history daemons (and the register of finds) each own the save file of their own name.
-        if (path is "/secure/chronicle" or "/secure/renown" or "/secure/rumors" or "/secure/events" or "/secure/finds") return !caller.IsClone && caller.ProgramPath == path;
+        if (path is "/secure/chronicle" or "/secure/renown" or "/secure/rumors" or "/secure/events" or "/secure/finds" or "/secure/roomids") return !caller.IsClone && caller.ProgramPath == path;
         return path.StartsWith("/players/") && IsPlayerBody(caller);
     }
 
