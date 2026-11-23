@@ -209,15 +209,22 @@ internal sealed partial class Kernel : IDriverServices
         if (used < long.MaxValue / 2) _domainTime[domain] = (start, used + Math.Max(0, spent));
     }
 
+    private volatile string? _compilingDomain; // the sandbox domain whose program is being compiled (outermost compile), for the watchdog
+
     private void CompileStarted(string domain)
     {
-        if (_compileDepth++ == 0) _compileStarted = System.Diagnostics.Stopwatch.GetTimestamp();
-        Volatile.Write(ref _busySince, 0); // a compile is the driver's own work: the stall clock waits
+        if (_compileDepth++ == 0)
+        {
+            _compileStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+            _compilingDomain = domain.Length > 0 ? domain : null;
+        }
+        Volatile.Write(ref _busySince, 0); // a compile is the driver's own work: the stall clock waits (but see the watchdog)
     }
 
     private void CompileEnded()
     {
         if (--_compileDepth > 0) return;
+        _compilingDomain = null;
         var now = System.Diagnostics.Stopwatch.GetTimestamp();
         _compileTime += now - _compileStarted;
         if (_inStep) Volatile.Write(ref _busySince, now);
@@ -242,11 +249,16 @@ internal sealed partial class Kernel : IDriverServices
     public void StartWatchdog()
     {
         var limit = (long)(_settings.StallSeconds * System.Diagnostics.Stopwatch.Frequency);
+        // Source written to make the compiler work for minutes is a stall too: a home's program may take six times the stall limit
+        // (at least 30 seconds, so that a large file on a busy machine is not mistaken for one) to compile.
+        var compileLimit = Math.Max(30 * System.Diagnostics.Stopwatch.Frequency, 6 * limit);
         var thread = new Thread(() =>
         {
             while (true)
             {
                 Thread.Sleep(100);
+                if (_compilingDomain is { } compiling && System.Diagnostics.Stopwatch.GetTimestamp() - Volatile.Read(ref _compileStarted) > compileLimit)
+                    Stall(compiling);
                 var since = Volatile.Read(ref _busySince);
                 if (since == 0 || System.Diagnostics.Stopwatch.GetTimestamp() - since < limit) continue;
                 if (Volatile.Read(ref _restricted) == 0 || _lastRestricted is not { } domain) continue; // the game's own code: trusted
