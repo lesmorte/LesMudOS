@@ -11,9 +11,9 @@ import tempfile
 import time
 
 REDTEAM = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(REDTEAM)
+ROOT = os.path.dirname(os.path.dirname(REDTEAM))  # tests/redteam -> the repository
 sys.path.insert(0, os.path.join(ROOT, "tests"))
-os.environ.setdefault("LESMUDOS_TEST_PORT", "5041")
+os.environ.setdefault("LESMUDOS_TEST_PORT", "4852")
 import smoke_test as h  # noqa: E402
 
 SECRET = h.SECRET

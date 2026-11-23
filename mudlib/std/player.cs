@@ -1374,6 +1374,12 @@ public class Player : Adventurer
         checkpointRoom = origin != null && origin.Domain == "" ? origin.Name : "";
         inWorkshop = true;
         Tell("You step into the workshop. Nothing that happens here will follow you out.\n");
+        var space = "";
+        for (var e = Environment(); e != null && space == ""; e = Environment(e)) space = e.Domain;
+        if (space.StartsWith("wiz:") && space.Substring(4) != Name.ToLowerInvariant())
+            Tell($"This is {Cap(space.Substring(4))}'s workshop: everything here is their code, and so is what it shows you. Text from it is marked\n" +
+                 $"[{space.Substring(4)}'s workshop]; it cannot ask for your input or answer your own commands. Review a submission from outside, with\n" +
+                 "{cmd}submission NUMBER cat FILE{/}: that is the register's copy, exactly what would be published.\n");
     }
 
     /// <summary>

@@ -1049,14 +1049,15 @@ def main():
         check("publish: a level 10 wizard cannot approve another's request as if it were theirs: it stays the submitter's", chief.command("submission " + (own.group(1) if own else "0")), "Rev")
         rev.command("withdraw " + (own.group(1) if own else "0"))
         check("publish: an ordinary player has no such command", pat.command("approve 1"), "What?")
-        # A file changes after the request: refused.
+        # A file changes after the request (P2 of the November 2026 review): the register keeps its own copy, and that copy is what
+        # a reviewer reads and what approval publishes. A change made since, or a file added, goes nowhere.
         h.edit(mudlib, W + "area/beast", "XpValue = 7", "XpValue = 7000")
-        check("publish: a file changed after submission is refused", rev.command("approve 1"), "Not approved: beast.cs changed since request #1 was submitted")
-        check("publish: nothing was written", "absent" if not os.path.exists(os.path.join(mudlib, "domains", "area")) else "present", "absent")
-        h.edit(mudlib, W + "area/beast", "XpValue = 7000", "XpValue = 7")
         h.write(mudlib, W + "area/extra", "// @inherit /std/item\npublic class WrenExtra : Item { }\n")
-        check("publish: a file added after submission is refused", rev.command("approve 1"), "Not approved: extra.cs changed since request #1")
-        os.remove(os.path.join(mudlib, "wiz", "wren", "area", "extra.cs"))
+        got = rev.command("submission 1 cat beast.cs")
+        check("publish: the reviewer reads the register's copy, numbered, with its hash", got, "Request #1, beast.cs as submitted", "sha256 ", "XpValue = 7", absent=("XpValue = 7000",))
+        check("publish: a file added since is not in the request", rev.command("submission 1 cat extra.cs"), "Request #1 has no file extra.cs")
+        check("publish: the copy is shown with no markup read", rev.command("submission 1 cat glade.cs"), "   1  ")
+        check("publish: an ordinary wizard cannot read another's request", lowe.command("submission 1 cat beast.cs"), "Request #1 is not yours")
         # Path tricks.
         check("publish: a directory outside the home is refused", wren.command("submit ~/../rev"), "You can submit only a directory inside your own home")
         check("publish: a destination outside /domains is refused", wren.command("submit ~/area to /secure/area"), "the destination must be /domains/<name>")
@@ -1084,12 +1085,17 @@ def main():
         check("publish: a file that does not compile is refused", wren.command("submit ~/broken"), "these files do not compile")
         # Forgery from sandbox code was tried above (d.publish.Approve, publish.Approve.as.chief). The request is still waiting:
         check("publish: the forged approvals left the request waiting", rev.command("submissions"), "#1 waiting")
-        # Resubmit after the change round trip (the content is back as submitted, so #1 approves).
+        # The request is approved from its copy.
         got = rev.command("approve 1")
         check("publish: a level 5 wizard approves", got, "Request #1 is approved and published to /domains/area", "compiled and loaded", "Rooms: /domains/area/glade, /domains/area/inner")
         pub = os.path.join(mudlib, "domains", "area")
         glade = open(os.path.join(pub, "glade.cs")).read()
         check("publish: paths are rewritten to the destination", glade, '"/domains/area/inner"', absent=("/wiz/",))
+        beast = open(os.path.join(pub, "beast.cs")).read()
+        check("publish: what is published is the copy as submitted, not the file changed since", beast, "XpValue = 7", absent=("XpValue = 7000",))
+        check("publish: a file added since is not published", "absent" if not os.path.exists(os.path.join(pub, "extra.cs")) else "present", "absent")
+        h.edit(mudlib, W + "area/beast", "XpValue = 7000", "XpValue = 7")
+        os.remove(os.path.join(mudlib, "wiz", "wren", "area", "extra.cs"))
         check("publish: the originals stay in the home", "yes" if os.path.exists(os.path.join(mudlib, "wiz", "wren", "area", "glade.cs")) else "no", "yes")
         check("publish: the record keeps who and the hashes", chief.command("submission 1"), "approved", "by Rev", "sha256")
         wren.absorb()

@@ -51,9 +51,11 @@ internal sealed class TickInjector : CSharpSyntaxRewriter
     /// <summary>Turn "=> expr;" into "{ Tick(); return expr; }", keeping all trivia (and so all line breaks).</summary>
     private BlockSyntax ToBlock(ArrowExpressionClauseSyntax arrow, SyntaxToken semicolon, bool returnsValue)
     {
-        StatementSyntax statement = returnsValue
-            ? ReturnStatement(arrow.Expression)
-            : ExpressionStatement(arrow.Expression);
+        StatementSyntax statement = arrow.Expression is ThrowExpressionSyntax thrown
+            ? ThrowStatement(thrown.Expression).WithThrowKeyword(thrown.ThrowKeyword) // "=> throw e;" (no "return throw")
+            : returnsValue
+                ? ReturnStatement(arrow.Expression)
+                : ExpressionStatement(arrow.Expression);
         return Block(
             Token(SyntaxKind.OpenBraceToken).WithLeadingTrivia(arrow.ArrowToken.LeadingTrivia).WithTrailingTrivia(arrow.ArrowToken.TrailingTrivia),
             List(new[] { Tick, statement }),

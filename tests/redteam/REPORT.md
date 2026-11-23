@@ -1,6 +1,6 @@
 # Red-team review of the wizard sandbox and publishing (commit 986fe75)
 
-Attacker: a level 1 wizard (Wren) writing C# in /wiz/wren. Each script in this directory prints FAIL where the attack works and exits 1; after a fix it must print only PASS. Run from the repository root after `dotnet build`, one at a time, e.g. `LESMUDOS_TEST_PORT=5041 python3 redteam/f2_exception_window.py`. Shared harness: rtlib.py (a level 10 wizard "chief", an ordinary player "pat" in the village square, the attacker "wren", a level 5 reviewer "rev").
+Attacker: a level 1 wizard (Wren) writing C# in /wiz/wren. Each script in this directory prints FAIL where the attack works and exits 1; after a fix it must print only PASS. Run from the repository root after `dotnet build`, one at a time, e.g. `LESMUDOS_TEST_PORT=5041 python3 tests/redteam/f2_exception_window.py`. Shared harness: rtlib.py (a level 10 wizard "chief", an ordinary player "pat" in the village square, the attacker "wren", a level 5 reviewer "rev").
 
 | # | Severity | Finding | Script |
 |---|---|---|---|

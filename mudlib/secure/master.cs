@@ -230,6 +230,10 @@ public class Master : MudObject, IMaster
         "edit", "delete", "rmdir", "copy", "move", "rename", "mkdir", "update", "shutdown", "goto",
     };
 
+    // What a workshop's rooms may do to a visitor besides reading: walk them through an exit as /std/room does (the visitor's body
+    // is checkpointed like the owner's, so nothing done to it lasts; what matters is that the workshop cannot speak as the game).
+    private static readonly HashSet<string> VisitorMoves = new() { "SneakDeparts", "RecordArrival", "RecordFoundExit", "Look" };
+
     // Functions that only read, by the naming rule every public function of the game keeps (docs/SANDBOX.md section 3).
     private static readonly string[] ReadOnlyPrefixes = { "Query", "Is", "Has", "Can" };
     private static readonly HashSet<string> ReadOnlyNames = new() { "Short", "Long", "LongFor", "Id", "HealthLine", "Stat", "Appraisal", "DescribeCount" };
@@ -278,7 +282,7 @@ public class Master : MudObject, IMaster
             if (SpaceOf(body) == domain)
             {
                 // A visitor (a reviewer, a level 10 who walked in): the workshop may show them things, but not speak as the game.
-                if (function == "CatchTellQuoted" || function.StartsWith("AddAction:")) return true;
+                if (function == "CatchTellQuoted" || function.StartsWith("AddAction:") || VisitorMoves.Contains(function)) return true;
                 if (function is "CatchTell" or "InputTo" or "GmcpSend" || verb != null) return false;
                 return ReadOnly(function);
             }
