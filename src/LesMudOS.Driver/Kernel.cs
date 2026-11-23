@@ -1056,8 +1056,16 @@ internal sealed class Kernel : IDriverServices
 
         // The temporary name starts with a dot, so it is invisible to GetDir and cannot be addressed.
         var temp = Path.Combine(Path.GetDirectoryName(fullPath)!, $".{segments[^1]}.{Guid.NewGuid():N}.tmp");
-        File.WriteAllText(temp, content, new UTF8Encoding(false));
-        File.Move(temp, fullPath, overwrite: true);
+        try
+        {
+            File.WriteAllText(temp, content, new UTF8Encoding(false));
+            File.Move(temp, fullPath, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            try { File.Delete(temp); } catch (Exception) { }
+            throw new MudRuntimeException($"Could not write {mudPath}"); // a read-only mudlib (DEPLOY.md, MUDLIB_WRITABLE) and the like
+        }
         Log.Info($"file written: {mudPath} by {caller.Name} ({content.Length} chars)");
     }
 
@@ -1188,7 +1196,8 @@ internal sealed class Kernel : IDriverServices
         var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "make-dir", path);
         if (segments.Length == 0 || Directory.Exists(fullPath) || File.Exists(fullPath)) return false;
         if (!Directory.Exists(Path.GetDirectoryName(fullPath))) throw new MudRuntimeException($"No such parent directory for {mudPath}");
-        Directory.CreateDirectory(fullPath);
+        try { Directory.CreateDirectory(fullPath); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { throw new MudRuntimeException($"Could not create {mudPath}"); }
         Log.Info($"directory created: {mudPath} by {caller.Name}");
         return true;
     }

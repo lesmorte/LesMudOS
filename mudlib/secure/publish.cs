@@ -477,7 +477,7 @@ public class Publish : MudObject
                 catch (MudRuntimeException e) when (e.Message.Contains("is abstract")) { }
             }
         }
-        catch (MudRuntimeException e)
+        catch (Exception e) // also a fault in a published file's Create, which need not be a MudRuntimeException
         {
             foreach (var ob in loaded) if (ob.IsAlive) { try { Destruct(ob); } catch (MudRuntimeException) { } }
             foreach (var path in created) { try { RemoveFile(path); } catch (MudRuntimeException) { } }

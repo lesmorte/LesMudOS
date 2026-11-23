@@ -994,6 +994,16 @@ def main():
         if "A plain hall for the sandbox test." not in pat.command("look"):
             pat.command("sbtest")
 
+        # ---- demoted to level 0 while in the workshop: out within a heartbeat
+        wren.command("lab")
+        chief.command("promote wren 0")
+        got = wren.read_until("as you entered it", timeout=10)
+        check("restore: a wizard demoted in the workshop is put out of it", got, "You leave the workshop as you entered it.")
+        check("restore: and is back in the real room they came from", chief.command("dump wren"), "workshop=False env=/domains/sbtest/hall ")
+        chief.command("promote wren 1")
+        wren.absorb()
+        wren.pending = ""
+
         # ================================================================ the level 5 to 9 rule
         check("rule: a level 5 wizard cannot edit the real game", rev.command("edit " + T + "hacked"), "You need wizard level 10 to change anything outside /wiz", absent=("editor",))
         check("rule: a level 5 wizard cannot update the real game", rev.command("update " + T + "hall"), "You need wizard level 10 to update", absent=("Recompiled",))
