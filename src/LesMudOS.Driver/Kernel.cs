@@ -21,6 +21,12 @@ internal static class Log
 /// timers and the single-threaded game loop. Everything that touches world
 /// state runs on the game thread; the network layer only posts events to it.
 /// </summary>
+/// <summary>A move the master refused (IMaster.MoveRefusal). The message is the master's one-line reason.</summary>
+internal sealed class RefusedException : MudRuntimeException
+{
+    public RefusedException(string message) : base(message) { }
+}
+
 internal sealed class Kernel : IDriverServices
 {
     public const string MasterPath = "/secure/master";
@@ -226,10 +232,16 @@ internal sealed class Kernel : IDriverServices
     {
         if (!Restricted || target.Domain.Length > 0 || _master is not { IsAlive: true }) return true;
         if (AskMaster(m => m.ValidCall(target, function))) return true;
-        _refusals++;
-        if (_refusals <= 3) Log.Info($"sandbox: refused {function} on {target.Name} (restricted code: {RestrictedCaller()?.Name ?? "?"})");
-        else if (_refusals == 4) Log.Info("sandbox: further refusals in this execution are not logged");
+        NoteRefusal($"refused {function} on {target.Name} (restricted code: {RestrictedCaller()?.Name ?? "?"})");
         return false;
+    }
+
+    /// <summary>A refusal goes to the log, a few per execution at most, so that a loop of refused calls cannot fill the disk.</summary>
+    private void NoteRefusal(string text)
+    {
+        _refusals++;
+        if (_refusals <= 3) Log.Info("sandbox: " + text);
+        else if (_refusals == 4) Log.Info("sandbox: further refusals in this execution are not logged");
     }
 
     /// <summary>
@@ -398,7 +410,8 @@ internal sealed class Kernel : IDriverServices
             var frames = (error.StackTrace ?? "").Split('\n').Take(12).Select(f => f.TrimEnd());
             text = $"{error.GetType().Name}: {message}\n{string.Join("\n", frames)}";
         }
-        Log.Info($"ERROR ({player?.Name ?? "driver"}): {text}");
+        // A move the master refused is policy at work, not a fault: it is logged as a refusal.
+        Log.Info(error is RefusedException ? $"refused ({player?.Name ?? "driver"}): {text}" : $"ERROR ({player?.Name ?? "driver"}): {text}");
         Runtime.Ticks = 0; // give the error handlers a budget of their own
         try
         {
@@ -685,7 +698,7 @@ internal sealed class Kernel : IDriverServices
             for (var i = 0; i < args.Length; i++)
                 if (!TryCross(args[i], out plain[i]))
                 {
-                    Log.Info($"sandbox: refused {function} on {target.Name}: argument {i + 1} ({args[i]!.GetType().Name}) cannot cross between domains");
+                    NoteRefusal($"refused {function} on {target.Name}: argument {i + 1} ({args[i]!.GetType().Name}) cannot cross between domains");
                     return null;
                 }
             args = plain;
@@ -695,7 +708,7 @@ internal sealed class Kernel : IDriverServices
             var result = In(target, () => method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, args, null));
             if (!crossing) return result;
             if (TryCross(result, out var copy)) return copy;
-            Log.Info($"sandbox: dropped the result of {function} on {target.Name} ({result!.GetType().Name}): it cannot cross between domains");
+            NoteRefusal($"dropped the result of {function} on {target.Name} ({result!.GetType().Name}): it cannot cross between domains");
             return null;
         }
         catch (ArgumentException mismatch)
@@ -713,7 +726,7 @@ internal sealed class Kernel : IDriverServices
         if (!what.IsAlive || !destination.IsAlive) throw new MudRuntimeException("Cannot move a destructed object");
         for (var e = destination; e is not null; e = e.Environment)
             if (e == what) throw new MudRuntimeException($"Cannot move {what.Name} into itself");
-        if (MoveRefusalFor(what, destination, caller) is { } refusal) throw new MudRuntimeException(refusal);
+        if (MoveRefusalFor(what, destination, caller) is { } refusal) throw new RefusedException(refusal);
         MoveCore(what, destination);
     }
 
@@ -863,7 +876,7 @@ internal sealed class Kernel : IDriverServices
     {
         if (_thisPlayer is not { IsAlive: true, Living: true } player) return;
         RequireOwnCode(owner, handler, "AddAction");
-        if (!Permit(player, "AddAction")) return;
+        if (!Permit(player, "AddAction:" + verb)) return;
         player.Actions.RemoveAll(a => a.Owner == owner && a.Verb == verb);
         player.Actions.Add(new ActionBinding(verb, owner, handler));
     }
@@ -882,7 +895,7 @@ internal sealed class Kernel : IDriverServices
     {
         var target = _thisPlayer ?? caller;
         RequireOwnCode(caller, handler, "InputTo");
-        if (!Permit(target, "InputTo")) return;
+        if (!Permit(target, noEcho ? "InputToNoEcho" : "InputTo")) return;
         if (target.Connection is not Connection connection) throw new MudRuntimeException("InputTo: no interactive player");
         target.InputTo = handler;
         target.InputToOwner = caller;

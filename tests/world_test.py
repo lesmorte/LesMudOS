@@ -720,6 +720,10 @@ def run_sandbox(wiz, mudlib):
         'SetRoute(new[] {  }', 'SetRoute(new[] { "/domains/hollow/village/trusted_edge", "/wiz/wiz/hall" }'))
     h.write(mudlib, "/domains/hollow/village/trusted_edge", rm("TrustedEdge", "Trusted Edge", {"north": "/wiz/wiz/hall"}, '        AddSpawn("%sintruder");\n' % W))
     kay = fresh("kay")
+    # CHANGED (sandbox): only wizards can be in a wizard's sandbox space (docs/SANDBOX.md), so kay is a level 1 wizard; what
+    # kay gains in the workshop is undone when kay leaves it, which only makes the checks below stronger.
+    wiz.command("promote kay 1")
+    a.drain(kay, 0.3)
     kay.command("tele /wiz/wiz/hall")
     time.sleep(6)
     a.drain(kay, 0.2)

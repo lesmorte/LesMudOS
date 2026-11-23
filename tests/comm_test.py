@@ -194,7 +194,7 @@ def run(work, mudlib):
     check("Mina becomes a level 1 wizard", warden.command("promote mina 1"), "mina is now wizard level 1")
     heard(mina, "level is now 1")
     h.write(mudlib, "/wiz/mina/poster", POSTER)
-    check("Mina clones her probe", mina.command("clone /wiz/mina/poster"), "Cloned /wiz/mina/poster#")
+    h.write(mudlib, "/wiz/mina/desk", "// @inherit /std/room\npublic class MinaDesk : Room { public override void Create() { ShortDesc = \"Mina's Desk\"; LongDesc = \"A workshop.\"; } }\n")
     for c in (warden, alice, bob, carol, dana, mina):
         flush(c)
 
@@ -544,6 +544,11 @@ def run(work, mudlib):
         dana.command("idleme")
 
     # ---- security of the channel service ----
+    # CHANGED (sandbox): Mina's probe is cloned and run in her workshop (docs/SANDBOX.md); from there its calls on the services
+    # do not reach them at all and return nothing (null), where before the services answered "" themselves.
+    mina_was = mina.command("stat here").strip().split(":")[0]
+    mina.command("goto ~/desk")
+    check("Mina clones her probe", mina.command("clone /wiz/mina/poster"), "Cloned /wiz/mina/poster#")
     flush(warden)
     flush(mina)
     out = mina.command("post")
@@ -551,13 +556,13 @@ def run(work, mudlib):
     check("probe: nor to wizard in her name", out, "send-wizard: null")
     check("probe: is not a member as far as the service is concerned", out, "ismember: False")
     check("probe: cannot list the channels", out, "verbs: 0", "listing: null")
-    check("probe: cannot switch her channels", out, "switch: empty")
+    check("probe: cannot switch her channels", out, "switch: null")
     check("probe: nothing reached the sysop channel", flush(warden), absent=("hacked", "[sysop]"))
     check("probe: nothing reached the wizard channel", flush(mina), absent=("hacked wizard",))
     out = mina.command("probe")
-    check("probe: cannot say through the communication service", out, "say: empty")
-    check("probe: cannot tell through it", out, "tell: empty")
-    check("probe: cannot shout through it", out, "shout: empty")
+    check("probe: cannot say through the communication service", out, "say: null")
+    check("probe: cannot tell through it", out, "tell: null")
+    check("probe: cannot shout through it", out, "shout: null")
     check("probe: cannot read what a player keeps", out, "ignores: False", "lastteller: empty")
     check("probe: nobody heard the forged text", flush(alice) + flush(bob) + flush(dana), absent=("by poster",))
     check("probe: Mina's wizard channel is still on", warden.command("wizard still on"), "[wizard] Warden: still on")
@@ -578,6 +583,7 @@ def run(work, mudlib):
     check("promotion: she lists both", mina.command("channels"), "wizard", "sysop")
     check("promotion: the probe still cannot post", mina.command("post"), "send-sysop: null")
     check("promotion: even though its owner belongs", flush(warden), absent=("hacked",))
+    mina.command("goto " + mina_was)
 
     # ---- help ----
     out = alice.command("help", marker="Colour:")

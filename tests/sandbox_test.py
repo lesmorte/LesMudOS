@@ -161,7 +161,7 @@ public class SbInspector : Item
         {
             var chron = LoadObject("/secure/chronicle");
             text = $"entries={chron.Call<int>("QueryEntryCount")} rumors={LoadObject("/secure/rumors").Call<int>("QueryCount", "greenvale")} finders={LoadObject("/secure/finds").Call<int>("QueryFinders")} " +
-                   $"wren={LoadObject("/secure/wizlist").Call<int>("QueryLevel", "wren")} doors={LoadObject("/secure/doors").Call<int>("QueryDoors")}";
+                   $"wren={LoadObject("/secure/wizlist").Call<int>("QueryLevel", "wren")} realdoor={LoadObject("/secure/doors").Call<int>("QueryState", "/domains/sbtest/annex|/domains/sbtest/hall")}";
         }
         else
         {
@@ -484,6 +484,14 @@ public class WrenWand : Item
             Write("LOADED " + (mob == null ? "none" : mob.Domain == "" ? "real" : mob.Domain) + "\\n");
             return true;
         });
+        AddAction("wandphish", a =>
+        {
+            // Take over the password command, and ask for a hidden line: both refused, even in the workshop.
+            AddAction("password", x => { Write("PHISHED\\n"); return true; });
+            InputTo(line => Write("CAUGHT " + line + "\\n"), true);
+            Write("Password: ");
+            return true;
+        });
         AddAction("wandsmite", a => { ThisPlayer()!.Call("Die", Self); return true; });
         AddAction("wandimp", a => { MoveObject(CloneObject("/wiz/wren/imp"), ThisPlayer()!); Write("IMP MOVED\\n"); return true; });
         AddAction("wandseen", a => { Write("SEEN " + (Present("sentinel", ThisPlayer()!)?.Call<string>("QuerySeen") ?? "nosentinel") + "\\n"); return true; });
@@ -804,7 +812,8 @@ def main():
                 elif name == "static.QualityMultipliers":
                     check(f"{origin}: {name} changes only a copy", "ok" if value != "999" else value, "ok")
                 elif name == "d.doors.State":
-                    check(f"{origin}: {name} refused for a door with a real room", value, "-1")
+                    # The lab is one end of the door it names, so it may keep that door's state; anything else is not an end.
+                    check(f"{origin}: {name} only for a door the caller is one end of", value, "1" if origin == "room" else "-1")
                 else:
                     check(f"{origin}: {name} refused", "refused" if refused(value) else value, "refused")
             time.sleep(0.3)
@@ -855,6 +864,12 @@ def main():
         check("crossing: trusted code gets no typed view of a sandbox object", got, "view=noview")
         same("crossing: no sandbox code ran in trusted frames (the player is unchanged)", base_pat, chief.command("dump pat"))
         check("driver: a delegate of another object cannot be scheduled", wren.command("wandpass"), "PASS ERR:CallOut:", "may only use its own code")
+
+        # ---- phishing a visiting wizard: no hidden-line prompt, no taking over protected commands
+        wren.command("wandphish", sync=False, marker="Password: ")
+        got = wren.command("look")
+        check("phishing: sandbox code cannot ask for a hidden line, even in the workshop", got, "Wren's Lab", absent=("CAUGHT",))
+        check("phishing: nor take over the password command", wren.command("password"), "Change your password outside the workshop", absent=("PHISHED",))
 
         # ---- the same attacks against a wizard in the workshop succeed
         wren.send("wandself")

@@ -564,8 +564,11 @@ def step_doorprobe(chief, mudlib):
     to(chief, "door_a")
     chief.command("open door")  # open, so that a forged close shows
     a.drain(watcher, 0.3)
+    chief.command("goto ~/wroom")  # CHANGED (sandbox): a wizard's code runs in their workshop
+    a.drain(chief, 0.3)
     check("the meddler is cloned", chief.command("clone ~/meddler"), "meddler")
     out = chief.command("meddle")
+    to(chief, "door_a")
     check("the meddler ran", out, "MEDDLE ")
     check("a wizard's thing cannot register a door", out, "State=-1")
     check("nor open, close, lock, unlock or reset one", out, "Open=False", "Close=False", "Lock=False", "Unlock=False", "Reset=False", absent=("Open=True", "Close=True", "Lock=True", "Unlock=True", "Reset=True"))
@@ -1038,13 +1041,16 @@ def step_sneakprobe(chief, mudlib):
     put(s, "lurk", "lurker")
     say(s, "lurk", 1.5)
     start = stat(s)
-    to(chief, "n_lurk")
+    h.write(mudlib, "/wiz/snchief/wroom", WIZ_ROOM)
+    chief.command("goto ~/wroom")  # CHANGED (sandbox): a wizard's code runs in their workshop, and reaches the Scout from there
     check("the meddler is cloned", chief.command("clone ~/snmeddler"), "snmeddler")
     out = chief.command("smeddle snprobe")
+    to(chief, "n_lurk")
     check("the meddler ran", out, "MEDDLE ")
-    check("a wizard's object is no creature: it cannot ask whether the Scout is noticed", out, "Notice=-1")
+    # CHANGED (sandbox): the calls on the Scout no longer reach it at all (nothing comes back: 0, False).
+    check("a wizard's object is no creature: it cannot ask whether the Scout is noticed", out, "Notice=0")
     check("it cannot set a creature on the Scout", out, "Engage=called")
-    check("nor make the Scout depart with a roll or a cost", out, "Departs=True")
+    check("nor make the Scout depart with a roll or a cost", out, "Departs=False")
     check("nor end the sneaking by Disturbed", out, "Disturbed=called", "Sneaking=True")
     check("nor fix or free the dice", out, "Rolls=False", "RollsRandom=False", "RollsNow=notice:50.0")
     check("Surprising is false outside a fight being begun", out, "Surprising=False")
@@ -1060,9 +1066,10 @@ def step_sneakprobe(chief, mudlib):
     to(s, "hall")
     s.command("sfill")
     s.command("sneak on")
-    to(s, "/wiz/snchief/wizlair")
-    out = a.quiet(s, 4.5)
-    check("a wizard's creature always notices (no roll to fail), as creatures did before sneaking", str(stat(s)["fighting"]) + str("has not noticed you" in out), "TrueFalse")
+    # CHANGED (sandbox): a player cannot enter a wizard's workshop at all, so never meets a wizard's creature.
+    out = s.command("stele /wiz/snchief/wizlair") + a.quiet(s, 0.5)
+    check("a Scout cannot be brought into a wizard's lair", out, "Only wizards can enter a wizard's workshop.")
+    check("and is in no fight", str(stat(s)["fighting"]), "False")
     s.command("sslay")
     s.command("quit")
 

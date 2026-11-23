@@ -68,7 +68,7 @@ What crosses between a sandbox object and a real one, in either direction, is pl
 
 So a wizard's object cannot kill the Goblin Overseer from afar, hand a friend gold through `Users()`, set a quest, give experience or kill credit, start a fight, equip, add an effect, move, rest or wake anyone, or reach a daemon to write history, through any route: directly, from a creature, an item, a room, a delayed call, a heartbeat, an `Init` hook, or from inherited `/std` code running in a sandbox object.
 
-Text follows the same rule: `Write`, `TellObject`, `TellRoom` and `Say` from a restricted execution reach only sandbox objects and characters in the workshop. Sandbox code cannot print a convincing lie on an ordinary player's screen. It cannot bind verbs (`AddAction`) on, or capture the next line (`InputTo`) of, a character who is not in the workshop.
+Text follows the same rule: `Write`, `TellObject`, `TellRoom` and `Say` from a restricted execution reach only sandbox objects and characters in the workshop. Sandbox code cannot print a convincing lie on an ordinary player's screen. It cannot bind verbs (`AddAction`) on, or capture the next line (`InputTo`) of, a character who is not in the workshop. Even in the workshop it can never ask for a hidden line (a password prompt), and cannot take over the commands that protect a character or decide for the real game (`password`, `quit`, `save`, `goto`, the file and publishing commands, `promote`, `update`, `shutdown`), so a reviewer visiting a workshop keeps them.
 
 ### What can cross the boundary
 
@@ -108,7 +108,7 @@ Existing guards are unchanged and still apply, and the master refuses every priv
 | Skill ranks, unlock counters, trainers | A trainer that is a sandbox object cannot teach (the rank service trusts only real trainers). Kills in the workshop are not credited (the rank service is refused to restricted executions), and anything counted on the character is undone by the restore. A wizard's kills in the real game count for their own unlocks like anyone's: that is character progress, not history. |
 | Rest | Resting is the character's own state: free in the workshop, undone on leaving. Sandbox code cannot rest or wake anyone outside. |
 | Sneak | The notice dice are shared and read-only; sandbox creatures may roll them. Sandbox code cannot set the test dice, end anyone's sneaking or spot anyone outside. |
-| Doors and their shared state | A door's state lives in `/secure/doors`. A sandbox room may change only a door whose two rooms are both sandbox rooms; doors of the real game cannot be reached. Nothing there is saved. |
+| Doors and their shared state | A door's state lives in `/secure/doors`, and only a room that is one end of a door may change it. A sandbox room is therefore one end of every door it can change: a door between two of the game's rooms cannot be reached from a workshop. Nothing there is saved. |
 | Communication daemons and channels | Sandbox code cannot say, tell, shout or speak on a channel; it can only send text to characters in the workshop. The wizard's own typed words are not sandbox code. |
 | Attributes | Placed points and attribute changes in the workshop are undone by the restore. |
 | Shops and merchants | A sandbox shopkeeper trades only with characters in the workshop and its goods are sandbox objects; real coins cannot be dropped there, and gold earned there is undone. A real shop cannot be reached from sandbox space. |

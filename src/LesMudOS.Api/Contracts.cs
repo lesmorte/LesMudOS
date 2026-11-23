@@ -41,8 +41,8 @@ public interface IMaster
 
     /// <summary>
     /// Asked only while restricted code is on the call stack, before it reaches an unrestricted object: a Call (function is the
-    /// method name), a typed view ("As"), text sent by an efun ("CatchTell"), a verb binding ("AddAction") or an input capture
-    /// ("InputTo") on the target. False refuses: the call returns null, the view is null, the text or binding is dropped.
+    /// method name), a typed view ("As"), text sent by an efun ("CatchTell"), a verb binding ("AddAction:" and the verb) or an
+    /// input capture ("InputTo", or "InputToNoEcho" for a hidden line such as a password) on the target. False refuses: the call returns null, the view is null, the text or binding is dropped.
     /// The master's own calls while it answers are not checked.
     /// </summary>
     bool ValidCall(ObjectRef target, string function) => true;

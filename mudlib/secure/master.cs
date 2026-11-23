@@ -177,6 +177,12 @@ public class Master : MudObject, IMaster
         return null;
     }
 
+    private static readonly HashSet<string> ProtectedVerbs = new()
+    {
+        "password", "quit", "save", "promote", "submit", "submissions", "submission", "approve", "reject", "withdraw", "revoke",
+        "edit", "delete", "rmdir", "copy", "move", "rename", "mkdir", "update", "shutdown", "goto",
+    };
+
     // Functions that only read, by the naming rule every public function of the game keeps (docs/SANDBOX.md section 3).
     private static readonly string[] ReadOnlyPrefixes = { "Query", "Is", "Has", "Can" };
     private static readonly HashSet<string> ReadOnlyNames = new() { "Short", "Long", "LongFor", "Id", "HealthLine", "Stat", "Appraisal", "DescribeCount" };
@@ -209,8 +215,12 @@ public class Master : MudObject, IMaster
     public bool ValidCall(ObjectRef target, string function)
     {
         if (function == "As") return false;
+        // A hidden line is a password: no sandbox code may ask for one, of anyone. Nor may it take over the commands that
+        // protect a character or decide for the real game, even of a wizard in its own workshop (a visiting reviewer).
+        if (function == "InputToNoEcho") return false;
+        if (function.StartsWith("AddAction:") && ProtectedVerbs.Contains(function.Substring("AddAction:".Length))) return false;
         if (PlaceOf(target) == Place.Workshop) return true;
-        if (function is "CatchTell" or "AddAction" or "InputTo") return false;
+        if (function is "CatchTell" or "InputTo" || function.StartsWith("AddAction:")) return false;
         if (ReadOnly(function)) return true;
         if (target.IsClone || target.Domain != "") return false;
         if (target.ProgramPath.StartsWith("/skills/") || target.ProgramPath.StartsWith("/classes/")) return true;

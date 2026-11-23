@@ -225,9 +225,10 @@ public class Meddler : Thing
     private bool Meddle(string args)
     {
         var w = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var room = Environment(ThisPlayer()!)!;
-        var who = Present(w[0], room);
+        // CHANGED (sandbox): the meddler runs in its wizard's workshop and finds the victim (and the victim's room) from there.
+        var who = Users().FirstOrDefault(u => (u.Call<string>("QueryName") ?? "").ToLower() == w[0].ToLower());
         if (who == null) { Write("MEDDLE none\n"); return true; }
+        var room = Environment(who)!;
         var gob = Present("gob", room);
         var ranks = LoadObject("/secure/ranks");
         var tries = new List<string>();
@@ -982,14 +983,18 @@ def security(chief, mudlib):
     chief.command("rkspawn gob12")
     chief.command("rkspawn gob12")
     before = state(vic)
+    h.write(mudlib, "/wiz/rkchief/den", "// @inherit /std/room\npublic class RkChiefDen : Room { public override void Create() { ShortDesc = \"Den\"; LongDesc = \"A workshop.\"; } }\n")
+    chief.command("goto /wiz/rkchief/den")  # CHANGED (sandbox): a wizard's code runs in their workshop
     check("the meddler is cloned", chief.command("clone ~/meddler"), "meddler")
     out = chief.command("meddle rkvictim")
+    to(chief, "arena")
     check("the meddler ran", out, "MEDDLE ")
-    check("no setter on the character answers a wizard's object", out, "RankSetSkill=False", "RankRecordUnlock=False", "RankCountKill=False",
-          "RankCountKillWith=False", "RankPay=False", absent=("RankSetSkill=True", "RankCountKill=True", "RankPay=True"))
-    check("the rank daemon refuses a wizard's object", out, "Train=refused|", "RecordIfMet=False", "CreditKill=0")
-    check("crafting's fixed dice refuse it too", out, "SetTestRolls=False")
-    check("a timed effect does not speed learning", out, "LearnSpeedOf=1.25")
+    # CHANGED (sandbox): none of these calls reaches its target from sandbox code any more; each returns nothing (null).
+    check("no setter on the character answers a wizard's object", out, "RankSetSkill=null", "RankRecordUnlock=null", "RankCountKill=null",
+          "RankCountKillWith=null", "RankPay=null", absent=("RankSetSkill=True", "RankCountKill=True", "RankPay=True"))
+    check("the rank daemon refuses a wizard's object", out, "Train=null", "RecordIfMet=null", "CreditKill=null")
+    check("crafting's fixed dice refuse it too", out, "SetTestRolls=null")
+    check("a timed effect cannot even be put on the victim, so it cannot speed learning", out, "LearnSpeedOf=0")
     a.drain(vic, 0.5)
     after = state(vic)
     check("the victim's ranks, unlocks and counters are as they were", f"{after['ranks']}|{after['unlocks']}|{after['kills']}|{after['with']}",

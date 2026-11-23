@@ -260,7 +260,8 @@ public class Dresser : Thing
     public override void Init() { AddAction("dress", Dress); }
     private bool Dress(string args)
     {
-        var who = Present(args.Trim(), Environment(ThisPlayer()!)!);
+        // CHANGED (sandbox): the dresser runs in its wizard's workshop and finds the victim wherever they are.
+        var who = Users().FirstOrDefault(u => (u.Call<string>("QueryName") ?? "").ToLower() == args.Trim().ToLower());
         if (who == null) { Write("DRESS none\n"); return true; }
         var tries = new List<string>();
         foreach (var name in new[] { "jerkin", "oathblade", "robe" })
@@ -745,10 +746,12 @@ def run(work, mudlib, box):
     victim.command("mk " + O + "leather_jerkin")
     victim.command("mk " + O + "scholars_robe")
     victim.command("mk " + T + "oathblade")
-    w.command("goto " + T + "lab")
+    h.write(mudlib, "/wiz/warden/den", "// @inherit /std/room\npublic class WardenDen : Room { public override void Create() { ShortDesc = \"Den\"; LongDesc = \"A workshop.\"; } }\n")
+    w.command("goto /wiz/warden/den")  # CHANGED (sandbox): a wizard's code runs in their workshop
     victim.command("lab")
     check("the dresser is cloned", w.command("clone ~/dresser"), "dresser")
     out = w.command("dress caldupe")
+    w.command("goto " + T + "lab")
     check("the dresser ran", out, "DRESS ")
     check("no public method dresses a mage in the jerkin or the blade (it keeps its own staff)", out, "body=none", "weapon=/domains/hollow/obj/apprentice_staff", absent=("oathblade#", "leather_jerkin#"))
     truth("and the mage is wearing nothing it was not given", "body:" not in victim.command("score") and "jerkin" not in victim.command("score"), victim.command("score"))
