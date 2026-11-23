@@ -10,6 +10,7 @@ exits are saved, and tries the wizard sandbox (/wiz) against the trusted areas.
 Usage (from the repository root, after `dotnet build`):
     LESMUDOS_TEST_PORT=4823 python3 tests/world_test.py
 """
+import json
 import os
 import re
 import shutil
@@ -720,6 +721,10 @@ def run_sandbox(wiz, mudlib):
         'SetRoute(new[] {  }', 'SetRoute(new[] { "/domains/hollow/village/trusted_edge", "/wiz/wiz/hall" }'))
     h.write(mudlib, "/domains/hollow/village/trusted_edge", rm("TrustedEdge", "Trusted Edge", {"north": "/wiz/wiz/hall"}, '        AddSpawn("%sintruder");\n' % W))
     kay = fresh("kay")
+    # CHANGED (sandbox): only wizards can be in a wizard's sandbox space (docs/SANDBOX.md), so kay is a level 1 wizard; what
+    # kay gains in the workshop is undone when kay leaves it, which only makes the checks below stronger.
+    wiz.command("promote kay 1")
+    a.drain(kay, 0.3)
     kay.command("tele /wiz/wiz/hall")
     time.sleep(6)
     a.drain(kay, 0.2)
@@ -738,6 +743,9 @@ def run_sandbox(wiz, mudlib):
     a.drain(kay, 0.3)
     check("a /wiz room's hidden exit can be found (and leads where it says)", exits_of(kay.command("look")), "west")
     kay.command("tele " + ELDER)
+    # CHANGED (sandbox): kay leaves the workshop (and is restored) and is no longer a wizard, so sees only what kay has found.
+    wiz.command("promote kay 0")
+    a.drain(kay, 0.3)
     check("a found /wiz exit grants nothing in a trusted area", exits_of(kay.command("look")), "east", absent=("west",))
     kay.command("tele " + W + "hub")
     check("an object that is not a room cannot record a found exit", kay.command("evil"), "EVIL False")
@@ -746,14 +754,19 @@ def run_sandbox(wiz, mudlib):
     # cap on records for /wiz rooms
     many = "".join(f'        HiddenExit("d{i}", "/wiz/wiz/den", "", 100);\n' for i in range(60))
     h.write(mudlib, wizw + "many", rm("WizMany", "Wiz Many", {"east": wizw + "den"}, many))
+    wiz.command("promote kay 1")
+    a.drain(kay, 0.3)
     kay.command("tele /wiz/wiz/many")
     kay.send("search")
     time.sleep(4)
     a.drain(kay, 0.3)
-    listed = exits_of(kay.command("look")).count("d")
-    kay.command("tele /wiz/wiz/hall")
-    check("a sandbox room cannot fill a character's save with found exits (at most 50 records under /wiz)", "ok" if listed <= 52 else str(listed), "ok")
+    kay.command("tele " + ELDER)
     kay.send("quit")
+    time.sleep(1)
+    # CHANGED (sandbox): what kay found in the workshop is undone when kay leaves it, so nothing of it reaches the save at all.
+    saved = json.load(open(os.path.join(os.path.dirname(mudlib), "save", "players", "kay.json")))
+    under_wiz = [e for e in saved.get("foundExits", []) if e.startswith("/wiz/")]
+    check("a sandbox room cannot fill a character's save with found exits (none at all reach it from the workshop)", "ok" if len(under_wiz) <= 50 else str(len(under_wiz)), "ok")
 
 
 def pinfo_path(wiz, path):

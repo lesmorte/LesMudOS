@@ -863,7 +863,7 @@ public abstract class Adventurer : Living
     // ---- Saving ----
 
     /// <summary>Record the carried items and the logout room just before the player is saved.</summary>
-    protected void PrepareSave()
+    protected void PrepareSave(ObjectRef? at = null)
     {
         if (!inventoryRestored) return;
         carried.Clear();
@@ -873,8 +873,8 @@ public abstract class Adventurer : Living
             carried.Add(RecordOf(item));
             if (IsEquipped(item)) carriedEquipped.Add(carried.Count - 1);
         }
-        var room = Environment();
-        logoutRoom = room != null && room.Call<bool>("QueryLogoutRoom") ? room.Name : "";
+        var room = at ?? Environment();
+        logoutRoom = room != null && room.Domain == "" && room.Call<bool>("QueryLogoutRoom") ? room.Name : ""; // never a wizard's workshop
     }
 
     /// <summary>Remove the carried items from the game, as the player leaves. They return at the next login.</summary>
@@ -992,7 +992,7 @@ public abstract class Adventurer : Living
     /// <summary>Move the player into the world: the saved logout room, if there is one, else the start room.</summary>
     protected void EnterWorld(string startRoom)
     {
-        var destination = logoutRoom != "" ? logoutRoom : startRoom;
+        var destination = logoutRoom != "" && !logoutRoom.ToLowerInvariant().StartsWith("/wiz/") ? logoutRoom : startRoom;
         logoutRoom = "";
         try
         {
@@ -1335,6 +1335,7 @@ public abstract class Adventurer : Living
     /// </summary>
     public override void Die(ObjectRef? killer)
     {
+        if (DiesInWorkshop(killer)) return;
         if (dying) return;
         dying = true;
         EndRest();
@@ -1367,6 +1368,12 @@ public abstract class Adventurer : Living
 
     /// <summary>Write the character to disk now. Players override this.</summary>
     protected virtual void PersistNow() { }
+
+    /// <summary>A player in a wizard's workshop dies without a corpse and is restored (docs/SANDBOX.md); true if that is what happened.</summary>
+    protected virtual bool DiesInWorkshop(ObjectRef? killer) => false;
+
+    /// <summary>What score adds after the name while the character is in a wizard's workshop. Players override it.</summary>
+    protected virtual string WorkshopNote() => "";
 
     /// <summary>Put everything carried (equipment included) and the fee into a corpse in the room.</summary>
     private void LeaveCorpse(ObjectRef? room, ObjectRef? killer, int fee)
@@ -1545,7 +1552,12 @@ public abstract class Adventurer : Living
         foreach (var (item, n) in plan)
         {
             var description = Describe(item, n);
-            if (MovePortion(item, n, room) == null) { Write($"You cannot drop {description}.\n"); continue; }
+            if (MovePortion(item, n, room) == null)
+            {
+                // The one rule of a wizard's workshop that a drop can meet (docs/SANDBOX.md).
+                Write(room.Domain != "" && item.Domain == "" ? "Real things cannot be set down in the workshop; they leave with you.\n" : $"You cannot drop {description}.\n");
+                continue;
+            }
             LeaveRest();
             Write($"You drop {description}.\n");
             Say($"{Name} drops {description}.\n");
@@ -1886,7 +1898,7 @@ public abstract class Adventurer : Living
     private bool CmdScore(string args)
     {
         var text = new StringBuilder();
-        text.Append($"{Short()}\n");
+        text.Append($"{Short()}{WorkshopNote()}\n");
         text.Append($"Level {Level}   Experience {xp}");
         text.Append(Level >= MaxLevel ? " (highest level)\n" : $" ({QueryXpForLevel(Level + 1) - xp} more for level {Level + 1})\n");
         var calling = archetypeName == "" ? "none yet" : archetypeName;
@@ -2002,7 +2014,7 @@ public abstract class Adventurer : Living
         if (!IsWizard(LevelStat)) return false;
         var thing = args.Trim() == "" ? null : FindHere(args.Trim());
         if (thing == null) { NotifyFail("Stat what? (a name, me, or here)"); return false; }
-        Write(thing.Call<string>("Stat") ?? thing.Name + "\n");
+        Write((thing.Call<string>("Stat") ?? thing.Name + "\n") + (thing.Domain != "" ? $"  Sandbox object ({thing.Domain}): it cannot leave the workshop.\n" : ""));
         return true;
     }
 

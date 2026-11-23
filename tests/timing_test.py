@@ -437,11 +437,13 @@ def run():
     t0 = time.time()
     hero.send("arena")
     attacked = hero.wait_for(r"attacks you!", m, 12)
-    check_near("an aggressive creature (Reaction Time 3.0) attacks 6 s after you enter", attacked - t0 if attacked else None, 6.0, 0.5)
-    time.sleep(13)
+    # The current rule (the sneak work, ambush openers): an aggressive creature starts the fight as soon as it notices you, and its
+    # first blow waits its Reaction Time.
+    check_near("an aggressive creature (Reaction Time 3.0) starts the fight as you enter", attacked - t0 if attacked else None, 0.0, 0.5)
+    time.sleep(19)
     his = hero.times(r"A brute anvil (scratches|hits|misses|smashes) you", m)
     mine = hero.times(r"You (scratch|hit|smash|miss) a brute anvil", m)
-    check_near("its first blow comes with the attack", his[0] - attacked if his and attacked else None, 0.0, 0.5)
+    check_near("its first blow comes its Reaction Time later (3.0 x 2 s)", his[0] - attacked if his and attacked else None, 6.0, 0.5)
     check_intervals("the ambusher then acts every 8 s (3.0 + 1.0)", his, 8.0, count=1)
     check_near("the player it attacks is drawn in: first action after his own Reaction Time (2.5 x 2 s)", mine[0] - attacked if mine and attacked else None, 5.0, 0.6)
     clean_arena(wiz)

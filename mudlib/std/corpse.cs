@@ -109,7 +109,7 @@ public class Corpse : Thing
     /// </summary>
     private void ReadYields(ObjectRef deceased)
     {
-        if (deceased == null || !deceased.IsAlive || PreviousObject() != deceased || !InTrustedTree(deceased.ProgramPath)) return;
+        if (deceased == null || !deceased.IsAlive || PreviousObject() != deceased || deceased.Domain != "" || !InTrustedTree(deceased.ProgramPath)) return;
         if (deceased.Call<bool>("IsPlayerCharacter")) return;
         var file = deceased.ProgramPath.Substring(deceased.ProgramPath.LastIndexOf('/') + 1);
         var chronicle = deceased.Call<string>("get_ChronicleKind") ?? "";
@@ -130,7 +130,7 @@ public class Corpse : Thing
     /// <summary>A creature from a trusted tree, itself calling Setup, may say how long its corpse lasts (1 to 3600 seconds).</summary>
     private void ReadLifetime(ObjectRef deceased)
     {
-        if (deceased == null || !deceased.IsAlive || PreviousObject() != deceased || !InTrustedTree(deceased.ProgramPath)) return;
+        if (deceased == null || !deceased.IsAlive || PreviousObject() != deceased || deceased.Domain != "" || !InTrustedTree(deceased.ProgramPath)) return;
         var own = deceased.Call<int>("get_CorpseSeconds");
         if (own >= 1 && own <= PlayerSeconds) lifetimeSeconds = own;
     }

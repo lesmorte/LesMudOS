@@ -16,6 +16,12 @@ internal static class Log
     public static void Info(string message) => Console.WriteLine($"{DateTime.Now:HH:mm:ss} {message}");
 }
 
+/// <summary>A move the master refused (IMaster.MoveRefusal). The message is the master's one-line reason.</summary>
+internal sealed class RefusedException : MudRuntimeException
+{
+    public RefusedException(string message) : base(message) { }
+}
+
 /// <summary>
 /// The driver kernel: object table, containment tree, command dispatch,
 /// timers and the single-threaded game loop. Everything that touches world
@@ -38,6 +44,9 @@ internal sealed partial class Kernel : IDriverServices
     private readonly ConditionalWeakTable<Type, Dictionary<(string, int), MethodInfo?>> _methodCache = new();
 
     private readonly List<ObjectRef> _callStack = new();
+    private int _restricted;    // how many frames on _callStack belong to restricted objects (a domain other than "")
+    private int _masterDepth;   // > 0 while the master answers a question: its own calls are not put to ValidCall
+    private int _refusals;      // ValidCall refusals in this execution, for the log
     private readonly byte[]? _adminSecretHash;
     private int _adminSecretFailures;
 
@@ -68,22 +77,187 @@ internal sealed partial class Kernel : IDriverServices
     private IMaster MasterObject => _master?.Target as IMaster ?? throw new MudRuntimeException("No master object");
 
     /// <summary>Ask the master object a question, with the master on the call stack.</summary>
-    private T AskMaster<T>(Func<IMaster, T> question) => In(_master!, () => question(MasterObject));
+    private T AskMaster<T>(Func<IMaster, T> question)
+    {
+        _masterDepth++;
+        try { return In(_master!, () => question(MasterObject)); }
+        finally { _masterDepth--; }
+    }
 
     // ---- Call stack: which object's code is running, for PreviousObject() ----
 
-    private void In(ObjectRef ob, Action work)
+    private void Push(ObjectRef ob)
     {
         _callStack.Add(ob);
+        if (ob.Domain.Length > 0) _restricted++;
+    }
+
+    private void Pop()
+    {
+        if (_callStack.Count == 0) return;
+        var ob = _callStack[^1];
+        _callStack.RemoveAt(_callStack.Count - 1);
+        if (ob.Domain.Length > 0 && _restricted > 0) _restricted--;
+    }
+
+    private void ClearStack()
+    {
+        _callStack.Clear();
+        _restricted = 0;
+        _masterDepth = 0;
+    }
+
+    private string TopDomain => _callStack.Count > 0 ? _callStack[^1].Domain : "";
+
+    private void In(ObjectRef ob, Action work)
+    {
+        var below = TopDomain;
+        Push(ob);
         try { work(); }
-        finally { if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1); }
+        catch (Exception error) when (ob.Domain != below && IsMudlibType(error.GetType()))
+        {
+            throw new MudRuntimeException(SafeMessage(error)); // read while this object's frame is still on the stack
+        }
+        finally { Pop(); }
     }
 
     private T In<T>(ObjectRef ob, Func<T> work)
     {
-        _callStack.Add(ob);
+        var below = TopDomain;
+        Push(ob);
         try { return work(); }
-        finally { if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1); }
+        catch (Exception error) when (ob.Domain != below && IsMudlibType(error.GetType()))
+        {
+            throw new MudRuntimeException(SafeMessage(error));
+        }
+        finally { Pop(); }
+    }
+
+    // ---- Values that cross between domains (docs/SANDBOX.md) ----
+    // A value made by one domain's code must not carry that code into another domain, where it would run with the other's
+    // call stack: an object whose ToString, Equals or comparer is mudlib code, an exception whose Message is, an enumerator.
+    // So arguments and results that cross go as plain data: scalars, strings, handles, and copies of arrays, lists, sets and
+    // dictionaries (with the default comparer) of those. Anything else does not cross. An exception of a mudlib type crosses
+    // as a plain MudRuntimeException with its message, read before the frame that threw it is left.
+
+    private static bool IsMudlibType(Type type) => type.Assembly.GetName().Name?.StartsWith(ProgramCompiler.AssemblyPrefix, StringComparison.Ordinal) == true;
+
+    private static string SafeMessage(Exception error)
+    {
+        try { return error.Message ?? "error"; }
+        catch (EvalCostExceededException) { throw; }
+        catch (Exception) { return "error"; }
+    }
+
+    private static readonly HashSet<Type> PlainTypes = new()
+    {
+        typeof(string), typeof(bool), typeof(char), typeof(byte), typeof(sbyte), typeof(short), typeof(ushort), typeof(int), typeof(uint),
+        typeof(long), typeof(ulong), typeof(float), typeof(double), typeof(decimal), typeof(ObjectRef),
+    };
+
+    private static bool PlainElement(Type type, int depth = 0)
+    {
+        if (depth > 6) return false;
+        if (PlainTypes.Contains(type) || type.IsEnum || type == typeof(object)) return true;
+        if (type.IsArray) return PlainElement(type.GetElementType()!, depth + 1);
+        if (!type.IsGenericType) return false;
+        var definition = type.GetGenericTypeDefinition();
+        if (definition == typeof(List<>) || definition == typeof(HashSet<>) || definition == typeof(Dictionary<,>) || definition == typeof(Nullable<>)
+            || (type.IsValueType && definition.FullName?.StartsWith("System.ValueTuple`", StringComparison.Ordinal) == true))
+            return type.GetGenericArguments().All(a => a != typeof(object) || !type.IsValueType) && type.GetGenericArguments().All(a => PlainElement(a, depth + 1));
+        return false;
+    }
+
+    /// <summary>A copy of a value that may cross between domains, or false if it may not cross.</summary>
+    private static bool TryCross(object? value, out object? copy, int depth = 0)
+    {
+        copy = value;
+        if (value == null) return true;
+        if (depth > 6) return false;
+        var type = value.GetType();
+        if (PlainTypes.Contains(type) || type.IsEnum) return true;
+        if (type.IsArray)
+        {
+            var element = type.GetElementType()!;
+            if (!PlainElement(element)) return false;
+            var source = (Array)value;
+            var array = Array.CreateInstance(element, source.Length);
+            for (var i = 0; i < source.Length; i++)
+            {
+                if (!TryCross(source.GetValue(i), out var item, depth + 1)) return false;
+                array.SetValue(item, i);
+            }
+            copy = array;
+            return true;
+        }
+        if (!type.IsGenericType || !PlainElement(type)) return false;
+        var definition = type.GetGenericTypeDefinition();
+        if (type.IsValueType) return true; // a value tuple or nullable of plain types (no object fields: PlainElement refused those)
+        if (definition == typeof(List<>) || definition == typeof(HashSet<>))
+        {
+            var result = Activator.CreateInstance(type)!;
+            var add = type.GetMethod("Add")!;
+            foreach (var item in (System.Collections.IEnumerable)value)
+            {
+                if (!TryCross(item, out var plain, depth + 1)) return false;
+                add.Invoke(result, [plain]);
+            }
+            copy = result;
+            return true;
+        }
+        if (definition == typeof(Dictionary<,>))
+        {
+            var result = (System.Collections.IDictionary)Activator.CreateInstance(type)!; // the default comparer, whatever the original had
+            foreach (System.Collections.DictionaryEntry entry in (System.Collections.IDictionary)value)
+            {
+                if (!TryCross(entry.Key, out var key, depth + 1) || key == null || !TryCross(entry.Value, out var item, depth + 1)) return false;
+                result[key] = item;
+            }
+            copy = result;
+            return true;
+        }
+        return false;
+    }
+
+    // ---- Restricted code (docs/SANDBOX.md): objects with a domain, and the master's ValidCall ----
+
+    /// <summary>
+    /// Is restricted code on the call stack, outside the master's own answers? An execution for a restricted ThisPlayer (a sandbox
+    /// creature's arrival offering Init to the things around it) counts too: real code running for a sandbox object acts for it.
+    /// </summary>
+    private bool Restricted => (_restricted > 0 || _thisPlayer is { Domain.Length: > 0 }) && _masterDepth == 0;
+
+    /// <summary>May the running code reach this object in this way? Always yes unless restricted code is running and the target is not restricted.</summary>
+    private bool Permit(ObjectRef target, string function)
+    {
+        if (!Restricted || target.Domain.Length > 0 || _master is not { IsAlive: true }) return true;
+        if (AskMaster(m => m.ValidCall(target, function))) return true;
+        NoteRefusal($"refused {function} on {target.Name} (restricted code: {RestrictedCaller()?.Name ?? "?"})");
+        return false;
+    }
+
+    /// <summary>A refusal goes to the log, a few per execution at most, so that a loop of refused calls cannot fill the disk.</summary>
+    private void NoteRefusal(string text)
+    {
+        _refusals++;
+        if (_refusals <= 3) Log.Info("sandbox: " + text);
+        else if (_refusals == 4) Log.Info("sandbox: further refusals in this execution are not logged");
+    }
+
+    /// <summary>
+    /// A delayed call, an action handler or an input handler runs later in its owner's frame, so it must be the owner's own code:
+    /// a method or lambda of the owner's class or one of its base classes, bound to the owner (or to nothing, or to a closure).
+    /// Otherwise one object could hand another a delegate and have it run later as the other.
+    /// </summary>
+    private static void RequireOwnCode(ObjectRef owner, Delegate function, string what)
+    {
+        if (function.Target is MudObject bound && !ReferenceEquals(bound, owner.Target))
+            throw new MudRuntimeException($"{what}: {owner.Name} may only use its own code");
+        var assembly = function.Method.DeclaringType?.Assembly;
+        if (assembly == null || assembly == typeof(MudObject).Assembly) return;
+        for (var t = owner.Target?.GetType(); t != null && t != typeof(MudObject); t = t.BaseType)
+            if (t.Assembly == assembly) return;
+        throw new MudRuntimeException($"{what}: {owner.Name} may only use its own code");
     }
 
     // =====================================================================
@@ -120,19 +294,32 @@ internal sealed partial class Kernel : IDriverServices
 
     private void RunTimers()
     {
+        RunDueCallOuts();
+        if (DateTime.UtcNow >= _nextHeartBeat)
+        {
+            _nextHeartBeat = DateTime.UtcNow + HeartBeatInterval;
+            foreach (var ob in _heartBeats.ToArray())
+                if (ob is { IsAlive: true, HeartBeat: true })
+                    Execute(ob.Living ? ob : null, () => In(ob, () => ob.Target?.HeartBeat()));
+            RunDueCallOuts(); // what a heartbeat scheduled for now runs before the next line any player typed
+        }
+    }
+
+    /// <summary>
+    /// Run every call-out that is due, including one made for "now" by a call-out of this same pass (so that work scheduled with
+    /// no delay, such as the restore of a character leaving the workshop, runs before the next network event). Bounded, so that a
+    /// call-out that reschedules itself with no delay cannot stall the loop.
+    /// </summary>
+    private void RunDueCallOuts()
+    {
+        var budget = _callOuts.Count + 64;
         var now = DateTime.UtcNow;
-        while (_callOuts.TryPeek(out var entry, out var due) && due <= now)
+        while (budget-- > 0 && _callOuts.TryPeek(out var entry, out var due) && due <= now)
         {
             _callOuts.Dequeue();
             if (_cancelledCallOuts.Remove(entry.Id) || !entry.Owner.IsAlive) continue;
             Execute(entry.Player is { IsAlive: true } ? entry.Player : null, () => In(entry.Owner, entry.Function));
-        }
-        if (now >= _nextHeartBeat)
-        {
-            _nextHeartBeat = now + HeartBeatInterval;
-            foreach (var ob in _heartBeats.ToArray())
-                if (ob is { IsAlive: true, HeartBeat: true })
-                    Execute(ob.Living ? ob : null, () => In(ob, () => ob.Target?.HeartBeat()));
+            now = DateTime.UtcNow;
         }
     }
 
@@ -146,7 +333,8 @@ internal sealed partial class Kernel : IDriverServices
         Runtime.Ticks = 0;
         _thisPlayer = player;
         _verb = "";
-        _callStack.Clear();
+        ClearStack();
+        _refusals = 0;
         Exception? failure = null;
         try
         {
@@ -160,7 +348,7 @@ internal sealed partial class Kernel : IDriverServices
         {
             _thisPlayer = null;
             _pending = null;
-            _callStack.Clear();
+            ClearStack();
         }
         // Reported here, not inside the catch block: a catch handler still runs
         // on top of the faulting stack, which after runaway recursion is nearly full.
@@ -192,7 +380,7 @@ internal sealed partial class Kernel : IDriverServices
         string text;
         Runtime.Ticks = 0;
         _thisPlayer = owner;
-        _callStack.Clear();
+        ClearStack();
         try
         {
             if (afterOutput && !In(owner, () => owner.Target?.PromptsAfterOutput() ?? false)) return;
@@ -206,7 +394,7 @@ internal sealed partial class Kernel : IDriverServices
         finally
         {
             _thisPlayer = null;
-            _callStack.Clear();
+            ClearStack();
         }
         connection.Send(text);
         connection.AtPrompt = true;
@@ -222,7 +410,8 @@ internal sealed partial class Kernel : IDriverServices
             var frames = (error.StackTrace ?? "").Split('\n').Take(12).Select(f => f.TrimEnd());
             text = $"{error.GetType().Name}: {message}\n{string.Join("\n", frames)}";
         }
-        Log.Info($"ERROR ({player?.Name ?? "driver"}): {text}");
+        // A move the master refused is policy at work, not a fault: it is logged as a refusal.
+        Log.Info(error is RefusedException ? $"refused ({player?.Name ?? "driver"}): {text}" : $"ERROR ({player?.Name ?? "driver"}): {text}");
         Runtime.Ticks = 0; // give the error handlers a budget of their own
         try
         {
@@ -374,34 +563,59 @@ internal sealed partial class Kernel : IDriverServices
             throw new MudRuntimeException($"{program.Path} is abstract: it can be inherited but not loaded or cloned");
 
         var handle = new ObjectRef(name, program.Path, isClone);
-        _pending = (handle, program.ObjectType);
-        _callStack.Add(handle);
+        // The domain comes first, from the cloner's call stack; then a blueprint is made with an empty stack, so that loading a
+        // program behaves the same whoever happens to load it first.
+        handle.Domain = _master is { IsAlive: true } ? AskMaster(m => m.ObjectDomain(program.Path, isClone)) ?? "" : "";
+        List<ObjectRef>? outer = null;
+        var outerMasterDepth = _masterDepth;
+        if (!isClone)
+        {
+            outer = new List<ObjectRef>(_callStack);
+            ClearStack();
+            _thisPlayer = null; // Instantiate gives the creator's back afterwards
+        }
         try
         {
-            Activator.CreateInstance(program.ObjectType);
-        }
-        catch (TargetInvocationException wrapped) when (wrapped.InnerException is not null)
-        {
-            handle.Target = null;
-            throw wrapped.InnerException;
+            _pending = (handle, program.ObjectType);
+            Push(handle);
+            try
+            {
+                Activator.CreateInstance(program.ObjectType);
+            }
+            catch (TargetInvocationException wrapped) when (wrapped.InnerException is not null)
+            {
+                handle.Target = null;
+                var inner = wrapped.InnerException;
+                if (handle.Domain.Length > 0 && IsMudlibType(inner.GetType())) throw new MudRuntimeException(SafeMessage(inner));
+                throw inner;
+            }
+            finally
+            {
+                _pending = null;
+                Pop();
+            }
+
+            _objects[name] = handle;
+            try
+            {
+                In(handle, () => handle.Target!.Create());
+            }
+            catch
+            {
+                Destroy(handle);
+                throw;
+            }
+            return handle;
         }
         finally
         {
-            _pending = null;
-            if (_callStack.Count > 0) _callStack.RemoveAt(_callStack.Count - 1);
+            if (outer != null)
+            {
+                ClearStack();
+                foreach (var ob in outer) Push(ob);
+                _masterDepth = outerMasterDepth;
+            }
         }
-
-        _objects[name] = handle;
-        try
-        {
-            In(handle, () => handle.Target!.Create());
-        }
-        catch
-        {
-            Destroy(handle);
-            throw;
-        }
-        return handle;
     }
 
     public ObjectRef? FindObject(string name)
@@ -426,10 +640,10 @@ internal sealed partial class Kernel : IDriverServices
         if (!target.IsAlive) return;
         var environment = target.Environment;
 
-        // Contents fall out into the environment, or are destroyed with the container.
+        // Contents fall out into the environment, or are destroyed with the container (also when the master would not let them be there).
         foreach (var item in target.Inventory.ToArray())
         {
-            if (environment is { IsAlive: true }) Move(item, environment);
+            if (environment is { IsAlive: true } && MoveRefusalFor(item, environment, target) == null) MoveCore(item, environment);
             else Destroy(item);
         }
 
@@ -467,6 +681,7 @@ internal sealed partial class Kernel : IDriverServices
     public object? CallOther(ObjectRef target, string function, object?[] args)
     {
         if (target.Target is not { } instance) return null;
+        if (!Permit(target, function)) return null;
         var methods = _methodCache.GetOrCreateValue(instance.GetType());
         if (!methods.TryGetValue((function, args.Length), out var method))
         {
@@ -476,9 +691,26 @@ internal sealed partial class Kernel : IDriverServices
             methods[(function, args.Length)] = method;
         }
         if (method is null) return null;
+        // Across a domain boundary only plain data goes in and comes out (see TryCross).
+        var crossing = TopDomain != target.Domain;
+        if (crossing)
+        {
+            var plain = new object?[args.Length];
+            for (var i = 0; i < args.Length; i++)
+                if (!TryCross(args[i], out plain[i]))
+                {
+                    NoteRefusal($"refused {function} on {target.Name}: argument {i + 1} ({args[i]!.GetType().Name}) cannot cross between domains");
+                    return null;
+                }
+            args = plain;
+        }
         try
         {
-            return In(target, () => method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, args, null));
+            var result = In(target, () => method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, args, null));
+            if (!crossing) return result;
+            if (TryCross(result, out var copy)) return copy;
+            NoteRefusal($"dropped the result of {function} on {target.Name} ({result!.GetType().Name}): it cannot cross between domains");
+            return null;
         }
         catch (ArgumentException mismatch)
         {
@@ -490,12 +722,22 @@ internal sealed partial class Kernel : IDriverServices
     // IDriverServices: containment
     // =====================================================================
 
-    public void Move(ObjectRef what, ObjectRef destination)
+    public void Move(ObjectRef caller, ObjectRef what, ObjectRef destination)
     {
         if (!what.IsAlive || !destination.IsAlive) throw new MudRuntimeException("Cannot move a destructed object");
         for (var e = destination; e is not null; e = e.Environment)
             if (e == what) throw new MudRuntimeException($"Cannot move {what.Name} into itself");
+        if (MoveRefusalFor(what, destination, caller) is { } refusal) throw new RefusedException(refusal);
+        MoveCore(what, destination);
+    }
 
+    /// <summary>The master's reason to refuse a move, or null. Not asked while the master itself is answering.</summary>
+    private string? MoveRefusalFor(ObjectRef what, ObjectRef destination, ObjectRef caller)
+        => _master is { IsAlive: true } && _masterDepth == 0 ? AskMaster(m => m.MoveRefusal(what, destination, caller)) : null;
+
+    private void MoveCore(ObjectRef what, ObjectRef destination)
+    {
+        var from = what.Environment;
         // Leave the old environment and drop every command binding that depended on being there.
         if (what.Environment is { } old)
         {
@@ -512,6 +754,10 @@ internal sealed partial class Kernel : IDriverServices
         try
         {
             bool StillThere() => what.IsAlive && what.Environment == destination && destination.IsAlive;
+
+            // The object hears of its own move first, before anything in its new place can offer it commands.
+            In(what, () => what.Target?.OnMoved(from));
+            if (!StillThere()) return;
 
             if (what.Living)
             {
@@ -584,6 +830,22 @@ internal sealed partial class Kernel : IDriverServices
         return top >= 1 ? _callStack[top - 1] : null;
     }
 
+    public IReadOnlyList<ObjectRef> CallerChain() => _callStack.ToArray();
+
+    public ObjectRef? RestrictedCaller()
+    {
+        if (_restricted > 0)
+            foreach (var ob in _callStack) if (ob.Domain.Length > 0) return ob;
+        return _thisPlayer is { Domain.Length: > 0 } player ? player : null;
+    }
+
+    /// <summary>A typed view is a direct reference: only within one domain, and from restricted code only as the master allows.</summary>
+    public bool MayView(ObjectRef target)
+    {
+        if (_masterDepth > 0 || target.Domain == TopDomain) return Permit(target, "As");
+        return target.Domain.Length == 0 && Permit(target, "As");
+    }
+
     public ObjectRef? ThisPlayer => _thisPlayer;
     public string Verb => _verb;
 
@@ -614,6 +876,8 @@ internal sealed partial class Kernel : IDriverServices
     public void AddAction(ObjectRef owner, string verb, ActionHandler handler)
     {
         if (_thisPlayer is not { IsAlive: true, Living: true } player) return;
+        RequireOwnCode(owner, handler, "AddAction");
+        if (!Permit(player, "AddAction:" + verb)) return;
         player.Actions.RemoveAll(a => a.Owner == owner && a.Verb == verb);
         player.Actions.Add(new ActionBinding(verb, owner, handler));
     }
@@ -631,6 +895,8 @@ internal sealed partial class Kernel : IDriverServices
     public void InputTo(ObjectRef caller, Action<string> handler, bool noEcho)
     {
         var target = _thisPlayer ?? caller;
+        RequireOwnCode(caller, handler, "InputTo");
+        if (!Permit(target, noEcho ? "InputToNoEcho" : "InputTo")) return;
         if (target.Connection is not Connection connection) throw new MudRuntimeException("InputTo: no interactive player");
         target.InputTo = handler;
         target.InputToOwner = caller;
@@ -659,16 +925,19 @@ internal sealed partial class Kernel : IDriverServices
 
     public void Write(string message)
     {
-        if (_thisPlayer is { IsAlive: true } player) In(player, () => player.Target!.CatchTell(message));
+        if (_thisPlayer is { IsAlive: true } player) { if (Permit(player, "CatchTell")) In(player, () => player.Target!.CatchTell(message)); }
         else Log.Info($"write: {message.TrimEnd()}");
     }
 
-    public void TellObject(ObjectRef ob, string message) => In(ob, () => ob.Target?.CatchTell(message));
+    public void TellObject(ObjectRef ob, string message)
+    {
+        if (Permit(ob, "CatchTell")) In(ob, () => ob.Target?.CatchTell(message));
+    }
 
     public void TellRoom(ObjectRef room, string message, ObjectRef[] exclude)
     {
         foreach (var listener in room.Inventory.ToArray())
-            if (listener.Living && Array.IndexOf(exclude, listener) < 0)
+            if (listener.Living && Array.IndexOf(exclude, listener) < 0 && Permit(listener, "CatchTell"))
                 In(listener, () => listener.Target?.CatchTell(message));
     }
 
@@ -692,6 +961,7 @@ internal sealed partial class Kernel : IDriverServices
 
     public int CallOut(ObjectRef owner, Action function, double delaySeconds)
     {
+        RequireOwnCode(owner, function, "CallOut");
         var id = ++_nextCallOutId;
         var due = DateTime.UtcNow + TimeSpan.FromSeconds(Math.Max(0, delaySeconds));
         _callOuts.Enqueue(new CallOutEntry(id, owner, _thisPlayer, function), due);
@@ -761,11 +1031,11 @@ internal sealed partial class Kernel : IDriverServices
         var directories = directory.GetDirectories()
             .Where(d => !d.Name.StartsWith('.') && !(segments.Length == 0 && d.Name is "bin" or "obj"))
             .OrderBy(d => d.Name, StringComparer.Ordinal)
-            .Select(d => new DirEntry(d.Name, true, 0));
+            .Select(d => new DirEntry(d.Name, true, 0) { IsLink = d.LinkTarget != null });
         var files = directory.GetFiles()
             .Where(f => !f.Name.StartsWith('.'))
             .OrderBy(f => f.Name, StringComparer.Ordinal)
-            .Select(f => new DirEntry(f.Name, false, f.Length));
+            .Select(f => new DirEntry(f.Name, false, f.Length) { IsLink = f.LinkTarget != null });
         return directories.Concat(files).ToList();
     }
 
@@ -787,8 +1057,16 @@ internal sealed partial class Kernel : IDriverServices
 
         // The temporary name starts with a dot, so it is invisible to GetDir and cannot be addressed.
         var temp = Path.Combine(Path.GetDirectoryName(fullPath)!, $".{segments[^1]}.{Guid.NewGuid():N}.tmp");
-        File.WriteAllText(temp, content, new UTF8Encoding(false));
-        File.Move(temp, fullPath, overwrite: true);
+        try
+        {
+            File.WriteAllText(temp, content, new UTF8Encoding(false));
+            File.Move(temp, fullPath, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            try { File.Delete(temp); } catch (Exception) { }
+            throw new MudRuntimeException($"Could not write {mudPath}"); // a read-only mudlib (DEPLOY.md, MUDLIB_WRITABLE) and the like
+        }
         Log.Info($"file written: {mudPath} by {caller.Name} ({content.Length} chars)");
     }
 
@@ -919,7 +1197,8 @@ internal sealed partial class Kernel : IDriverServices
         var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "make-dir", path);
         if (segments.Length == 0 || Directory.Exists(fullPath) || File.Exists(fullPath)) return false;
         if (!Directory.Exists(Path.GetDirectoryName(fullPath))) throw new MudRuntimeException($"No such parent directory for {mudPath}");
-        Directory.CreateDirectory(fullPath);
+        try { Directory.CreateDirectory(fullPath); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { throw new MudRuntimeException($"Could not create {mudPath}"); }
         Log.Info($"directory created: {mudPath} by {caller.Name}");
         return true;
     }
@@ -972,6 +1251,8 @@ internal sealed partial class Kernel : IDriverServices
         return string.Join('$', PasswordScheme, PasswordIterations.ToString(CultureInfo.InvariantCulture),
             Convert.ToBase64String(salt), Convert.ToBase64String(hash));
     }
+
+    public string Sha256(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
 
     public bool VerifyPassword(string password, string hash)
     {

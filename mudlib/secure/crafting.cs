@@ -135,7 +135,7 @@ public class CraftingDaemon : Thing
         return false;
     }
 
-    private static bool Trusted(ObjectRef? ob) => ob != null && InTrustedTree(ob.ProgramPath);
+    private static bool Trusted(ObjectRef? ob) => ob != null && ob.Domain == "" && InTrustedTree(ob.ProgramPath); // never a sandbox object (docs/SANDBOX.md)
 
     private static bool IsPlayerBody(ObjectRef? ob) => ob != null && ob.IsAlive && ob.IsClone && ob.ProgramPath == PlayerProgram;
 

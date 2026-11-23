@@ -52,7 +52,9 @@ public class Node : Thing
     {
         // A node in a trusted tree can be gathered only by trusted code (the crafting daemon), so a wizard's sandbox cannot strip
         // real nodes bare. A node under /wiz answers anyone, for wizards' own tests.
-        if (InTrusted(Self.ProgramPath) && !InTrusted(PreviousObject()?.ProgramPath ?? "")) return false;
+        // A sandbox object (docs/SANDBOX.md) answers anyone too, and only a real object of a trusted tree counts as trusted code.
+        var caller = PreviousObject();
+        if (Self.Domain == "" && InTrusted(Self.ProgramPath) && !(caller != null && caller.Domain == "" && InTrusted(caller.ProgramPath))) return false;
         var room = Environment();
         if (room == null || !who.IsAlive || Environment(who) != room || !who.Call<bool>("IsCreature")) return false;
         if (QueryCharges() <= 0) return false;

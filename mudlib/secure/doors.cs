@@ -30,7 +30,9 @@ public class Doors : MudObject
         var caller = PreviousObject();
         if (Self.IsClone || caller == null || caller.IsClone || !caller.IsAlive || key == null) return false;
         var parts = key.Split('|');
-        return parts.Length == 2 && (parts[0] == caller.ProgramPath || parts[1] == caller.ProgramPath) && parts[0] != parts[1];
+        // The caller is one end of the door. For sandbox code (docs/SANDBOX.md) that end is a room of a wizard's home, so a door
+        // between two of the game's rooms can never be reached from a workshop.
+        return parts.Length == 2 && parts[0] != parts[1] && (parts[0] == caller.ProgramPath || parts[1] == caller.ProgramPath);
     }
 
     /// <summary>

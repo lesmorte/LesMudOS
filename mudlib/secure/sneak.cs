@@ -55,7 +55,7 @@ public class SneakRules : MudObject
     {
         var who = ThisPlayer();
         var caller = PreviousObject();
-        if (Self.IsClone || caller == null || !TrustedTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)) || who == null || who.Call<int>("QueryWizLevel") < 10) return false;
+        if (Self.IsClone || caller == null || caller.Domain != "" || !TrustedTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)) || who == null || who.Call<int>("QueryWizLevel") < 10) return false;
         if (mode == "random") { fixedRoll = -1; return true; }
         if (mode == null || !mode.StartsWith("notice:")) return false;
         var parts = mode.Substring(7).Split('.');

@@ -170,7 +170,8 @@ public class Meddler : Thing
     public override void Init() { AddAction("meddle", Meddle); }
     private bool Meddle(string args)
     {
-        var who = Present(args.Trim(), Environment(ThisPlayer()!)!);
+        // CHANGED (sandbox): the meddler runs in its wizard's workshop and finds the victim wherever they are.
+        var who = Users().FirstOrDefault(u => (u.Call<string>("QueryName") ?? "").ToLower() == args.Trim().ToLower());
         if (who == null) { Write("MEDDLE none\n"); return true; }
         var other = Present("dummy", Environment(who)!);
         var tries = new List<string>();
@@ -513,7 +514,8 @@ def run(work, mudlib):
     h.write(mudlib, "/wiz/chief/meddler", MEDDLER)
     vic = login("rvictim", "mage")
     vic.command("rspawn dummy")
-    chief.command("goto " + T + "hall")
+    h.write(mudlib, "/wiz/chief/den", "// @inherit /std/room\npublic class ChiefDen : Room { public override void Create() { ShortDesc = \"Chief's Den\"; LongDesc = \"A workshop.\"; } }\n")
+    chief.command("goto /wiz/chief/den")  # CHANGED (sandbox): a wizard's code runs in their workshop
     a.drain(chief, 0.4)
     check("the meddler is cloned", chief.command("clone ~/meddler"), "meddler")
     # an aggressive creature in the room, for the call that names it as an enemy
@@ -529,6 +531,7 @@ def run(work, mudlib):
     out = chief.command("meddle rvictim")
     check("no public method puts a standing character down", out, "resting=False", "fighting=False")
     check("the standing character is still on its feet (score)", "yes" if not resting(vic) else "no", "yes")
+    chief.command("goto " + T + "hall")
     vic.command("rslay")
 
     # ===== 10. crafting or gathering ends resting =====

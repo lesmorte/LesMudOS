@@ -156,7 +156,7 @@ public class Monster : Npc
         // A death the game itself caused (this creature's own code, a blow or spell from a trusted tree, the driver) counts toward the
         // kill counters of docs/specs/skill-ranks.md; one a wizard's object forced by calling Die or FinishDamage does not.
         var cause = PreviousObject();
-        var counted = cause == null || cause == Self || RankDaemonTrusts(cause.ProgramPath);
+        var counted = cause == null || cause == Self || (cause.Domain == "" && RankDaemonTrusts(cause.ProgramPath));
         Dead = true;
         ResetCombat();
         var room = Environment();

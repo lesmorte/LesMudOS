@@ -180,7 +180,10 @@ public class Rogue : Item
         r.Add("split " + (skin.Call<ObjectRef>("Split", 1) == null ? "refused" : "done"));
         r.Add("receive " + skin.Call<bool>("ReceiveStack", 10));
         r.Add("direct " + (skin.As<Item>()?.SetQuality(5).ToString() ?? "none"));
-        r.Add("create " + (CreateIn("/domains/test/wolf_skin", 50, 5, who) == null ? "refused" : "made"));
+        // CHANGED (sandbox): in the workshop, what sandbox code makes from a real file is a sandbox object (docs/SANDBOX.md).
+        var made = CreateIn("/domains/test/wolf_skin", 50, 5, who);
+        r.Add("create " + (made == null ? "refused" : made.Domain == "" ? "real" : "sandbox"));
+        made?.Call("Vanish");
         var fresh = CloneObject("/domains/test/wolf_skin");
         r.Add("takesplit " + fresh.Call<bool>("TakeSplit", 5, 10, ""));
         fresh.Call("Vanish");
@@ -466,19 +469,24 @@ def run(work, mudlib, box):
     os.makedirs(os.path.join(mudlib, "wiz", "wiz"), exist_ok=True)
     h.write(mudlib, "/wiz/wiz/rogue", ROGUE)
     h.write(mudlib, "/wiz/wiz/rogue_mat", ROGUE_MAT)
+    # CHANGED (sandbox): a wizard's code runs in their workshop, one of their own rooms; the real skins are carried in.
+    h.write(mudlib, "/wiz/wiz/bench", a.room("WizBench", "Wiz's Bench", {"out": TEST + "lab"}, ""))
     wiz.command("drop all skins")
     wiz.command("mk 2 1")
+    check("sandbox: the wizard steps into the workshop", wiz.command("goto /wiz/wiz/bench"), "You step into the workshop.")
     check("sandbox: the rogue charm is cloned", wiz.command("clone /wiz/wiz/rogue"), "Cloned /wiz/wiz/rogue#")
     text = wiz.command("rogue")
     print("      (rogue said: " + text.strip().splitlines()[0] + ")")
     check("sandbox: cannot set quality, quantity, state or properties of a real item", text, "quality False", "quantity False", "restore False", "property False")
     check("sandbox: cannot split a real stack, or feed it", text, "split refused", "receive False", "takesplit False")
     check("sandbox: a direct typed call is refused too", text, "direct ", absent=("direct True",))
-    check("sandbox: CreateIn of a real item at Legendary is refused", text, "create refused")
+    check("sandbox: CreateIn of a real item at Legendary makes only a sandbox object", text, "create sandbox")
     check("sandbox: its own sandbox items it may change", text, "own True True")
     check("sandbox: the real stack is unchanged", wiz.command("count"), "count q1=2 objects 1")
     check("sandbox: the sandbox stack exists", wiz.command("i"), "a legendary sandbox pebble (x7)")
     wiz.command("drop all pebbles")
+    check("sandbox: leaving the workshop restores the wizard", wiz.command("goto " + TEST + "lab"), "You leave the workshop as you entered it.")
+    check("sandbox: with the real skins as they were, and nothing from the workshop", wiz.command("i"), "a wolf skin (x2)", absent=("pebble", "charm"))
 
     # ===== corpses and lost property =====
     for who in (ann, ben):
