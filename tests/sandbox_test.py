@@ -349,6 +349,19 @@ public static class Attacks
         T("d.master.MoveRefusal", () => ((ObjectRef)e("load", new object?[] { "/secure/master" })!).Call("MoveRefusal", pat, lab, pat));
         T("d.master.Connect", () => ((ObjectRef)e("load", new object?[] { "/secure/master" })!).Call("Connect"));
         T("d.master.As", () => ((ObjectRef)e("load", new object?[] { "/secure/master" })!).As<IMaster>());
+        // GMCP (docs/specs/gmcp.md): send to a player or to oneself, forge Room.Info through the service, make the room register
+        // save a workshop room, read another character's facts.
+        if (pat != null)
+        {
+            T("gmcp.send.p", () => e("gmcp", new object?[] { pat, "Comm.Channel.Text", "HACKTEXT" }));
+            T("gmcp.d.Look.p", () => ((ObjectRef)e("load", new object?[] { "/secure/gmcp" })!).Call("Look", pat));
+            T("gmcp.d.Poll.p", () => ((ObjectRef)e("load", new object?[] { "/secure/gmcp" })!).Call("Poll", pat));
+            T("gmcp.d.Channel.p", () => ((ObjectRef)e("load", new object?[] { "/secure/gmcp" })!).Call("Channel", pat, "tell", "Boss", "HACKTEXT"));
+            T("gmcp.facts.p", () => pat.Call("GmcpFacts"));
+        }
+        if (lab != null) T("gmcp.send.self", () => e("gmcpself", new object?[] { "Room.Info" }));
+        T("gmcp.roomids.Assign", () => ((ObjectRef)e("load", new object?[] { "/secure/roomids" })!).Call("Assign", "/wiz/wren/lab"));
+        T("gmcp.roomids.Assign2", () => ((ObjectRef)e("load", new object?[] { "/secure/roomids" })!).Call("Assign", "/domains/sbtest/nowhere", false));
         // Privileged efuns from sandbox code itself.
         T("efun.writefile", () => e("writefile", new object?[] { "/domains/sbtest/hacked.cs", "// hacked" }));
         T("efun.readfile", () => e("readfile", new object?[] { "/secure/master.cs" }));
@@ -387,6 +400,8 @@ def efun_method():
             case "secret": return CheckAdminSecret((string)a[0]!);
             case "update": return UpdateProgram((string)a[0]!).Count;
             case "shutdown": Shutdown(); return "shut";
+            case "gmcp": return GmcpSend((ObjectRef)a[0]!, (string)a[1]!, new Dictionary<string, object?> { ["text"] = (string)a[2]! });
+            case "gmcpself": return ThisPlayer() == null ? null : GmcpSend(ThisPlayer()!, (string)a[0]!, new Dictionary<string, object?> { ["num"] = 1 });
         }
         return "unknown";
     }
@@ -825,6 +840,8 @@ def main():
             same(f"{origin}: the room is unchanged", base_hall, chief.command("dump hall"))
             same(f"{origin}: the relic is unchanged", base_relic, chief.command("dump relic"))
             same(f"{origin}: no history, no daemon change", base_hist, chief.command("dump history"))
+            saved_ids = os.path.join(work, "save", "secure", "roomids.json")
+            check(f"{origin}: the room register saved no workshop room", open(saved_ids).read() if os.path.exists(saved_ids) else "", absent=("/wiz/", "nowhere"))
             check(f"{origin}: the player is still connected", pat.command("look"), "Sandbox Test Hall")
             return found
 
