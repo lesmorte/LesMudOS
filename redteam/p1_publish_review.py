@@ -63,21 +63,29 @@ def main():
         print(w.command("x").strip()[:200])
         raw = open(os.path.join(g.mudlib, "wiz", "wren", "glade", "glade.cs"), encoding="utf-8").read()
         rtlib.check("P1: the editor keeps U+2028 (setup)", LS in raw, raw)
-        print(w.command("submit ~/glade").strip()[:300])
+        submitted = w.command("submit ~/glade")
+        print(submitted.strip()[:300])
+        catview = rev.command("cat /wiz/wren/glade/glade.cs")
+        rtlib.check("P1: cat shows the hidden line end visibly", "<U+2028>" in catview, catview)
         sub = rev.command("submissions")
-        num = re.search(r"#(\d+) waiting\s+Wren\s+/wiz/wren/glade", sub).group(1)
-        view = rev.command("cat /wiz/wren/glade/glade.cs")
-        print("REVIEWER SEES:\n" + view)
-        shown = [l for l in view.splitlines() if l.strip().startswith(tuple(str(i) for i in range(1, 20)))]
-        code_lines = [l for l in shown if re.match(r"\s*\d+\s{2}", l) and not re.match(r"\s*\d+\s{2}\s*//", l)]
-        has_hidden_visible = any("AddGold" in l for l in code_lines)
-        print("lines with AddGold outside a // comment, as the reviewer sees them:", has_hidden_visible)
-        before = g.dump("pat")
-        out = rev.command(f"approve {num}")
-        print("approve:", out.strip()[:300])
-        after = g.dump("pat")
-        print("pat after:", after.strip())
-        rtlib.check("P1: code the reviewer saw only inside a comment does not run when published", "gold=100019" not in after and "gold=99999" not in after and "gold=100" not in after.split("xp=")[0], after)
+        found = re.search(r"#(\d+) waiting\s+Wren\s+/wiz/wren/glade", sub)
+        if found is None:
+            # After the fix a file holding U+2028 cannot be submitted at all: it never reaches a reviewer.
+            rtlib.check("P1: a file with a hidden line end is refused at submission", "U+2028" in submitted and found is None, submitted)
+        else:
+            num = found.group(1)
+            view = rev.command(f"submission {num} cat glade.cs")
+            print("REVIEWER SEES:\n" + view)
+            shown = [l for l in view.splitlines() if l.strip().startswith(tuple(str(i) for i in range(1, 20)))]
+            code_lines = [l for l in shown if re.match(r"\s*\d+\s{2}", l) and not re.match(r"\s*\d+\s{2}\s*//", l)]
+            has_hidden_visible = any("AddGold" in l for l in code_lines)
+            print("lines with AddGold outside a // comment, as the reviewer sees them:", has_hidden_visible)
+            before = g.dump("pat")
+            out = rev.command(f"approve {num}")
+            print("approve:", out.strip()[:300])
+            after = g.dump("pat")
+            print("pat after:", after.strip())
+            rtlib.check("P1: code the reviewer saw only inside a comment does not run when published", "gold=100019" not in after and "gold=99999" not in after and "gold=100" not in after.split("xp=")[0], after)
 
         # ---- P2: swap and swap back.
         os.makedirs(os.path.join(g.mudlib, "wiz", "wren", "meadow"), exist_ok=True)
@@ -87,8 +95,9 @@ def main():
         sub = rev.command("submissions")
         num = re.search(r"#(\d+) waiting\s+Wren\s+/wiz/wren/meadow", sub).group(1)
         open(path, "w").write(MEADOW_NICE)          # the wizard edits in a harmless version
-        view = rev.command("cat /wiz/wren/meadow/meadow.cs")
+        # The reviewer reads the way the register tells them to: its own copy, from outside the workshop.
         rev.command(f"submission {num}")
+        view = rev.command(f"submission {num} cat meadow.cs")
         print("REVIEWER SEES:\n" + view)
         open(path, "w").write(MEADOW_EVIL)          # and puts the submitted bytes back
         out = rev.command(f"approve {num}")

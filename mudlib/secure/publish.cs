@@ -18,8 +18,14 @@ public class Publish : MudObject
     private const int LevelRevoke = 10;
     private const int MaxFiles = 200;
     private const int MaxDepth = 8;
+    private const int MaxRequestChars = 1_000_000;  // the copy a request keeps of its files
+    private const int MaxWaitingChars = 4_000_000;  // all copies kept for waiting requests together
 
-    /// <summary>The requests, flattened: "&lt;id&gt;.&lt;field&gt;" to the value. Fields: submitter, source, dest, note, time, state, files, kind, decider, decided, reason, published.</summary>
+    /// <summary>
+    /// The requests, flattened: "&lt;id&gt;.&lt;field&gt;" to the value. Fields: submitter, source, dest, note, time, state, files, kind,
+    /// decider, decided, reason, published; and while a request waits, "copy:&lt;file&gt;", the text of each file as submitted, which is
+    /// what a reviewer reads (submission N cat FILE) and what approval publishes (P2 of the November 2026 review).
+    /// </summary>
     [Saved] private Dictionary<string, string> records = new();
     [Saved] private int nextId = 1;
 
@@ -34,6 +40,24 @@ public class Publish : MudObject
     private string Get(int id, string field) => records.GetValueOrDefault(id + "." + field) ?? "";
 
     private void Set(int id, string field, string value) => records[id + "." + field] = value ?? "";
+
+    /// <summary>The copy a request keeps of its files, or null if it keeps none (decided, or from before copies were kept).</summary>
+    private Dictionary<string, string>? CopyOf(int id)
+    {
+        var files = ParseList(Get(id, "files"));
+        var copy = new Dictionary<string, string>();
+        foreach (var file in files.Keys)
+        {
+            if (!records.TryGetValue(id + ".copy:" + file, out var text)) return null;
+            copy[file] = text;
+        }
+        return copy.Count > 0 ? copy : null;
+    }
+
+    private void DropCopy(int id)
+    {
+        foreach (var key in records.Keys.Where(k => k.StartsWith(id + ".copy:")).ToList()) records.Remove(key);
+    }
 
     private List<int> Ids()
     {
@@ -123,21 +147,115 @@ public class Publish : MudObject
         return result.ToString();
     }
 
-    /// <summary>The names of the classes declared at the top level of a file (lines that start in column 0).</summary>
+    private static readonly HashSet<string> TypeKeywords = new() { "class", "struct", "interface", "enum", "record", "delegate" };
+
+    /// <summary>
+    /// Every name that may be a type declared in a submitted file, over-counted on purpose (L1 of the November 2026 review): each
+    /// word after class, struct, interface, enum or record, anywhere in the text (comments and strings included, so that nothing can
+    /// hide a declaration), with \uXXXX escapes decoded first. A comment such as "this class Room" then counts Room too; the
+    /// author rewords it.
+    /// </summary>
+    private static List<string> DeclaredNames(string text)
+    {
+        var decoded = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '\\' && i + 5 < text.Length && text[i + 1] == 'u' && Hex(text.Substring(i + 2, 4)) is { } code)
+            {
+                decoded.Append((char)code);
+                i += 5;
+            }
+            else decoded.Append(text[i]);
+        }
+        var words = Words(decoded.ToString());
+        var names = new List<string>();
+        for (var i = 0; i + 1 < words.Count; i++)
+            if (TypeKeywords.Contains(words[i]) && !TypeKeywords.Contains(words[i + 1]) && words[i + 1] != "where") names.Add(words[i + 1]);
+        return names;
+    }
+
+    private static int? Hex(string four)
+    {
+        var value = 0;
+        foreach (var c in four)
+        {
+            var digit = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+            if (digit < 0) return null;
+            value = value * 16 + digit;
+        }
+        return value;
+    }
+
+    /// <summary>The identifier-like words of a text, in order (an @ before a word is dropped; everything else separates words).</summary>
+    private static List<string> Words(string text)
+    {
+        var words = new List<string>();
+        var word = new StringBuilder();
+        foreach (var c in text)
+        {
+            if (char.IsLetterOrDigit(c) || c == '_') { word.Append(c); continue; }
+            if (word.Length > 0) { words.Add(word.ToString()); word.Clear(); }
+        }
+        if (word.Length > 0) words.Add(word.ToString());
+        return words;
+    }
+
+    /// <summary>
+    /// The names of the types declared in a file of the mudlib itself (trusted, so read exactly): words after a type keyword at
+    /// brace depth 0, outside comments, strings and character literals.
+    /// </summary>
     private static List<string> ClassNames(string text)
     {
-        var names = new List<string>();
-        foreach (var raw in text.Split('\n'))
+        var code = new StringBuilder(text.Length);
+        var depth = 0;
+        for (var i = 0; i < text.Length; i++)
         {
-            if (raw.Length == 0 || raw[0] == ' ' || raw[0] == '\t' || raw[0] == '/') continue;
-            var at = raw.IndexOf("class ", StringComparison.Ordinal);
-            if (at < 0 || (at > 0 && raw[at - 1] != ' ')) continue;
-            var i = at + 6;
-            var name = new StringBuilder();
-            while (i < raw.Length && (char.IsLetterOrDigit(raw[i]) || raw[i] == '_')) name.Append(raw[i++]);
-            if (name.Length > 0) names.Add(name.ToString());
+            var c = text[i];
+            var next = i + 1 < text.Length ? text[i + 1] : '\0';
+            if (c == '/' && next == '/') { while (i < text.Length && text[i] != '\n') i++; code.Append(' '); continue; }
+            if (c == '/' && next == '*') { i += 2; while (i + 1 < text.Length && !(text[i] == '*' && text[i + 1] == '/')) i++; i++; code.Append(' '); continue; }
+            if (c == '"' || c == '\'')
+            {
+                var verbatim = i > 0 && (text[i - 1] == '@' || (text[i - 1] == '$' && i > 1 && text[i - 2] == '@'));
+                var quote = c;
+                i++;
+                while (i < text.Length && text[i] != quote) { if (!verbatim && text[i] == '\\') i++; else if (verbatim && i + 1 < text.Length && text[i] == '"' && text[i + 1] == '"') i++; i++; }
+                code.Append(' ');
+                continue;
+            }
+            if (c == '{') { depth++; code.Append(' '); continue; }
+            if (c == '}') { depth--; code.Append(' '); continue; }
+            code.Append(depth == 0 ? c : ' ');
         }
+        var words = Words(code.ToString());
+        var names = new List<string>();
+        for (var i = 0; i + 1 < words.Count; i++)
+            if (TypeKeywords.Contains(words[i]) && !TypeKeywords.Contains(words[i + 1])) names.Add(words[i + 1]);
         return names;
+    }
+
+    /// <summary>
+    /// The first character of a text that cannot be published, as "line L, column C: U+XXXX", or null (P1 of the November 2026
+    /// review): anything but tab, newline and printable characters. U+2028 ends a // comment for the compiler but not for a reader;
+    /// the bidirectional controls reorder what is shown; the zero-width characters and terminal controls hide things.
+    /// </summary>
+    private static string? Unprintable(string text)
+    {
+        var line = 1;
+        var column = 0;
+        foreach (var c in text)
+        {
+            column++;
+            if (c == '\n') { line++; column = 0; continue; }
+            int u = c;
+            var bad = (u < 0x20 && u != 0x09 && u != 0x0D) || (u >= 0x7F && u <= 0x9F) || u == 0x2028 || u == 0x2029 || u == 0x061C
+                      || u == 0xFEFF || u == 0x180E || (u >= 0x200B && u <= 0x200F) || (u >= 0x202A && u <= 0x202E) || (u >= 0x2060 && u <= 0x2069)
+                      || u == 0x00AD || u == 0x034F || u == 0x115F || u == 0x1160 || u == 0x3164 || (u >= 0xFFF0 && u <= 0xFFFF)
+                      || (u >= 0xE000 && u <= 0xF8FF) || (u >= 0xFE00 && u <= 0xFE0F) || char.IsSurrogate(c);
+            if (u == 0x0D) bad = false; // a Windows line end is harmless
+            if (bad) return $"line {line}, column {column}: U+{u:X4}";
+        }
+        return null;
     }
 
     /// <summary>Every class name declared at the top level of the mudlib's own files (outside /wiz and outside one directory).</summary>
@@ -244,7 +362,7 @@ public class Publish : MudObject
                 return $"{file} names a path in a wizard's home other than its own directory: published code may not depend on a workshop.";
         var mine = new Dictionary<string, string>();
         foreach (var (file, text) in rewritten)
-            foreach (var name in ClassNames(text))
+            foreach (var name in DeclaredNames(text).Distinct())
                 if (!mine.TryAdd(name, file)) return $"the class name {name} is used twice ({mine[name]} and {file}).";
         var theirs = new Dictionary<string, string>();
         MudlibClasses("", dest, theirs, 0);
@@ -274,6 +392,11 @@ public class Publish : MudObject
         if (refusal != null) return refusal + "\n";
         var contents = ReadAll(source, out var problem);
         if (contents == null) return problem + "\n";
+        foreach (var (file, text) in contents.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            if (Unprintable(text) is { } where)
+                return $"Not submitted: {source}/{file}, {where}: only printable characters, tabs and line ends can be published (a reviewer must see every character).\n";
+        var size = contents.Values.Sum(t => t.Length);
+        if (size > MaxRequestChars) return $"Not submitted: {source} holds {size} characters; a request can hold at most {MaxRequestChars}.\n";
 
         // Every file must compile where it is now, in the workshop.
         var errors = new List<string>();
@@ -294,7 +417,11 @@ public class Publish : MudObject
             {
                 Set(old, "state", "replaced");
                 Set(old, "decided", Time().ToString());
+                DropCopy(old);
             }
+        var waitingSize = Ids().Where(i => Get(i, "state") == "waiting").Sum(i => CopyOf(i)?.Values.Sum(t => t.Length) ?? 0);
+        if (waitingSize + size > MaxWaitingChars)
+            return "Not submitted: the register is holding as much waiting work as it can. Ask a wizard of level 5 to decide the waiting requests first.\n";
 
         var id = nextId++;
         Set(id, "submitter", actor.Name);
@@ -305,6 +432,7 @@ public class Publish : MudObject
         Set(id, "state", "waiting");
         Set(id, "kind", kind);
         Set(id, "files", FileList(contents.ToDictionary(kv => kv.Key, kv => Sha256(kv.Value))));
+        foreach (var (file, text) in contents) Set(id, "copy:" + file, text);
         Store();
 
         foreach (var user in Users())
@@ -314,7 +442,7 @@ public class Publish : MudObject
             if (LoadObject(WizList).Call<int>("QueryLevel", name) >= LevelDecide)
                 TellObject(user, $"[publishing] {Cap(actor.Name)} asks for {source} to be published to {dest} (request #{id}). {{cmd}}submission {id}{{/}} to review it.\n");
         }
-        return $"Submitted as request #{id}: {contents.Count} file(s) from {source} to {dest}{(kind == "update" ? " (an update)" : "")}. A wizard of level {LevelDecide} or higher will review it. Do not change the files until it is decided.\n";
+        return $"Submitted as request #{id}: {contents.Count} file(s) from {source} to {dest}{(kind == "update" ? " (an update)" : "")}. A wizard of level {LevelDecide} or higher will review it. The request keeps its own copy of the files: that copy is what is reviewed and published, whatever happens to the files afterwards.\n";
     }
 
     /// <summary>How many requests are waiting (the login notice for wizards).</summary>
@@ -362,8 +490,42 @@ public class Publish : MudObject
         if (prior > 0 && prior != id)
             foreach (var file in before.Keys.Where(f => !files.ContainsKey(f)).OrderBy(f => f, StringComparer.Ordinal))
                 text.Append($"  {file} (removed)\n");
-        if (Get(id, "state") == "waiting") text.Append($"  Read the files with {{cmd}}cat{{/}}, walk the area with {{cmd}}goto{{/}}, then {{cmd}}approve {id}{{/}} or {{cmd}}reject {id}{{/}} REASON.\n");
+        if (Get(id, "state") == "waiting")
+            text.Append($"  Read each file with {{cmd}}submission {id} cat FILE{{/}}: that is the register's own copy, exactly what approval publishes, shown\n" +
+                        $"  from here, outside any workshop, where no wizard's code can change what you see. Then {{cmd}}approve {id}{{/}} or {{cmd}}reject {id}{{/}} REASON.\n" +
+                        "  Do not review from inside the submitter's workshop: it is their ground, and what their code shows you there is theirs.\n");
         return text.ToString();
+    }
+
+    /// <summary>
+    /// submission N cat FILE: the register's copy of one file of a waiting request, numbered, every character that is not printable
+    /// ASCII shown as &lt;U+XXXX&gt;, for the body to print exactly as it is (no colour markup is interpreted).
+    /// </summary>
+    public string ShowFile(int id, string file)
+    {
+        if (Actor() is not { } actor) return Refused;
+        if (!records.ContainsKey(id + ".state")) return $"There is no request #{id}.\n";
+        if (actor.Level < LevelDecide && Get(id, "submitter") != actor.Name) return $"Request #{id} is not yours.\n";
+        if (CopyOf(id) is not { } copy) return $"Request #{id} keeps no copy of its files (it is {Get(id, "state")}).\n";
+        file = (file ?? "").Trim().TrimStart('/');
+        if (file.StartsWith(Get(id, "source").TrimStart('/') + "/")) file = file.Substring(Get(id, "source").Length);
+        if (!file.EndsWith(".cs")) file += ".cs";
+        if (!copy.TryGetValue(file, out var text))
+            return $"Request #{id} has no file {file}. Its files: {string.Join(", ", copy.Keys.OrderBy(f => f, StringComparer.Ordinal))}.\n";
+        var lines = text.Replace("\r\n", "\n").Split('\n').ToList();
+        if (lines.Count > 0 && lines[^1] == "") lines.RemoveAt(lines.Count - 1);
+        var shown = new StringBuilder($"Request #{id}, {file} as submitted ({lines.Count} lines, sha256 {Sha256(text)}):\n");
+        for (var i = 0; i < lines.Count; i++)
+        {
+            shown.Append($"{i + 1,4}  ");
+            foreach (var c in lines[i])
+            {
+                if (c == '\t' || (c >= ' ' && c <= '~')) shown.Append(c);
+                else shown.Append($"<U+{(int)c:X4}>");
+            }
+            shown.Append('\n');
+        }
+        return shown.ToString();
     }
 
     // ------------------------------------------------------------------
@@ -386,6 +548,7 @@ public class Publish : MudObject
         reason = (reason ?? "").Trim();
         if (reason == "") return "Say why: {cmd}reject{/} NUMBER REASON.\n";
         Set(id, "state", "rejected");
+        DropCopy(id);
         Set(id, "decider", actor.Name);
         Set(id, "decided", Time().ToString());
         Set(id, "reason", reason.Length > 200 ? reason.Substring(0, 200) : reason);
@@ -401,6 +564,7 @@ public class Publish : MudObject
         if (Get(id, "submitter") != actor.Name) return $"Request #{id} is not yours.\n";
         if (Get(id, "state") != "waiting") return $"Request #{id} is {Get(id, "state")}, not waiting.\n";
         Set(id, "state", "withdrawn");
+        DropCopy(id);
         Set(id, "decided", Time().ToString());
         Store();
         return $"Request #{id} is withdrawn.\n";
@@ -423,14 +587,13 @@ public class Publish : MudObject
         var destRefusal = DestinationRefusal(dest, submitter, out var kind);
         if (destRefusal != null) return "Not approved: " + destRefusal + "\n";
 
-        // 1. Exactly what was submitted: the same files, each with the same hash.
-        var contents = ReadAll(source, out var problem);
-        if (contents == null) return $"Not approved: {problem} {Cap(submitter)} must submit it again.\n";
+        // 1. Exactly what was submitted and reviewed: the register's own copy, checked against the hashes taken at submission. The
+        // files in the workshop are not read again (they may have changed since, for better or worse: it does not matter).
+        if (CopyOf(id) is not { } contents) return $"Not approved: request #{id} keeps no copy of its files. {Cap(submitter)} must submit it again.\n";
         var submitted = ParseList(Get(id, "files"));
-        var now = contents.ToDictionary(kv => kv.Key, kv => Sha256(kv.Value));
-        var changed = submitted.Keys.Union(now.Keys).Where(f => !submitted.ContainsKey(f) || !now.ContainsKey(f) || submitted[f] != now[f]).OrderBy(f => f, StringComparer.Ordinal).ToList();
-        if (changed.Count > 0)
-            return $"Not approved: {string.Join(", ", changed.Take(5))} changed since request #{id} was submitted. {Cap(submitter)} must submit it again.\n";
+        var changed = submitted.Keys.Where(f => !contents.ContainsKey(f) || Sha256(contents[f]) != submitted[f]).ToList();
+        if (changed.Count > 0 || contents.Count != submitted.Count) return $"Not approved: the register's copy of request #{id} does not match its hashes. {Cap(submitter)} must submit it again.\n";
+        if (contents.Values.Select(Unprintable).FirstOrDefault(w => w != null) is { } where) return $"Not approved: a file holds an unprintable character ({where}).\n";
 
         // 2. Rewritten for the destination, and still fit for the real game.
         var rewritten = contents.ToDictionary(kv => kv.Key, kv => Rewrite(kv.Value, source, dest));
@@ -488,6 +651,7 @@ public class Publish : MudObject
         }
 
         if (prior > 0) Set(prior, "state", "superseded");
+        DropCopy(id); // the published files are the copy now
         Set(id, "state", "approved");
         Set(id, "dest", dest);
         Set(id, "kind", kind);

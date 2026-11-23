@@ -147,6 +147,33 @@ public class Master : MudObject, IMaster
         return Place.Real;
     }
 
+    /// <summary>The sandbox domain of the space a container is in (the first sandbox object around it), or "" in the real game.</summary>
+    private string SpaceOf(ObjectRef? container)
+    {
+        for (var e = container; e != null; e = Environment(e))
+            if (e.Domain != "") return e.Domain;
+        return "";
+    }
+
+    /// <summary>The character in the workshop that is this object or carries it, or null.</summary>
+    private ObjectRef? WorkshopBodyOf(ObjectRef? container)
+    {
+        for (var e = container; e != null; e = Environment(e))
+        {
+            if (e.Domain != "") return null;
+            if (IsPlayerBody(e) && InWorkshop(e)) return e;
+        }
+        return null;
+    }
+
+    /// <summary>The domain of the sandbox code acting now ("" if none).</summary>
+    private string ActingDomain() => RestrictedCaller()?.Domain ?? "";
+
+    /// <summary>Is this character the owner of that domain, standing in it: the wizard in their own workshop?</summary>
+    private bool OwnerAtHome(ObjectRef body, string domain)
+        => domain.StartsWith("wiz:") && domain.Length > 4 && SpaceOf(body) == domain
+           && (body.Call<string>("QueryName") ?? "").ToLowerInvariant() == domain.Substring(4);
+
     private int WizLevelOf(ObjectRef body)
     {
         try { return LoadObject(WizList).Call<int>("QueryLevel", body.Call<string>("QueryName") ?? ""); }
@@ -156,7 +183,8 @@ public class Master : MudObject, IMaster
     /// <summary>The boundary of sandbox space, for every move. The table is in docs/SANDBOX.md, "What can cross the boundary".</summary>
     public string? MoveRefusal(ObjectRef what, ObjectRef destination, ObjectRef caller)
     {
-        var restricted = RestrictedCaller() != null;
+        var domain = ActingDomain();
+        var restricted = domain != "";
         var to = PlaceOf(destination);
         if (IsPlayerBody(what))
         {
@@ -164,17 +192,35 @@ public class Master : MudObject, IMaster
             if (restricted)
             {
                 if (!InWorkshop(what)) return "Sandbox code cannot move anyone who is not in the workshop.";
+                if (SpaceOf(what) != domain) return "Sandbox code can move only the wizards in its own workshop.";
+                if (to == Place.Sandbox && SpaceOf(destination) != domain) return "Sandbox code cannot move anyone into another wizard's workshop.";
                 if (to != Place.Sandbox && Environment(destination) != null) return "Sandbox code can move a wizard out of the workshop only into a room.";
+                return null;
             }
+            // Into a workshop only by the character's own command (goto, an exit): nothing else may carry a wizard in, the level 10
+            // included (C1 of the November 2026 review: the wizard was dragged in to be shown a fake prompt).
+            if (to == Place.Sandbox && !InWorkshop(what) && ThisPlayer() != what) return "Only a wizard's own command takes them into a workshop.";
             return null;
         }
         if (what.Domain != "")
-            return to == Place.Real ? "Things made in the workshop cannot leave it." : null;
+        {
+            if (to == Place.Real) return "Things made in the workshop cannot leave it.";
+            if (restricted)
+            {
+                if (what.Domain != domain) return "Sandbox code can move only its own things.";
+                var space = to == Place.Sandbox ? SpaceOf(destination) : SpaceOf(WorkshopBodyOf(destination));
+                if (space != domain) return "Sandbox code cannot put things in another wizard's workshop.";
+            }
+            return null;
+        }
         // A real thing, or a real creature.
         if (to == Place.Sandbox) return Living(what) ? "Only wizards can enter a wizard's workshop." : "Real things cannot be set down in the workshop.";
         var at = PlaceOf(Environment(what));
         if (at == Place.Workshop && to != Place.Workshop) return "What a wizard carries in the workshop stays with them until they leave it.";
         if (restricted && (at != Place.Workshop || to != Place.Workshop)) return "Sandbox code cannot move real things.";
+        if (restricted && (WorkshopBodyOf(Environment(what)) is not { } from || !OwnerAtHome(from, domain)
+                           || WorkshopBodyOf(destination) is not { } into || !OwnerAtHome(into, domain)))
+            return "Sandbox code can move only what the wizard in their own workshop carries.";
         return null;
     }
 
@@ -209,21 +255,37 @@ public class Master : MudObject, IMaster
     }
 
     /// <summary>
-    /// What restricted code may do to a real object (asked by the driver only while sandbox code is on the call stack): anything to a
-    /// character in the workshop and what it carries; read anything; use the stateless rule objects and the sandbox-aware daemon
-    /// functions. Never a typed view, and no text, verb or input capture for anyone outside the workshop.
+    /// What restricted code may do to an object outside its own domain (the driver asks only then, and only while sandbox code is
+    /// on the call stack). To the wizard in their own workshop, and what they carry: anything but a typed view, a hidden-input
+    /// prompt or a protected verb. To a visitor in that workshop: read, offer verbs the visitor does not bind itself, and text,
+    /// which the driver marks as the workshop's (CatchTellQuoted); never their input, never their own verbs. Elsewhere: read
+    /// anything, and use the stateless rule objects and the sandbox-aware daemon functions; another wizard's sandbox: read only.
     /// </summary>
     public bool ValidCall(ObjectRef target, string function)
     {
         if (function == "As") return false;
         // A hidden line is a password: no sandbox code may ask for one, of anyone. Nor may it take over the commands that
-        // protect a character or decide for the real game, even of a wizard in its own workshop (a visiting reviewer).
+        // protect a character or decide for the real game, even of a wizard in its own workshop.
         if (function == "InputToNoEcho") return false;
-        if (function.StartsWith("AddAction:") && ProtectedVerbs.Contains(function.Substring("AddAction:".Length))) return false;
-        if (PlaceOf(target) == Place.Workshop) return true;
-        if (function is "CatchTell" or "InputTo" || function.StartsWith("AddAction:")) return false;
+        var verb = function.StartsWith("AddAction:") ? function.Substring("AddAction:".Length)
+            : function.StartsWith("OwnVerb:") ? function.Substring("OwnVerb:".Length) : null;
+        if (verb != null && ProtectedVerbs.Contains(verb)) return false;
+        var domain = ActingDomain();
+        if (target.Domain != "") return target.Domain == domain || (verb == null && !function.StartsWith("CatchTell") && function != "InputTo" && ReadOnly(function));
+        if (WorkshopBodyOf(target) is { } body)
+        {
+            if (OwnerAtHome(body, domain)) return true;
+            if (SpaceOf(body) == domain)
+            {
+                // A visitor (a reviewer, a level 10 who walked in): the workshop may show them things, but not speak as the game.
+                if (function == "CatchTellQuoted" || function.StartsWith("AddAction:")) return true;
+                if (function is "CatchTell" or "InputTo" or "GmcpSend" || verb != null) return false;
+                return ReadOnly(function);
+            }
+        }
+        if (function is "CatchTell" or "CatchTellQuoted" or "InputTo" or "GmcpSend" || verb != null) return false;
         if (ReadOnly(function)) return true;
-        if (target.IsClone || target.Domain != "") return false;
+        if (target.IsClone) return false;
         if (target.ProgramPath.StartsWith("/skills/") || target.ProgramPath.StartsWith("/classes/")) return true;
         return SandboxAware.TryGetValue(target.ProgramPath, out var functions) && functions.Contains(function);
     }

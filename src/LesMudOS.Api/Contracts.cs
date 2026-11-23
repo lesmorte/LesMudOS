@@ -80,12 +80,51 @@ public static class Runtime
     internal static long Ticks;
     internal static long Limit = 5_000_000;
 
+    /// <summary>The domain of the object whose frame is on top of the driver's call stack; null when the stack is empty.</summary>
+    internal static string? CurrentDomain;
+
     public static void Tick()
     {
         if (++Ticks > Limit) throw new EvalCostExceededException();
         // Turns a would-be process-killing StackOverflow into a catchable exception.
         RuntimeHelpers.EnsureSufficientExecutionStack();
     }
+
+    /// <summary>
+    /// The tick of sandbox code (docs/SANDBOX.md, "Sandbox code runs only in its own frames"): the same count and stack check, and
+    /// first a check that the object on top of the driver's call stack is of the domain this code was compiled for. Sandbox code
+    /// reached in any other way (a Message, ToString or Equals read by real code, a delegate or enumerator kept and run later, an
+    /// exception filter run while another object's frame is on top) stops at its first statement.
+    /// </summary>
+    public static void Tick(string domain)
+    {
+        if (!string.Equals(domain, CurrentDomain, StringComparison.Ordinal)) throw new SandboxFrameException(domain);
+        if (++Ticks > Limit) throw new EvalCostExceededException();
+        RuntimeHelpers.EnsureSufficientExecutionStack();
+    }
+
+    /// <summary>Set by the driver: may code of this domain run now as a catch filter (see Filter)?</summary>
+    internal static Func<string, bool>? FilterCheck;
+
+    /// <summary>
+    /// The check for a catch filter of sandbox code, which runs while the frames the exception came out of are still on the stack:
+    /// true if this domain's frame is on top, or if it is the sandbox code acting (the nearest restricted frame) and the master is
+    /// not answering a question; otherwise the exception (a throwing filter counts as false, so the handler is skipped).
+    /// </summary>
+    public static bool Filter(string domain)
+    {
+        if (!string.Equals(domain, CurrentDomain, StringComparison.Ordinal) && FilterCheck?.Invoke(domain) != true)
+            throw new SandboxFrameException(domain);
+        if (++Ticks > Limit) throw new EvalCostExceededException();
+        RuntimeHelpers.EnsureSufficientExecutionStack();
+        return true;
+    }
+}
+
+/// <summary>Sandbox code was reached outside a frame of its own domain (see Runtime.Tick(string)).</summary>
+public sealed class SandboxFrameException : MudRuntimeException
+{
+    internal SandboxFrameException(string domain) : base($"code of {domain} cannot run outside its own objects") { }
 }
 
 /// <summary>The kernel entry points behind the efuns. Implemented by the driver host.</summary>

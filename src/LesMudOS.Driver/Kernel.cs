@@ -47,6 +47,7 @@ internal sealed partial class Kernel : IDriverServices
     private int _restricted;    // how many frames on _callStack belong to restricted objects (a domain other than "")
     private int _masterDepth;   // > 0 while the master answers a question: its own calls are not put to ValidCall
     private int _refusals;      // ValidCall refusals in this execution, for the log
+    private volatile string? _lastRestricted; // the sandbox domain whose frame was pushed last, for the stall watchdog
     private readonly byte[]? _adminSecretHash;
     private int _adminSecretFailures;
 
@@ -69,9 +70,13 @@ internal sealed partial class Kernel : IDriverServices
         if (!string.IsNullOrEmpty(adminSecret))
             _adminSecretHash = SHA256.HashData(Encoding.UTF8.GetBytes(adminSecret));
         _mudlibRoot = Path.GetFullPath(mudlibRoot).TrimEnd(Path.DirectorySeparatorChar);
-        _compiler = new ProgramCompiler(mudlibRoot);
+        _compiler = new ProgramCompiler(mudlibRoot)
+        {
+            DomainOf = path => _master is { IsAlive: true } ? AskMaster(m => m.ObjectDomain(path, false)) ?? "" : "",
+        };
         _saves = new SaveStore(saveRoot);
         DriverHost.Services = this;
+        Runtime.FilterCheck = domain => _masterDepth == 0 && RestrictedCaller()?.Domain == domain;
     }
 
     private IMaster MasterObject => _master?.Target as IMaster ?? throw new MudRuntimeException("No master object");
@@ -86,18 +91,28 @@ internal sealed partial class Kernel : IDriverServices
 
     // ---- Call stack: which object's code is running, for PreviousObject() ----
 
+    // Runtime.CurrentDomain always names the domain of the top frame: sandbox code checks it at its first statement (TickInjector).
+
     private void Push(ObjectRef ob)
     {
         _callStack.Add(ob);
-        if (ob.Domain.Length > 0) _restricted++;
+        if (ob.Domain.Length > 0)
+        {
+            _restricted++;
+            _lastRestricted = ob.Domain;
+        }
+        Runtime.CurrentDomain = ob.Domain;
     }
 
     private void Pop()
     {
-        if (_callStack.Count == 0) return;
-        var ob = _callStack[^1];
-        _callStack.RemoveAt(_callStack.Count - 1);
-        if (ob.Domain.Length > 0 && _restricted > 0) _restricted--;
+        if (_callStack.Count > 0)
+        {
+            var ob = _callStack[^1];
+            _callStack.RemoveAt(_callStack.Count - 1);
+            if (ob.Domain.Length > 0 && _restricted > 0) _restricted--;
+        }
+        Runtime.CurrentDomain = _callStack.Count > 0 ? _callStack[^1].Domain : null;
     }
 
     private void ClearStack()
@@ -105,32 +120,55 @@ internal sealed partial class Kernel : IDriverServices
         _callStack.Clear();
         _restricted = 0;
         _masterDepth = 0;
+        Runtime.CurrentDomain = null;
     }
 
     private string TopDomain => _callStack.Count > 0 ? _callStack[^1].Domain : "";
 
-    private void In(ObjectRef ob, Action work)
-    {
-        var below = TopDomain;
-        Push(ob);
-        try { work(); }
-        catch (Exception error) when (ob.Domain != below && IsMudlibType(error.GetType()))
-        {
-            throw new MudRuntimeException(SafeMessage(error)); // read while this object's frame is still on the stack
-        }
-        finally { Pop(); }
-    }
+    private void In(ObjectRef ob, Action work) => In<bool>(ob, () => { work(); return true; });
 
+    /// <summary>
+    /// Run work in ob's frame. Two rules make a domain boundary hold (docs/SANDBOX.md, "Sandbox code runs only in its own frames"):
+    /// an exception leaves a frame of another domain only as a plain MudRuntimeException with its text, read here while ob's frame
+    /// is still on top (an AggregateException or any other wrapper included, whatever its type); and sandbox code called while the
+    /// master answers a question is restricted all the same.
+    /// </summary>
     private T In<T>(ObjectRef ob, Func<T> work)
     {
         var below = TopDomain;
+        var masterDepth = _masterDepth;
+        var outermost = ob.Domain.Length > 0 && _restricted == 0;
+        if (outermost) EnterDomain(ob.Domain);
+        if (ob.Domain.Length > 0) _masterDepth = 0;
         Push(ob);
         try { return work(); }
-        catch (Exception error) when (ob.Domain != below && IsMudlibType(error.GetType()))
+        catch (Exception error) when (ob.Domain != below && !CrossesAsIs(error))
         {
-            throw new MudRuntimeException(SafeMessage(error));
+            throw new MudRuntimeException(CrossingText(error, ob));
         }
-        finally { Pop(); }
+        finally
+        {
+            Pop();
+            _masterDepth = masterDepth;
+            if (outermost) LeaveDomain(ob.Domain);
+        }
+    }
+
+    // Time spent in sandbox code, per domain (filled in with the stall watchdog).
+    private void EnterDomain(string domain) { }
+    private void LeaveDomain(string domain) { }
+
+    /// <summary>The driver's own sealed exceptions, whose text is a plain string, cross as they are; everything else is converted.</summary>
+    private static bool CrossesAsIs(Exception error)
+        => error is EvalCostExceededException or InsufficientExecutionStackException or RefusedException or SandboxFrameException;
+
+    /// <summary>The text of an exception leaving ob's frame. From sandbox code: one line, without control characters, at most 300 characters.</summary>
+    private static string CrossingText(Exception error, ObjectRef ob)
+    {
+        var text = SafeMessage(error);
+        if (ob.Domain.Length == 0) return text;
+        text = PlainText.Clean(text.Replace('\n', ' ').Replace('\r', ' '));
+        return text.Length > 300 ? text[..300] + "..." : text;
     }
 
     // ---- Values that cross between domains (docs/SANDBOX.md) ----
@@ -145,8 +183,7 @@ internal sealed partial class Kernel : IDriverServices
     private static string SafeMessage(Exception error)
     {
         try { return error.Message ?? "error"; }
-        catch (EvalCostExceededException) { throw; }
-        catch (Exception) { return "error"; }
+        catch (Exception) { return error.GetType().Name; }
     }
 
     private static readonly HashSet<Type> PlainTypes = new()
@@ -162,19 +199,30 @@ internal sealed partial class Kernel : IDriverServices
         if (type.IsArray) return PlainElement(type.GetElementType()!, depth + 1);
         if (!type.IsGenericType) return false;
         var definition = type.GetGenericTypeDefinition();
-        if (definition == typeof(List<>) || definition == typeof(HashSet<>) || definition == typeof(Dictionary<,>) || definition == typeof(Nullable<>)
-            || (type.IsValueType && definition.FullName?.StartsWith("System.ValueTuple`", StringComparison.Ordinal) == true))
-            return type.GetGenericArguments().All(a => a != typeof(object) || !type.IsValueType) && type.GetGenericArguments().All(a => PlainElement(a, depth + 1));
+        // A value tuple or nullable is copied by value, so it may hold only scalars, strings, handles and enums: a list inside a tuple
+        // would be shared between the domains, not copied (F4 of the November 2026 review).
+        if (definition == typeof(Nullable<>) || (type.IsValueType && definition.FullName?.StartsWith("System.ValueTuple`", StringComparison.Ordinal) == true))
+            return type.GetGenericArguments().All(a => PlainTypes.Contains(a) || a.IsEnum);
+        if (definition == typeof(List<>) || definition == typeof(HashSet<>) || definition == typeof(Dictionary<,>))
+            return type.GetGenericArguments().All(a => PlainElement(a, depth + 1));
         return false;
     }
 
-    /// <summary>A copy of a value that may cross between domains, or false if it may not cross.</summary>
-    private static bool TryCross(object? value, out object? copy, int depth = 0)
+    /// <summary>
+    /// A copy of a value that may cross between domains, or false if it may not cross. With clean (a value going from sandbox code to
+    /// real code), every string in it loses the characters PlainText removes, so that no terminal control reaches a screen that way.
+    /// </summary>
+    private static bool TryCross(object? value, out object? copy, bool clean = false, int depth = 0)
     {
         copy = value;
         if (value == null) return true;
         if (depth > 6) return false;
         var type = value.GetType();
+        if (type == typeof(string))
+        {
+            if (clean) copy = PlainText.Clean((string)value);
+            return true;
+        }
         if (PlainTypes.Contains(type) || type.IsEnum) return true;
         if (type.IsArray)
         {
@@ -184,7 +232,7 @@ internal sealed partial class Kernel : IDriverServices
             var array = Array.CreateInstance(element, source.Length);
             for (var i = 0; i < source.Length; i++)
             {
-                if (!TryCross(source.GetValue(i), out var item, depth + 1)) return false;
+                if (!TryCross(source.GetValue(i), out var item, clean, depth + 1)) return false;
                 array.SetValue(item, i);
             }
             copy = array;
@@ -192,14 +240,29 @@ internal sealed partial class Kernel : IDriverServices
         }
         if (!type.IsGenericType || !PlainElement(type)) return false;
         var definition = type.GetGenericTypeDefinition();
-        if (type.IsValueType) return true; // a value tuple or nullable of plain types (no object fields: PlainElement refused those)
+        if (type.IsValueType)
+        {
+            // A value tuple of scalars, strings, handles and enums (PlainElement refused anything else): its strings are cleaned.
+            if (clean && value is System.Runtime.CompilerServices.ITuple tuple)
+            {
+                var parts = new object?[tuple.Length];
+                var changed = false;
+                for (var i = 0; i < tuple.Length; i++)
+                {
+                    parts[i] = tuple[i] is string text ? PlainText.Clean(text) : tuple[i];
+                    changed |= !Equals(parts[i], tuple[i]);
+                }
+                if (changed) copy = Activator.CreateInstance(type, parts);
+            }
+            return true;
+        }
         if (definition == typeof(List<>) || definition == typeof(HashSet<>))
         {
             var result = Activator.CreateInstance(type)!;
             var add = type.GetMethod("Add")!;
             foreach (var item in (System.Collections.IEnumerable)value)
             {
-                if (!TryCross(item, out var plain, depth + 1)) return false;
+                if (!TryCross(item, out var plain, clean, depth + 1)) return false;
                 add.Invoke(result, [plain]);
             }
             copy = result;
@@ -210,7 +273,7 @@ internal sealed partial class Kernel : IDriverServices
             var result = (System.Collections.IDictionary)Activator.CreateInstance(type)!; // the default comparer, whatever the original had
             foreach (System.Collections.DictionaryEntry entry in (System.Collections.IDictionary)value)
             {
-                if (!TryCross(entry.Key, out var key, depth + 1) || key == null || !TryCross(entry.Value, out var item, depth + 1)) return false;
+                if (!TryCross(entry.Key, out var key, clean, depth + 1) || key == null || !TryCross(entry.Value, out var item, clean, depth + 1)) return false;
                 result[key] = item;
             }
             copy = result;
@@ -227,13 +290,41 @@ internal sealed partial class Kernel : IDriverServices
     /// </summary>
     private bool Restricted => (_restricted > 0 || _thisPlayer is { Domain.Length: > 0 }) && _masterDepth == 0;
 
-    /// <summary>May the running code reach this object in this way? Always yes unless restricted code is running and the target is not restricted.</summary>
-    private bool Permit(ObjectRef target, string function)
+    /// <summary>
+    /// May the running code reach this object in this way? Always yes unless restricted code is running; then yes for an object of
+    /// the acting sandbox code's own domain, and otherwise (a real object, or another wizard's sandbox) as the master's ValidCall says.
+    /// </summary>
+    private bool Permit(ObjectRef target, string function, bool quiet = false)
     {
-        if (!Restricted || target.Domain.Length > 0 || _master is not { IsAlive: true }) return true;
+        if (!Restricted || _master is not { IsAlive: true }) return true;
+        if (RestrictedCaller() is { } actor && target.Domain.Length > 0 && target.Domain == actor.Domain) return true;
         if (AskMaster(m => m.ValidCall(target, function))) return true;
-        NoteRefusal($"refused {function} on {target.Name} (restricted code: {RestrictedCaller()?.Name ?? "?"})");
+        if (!quiet) NoteRefusal($"refused {function} on {target.Name} (restricted code: {RestrictedCaller()?.Name ?? "?"})");
         return false;
+    }
+
+    /// <summary>
+    /// Text on its way to a listener. From real code it goes as it is. From restricted code it loses every terminal control
+    /// (PlainText), and it goes as it is only where the master allows CatchTell (the wizard in their own workshop, sandbox objects);
+    /// to a visitor in the workshop it goes quoted, every line marked with the workshop it came from, where the master allows
+    /// CatchTellQuoted; to anyone else not at all.
+    /// </summary>
+    private string? TextFor(ObjectRef listener, string message)
+    {
+        if (!Restricted || _master is not { IsAlive: true }) return message;
+        message = PlainText.Clean(message);
+        if (Permit(listener, "CatchTell", quiet: true)) return message;
+        if (Permit(listener, "CatchTellQuoted")) return Quoted(message, RestrictedCaller()?.Domain ?? "");
+        return null;
+    }
+
+    private static string Quoted(string message, string domain)
+    {
+        var mark = "[" + (domain.StartsWith("wiz:", StringComparison.Ordinal) ? domain[4..] + "'s workshop" : domain) + "] ";
+        var lines = message.Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+            if (lines[i].Length > 0) lines[i] = mark + lines[i];
+        return string.Join('\n', lines);
     }
 
     /// <summary>A refusal goes to the log, a few per execution at most, so that a loop of refused calls cannot fill the disk.</summary>
@@ -388,7 +479,7 @@ internal sealed partial class Kernel : IDriverServices
         }
         catch (Exception error)
         {
-            Log.Info($"ERROR (prompt of {owner.Name}): {error.Message}");
+            Log.Info($"ERROR (prompt of {owner.Name}): {SafeMessage(error)}");
             text = "> ";
         }
         finally
@@ -402,12 +493,18 @@ internal sealed partial class Kernel : IDriverServices
 
     private void ReportError(ObjectRef? player, Exception error)
     {
-        var message = error is InsufficientExecutionStackException ? "Recursion too deep" : error.Message;
+        // The call stack is empty here. Every exception that left a sandbox frame was converted on the way out (In), so this reads
+        // only the driver's and real code's text; and should anything else get here, its getters are not trusted to succeed.
+        string message;
+        try { message = error is InsufficientExecutionStackException ? "Recursion too deep" : error.Message ?? "error"; }
+        catch (Exception) { message = error.GetType().Name; }
         var text = message;
         if (error is not MudRuntimeException)
         {
             // Keep the innermost frames; a runaway recursion has thousands of identical ones.
-            var frames = (error.StackTrace ?? "").Split('\n').Take(12).Select(f => f.TrimEnd());
+            string trace;
+            try { trace = error.StackTrace ?? ""; } catch (Exception) { trace = ""; }
+            var frames = trace.Split('\n').Take(12).Select(f => f.TrimEnd());
             text = $"{error.GetType().Name}: {message}\n{string.Join("\n", frames)}";
         }
         // A move the master refused is policy at work, not a fault: it is logged as a refusal.
@@ -420,7 +517,7 @@ internal sealed partial class Kernel : IDriverServices
         }
         catch (Exception nested)
         {
-            Log.Info($"ERROR in error handler: {nested.Message}");
+            Log.Info($"ERROR in error handler: {SafeMessage(nested)}");
         }
     }
 
@@ -577,6 +674,7 @@ internal sealed partial class Kernel : IDriverServices
         try
         {
             _pending = (handle, program.ObjectType);
+            var belowDomain = TopDomain;
             Push(handle);
             try
             {
@@ -586,7 +684,9 @@ internal sealed partial class Kernel : IDriverServices
             {
                 handle.Target = null;
                 var inner = wrapped.InnerException;
-                if (handle.Domain.Length > 0 && IsMudlibType(inner.GetType())) throw new MudRuntimeException(SafeMessage(inner));
+                // A constructor's exception leaves the new object's frame (still on top here) like any other: converted, whatever its type.
+                if (handle.Domain != belowDomain && !CrossesAsIs(inner))
+                    throw new MudRuntimeException(CrossingText(inner, handle));
                 throw inner;
             }
             finally
@@ -631,7 +731,9 @@ internal sealed partial class Kernel : IDriverServices
         if (caller != target && !AskMaster(m => m.ValidOperation("destruct", caller, target.Name)))
             throw new MudRuntimeException($"{caller.Name} may not destruct {target.Name}");
         if (target == _master) throw new MudRuntimeException("The master object cannot be destructed");
-        In(target, () => target.Target!.OnDestruct());
+        // Real code destructing a sandbox object does not run its code (F3 of the November 2026 review): a restore, a quit or a
+        // link death destructs what the workshop made as a step that must complete, and a throwing OnDestruct stopped it halfway.
+        if (target.Domain.Length == 0 || Restricted) In(target, () => target.Target!.OnDestruct());
         Destroy(target);
     }
 
@@ -640,10 +742,15 @@ internal sealed partial class Kernel : IDriverServices
         if (!target.IsAlive) return;
         var environment = target.Environment;
 
-        // Contents fall out into the environment, or are destroyed with the container (also when the master would not let them be there).
+        // Contents fall out into the environment, or are destroyed with the container (also when the master would not let them be
+        // there). When real code destructs, sandbox contents are destroyed with it: moving them would run their code (OnMoved, Init)
+        // in the middle of a destruct that must complete.
+        var sandboxGoes = !Restricted;
         foreach (var item in target.Inventory.ToArray())
         {
-            if (environment is { IsAlive: true } && MoveRefusalFor(item, environment, target) == null) MoveCore(item, environment);
+            if (!item.IsAlive) continue;
+            if (sandboxGoes && item.Domain.Length > 0) Destroy(item);
+            else if (environment is { IsAlive: true } && MoveRefusalFor(item, environment, target) == null) MoveCore(item, environment);
             else Destroy(item);
         }
 
@@ -692,12 +799,13 @@ internal sealed partial class Kernel : IDriverServices
         }
         if (method is null) return null;
         // Across a domain boundary only plain data goes in and comes out (see TryCross).
-        var crossing = TopDomain != target.Domain;
+        var from = TopDomain;
+        var crossing = from != target.Domain;
         if (crossing)
         {
             var plain = new object?[args.Length];
             for (var i = 0; i < args.Length; i++)
-                if (!TryCross(args[i], out plain[i]))
+                if (!TryCross(args[i], out plain[i], clean: from.Length > 0 && target.Domain.Length == 0))
                 {
                     NoteRefusal($"refused {function} on {target.Name}: argument {i + 1} ({args[i]!.GetType().Name}) cannot cross between domains");
                     return null;
@@ -708,7 +816,7 @@ internal sealed partial class Kernel : IDriverServices
         {
             var result = In(target, () => method.Invoke(instance, BindingFlags.DoNotWrapExceptions, null, args, null));
             if (!crossing) return result;
-            if (TryCross(result, out var copy)) return copy;
+            if (TryCross(result, out var copy, clean: target.Domain.Length > 0 && from.Length == 0)) return copy;
             NoteRefusal($"dropped the result of {function} on {target.Name} ({result!.GetType().Name}): it cannot cross between domains");
             return null;
         }
@@ -832,10 +940,11 @@ internal sealed partial class Kernel : IDriverServices
 
     public IReadOnlyList<ObjectRef> CallerChain() => _callStack.ToArray();
 
+    /// <summary>The restricted object nearest the top of the call stack (the sandbox code acting most directly), or a restricted ThisPlayer.</summary>
     public ObjectRef? RestrictedCaller()
     {
         if (_restricted > 0)
-            foreach (var ob in _callStack) if (ob.Domain.Length > 0) return ob;
+            for (var i = _callStack.Count - 1; i >= 0; i--) if (_callStack[i].Domain.Length > 0) return _callStack[i];
         return _thisPlayer is { Domain.Length: > 0 } player ? player : null;
     }
 
@@ -877,14 +986,18 @@ internal sealed partial class Kernel : IDriverServices
     {
         if (_thisPlayer is not { IsAlive: true, Living: true } player) return;
         RequireOwnCode(owner, handler, "AddAction");
-        if (!Permit(player, "AddAction:" + verb)) return;
+        // A verb the living binds for itself (look, cat, tell, ...) is asked about as such: the master lets sandbox code shadow one
+        // only for the wizard in their own workshop, never for a visitor (P3a of the November 2026 review).
+        var own = Restricted && player.Actions.Any(a => a.Owner == player && a.Verb == verb);
+        if (!Permit(player, (own ? "OwnVerb:" : "AddAction:") + verb)) return;
         player.Actions.RemoveAll(a => a.Owner == owner && a.Verb == verb);
         player.Actions.Add(new ActionBinding(verb, owner, handler));
     }
 
     public void NotifyFail(string message)
     {
-        if (_thisPlayer is not null) _thisPlayer.NotifyFail = message.TrimEnd('\n');
+        // The driver prints it after the command, outside every frame: what sandbox code sets is passed through TextFor now.
+        if (_thisPlayer is not null && TextFor(_thisPlayer, message) is { } text) _thisPlayer.NotifyFail = text.TrimEnd('\n');
     }
 
     // Telnet IAC WILL ECHO / IAC WONT ECHO. "Will echo" makes the client stop
@@ -925,20 +1038,20 @@ internal sealed partial class Kernel : IDriverServices
 
     public void Write(string message)
     {
-        if (_thisPlayer is { IsAlive: true } player) { if (Permit(player, "CatchTell")) In(player, () => player.Target!.CatchTell(message)); }
-        else Log.Info($"write: {message.TrimEnd()}");
+        if (_thisPlayer is { IsAlive: true } player) { if (TextFor(player, message) is { } text) In(player, () => player.Target!.CatchTell(text)); }
+        else Log.Info($"write: {PlainText.Clean(message).TrimEnd()}");
     }
 
     public void TellObject(ObjectRef ob, string message)
     {
-        if (Permit(ob, "CatchTell")) In(ob, () => ob.Target?.CatchTell(message));
+        if (TextFor(ob, message) is { } text) In(ob, () => ob.Target?.CatchTell(text));
     }
 
     public void TellRoom(ObjectRef room, string message, ObjectRef[] exclude)
     {
         foreach (var listener in room.Inventory.ToArray())
-            if (listener.Living && Array.IndexOf(exclude, listener) < 0 && Permit(listener, "CatchTell"))
-                In(listener, () => listener.Target?.CatchTell(message));
+            if (listener.Living && Array.IndexOf(exclude, listener) < 0 && TextFor(listener, message) is { } text)
+                In(listener, () => listener.Target?.CatchTell(text));
     }
 
     public void Say(ObjectRef caller, string message)

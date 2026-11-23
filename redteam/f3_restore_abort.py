@@ -66,6 +66,7 @@ def main():
             print("buy", word, "->", r.strip()[:200])
             if "You buy" in r or "bought" in r.lower():
                 target = word
+                bought_reply = r
                 break
         if target:
             r = g.wren.command(f"give {target} to pat")
@@ -78,7 +79,12 @@ def main():
         text = open(save).read()
         carried = re.search(r'"carried": \[(.*?)\]', text, re.S).group(1)
         print("pat save carried:", carried.replace("\n", ""))
-        rtlib.check("F3: workshop gold buys nothing in the real game for an ordinary player", target is None or carried.count("/") <= 3, carried)
+        # After the fix Wren is restored with the gold he entered with, and may buy with that: what counts is that nothing bought
+        # cost more than his real gold (the original check counted any purchase, which a restored wizard may make honestly).
+        real_gold = int(re.search(r"gold=(\d+)", before).group(1))
+        price = int(re.search(r"for (\d+) gold", bought_reply).group(1)) if target else 0
+        rtlib.check("F3: workshop gold buys nothing in the real game for an ordinary player",
+                    target is None or (price <= real_gold and "gold=100" not in after), f"real gold {real_gold}, price {price}; {carried}")
     finally:
         g.stop()
     rtlib.finish()

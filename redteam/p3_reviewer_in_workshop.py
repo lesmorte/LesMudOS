@@ -73,7 +73,10 @@ def main():
         view = rev.command("cat /wiz/wren/lab.cs")
         print("REVIEWER SEES:\n" + view)
         real = open(g.mudlib + "/wiz/wren/lab.cs").read()
-        rtlib.check("P3a: cat in the workshop shows the file on disk", "InputTo" in view and "Harmless" not in view, view)
+        # The file on disk itself holds the fake's text, so the real listing is told by its header (the real line count).
+        header = f"/wiz/wren/lab.cs ({len(real.splitlines())} lines):"
+        rtlib.check("P3a: cat in the workshop shows the file on disk", "InputTo" in view and header in view and "lab.cs (3 lines)" not in view, view)
+        rtlib.check("P3b: the workshop's text to a visitor is marked as the workshop's", "[wren's workshop] Password:" in raw, raw[-300:])
     finally:
         g.stop()
     rtlib.finish()

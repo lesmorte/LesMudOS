@@ -309,6 +309,7 @@ public class Player : Adventurer
     protected override void IdleCheck()
     {
         if (inWorkshop && !leavingWorkshop && QueryWizLevel() < 1) ScheduleRestore(true); // no longer a wizard: out of the workshop
+        if (!inWorkshop && !leavingWorkshop) SweepSandboxThings();
         var idle = IdleSeconds(Self);
         var timeout = TimeoutSeconds();
         var warnAt = timeout - WarningLead(timeout);
@@ -402,12 +403,18 @@ public class Player : Adventurer
 
     private bool CmdQuit(string args)
     {
-        Save();
-        if (inWorkshop) Write("The workshop's changes were left behind.\n");
-        Write("Goodbye.\n");
-        Say($"{Name} leaves the game.\n");
-        ReleaseInventory(); // the carried items are saved as records (path and state) and come back at the next login
-        Destruct(); // the connection closes
+        try
+        {
+            Save();
+            if (inWorkshop) Write("The workshop's changes were left behind.\n");
+            Write("Goodbye.\n");
+            Say($"{Name} leaves the game.\n");
+            ReleaseInventory(); // the carried items are saved as records (path and state) and come back at the next login
+        }
+        finally
+        {
+            Destruct(); // the connection closes, whatever happened above
+        }
         return true;
     }
 
@@ -727,8 +734,27 @@ public class Player : Adventurer
     private static string Numbered(List<string> lines, int first, int last)
     {
         var text = new StringBuilder();
-        for (var i = first; i <= last; i++) text.Append($"{i,4}  {lines[i - 1]}\n");
+        for (var i = first; i <= last; i++) text.Append($"{i,4}  {Visible(lines[i - 1])}\n");
         return text.ToString();
+    }
+
+    /// <summary>
+    /// A line of a file as a builder must see it: a character that is invisible, reorders the text or ends a line for the compiler
+    /// but not for the eye (U+2028 ends a // comment) is shown as &lt;U+XXXX&gt; (P1 of the November 2026 review).
+    /// </summary>
+    private static string Visible(string line)
+    {
+        StringBuilder? shown = null;
+        for (var i = 0; i < line.Length; i++)
+        {
+            int u = line[i];
+            var hidden = (u < 0x20 && u != 0x09) || (u >= 0x7F && u <= 0x9F) || u == 0x2028 || u == 0x2029 || u == 0x061C || u == 0xFEFF
+                         || u == 0x180E || u == 0x00AD || (u >= 0x200B && u <= 0x200F) || (u >= 0x202A && u <= 0x202E) || (u >= 0x2060 && u <= 0x2069);
+            if (!hidden) { shown?.Append(line[i]); continue; }
+            shown ??= new StringBuilder(line.Substring(0, i));
+            shown.Append($"<U+{u:X4}>");
+        }
+        return shown?.ToString() ?? line;
     }
 
     private bool CmdCat(string args)
@@ -1141,10 +1167,16 @@ public class Player : Adventurer
     public override void NetDead()
     {
         if (!ready) return;
-        Save();
-        Say($"{Name} disconnects.\n");
-        ReleaseInventory();
-        Destruct();
+        try
+        {
+            Save();
+            Say($"{Name} disconnects.\n");
+            ReleaseInventory();
+        }
+        finally
+        {
+            Destruct();
+        }
     }
 
     // ---- Communication (docs/specs/communication.md) ----
@@ -1344,6 +1376,20 @@ public class Player : Adventurer
         Tell("You step into the workshop. Nothing that happens here will follow you out.\n");
     }
 
+    /// <summary>
+    /// A character outside the workshop carries nothing made in one. Every move into the real game is refused to sandbox things, so
+    /// this finds nothing; should one ever get here, it goes at the next heartbeat, without running its code, and the log says so.
+    /// </summary>
+    private void SweepSandboxThings()
+    {
+        foreach (var item in AllInventory())
+            if (item.IsAlive && item.Domain != "")
+            {
+                Destruct(item);
+                Write("Something made in a workshop crumbles away.\n");
+            }
+    }
+
     private void ScheduleRestore(bool toCheckpoint)
     {
         if (toCheckpoint) restoreToCheckpoint = true;
@@ -1357,10 +1403,14 @@ public class Player : Adventurer
     {
         if (!inWorkshop) return false;
         if (leavingWorkshop || restoreToCheckpoint) return true;
-        Tell("You die in the workshop. It leaves no corpse.\n");
-        ClearEnemies();
-        ResetCombat();
-        ScheduleRestore(true);
+        ScheduleRestore(true); // first: nothing below (sandbox enemies forgetting the fight) can keep the restore from happening
+        try
+        {
+            Tell("You die in the workshop. It leaves no corpse.\n");
+            ClearEnemies();
+            ResetCombat();
+        }
+        catch (MudRuntimeException) { }
         return true;
     }
 
@@ -1376,6 +1426,9 @@ public class Player : Adventurer
         var destination = restoreToCheckpoint || inside || outer == null || outer.Domain != "" || outer.IsClone ? (checkpointRoom != "" ? checkpointRoom : StartRoom) : outer.Name;
         leavingWorkshop = true;
         inWorkshop = false; // from here on, what is cloned for this character is real
+        // Nothing of sandbox code runs from here on (docs/SANDBOX.md, "Leaving the workshop cannot be stopped"): what is carried is
+        // destructed by this body, which for a sandbox thing runs none of its code, and whatever goes wrong, this body is destructed
+        // in the end, so it can never stay in the game as a real character with what the workshop gave it.
         try
         {
             var fresh = CloneObject(PlayerProgram);
@@ -1395,11 +1448,16 @@ public class Player : Adventurer
             }
             else Destruct(fresh);
         }
-        catch (MudRuntimeException problem)
+        catch (Exception problem)
         {
-            Tell("The workshop could not restore you (" + Esc(problem.Message) + "). You are disconnected; log in again to come back as you entered.\n");
+            Tell("The workshop could not restore you (" + Esc(problem is MudRuntimeException ? problem.Message : "an internal error") + "). You are disconnected; log in again to come back as you entered.\n");
         }
-        Destruct(); // the connection, if it is still here, closes; the save file is the checkpoint
+        finally
+        {
+            foreach (var item in AllInventory())
+                try { if (item.IsAlive) Destruct(item); } catch (Exception) { }
+            Destruct(); // the connection, if it is still here, closes; the save file is the checkpoint
+        }
     }
 
     private const string PlayerProgram = "/std/player";
@@ -1479,9 +1537,17 @@ public class Player : Adventurer
     private bool CmdSubmission(string args)
     {
         if (!IsWizard(LevelFiles)) return false;
-        var n = RequestNumber(args.Trim());
-        if (n == 0) { NotifyFail("Usage: {cmd}submission{/} NUMBER"); return false; }
-        return ToPublish("Show", n);
+        var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var n = words.Length > 0 ? RequestNumber(words[0]) : 0;
+        if (n == 0 || !(words.Length == 1 || (words.Length == 3 && words[1] == "cat")))
+        {
+            NotifyFail("Usage: {cmd}submission{/} NUMBER, or {cmd}submission{/} NUMBER cat FILE");
+            return false;
+        }
+        if (words.Length == 1) return ToPublish("Show", n);
+        // The register's own copy, printed exactly as it is: no colour markup is read in it.
+        WriteRaw(LoadObject(PublishDaemon).Call<string>("ShowFile", n, words[2]) ?? "The publication register did not answer.\n");
+        return true;
     }
 
     /// <summary>"approve NUMBER [to /domains/NAME]"</summary>

@@ -870,6 +870,7 @@ public abstract class Adventurer : Living
         carriedEquipped.Clear();
         foreach (var item in AllInventory())
         {
+            if (item.Domain != "") continue; // a sandbox thing is never a record of the real game (docs/SANDBOX.md)
             carried.Add(RecordOf(item));
             if (IsEquipped(item)) carriedEquipped.Add(carried.Count - 1);
         }
@@ -880,7 +881,18 @@ public abstract class Adventurer : Living
     /// <summary>Remove the carried items from the game, as the player leaves. They return at the next login.</summary>
     protected void ReleaseInventory()
     {
-        foreach (var item in AllInventory()) item.Call("Vanish");
+        // A sandbox thing is destructed without running any of its code (the driver runs no OnDestruct of sandbox code for real
+        // code), so it can neither stop nor delay a quit or a link death; a real thing vanishes as it always has.
+        foreach (var item in AllInventory())
+        {
+            try
+            {
+                if (!item.IsAlive) continue;
+                if (item.Domain != "") Destruct(item);
+                else item.Call("Vanish");
+            }
+            catch (MudRuntimeException) { if (item.IsAlive) Destruct(item); }
+        }
     }
 
     /// <summary>Bind the gameplay commands, start the heartbeat and bring the carried items back.</summary>
