@@ -113,6 +113,7 @@ Existing guards are unchanged and still apply, and the master refuses every priv
 | Attributes | Placed points and attribute changes in the workshop are undone by the restore. |
 | Shops and merchants | A sandbox shopkeeper trades only with characters in the workshop and its goods are sandbox objects; real coins cannot be dropped there, and gold earned there is undone. A real shop cannot be reached from sandbox space. |
 | Idle timer | Unchanged. Wizards are never disconnected for idleness; a wizard idle in the workshop stays there, unsaved. |
+| GMCP (the map and gauges) | Only real `/std` and `/secure` code may send GMCP, and while sandbox code runs only to a character in the workshop. Sandbox code cannot reach the GMCP service or read anyone's facts. A wizard's own map follows them in the workshop: their body asks the service after every prompt and heart beat, with no sandbox code running. Workshop rooms, clones, and every place a workshop room's exits name get room numbers from the range that is never saved. |
 | The test client's `sync` | A player command; it changes nothing and works anywhere. |
 | Classes, skills, traits | Rule objects with no state of their own; sandbox code may use them, and their effects go through the call guard like any other code. |
 
