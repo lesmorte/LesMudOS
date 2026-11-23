@@ -274,7 +274,7 @@ Commands in `/std/player` and the level each needs:
 | `pwd`, `cd [<dir>]`, `list [<dir>]` (alias `ls`), `cat <file>` | 1, anywhere |
 | `mkdir <dir>`, `edit <file>`, `copy <from> <to>`, `move <from> <to>`, `rename <file> <newname>`, `delete <file>`, `rmdir <dir>`, `update <path>`, `clone <path>` | 1 in your own home `/wiz/<you>/...`; otherwise as in the next table |
 | `shutdown` (saves every online player first) | 10 |
-| `submit <dir> [to /domains/<name>] [: note]`, `submissions [all]`, `submission <n>`, `withdraw <n>` | 1 (see PUBLISHING.md) |
+| `submit <dir> [to /domains/<name>] [: note]`, `submissions [all]`, `submission <n> [cat <file>]`, `withdraw <n>` | 1 (see PUBLISHING.md) |
 | `approve <n> [to /domains/<name>]`, `reject <n> <reason>` | 5, never for one's own request |
 | `revoke <n> [: reason]` | 10 |
 | `promote <secret>` | Any, but only works while there is no level-10 wizard |

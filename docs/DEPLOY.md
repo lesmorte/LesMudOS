@@ -124,6 +124,14 @@ Two server settings of the driver (not of the setup script), given as `--idle-mi
 
 A value is minutes (`0.5` is allowed), or a number with `s` or `m` (`30s`); the seconds form is for tests. Empty lines and telnet keep-alives do not count as activity. A timeout shorter than the idle time is raised to it.
 
+### A wizard's code that stalls the game
+
+| Setting | Environment | Default | Meaning |
+|---|---|---|---|
+| `--sandbox-stall` | `LESMUDOS_SANDBOX_STALL` | `5` | Seconds one step of the game may run with a wizard's sandbox code on the stack before the watchdog stops the driver |
+
+When it fires (SANDBOX.md section 7, "A stall"), the log says `sandbox: STALL: code of wiz:<name> ...`, the driver exits with code 3 and systemd starts it again. The wizard's home is closed: `save/sandbox_quarantine.txt` holds one line per closed home (`wiz:<name> <time> ...`), and the driver makes no object of a listed home. To reopen it, read the code that stalled, delete its line, and restart the service.
+
 ## 4. Make yourself the first wizard
 
 1. Connect: `telnet <droplet ip> 4000` (or any MUD client).

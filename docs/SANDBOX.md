@@ -10,7 +10,7 @@ Decided by the owner:
 - Wizards of any level make no history: no Renown, no Chronicle entries or firsts, whatever their level and wherever they are.
 - The admin secret lives only in the environment variable `LESMUDOS_ADMIN_SECRET` and is never readable from game code.
 
-Status: built. The wizard's view is in BUILDING.md ("Your workshop" and "Publishing your work"), the reviewer's in PUBLISHING.md, the driver pieces in DRIVER_API.md. The red-team suite is `tests/sandbox_test.py`.
+Status: built. The wizard's view is in BUILDING.md ("Your workshop" and "Publishing your work"), the reviewer's in PUBLISHING.md, the driver pieces in DRIVER_API.md. The red-team suite is `tests/sandbox_test.py`, with the independent review's proofs in `tests/redteam/` (section 8).
 
 ## 1. Terms
 
@@ -49,7 +49,11 @@ When the wizard leaves sandbox space, by walking or `goto` into a real room, by 
 - Quitting and losing the connection: the save file already holds the checkpoint, and the body is destroyed as usual without being saved.
 - A driver restart: the same; nothing was ever saved from the workshop.
 
-They are told in one line that the workshop's changes were left behind. So a wizard can give themselves a sword that kills in one blow, a thousand levels and a fortune inside their own area, test with them, and walk out as the character who walked in.
+They are told in one line that the workshop's changes were left behind.
+
+### Leaving the workshop cannot be stopped
+
+Every route out is a step that must complete, so no sandbox code runs in it. Real code that destructs a sandbox object does not run that object's `OnDestruct`, and a container destructed by real code destroys its sandbox contents instead of letting them fall out (which would run their `OnMoved` and `Init`). The restore destroys what was carried that way, and whatever goes wrong, it destructs the old body in the end: it can never stay in the game as a real character with what the workshop gave it. Quitting and losing the connection destruct sandbox things directly (never through their `Vanish`), and destruct the body whatever happened before. A death in the workshop schedules the restore before anything else (sandbox enemies forgetting the fight cannot stop it). As a last line, a body outside the workshop drops anything made in one at its next heartbeat, and never records one in its save file. The save file holds the checkpoint from the moment of entering, so a shutdown, a crash or a kill at any moment, the moment of leaving included, also comes back as the checkpoint. So a wizard can give themselves a sword that kills in one blow, a thousand levels and a fortune inside their own area, test with them, and walk out as the character who walked in.
 
 ### What sandbox code may touch
 
@@ -60,15 +64,30 @@ A restricted execution may do these to real objects, and nothing else:
 - call the read-only functions: names beginning `Query`, `Is`, `Has` or `Can`, and `Short`, `Long`, `LongFor`, `Id`, `HealthLine`, `Stat`, `Appraisal`, `DescribeCount` (every such public function in `/std`, `/secure`, `/domains`, `/classes`, `/skills` and `/events` is read-only, and that is the rule for new code);
 - call anything on the rule objects that hold no state: the skill, trait and class blueprints under `/skills` and `/classes`, and the class registry;
 - call the few daemon functions that know about sandbox space (the door register; the notice dice of sneaking);
-- call anything on a character in the workshop, or on what such a character carries, because all of it is thrown away on leaving.
+- call anything on the wizard in their own workshop, or on what they carry, because all of it is thrown away on leaving (but never a hidden-input prompt or a protected verb, below);
+- of a *visitor* in its workshop (another wizard, a reviewer, a level 10 who walked in): read, walk them through an exit as `/std/room` does, offer verbs they do not bind themselves, and show them text, which the driver marks (below). Never their input, never their own verbs, nothing else.
+
+Another wizard's sandbox is not sandbox code's own: it may call only the read-only functions of another home's objects, and can move neither them nor the wizards in another workshop. A home's code may build (`@inherit`, `@use`) only on real programs and on its own home's; real code never builds on a home's.
 
 Everything else is refused silently (the call returns nothing) and logged, at most a few lines per execution.
 
-What crosses between a sandbox object and a real one, in either direction, is plain data only: numbers, strings, object handles, and fresh copies of arrays, lists, sets and dictionaries of those (a dictionary always with the default comparer). Anything else (an object of a class written in a home, whose `ToString` or `Equals` would run later in the other side's frame; an enumerator; a delegate) does not cross: an argument like that refuses the call, a result like that arrives as null. An exception thrown by sandbox code reaches real code as a plain error with its message, read while the sandbox frame is still on the stack. Typed views (`As<T>()`) never cross at all, in either direction. So sandbox code can never run in a real object's frame, and real code can never be handed a reference into a real object's state. `As<T>()` from a restricted execution returns null for any real object, so direct typed calls are impossible. The guard is one check in the driver's `Call` path, decided by the master's `ValidCall`, so it covers every object type (players, creatures, rooms, items, daemons) and every public method, including ones written later; there is no list of mutators to keep in step.
+What crosses between a sandbox object and a real one, in either direction, is plain data only: numbers, strings, object handles, and fresh copies of arrays, lists, sets and dictionaries of those (a dictionary always with the default comparer). Anything else (an object of a class written in a home, whose `ToString` or `Equals` would run later in the other side's frame; an enumerator; a delegate) does not cross: an argument like that refuses the call, a result like that arrives as null. An exception that leaves a frame of another domain, of any type (a wrapper such as `AggregateException` included), reaches the other side as a plain error with its message, read while the frame it left is still on top of the stack; a message from sandbox code becomes one line without control characters, at most 300 characters. Strings returned from sandbox code to real code lose every terminal control and invisible character. Typed views (`As<T>()`) never cross at all, in either direction. So sandbox code can never run in a real object's frame, and real code can never be handed a reference into a real object's state.
+
+**Sandbox code runs only in its own frames.** As a second wall, a home's code is compiled with a tick of its own: the first statement of every method, accessor, operator, constructor, local function and lambda checks that an object of its own domain is on top of the call stack, and stops there if not. A `Message`, `ToString`, `Equals` or enumerator of a home's class that real code reached somehow, a delegate kept and run later, would stop at its first statement. A catch filter is checked the same way, but may also run while the frame the exception came out of is still on top, provided its home is the sandbox code acting and the master is not answering a question. Query syntax (`from ... select`) is refused, because its clauses become functions with no body to check. Sandbox code that the master calls while it answers a question is restricted all the same. `As<T>()` from a restricted execution returns null for any real object, so direct typed calls are impossible. The guard is one check in the driver's `Call` path, decided by the master's `ValidCall`, so it covers every object type (players, creatures, rooms, items, daemons) and every public method, including ones written later; there is no list of mutators to keep in step.
 
 So a wizard's object cannot kill the Goblin Overseer from afar, hand a friend gold through `Users()`, set a quest, give experience or kill credit, start a fight, equip, add an effect, move, rest or wake anyone, or reach a daemon to write history, through any route: directly, from a creature, an item, a room, a delayed call, a heartbeat, an `Init` hook, or from inherited `/std` code running in a sandbox object.
 
-Text follows the same rule: `Write`, `TellObject`, `TellRoom` and `Say` from a restricted execution reach only sandbox objects and characters in the workshop. Sandbox code cannot print a convincing lie on an ordinary player's screen. It cannot bind verbs (`AddAction`) on, or capture the next line (`InputTo`) of, a character who is not in the workshop. Even in the workshop it can never ask for a hidden line (a password prompt), and cannot take over the commands that protect a character or decide for the real game (`password`, `quit`, `save`, `goto`, the file and publishing commands, `promote`, `update`, `shutdown`), so a reviewer visiting a workshop keeps them.
+### Text from the sandbox
+
+`Write`, `TellObject`, `TellRoom`, `Say` and `NotifyFail` from a restricted execution reach only sandbox objects and characters in the workshop, and always lose every terminal control first: ESC (so no concealed text, cleared screen, moved cursor or terminal title), the other C0 and C1 controls but tab and newline, the Unicode line and paragraph separators, the zero-width characters, the bidirectional controls and the byte-order mark. Sandbox code cannot print a convincing lie on an ordinary player's screen.
+
+- To the wizard in their own workshop the text goes as it is (cleaned).
+- To a visitor every line is marked `[<owner>'s workshop] `, so it can never pass for the game's own output or a prompt. Entering another wizard's workshop says so: whose code it is, that its text is marked, that it cannot ask for input or answer the visitor's own commands, and that a submission is reviewed from outside.
+- To anyone else: nothing.
+
+Sandbox code cannot bind verbs (`AddAction`) on, or capture the next line (`InputTo`) of, a character who is not in the workshop, nor take a visitor's next line, nor shadow a verb a visitor's body binds itself (`look`, `cat`, `tell`, `score`, every command of the body). Even in their own workshop it can never ask a wizard for a hidden line (a password prompt), and cannot take over the commands that protect a character or decide for the real game (`password`, `quit`, `save`, `goto`, the file and publishing commands, `promote`, `update`, `shutdown`).
+
+No code but a character's own command (`goto`, an exit) takes them into a workshop: nothing can carry a wizard in, the level 10 included.
 
 ### What can cross the boundary
 
@@ -82,7 +101,7 @@ Text follows the same rule: `Write`, `TellObject`, `TellRoom` and `Say` from a r
 
 Because real objects cannot be set down in sandbox space and everything carried is rebuilt from the checkpoint on leaving, nothing real can be lost, duplicated or altered there. Nothing a character in the workshop carries can be moved into the real game at all, by anyone, so nothing can be passed out in the moment between leaving and the restore.
 
-Sandbox code may move only sandbox objects and characters in the workshop, and things already inside them. It cannot move, summon or teleport anything else, and it cannot pull a real thing into the workshop.
+Sandbox code may move only its own home's objects and the characters in its own workshop, and what the wizard in their own workshop carries, and only within its own workshop (a wizard also out into a room). It cannot move, summon or teleport anything else, cannot put things into another wizard's workshop, and cannot pull a real thing into the workshop.
 
 ### Where it is enforced
 
@@ -108,7 +127,7 @@ Existing guards are unchanged and still apply, and the master refuses every priv
 | Skill ranks, unlock counters, trainers | A trainer that is a sandbox object cannot teach (the rank service trusts only real trainers). Kills in the workshop are not credited (the rank service is refused to restricted executions), and anything counted on the character is undone by the restore. A wizard's kills in the real game count for their own unlocks like anyone's: that is character progress, not history. |
 | Rest | Resting is the character's own state: free in the workshop, undone on leaving. Sandbox code cannot rest or wake anyone outside. |
 | Sneak | The notice dice are shared and read-only; sandbox creatures may roll them. Sandbox code cannot set the test dice, end anyone's sneaking or spot anyone outside. |
-| Doors and their shared state | A door's state lives in `/secure/doors`, and only a room that is one end of a door may change it. A sandbox room is therefore one end of every door it can change: a door between two of the game's rooms cannot be reached from a workshop. Nothing there is saved. |
+| Doors and their shared state | A door's state lives in `/secure/doors`, and only a room that is one end of a door may change it. A sandbox room is therefore one end of every door it can change: a door between two of the game's rooms cannot be reached from a workshop. Nothing there is saved. The register keeps at most 200 doors asked about by one home's rooms, the oldest forgotten first. |
 | Communication daemons and channels | Sandbox code cannot say, tell, shout or speak on a channel; it can only send text to characters in the workshop. The wizard's own typed words are not sandbox code. |
 | Attributes | Placed points and attribute changes in the workshop are undone by the restore. |
 | Shops and merchants | A sandbox shopkeeper trades only with characters in the workshop and its goods are sandbox objects; real coins cannot be dropped there, and gold earned there is undone. A real shop cannot be reached from sandbox space. |
@@ -140,14 +159,15 @@ This narrows the old rule (level 5 wrote `/domains` directly). It is the owner's
 
 - The destination defaults to `/domains/<directory name>` and must be under `/domains`. If something is already published there by the same submitter, this is an update to it; if it belongs to someone else or to the base game, the request is refused. The approver may name another destination from the same allowed set.
 - Names are checked strictly: every directory and file name is lower-case ASCII letters, digits and `_` (files end in `.cs`), so `..`, hidden names, case tricks and Unicode look-alikes are refused; a directory or file that is a symbolic link is refused; at most 200 files.
-- The request records the submitter, the source, the destination, the note, the time, and the list of files with the SHA-256 of each file's content. What is approved is exactly what was submitted: if any file changes, appears or disappears afterward, approval is refused until it is submitted again.
-- Refused at once, with reasons, if the directory is empty, holds a file that does not compile in the sandbox, names a path in any wizard's home other than the submitted directory, or defines a class name already used elsewhere in the mudlib (the whole-mudlib build needs unique names).
+- The request records the submitter, the source, the destination, the note, the time, the list of files with the SHA-256 of each file's content, and a copy of every file. That copy is what a reviewer reads and what approval publishes: the files in the home may change afterwards, and it makes no difference to the request. A request holds at most 1,000,000 characters, and the register holds at most 4,000,000 for all waiting requests together; the copy is dropped when the request is decided (the hashes stay).
+- Every file must hold only printable characters, tabs and line ends. A character that a reader cannot see, or that the compiler reads differently from a reader (U+2028 ends a `//` comment for the compiler but not on the screen; the bidirectional controls reorder what is shown; the zero-width characters and controls hide things), refuses the request with its line and column.
+- Refused at once, with reasons, if the directory is empty, holds a file that does not compile in the sandbox, names a path in any wizard's home other than the submitted directory, or may define a type name already used elsewhere in the mudlib (the whole-mudlib build needs unique names). A submission's names are over-counted on purpose: every word after `class`, `struct`, `interface`, `enum`, `record` or `delegate`, anywhere in the text, comments and strings included, `\uXXXX` escapes decoded, so that no form of declaration is missed.
 - Every online wizard of level 5 or higher is told, and others see a count of waiting requests when they log in.
 
 ### Reviewing
 
 - `submissions` lists requests: one's own for any wizard, all of them for level 5 and up. `submission <number>` shows one in full, with its files and hashes and, for an update, which files are new, changed or removed.
-- A reviewer reads the files with `cat` and walks the area with `goto`, in the workshop like anyone else.
+- A reviewer reads the files with `submission <number> cat <file>`: the register's own copy, numbered, every character outside printable ASCII shown as `<U+XXXX>`, printed exactly as it is (no colour markup is read in it), with its SHA-256. That is exactly what approval publishes, shown by a route sandbox code cannot touch: the register and the body's own command, outside any workshop. Review is done from outside; a workshop is its owner's ground (PUBLISHING.md).
 
 ### Deciding
 
@@ -158,8 +178,8 @@ This narrows the old rule (level 5 wrote `/domains` directly). It is the owner's
 
 ### What approval does
 
-1. Reads every file once and checks its SHA-256 against the request, and that no file was added or removed.
-2. Writes the directory tree to the destination from exactly that content. In each file, every occurrence of the source path is rewritten to the destination path, so exits and spawns that pointed at `/wiz/<name>/<directory>/...` point at the published copy. After the rewrite no file may mention `/wiz/`.
+1. Takes the register's copy and checks each file's SHA-256 against the request, and again that every character is printable. The files in the home are not read again.
+2. Writes the directory tree to the destination from exactly that copy. In each file, every occurrence of the source path is rewritten to the destination path, so exits and spawns that pointed at `/wiz/<name>/<directory>/...` point at the published copy. After the rewrite no file may mention `/wiz/`.
 3. Compiles every written file in the real game, then loads each one that is not abstract. If any fails, every written file and created directory is removed and the approval is refused with the errors; nothing is half-published.
 4. Records who approved it and when, the SHA-256 of each file as published, tells the submitter, and writes it to the driver log.
 
@@ -190,11 +210,35 @@ Requests and their outcomes are kept permanently by `/secure/publish` with its o
 - From a wizard's own object, against an ordinary player and against a real creature elsewhere: gold, experience, quest, kill credit, damage, death, healing, effects, equipment, movement and text are each attempted and each refused, with the targets unchanged afterward.
 - The same attempts against a wizard who is in the workshop succeed, and are undone when they leave.
 - No event, Renown, Chronicle entry or vault record results from anything done in the workshop, including levelling.
-- Publishing: submit, the notices, review listing, approve by a second wizard, path rewriting, the published area loading and working as real game code, an update submission, rejection with a reason, withdrawal, refusal when a file changed after submission, refusal on a compile error with nothing left behind, refusal on a duplicate class name, refusal of self-approval, a level 4 wizard unable to approve, revocation by level 10.
-- An independent review, by someone who did not write the code, that tries to break the boundary.
+- Publishing: submit, the notices, review listing, reading the register's copy, approve by a second wizard, path rewriting, the published area loading and working as real game code, a change made after submission not published, an update submission, rejection with a reason, withdrawal, refusal on a compile error with nothing left behind, refusal on a duplicate class name, refusal of self-approval, a level 4 wizard unable to approve, revocation by level 10.
+- An independent review, by someone who did not write the code, that tries to break the boundary: section 8, and its proofs in `tests/redteam/` (`python3 tests/redteam/run_all.py`), which run in the suite from now on.
 
 ## 7. Limits
 
-- The sandbox is a boundary for game state, not for the machine. Sandbox code still runs inside the driver process with only the compile-time allow-list (DESIGN.md section 8) between it and the host; it can use memory and time up to the per-execution limits and can slow the game for everyone. Promotion to wizard remains a decision about trusting someone with the machine.
+- The sandbox is a boundary for game state, not for the machine. Sandbox code still runs inside the driver process with only the compile-time allow-list (DESIGN.md section 8) between it and the host. Promotion to wizard remains a decision about trusting someone with the machine.
+- **A stall.** Sandbox code's own loops and bodies tick, so its own work is bounded by the tick budget, but framework code it calls is not (`Enumerable.Range(0, 100000).SelectMany(_ => list).LongCount()` runs ten billion steps on a hundred thousand ticks), and .NET cannot stop a running thread. Two limits apply. Each home may use the game thread for at most one second of every two (compiling not counted); past that its code is refused until the next window, so many heartbeats cannot hold the game. And a watchdog stops the driver if one step of the game loop runs longer than the stall limit (default 5 seconds; `LESMUDOS_SANDBOX_STALL`, DEPLOY.md) with sandbox code on the stack: it writes the home's domain into `save/sandbox_quarantine.txt`, exits with code 3, and the service restarts it. The restarted driver makes no object of that home until an administrator deletes its line. What remains: once per home, every player waits up to the stall limit, everyone is disconnected, and what was not yet saved is lost (characters are saved at their usual moments). Memory is not limited: a home's code can allocate until the process fails.
 - A sandbox room can destroy itself with a visiting wizard inside, which disconnects them (their save file is the checkpoint, so nothing is lost). It cannot do this to anyone outside the workshop.
 - Approval is a code review. Code can behave differently depending on where it lives (its own path, the time, who is online); the reviewer must read it. The record of hashes proves what was approved.
+
+## 8. Review by an independent party, November 2026: what was found and how it was closed
+
+A reviewer who had not written the code attacked commit 986fe75 as a level 1 wizard, with scripts that print FAIL where an attack works (`tests/redteam/REPORT.md`). Thirteen findings; each is closed by class, not by script, and each script now prints only PASS.
+
+| # | Found | Closed by |
+|---|---|---|
+| F2 | A framework exception (`AggregateException`) wrapping a sandbox exception left the sandbox frame unconverted; the driver read its `Message` after the call stack was cleared, so the sandbox getter ran unrestricted (gold, quests, items, text, a level 10 dragged into a workshop). | Every exception that leaves a frame of another domain is converted, of any type, read while that frame is on top; sandbox code checks its own frame at its first statement and in catch filters ("Sandbox code runs only in its own frames"); sandbox code called while the master answers is restricted; the error reporter trusts no exception's getters. |
+| C1 | F2 plus raw escape codes: any wizard dragged in and shown a concealed fake password prompt. | F2, the text rules, and: only a character's own command takes them into a workshop. |
+| F3 | A sandbox item whose `OnDestruct` threw stopped the restore half-way: the old body stayed in the real game with the workshop's gold and a sandbox weapon. | "Leaving the workshop cannot be stopped": no sandbox code runs in any route out; the old body is destructed whatever happens; quit, link death, death and destructs of containers too. |
+| P1 | U+2028 ends a `//` comment for the compiler but not in `cat`: live code passed as a comment. | Submission and approval refuse every character that is not printable; `cat` shows such characters as `<U+XXXX>`. |
+| P2 | Swap and swap back: what the reviewer read was not tied to what was approved. | The register keeps a copy; the reviewer reads that copy (`submission N cat FILE`), and approval publishes it. |
+| P3a | `cat` (and every other unprotected verb) could be rebound on a visiting reviewer to show a fake file. | A visitor's own verbs cannot be shadowed; a visitor is reachable only by reading, walking an exit and marked text. |
+| P3b | Raw ESC passed in sandbox text; an ordinary `InputTo` on a visitor took the next line. | All terminal controls and invisible characters are removed from sandbox text and from strings sandbox code returns; text to a visitor is marked; a visitor's input cannot be taken. |
+| F1a | Expression-bodied lambdas, operators, conversions and indexers had no tick: a recursion overflowed the stack and killed the process. | They are rewritten into blocks with the tick (a void delegate's lambda without the return); query syntax is refused. |
+| F1b | Framework loops with no mudlib callback stalled every player. | The share of time per home and the stall watchdog with quarantine (section 7, "A stall"). A watchdog, not a narrower allow-list: no allow-list of framework calls bounds their nesting. |
+| F5 | One wizard's sandbox code called and moved another's. | Sandbox code reaches freely only its own home's objects; another home's answer read-only calls only, and nothing moves between homes; no code builds on another home's. |
+| F4 | A list inside a value tuple crossed uncopied. | Tuples and nullables cross only with scalar, string, handle or enum elements. |
+| L1 | (suspected) The duplicate class-name check saw only `class ` at column 0. | Confirmed by reading. Every type keyword anywhere in a submission counts, escapes decoded. |
+| L2 | (suspected) The door register grew without bound from sandbox rooms. | Confirmed by reading. At most 200 doors per home, the oldest forgotten. |
+
+The review's "Not tested" list is now tested where it can be: the death, `goto`, quit and link-death routes with a throwing item, such an item slipped into a reviewer's inventory, a shutdown in the workshop and a kill at the moment of leaving (`f3c_restore_routes.py`), the nested F1b form (`f1c_stall.py`). Still not tested: escapes from the CLR or CoreLib not thought of, memory exhaustion, how real clients render what is now removed, GMCP input fuzzing.
+

@@ -230,7 +230,9 @@ Every account has a password; the sample login flow is described in DRIVER_API.m
 The CLR has no instruction counter and no safe way to abort a thread, so the limit is built into the code at compile time. `TickInjector` inserts a call to `Runtime.Tick()`:
 
 - at the start of every loop body (`while`, `do`, `for`, `foreach`), and
-- at the start of every method, local function, accessor, constructor, operator and block-bodied lambda. Expression-bodied members are converted to blocks first.
+- at the start of every method, local function, accessor, constructor, operator, conversion, indexer and lambda. Expression-bodied members and lambdas are converted to blocks first (a lambda that the compiler finds to be a void delegate is rewritten without its `return` and compiled again). Query syntax is refused, since its clauses are lambdas with no syntax of their own.
+
+Code of a wizard's home calls `Runtime.Tick(domain)` instead, which also checks that an object of that domain is on top of the call stack (SANDBOX.md, "Sandbox code runs only in its own frames").
 
 `Tick()` does two things:
 
@@ -241,9 +243,8 @@ The CLR has no instruction counter and no safe way to abort a thread, so the lim
 
 **Known gaps**
 
-- Expression-bodied lambdas are not instrumented. A lambda that recurses through a delegate variable without passing through any instrumented method could overflow the stack.
 - Memory is not limited. One statement can allocate a very large array or string.
-- A long-running framework call (a pathological `string.Join`, a huge sort) counts as one tick.
+- A long-running framework call (a pathological `string.Join`, a huge sort, a nested `SelectMany`) counts as one tick. For sandbox code a share of time per home and a stall watchdog apply (SANDBOX.md section 7); trusted code has no watchdog.
 - Static fields in mudlib code are shared by all objects of one program version and are reset by an update.
 
 ## 10. Persistence
@@ -300,7 +301,7 @@ Not implemented: see the gaps listed in sections 4, 7, 9 and 11, plus shadows, r
 ## 14. Roadmap
 
 1. **Authoring loop:** renaming directories, an editor command that saves and updates in one step, a `FileSystemWatcher` option that updates a file when it is saved from an editor, and an on-disk compile cache.
-2. **Safety:** TLS for passwords in transit, login throttling, hashing off the game thread, per-domain privileges, instrumenting expression-bodied lambdas, a wall-clock watchdog, a cap on per-connection output.
+2. **Safety:** TLS for passwords in transit, login throttling, hashing off the game thread, per-domain privileges, a cap on per-connection output.
 3. **World lifecycle:** `Reset()`, clean-up of unused objects, graceful shutdown that saves players.
 4. **Protocol:** telnet negotiation, TLS, WebSocket.
 5. **Language features:** `async` scripts on a single-threaded scheduler, so that `await Prompt("Name: ")` can replace `InputTo` chains.
