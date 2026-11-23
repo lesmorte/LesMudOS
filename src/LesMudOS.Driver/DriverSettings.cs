@@ -9,6 +9,10 @@ namespace LesMudOS.Driver;
 ///   timeout  Time without typed input until a player is saved and disconnected. Default 10 minutes. Wizards are exempt (the
 ///            mudlib decides that). --timeout-minutes N, or LESMUDOS_TIMEOUT_MINUTES.
 ///
+///   stall    How long one step of the game loop may run with sandbox code on the call stack before the watchdog stops the driver
+///            (the service restarts it) and closes that wizard's workshop (docs/SANDBOX.md, "A stall"). Default 5 seconds.
+///            --sandbox-stall N, or LESMUDOS_SANDBOX_STALL (same forms as below; a bare number here is seconds).
+///
 /// A value is minutes, possibly fractional ("0.5"), or a number with a unit: "30s" seconds, "2m" minutes. The seconds form is
 /// for tests. Anything else is ignored with a note in the log.
 /// </summary>
@@ -19,6 +23,15 @@ internal sealed class DriverSettings
 
     public double IdleSeconds { get; private set; } = DefaultIdleMinutes * 60;
     public double TimeoutSeconds { get; private set; } = DefaultTimeoutMinutes * 60;
+    public double StallSeconds { get; private set; } = 5;
+
+    public void SetStall(string? text, string source)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        var t = text.Trim().ToLowerInvariant();
+        if (!t.EndsWith('s') && !t.EndsWith('m')) t += "s";
+        if (TryParse(t, source, out var seconds)) StallSeconds = Math.Max(1, seconds);
+    }
 
     public void SetIdle(string? text, string source) { if (TryParse(text, source, out var seconds)) IdleSeconds = seconds; }
 

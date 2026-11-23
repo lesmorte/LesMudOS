@@ -17,9 +17,15 @@ internal static class Log
 }
 
 /// <summary>A move the master refused (IMaster.MoveRefusal). The message is the master's one-line reason.</summary>
-internal sealed class RefusedException : MudRuntimeException
+internal class RefusedException : MudRuntimeException
 {
     public RefusedException(string message) : base(message) { }
+}
+
+/// <summary>A sandbox domain has used its share of the game thread's time for now (Kernel.EnterDomain). Not logged each time.</summary>
+internal sealed class SandboxBudgetException : RefusedException
+{
+    public SandboxBudgetException(string message) : base(message) { }
 }
 
 /// <summary>
@@ -74,7 +80,11 @@ internal sealed partial class Kernel : IDriverServices
         {
             DomainOf = path => _master is { IsAlive: true } ? AskMaster(m => m.ObjectDomain(path, false)) ?? "" : "",
         };
+        _compiler.CompileStarted = CompileStarted;
+        _compiler.CompileEnded = CompileEnded;
         _saves = new SaveStore(saveRoot);
+        _quarantineFile = Path.Combine(Path.GetFullPath(saveRoot), "sandbox_quarantine.txt");
+        LoadQuarantine();
         DriverHost.Services = this;
         Runtime.FilterCheck = domain => _masterDepth == 0 && RestrictedCaller()?.Domain == domain;
     }
@@ -154,9 +164,122 @@ internal sealed partial class Kernel : IDriverServices
         }
     }
 
-    // Time spent in sandbox code, per domain (filled in with the stall watchdog).
-    private void EnterDomain(string domain) { }
-    private void LeaveDomain(string domain) { }
+    // ---- Time spent in sandbox code (F1b of the November 2026 review; docs/SANDBOX.md, "A stall") ----
+    // Every loop and body of sandbox code ticks, so its own work is bounded by the tick budget. Framework code it calls is not:
+    // Enumerable.Range(0, 100000).SelectMany(_ => list).Count() runs ten billion steps with a hundred thousand ticks, and .NET
+    // cannot stop a thread. Two limits: each sandbox domain may use the game thread for at most a share of every window (time
+    // spent compiling not counted), after which entering its code is refused until the next window; and a watchdog thread stops
+    // the driver if one step of the game loop runs longer than the stall limit with sandbox code on the stack, after writing that
+    // domain into the quarantine file, so that the restarted driver does not load its code until an administrator reopens it.
+
+    private static readonly long DomainWindow = System.Diagnostics.Stopwatch.Frequency * 2;  // two seconds
+    private static readonly long DomainShare = System.Diagnostics.Stopwatch.Frequency;       // one second of each window
+    private readonly Dictionary<string, (long Start, long Used)> _domainTime = new();
+    private long _domainEnteredAt;
+    private long _compileTimeAtEntry;
+    private long _compileTime;         // total time spent compiling, so that a domain's share leaves it out
+    private long _compileStarted;
+    private int _compileDepth;
+    private long _busySince;           // Stopwatch time at which the current step of the game loop began; 0 while waiting or compiling
+    private readonly HashSet<string> _quarantined = new(StringComparer.Ordinal);
+    private readonly string _quarantineFile;
+
+    private void EnterDomain(string domain)
+    {
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        var (start, used) = _domainTime.GetValueOrDefault(domain);
+        if (now - start > DomainWindow) _domainTime[domain] = (now, 0);
+        else if (used > DomainShare)
+        {
+            if (used < long.MaxValue / 2)
+            {
+                Log.Info($"sandbox: {domain} has used its share of time in this window: its code waits");
+                _domainTime[domain] = (start, long.MaxValue / 2);
+            }
+            throw new SandboxBudgetException("This workshop's code has used its share of time. It runs again in a moment.");
+        }
+        _domainEnteredAt = now;
+        _compileTimeAtEntry = _compileTime;
+    }
+
+    private void LeaveDomain(string domain)
+    {
+        var spent = System.Diagnostics.Stopwatch.GetTimestamp() - _domainEnteredAt - (_compileTime - _compileTimeAtEntry);
+        var (start, used) = _domainTime.GetValueOrDefault(domain);
+        if (used < long.MaxValue / 2) _domainTime[domain] = (start, used + Math.Max(0, spent));
+    }
+
+    private void CompileStarted(string domain)
+    {
+        if (_compileDepth++ == 0) _compileStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+        Volatile.Write(ref _busySince, 0); // a compile is the driver's own work: the stall clock waits
+    }
+
+    private void CompileEnded()
+    {
+        if (--_compileDepth > 0) return;
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        _compileTime += now - _compileStarted;
+        if (_inStep) Volatile.Write(ref _busySince, now);
+    }
+
+    private bool _inStep;
+
+    private void StepBegins()
+    {
+        _inStep = true;
+        Volatile.Write(ref _busySince, System.Diagnostics.Stopwatch.GetTimestamp());
+        _lastRestricted = null;
+    }
+
+    private void StepEnds()
+    {
+        _inStep = false;
+        Volatile.Write(ref _busySince, 0);
+    }
+
+    /// <summary>Start the stall watchdog (Program does; a kernel made for a tool runs without one).</summary>
+    public void StartWatchdog()
+    {
+        var limit = (long)(_settings.StallSeconds * System.Diagnostics.Stopwatch.Frequency);
+        var thread = new Thread(() =>
+        {
+            while (true)
+            {
+                Thread.Sleep(100);
+                var since = Volatile.Read(ref _busySince);
+                if (since == 0 || System.Diagnostics.Stopwatch.GetTimestamp() - since < limit) continue;
+                if (Volatile.Read(ref _restricted) == 0 || _lastRestricted is not { } domain) continue; // the game's own code: trusted
+                Stall(domain);
+            }
+        }) { IsBackground = true, Name = "sandbox watchdog" };
+        thread.Start();
+    }
+
+    /// <summary>The watchdog's last resort: close the domain for the next start and stop the process (the service restarts it).</summary>
+    private void Stall(string domain)
+    {
+        try
+        {
+            File.AppendAllText(_quarantineFile, $"{domain} {DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ} held the game thread for {_settings.StallSeconds:0.#}s\n");
+        }
+        catch (Exception) { }
+        Log.Info($"sandbox: STALL: code of {domain} held the game thread for more than {_settings.StallSeconds:0.#}s. It is closed until an " +
+                 $"administrator removes its line from {_quarantineFile}. Stopping the driver; the service restarts it.");
+        Console.Out.Flush();
+        Environment.Exit(3);
+    }
+
+    private void LoadQuarantine()
+    {
+        if (!File.Exists(_quarantineFile)) return;
+        foreach (var line in File.ReadAllLines(_quarantineFile))
+        {
+            var word = line.Trim().Split(' ', 2)[0];
+            if (word.Length > 0 && !word.StartsWith('#')) _quarantined.Add(word);
+        }
+        if (_quarantined.Count > 0) Log.Info($"sandbox: closed after a stall (see {_quarantineFile}): {string.Join(", ", _quarantined)}");
+    }
 
     /// <summary>The driver's own sealed exceptions, whose text is a plain string, cross as they are; everything else is converted.</summary>
     private static bool CrossesAsIs(Exception error)
@@ -367,8 +490,14 @@ internal sealed partial class Kernel : IDriverServices
             var next = _nextHeartBeat;
             if (_callOuts.TryPeek(out _, out var due) && due < next) next = due;
             var wait = Math.Clamp((int)(next - now).TotalMilliseconds, 0, 1000);
-            if (_events.TryTake(out var work, wait)) work();
+            if (_events.TryTake(out var work, wait))
+            {
+                StepBegins();
+                work();
+            }
+            StepBegins();
             RunTimers();
+            StepEnds();
         }
         foreach (var connection in _connections.ToArray()) connection.Close();
         Log.Info("driver stopped");
@@ -508,7 +637,8 @@ internal sealed partial class Kernel : IDriverServices
             text = $"{error.GetType().Name}: {message}\n{string.Join("\n", frames)}";
         }
         // A move the master refused is policy at work, not a fault: it is logged as a refusal.
-        Log.Info(error is RefusedException ? $"refused ({player?.Name ?? "driver"}): {text}" : $"ERROR ({player?.Name ?? "driver"}): {text}");
+        if (error is not SandboxBudgetException)
+            Log.Info(error is RefusedException ? $"refused ({player?.Name ?? "driver"}): {text}" : $"ERROR ({player?.Name ?? "driver"}): {text}");
         Runtime.Ticks = 0; // give the error handlers a budget of their own
         try
         {
@@ -663,6 +793,8 @@ internal sealed partial class Kernel : IDriverServices
         // The domain comes first, from the cloner's call stack; then a blueprint is made with an empty stack, so that loading a
         // program behaves the same whoever happens to load it first.
         handle.Domain = _master is { IsAlive: true } ? AskMaster(m => m.ObjectDomain(program.Path, isClone)) ?? "" : "";
+        if (_quarantined.Contains(handle.Domain))
+            throw new MudRuntimeException($"This workshop ({handle.Domain}) is closed: its code held up the whole game. An administrator reopens it.");
         List<ObjectRef>? outer = null;
         var outerMasterDepth = _masterDepth;
         if (!isClone)
