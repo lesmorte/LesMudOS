@@ -470,7 +470,7 @@ SNEAK_ELITE = ("Goblin Elite Guard",)   # only for the options of docs/BALANCE_S
 # second notice roll (while an unnoticed Scout draws Aimed Shot) is made; "per_level": extra notice points per creature level above the Scout
 # (option C); "elite": extra notice points for SNEAK_ELITE (option C); "cap": the share of the target's maximum Vitality an Aimed Shot opener may deal;
 # "floor": the lowest base notice chance in percent (the game: 10; option F, not in the owner's list).
-OPT = dict(second=None, second_plus=0, second_scale=1.0, per_level=0, elite=0, cap=None, floor=10)
+OPT = dict(second=None, second_plus=0, second_scale=1.0, per_level=0, elite=0, cap=None, floor=10, g=None, g_strike=False)
 SIM_REROLL = True      # a fix to match the game: a creature that has not noticed the Scout re-rolls every 10 s at half the chance while he types his command
 SIM_BOW_STRIKE = True  # a fix to match the game: the ranged opening (2 s) goes to any Scout whose weapon is a bow, Precision Strike included (the melee Scout of the standard test holds the Hunting Bow)
 
@@ -481,6 +481,14 @@ def notice_chance(grace, scout_level, creature_level, alert, adjust, elite=False
     c = 50 - 5 * (grace - 5) + 5 * diff + (OPT["per_level"] * diff if diff > 0 else 0)
     c = max(OPT["floor"], min(90, c))
     return max(5, min(100, c + (30 if alert else 0) + (OPT["elite"] if elite else 0) + adjust))
+
+
+def g_share(g, d):
+    """Option G (docs/BALANCE_SCOUT.md section 10): g = (base, per level, floor) in shares; d = the player's level - the creature's level. Returns the share of the
+    target's maximum Vitality the opener may deal, or None when it reaches 100% (no cap)."""
+    base, per, floor = g
+    share = max(floor, base + per * d)
+    return None if share >= 1.0 else share
 
 
 def second_chance(entry):
@@ -846,6 +854,7 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
         return
     if ent.is_player:
         kw = {}
+        from_hiding = False
         if act.id == "aim":
             rk = ent.rank("aimed_shot")
             kw = dict(to_hit_bonus=ent.skill_int("aimed_shot", "tohit"), factor=rank_value("aimed_shot", "opener" if ent.aim_opening else "factor", rk))
@@ -854,6 +863,7 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
             if ent.strike_ambush:
                 kw["factor"] = rank_value("precision_strike", "ambush", ent.rank("precision_strike"))
                 ent.strike_ambush = False
+                from_hiding = True
         if act.id == "bash":
             kw = dict(factor=rank_value("shield_bash", "factor", ent.rank("shield_bash")))
         dmg, _ = do_hit(ent, target, t, **kw)
@@ -861,6 +871,10 @@ def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
             return
         if OPT["cap"] and act.id == "aim" and ent.aim_opening:   # option D: the opener may not take more than a share of the target's maximum Vitality
             dmg = min(dmg, max(1, int(OPT["cap"] * target.max_hp + 1e-9)))
+        if OPT["g"] and ((act.id == "aim" and ent.aim_opening) or (OPT["g_strike"] and from_hiding)):   # option G: the cap depends on the level difference
+            share = g_share(OPT["g"], ent.level - target.level)
+            if share is not None:
+                dmg = min(dmg, max(1, int(share * target.max_hp + 1e-9)))
         target.hp -= dmg
         if act.id == "bash" and target.hp > 0:
             out["stagger"](target, t, rank_value("shield_bash", "stagger", ent.rank("shield_bash")))
@@ -3289,14 +3303,14 @@ def aim_table(opener_delta=0.0, cost=None):
 
 
 @contextmanager
-def scout_option(mode=None, opener=0.0, second=None, per_level=0, elite=0, cap=None, cost=None, floor=10):
+def scout_option(mode=None, opener=0.0, second=None, per_level=0, elite=0, cap=None, cost=None, floor=10, g=None, g_strike=False):
     """Switch on the options of docs/BALANCE_SCOUT.md for a block: opener = change to Aimed Shot's opener multiplier (A); second = None, "same",
     "plus15" or "half" (B); per_level, elite (C); cap = share of the target's maximum Vitality (D); cost = Aimed Shot's Endurance at rank I (E).
     mode: the rank mode of ranked()."""
     saved = dict(OPT)
     try:
         scale, plus = SECOND_MODES[second] if second else (1.0, 0)
-        OPT.update(second=second, second_scale=scale, second_plus=plus, per_level=per_level, elite=elite, cap=cap, floor=floor)
+        OPT.update(second=second, second_scale=scale, second_plus=plus, per_level=per_level, elite=elite, cap=cap, floor=floor, g=g, g_strike=g_strike)
         with ranked(mode=mode, table=aim_table(opener, cost) if (opener or cost) else None):
             yield
     finally:
@@ -3404,10 +3418,11 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
     avail = {room: 0.0 for room, c in CELL_ROUTE}
     avoid = {}
     potion_ready, left = 0.0, START_POTIONS
-    st = dict(waited=0.0, deaths=0, fled=0, potions=0, kills=0, first=0, free=0, dmg=0.0, by={}, first_fights=0, fights=0, nodmg=0, laps=0, opened=0, noticed=0, second=0, reached=None, level_at={})
+    st = dict(lv={}, waited=0.0, deaths=0, fled=0, potions=0, kills=0, first=0, free=0, dmg=0.0, by={}, first_fights=0, fights=0, nodmg=0, laps=0, opened=0, noticed=0, second=0, reached=None, level_at={})
     carry_ms, carry_t = 0, 0.0
     pos = "Village"
     kills_now = [0, 0, 0]
+    fight_level = 1
 
     def on_kill(pl, enemy):
         nonlocal xp, level
@@ -3416,6 +3431,9 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
             kills_now[0] += 1
             kills_now[1] += pl.n_act == 1
             kills_now[2] += enemy.taken == 0   # killed before it ever began an action
+            b = st["lv"].setdefault(1 if fight_level < 3 else fight_level if fight_level == 3 else 4, [0, 0])
+            b[0] += 1
+            b[1] += pl.n_act == 1
             row = st["by"].setdefault(k.name, [0, 0, 0])
             row[0] += 1
             row[1] += pl.n_act == 1
@@ -3489,6 +3507,7 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
                 start = (typed, [typed + 2 * round(enemies[0].reaction * UNIT_MS) + ranged] + [typed + round(e.reaction * UNIT_MS) for e in enemies[1:]])
                 st["opened"] += 1
             kills_now[0] = kills_now[1] = kills_now[2] = 0
+            fight_level = level
             carry = max(0, round(carry_ms - (t - carry_t) * 1000))
             r = fight(p, enemies, left, boss=room == "Overseer Chamber", human=policy, start=start, stop_at_boss=True, heal_carry=carry, ambush=hidden,
                       second=second, on_kill=on_kill)
@@ -3576,7 +3595,7 @@ def cell_stats(calling, runs, sneak=True, recurve=False, seed=20261124, model=No
     fights = sum(r["fights"] for r in rows) or 1
     return dict(runs=runs, deaths=mean_se([r["deaths"] for r in rows]), fled=mean_se([r["fled"] for r in rows]), potions=mean_se([r["potions"] for r in rows]),
                 first=sum(r["first"] for r in rows) / kills * 100, free=sum(r["free"] for r in rows) / kills * 100, dmg=sum(r["dmg"] for r in rows) / fights * 100,
-                by=by_kind(rows), first_fights=sum(r["first_fights"] for r in rows) / fights * 100, nodmg=sum(r["nodmg"] for r in rows) / fights * 100,
+                by=by_kind(rows), lv={k: (sum(r["lv"].get(k, [0, 0])[1] for r in rows) / (sum(r["lv"].get(k, [0, 0])[0] for r in rows) or 1) * 100) for k in (1, 3, 4)}, first_fights=sum(r["first_fights"] for r in rows) / fights * 100, nodmg=sum(r["nodmg"] for r in rows) / fights * 100,
                 minutes=mean_se([r["reached"] / 60.0 for r in reached]), reached=len(reached) / runs * 100, fights=sum(r["fights"] for r in rows) / runs,
                 laps=sum(r["laps"] for r in rows) / runs, waited=mean_se([r["waited"] / 60.0 for r in reached])[0], opened=sum(r["opened"] for r in rows) / fights * 100, second=sum(r["second"] for r in rows) / runs,
                 died_runs=sum(1 for r in rows if r["deaths"]) / runs * 100,
@@ -3732,6 +3751,97 @@ def spread_table(runs=1500, seeds=range(1, 9)):
     print("| sd of one cell | " + " | ".join(f"{sd[c]:.2f}" for c in cols) + " |")
 
 
+
+# ---- option G: the opener's cap depends on the level difference (docs/BALANCE_SCOUT.md section 10) ----
+G_OPTIONS = [
+    ("baseline: the game now", {}),
+    ("D2 flat cap 60%", dict(cap=0.60)),
+    ("G1 60% + 20% x d, floor 40%", dict(g=(0.60, 0.20, 0.40))),
+    ("G2 60% + 15% x d, floor 30%", dict(g=(0.60, 0.15, 0.30))),
+    ("G3 50% + 25% x d, floor 25%", dict(g=(0.50, 0.25, 0.25))),
+    ("G1 + Precision Strike", dict(g=(0.60, 0.20, 0.40), g_strike=True)),
+    ("G2 + Precision Strike", dict(g=(0.60, 0.15, 0.30), g_strike=True)),
+    ("G3 + Precision Strike", dict(g=(0.50, 0.25, 0.25), g_strike=True)),
+]
+
+
+def level_table():
+    rows = [("Large Rat", 1), ("Giant Rat", 1), ("Goblin Scavenger", 2), ("Spore Bat", 2), ("Goblin Guard", 2), ("Giant Cave Toad", 3), ("Goblin Warrior", 3),
+            ("Goblin Elite Guard", 4), ("Goblin Overseer", 5)]
+    print("Creature level and d = Scout level - creature level (the Overseer is a Boss and never opened on):")
+    print("| creature | Vitality | level | d at Scout level 1 | d at level 3 | d at level 5 |")
+    print("|---|---|---|---|---|---|")
+    for n, _ in rows:
+        k = KINDS[n]
+        print(f"| {n} | {k.hp} | {k.level} | {1 - k.level:+d} | {3 - k.level:+d} | {5 - k.level:+d} |")
+    print()
+    print("Share of maximum Vitality the opener may deal, by d (no cap = 100%):")
+    print("| option | d=-3 | d=-2 | d=-1 | d=0 | d=+1 | d=+2 | d=+3 |")
+    print("|---|---|---|---|---|---|---|---|")
+    for label, kw in G_OPTIONS[2:5]:
+        cells = []
+        for d in range(-3, 4):
+            sh = g_share(kw["g"], d)
+            cells.append("none" if sh is None else f"{sh * 100:.0f}%")
+        print(f"| {label} | " + " | ".join(cells) + " |")
+
+
+def g_cell_table(runs=1500, recurve=False, sneak=True):
+    print(f"Archer {'sneaking' if sneak else 'NOT sneaking'}, {'Warden' + chr(39) + 's Recurve from level 3' if recurve else 'Hunting Bow'}, {runs} runs a row, seed 20261124. Last three columns: share of creatures killed by the first action, by the Scout's level at the start of the fight.")
+    print("| option | deaths a run | potions used | killed by the first action | killed before they acted | fights with no damage | minutes to level 5 | first-action kills at level 1-2 | level 3 | level 4-5 |")
+    print("|---|---|---|---|---|---|---|---|---|---|")
+    for label, kw in G_OPTIONS:
+        with sneaking(), scout_option(mode="none", **kw):
+            c = cell_stats(ARCHER, runs, sneak, recurve)
+        print(f"| {label} | {c['deaths'][0]:.2f} | {c['potions'][0]:.2f} | {c['first']:.0f}% | {c['free']:.0f}% | {c['nodmg']:.0f}% | {c['minutes'][0]:.1f} (+-{c['minutes'][1]:.1f}) | {c['lv'][1]:.0f}% | {c['lv'][3]:.0f}% | {c['lv'][4]:.0f}% |", flush=True)
+
+
+def melee_cell_table(runs=1500):
+    print(f"Melee Scout sneaking (Precision Strike, Hunting Bow), {runs} runs a row, seed 20261124:")
+    print("| option | deaths a run | potions used | killed by the first action | killed before they acted | minutes to level 5 | first-action kills at level 1-2 | level 3 | level 4-5 |")
+    print("|---|---|---|---|---|---|---|---|---|")
+    for label, kw in G_OPTIONS:
+        with sneaking(), scout_option(mode="none", **kw):
+            c = cell_stats("scout", runs, True)
+        print(f"| {label} | {c['deaths'][0]:.2f} | {c['potions'][0]:.2f} | {c['first']:.0f}% | {c['free']:.0f}% | {c['minutes'][0]:.1f} | {c['lv'][1]:.0f}% | {c['lv'][3]:.0f}% | {c['lv'][4]:.0f}% |", flush=True)
+
+
+def warrior_first(runs=1500):
+    print(f"Warrior (starting gear, one potion), the cellar progression, {runs} runs: share of creatures killed by his first action, by his level at the start of the fight:")
+    c = cell_stats("warrior", runs, False)
+    print(f"| level 1-2 | level 3 | level 4-5 | all |\n|---|---|---|---|\n| {c['lv'][1]:.1f}% | {c['lv'][3]:.1f}% | {c['lv'][4]:.1f}% | {c['first']:.1f}% |")
+    print()
+    print("EXTRAPOLATION (formula, not a run): chance that an ordinary blow that hits kills a full-Vitality Large Rat (12) outright, a Warrior who places 1 point in Might every level (Might 8 + level - 1), +2% damage a point above 5, rounded; no critical, no block:")
+    print("| level | Might | rusty sword 9-14 | woodcutter axe 14-21 | fine longsword 12-18 |")
+    print("|---|---|---|---|---|")
+    for lv in (1, 3, 5, 8, 10, 12, 15):
+        m = 8 + lv - 1
+        cells = []
+        for w in ("rusty sword", "woodcutter axe", "fine longsword"):
+            lo, hi = WEAPONS[w][0]
+            ok = sum(1 for r in range(lo, hi + 1) if max(1, rnd(r * (1 + 2 * (m - 5) / 100.0))) >= 12)
+            cells.append(f"{ok * 100 // (hi - lo + 1)}%")
+        print(f"| {lv} | {m} | " + " | ".join(cells) + " |")
+
+
+def g_report(runs=1500):
+    level_table()
+    print()
+    std_table(runs, G_OPTIONS)
+    print()
+    g_cell_table(runs, False)
+    print()
+    g_cell_table(runs, True)
+    print()
+    g_cell_table(runs, False, False)
+    print()
+    melee_cell_table(runs)
+    print()
+    hall_table(runs, G_OPTIONS)
+    print()
+    warrior_first(runs)
+
+
 def scout_report(parts=("std",), runs=1500):
     for part in parts:
         if part == "notice":
@@ -3752,6 +3862,8 @@ def scout_report(parts=("std",), runs=1500):
             yardstick_table(max(500, runs))
         elif part == "hall":
             hall_table(runs)
+        elif part == "g":
+            g_report(runs)
         elif part == "spread":
             spread_table(runs)
         print()
