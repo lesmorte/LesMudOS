@@ -35,6 +35,8 @@ public class Player : Adventurer
     [Saved] private string passwordHash = "";
     // ANSI colour. On by default, also for characters saved before this setting existed.
     [Saved] private bool colour = true;
+    // The player's own time zone for `time` (an IANA name, "UTC" or "UTC-5"); "" until set. Only this player ever sees it.
+    [Saved] private string timeZone = "";
     // `charset ascii`: every message to this player is turned into 7-bit ASCII (see Asciify). Off (UTF-8) by default, also for older saves.
     [Saved] private bool asciiOnly;
 
@@ -224,8 +226,8 @@ public class Player : Adventurer
         AddAction("who", CmdWho);
         AddAction("title", CmdTitle);
         AddAction("renown", a => { Write(LoadObject("/secure/renown").Call<string>("RenownText", Name) ?? ""); return true; });
-        AddAction("date", a => { Write(LoadObject("/secure/chronicle").Call<string>("DateCommand") ?? ""); return true; });
-        AddAction("time", a => { Write(LoadObject("/secure/chronicle").Call<string>("DateCommand") ?? ""); return true; }); // the same as date
+        AddAction("date", CmdTime);
+        AddAction("time", CmdTime); // the same as date
         AddAction("password", CmdPassword);
         AddAction("save", CmdSave);
         AddAction("quit", CmdQuit);
@@ -410,7 +412,7 @@ public class Player : Adventurer
         }
         Write(
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
-            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}charset{/} [ascii|utf8] (or {cmd}ascii{/} [on|off]: plain 7-bit characters if the boxes of {cmd}score{/} look wrong), {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
+            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}time{/} [-timezone [ZONE|REGION|none]] (your own time zone), {cmd}charset{/} [ascii|utf8] (or {cmd}ascii{/} [on|off]: plain 7-bit characters if the boxes of {cmd}score{/} look wrong), {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
             "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}vitality{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
@@ -483,6 +485,28 @@ public class Player : Adventurer
         if (word != "on" && word != "off") { NotifyFail("Usage: {cmd}ansi{/} [{cmd}on{/}|{cmd}off{/}]"); return false; }
         colour = word == "on";
         Write(colour ? "ANSI colour is now on. Commands you can type, like {cmd}help{/}, are highlighted.\n" : "ANSI colour is now off.\n");
+        return true;
+    }
+
+    /// <summary>`time` and `date`: the time in the player's zone. `time -timezone` lists zones, `time -timezone ZONE` sets one (see /secure/clock).</summary>
+    private bool CmdTime(string args)
+    {
+        var word = args.Trim();
+        var lower = word.ToLowerInvariant();
+        var clock = LoadObject("/secure/clock");
+        string rest;
+        if (lower is "-timezone" or "-tz" or "timezone" or "zones" or "-zones" or "tz") rest = "";
+        else if (lower.StartsWith("-timezone ") || lower.StartsWith("-tz ") || lower.StartsWith("timezone ") || lower.StartsWith("zones ") || lower.StartsWith("tz ")) rest = word.Substring(word.IndexOf(' ') + 1).Trim();
+        else if (word == "") { Write(clock.Call<string>("Show", timeZone, LoadObject("/secure/chronicle").Call<string>("DateCommand") ?? "") ?? ""); return true; }
+        else { NotifyFail("Usage: {cmd}time{/} [{cmd}-timezone{/} [ZONE|REGION|none]]"); return false; }
+        if (rest == "") { Write(clock.Call<string>("Zones") ?? ""); return true; }
+        var region = clock.Call<string>("Region", rest) ?? "";
+        if (region != "") { Write(region); return true; }
+        var answer = clock.Call<string>("Resolve", rest) ?? "MSG:Nothing comes of it.\n";
+        if (answer.StartsWith("MSG:")) { Write(answer.Substring(4)); return true; }
+        timeZone = answer.StartsWith("NONE:") ? "" : answer.Substring(5);
+        Write(timeZone == "" ? "Your time zone is cleared: {cmd}time{/} shows UTC again.\n" : "Your time zone is set.\n");
+        Write(clock.Call<string>("Show", timeZone, "") ?? "");
         return true;
     }
 

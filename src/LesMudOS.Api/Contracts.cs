@@ -98,6 +98,8 @@ internal interface IDriverServices
     bool GmcpActive(ObjectRef player);
 
     long TimeMs();
+    string[] TimeZoneNames();
+    string LocalTime(string zoneId);
     int IdleSeconds(ObjectRef ob);
     int IdleLimitSeconds();
     int TimeoutSeconds();

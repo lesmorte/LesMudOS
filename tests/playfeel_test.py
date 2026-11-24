@@ -408,6 +408,7 @@ def run(work, mudlib, box):
     check("setup: the first wizard", wiz.command("promote " + SECRET), "level 10 wizard")
     wiz.command("goto " + TEST + "hub")
     if os.environ.get("PF_ONLY") == "quick":  # the arrival, bare-skill and flee checks only
+        run_time()
         run_charset()
         run_arrival_news()
         run_bare_skill_command()
@@ -434,6 +435,7 @@ def run(work, mudlib, box):
     run_logfix(wiz)
     run_arrival_news()
     run_bare_skill_command()
+    run_time()
     run_charset()
     wiz.command("save")
     wiz.command("shutdown")
@@ -569,6 +571,96 @@ def run_bare_skill_command():
     out = c.command("strike")
     check("no target: one clear sentence, right after the command", out, "You are not fighting anyone: name a target, as in 'strike rat'.", absent=("Use it on whom",))
     check("and the prompt follows it, with nothing after", "ok" if out.rstrip().endswith(">") or "> " in out[-40:] else out[-120:], "ok")
+    c.command("quit")
+
+
+def clock_minutes(text):
+    """Minutes since midnight from 'It is 9:40 am on Tuesday ...', or None."""
+    m = re.search(r"It is (\d+):(\d\d) (am|pm) on", text)
+    if not m:
+        return None
+    return ((int(m.group(1)) % 12) + (12 if m.group(3) == "pm" else 0)) * 60 + int(m.group(2))
+
+
+def zone_minutes(name):
+    import datetime
+    import zoneinfo
+    now = datetime.datetime.now(zoneinfo.ZoneInfo(name))
+    return now.hour * 60 + now.minute, int(now.utcoffset().total_seconds() // 60)
+
+
+def near(a_, b_, tolerance=3):
+    d = abs(a_ - b_) % 1440
+    return min(d, 1440 - d) <= tolerance
+
+
+def offset_word(minutes):
+    return "UTC" + ("-" if minutes < 0 else "+") + str(abs(minutes) // 60) + ("" if minutes % 60 == 0 else ":%02d" % (abs(minutes) % 60))
+
+
+def run_time():
+    """`time`: the player's own zone (docs/specs/play-feel.md), saved, private, with the lists, and all of it in 7-bit ASCII when asked."""
+    c = login("tzed")
+    a.drain(c, 0.4)
+    text = c.command("time")
+    check("time: unset shows UTC and the hint", text, "UTC, the server's time", "Set your own with time -timezone ZONE.", "Today is ")
+    utc_now = zone_minutes("UTC")[0]
+    check("time: the unset time is UTC's", "ok" if clock_minutes(text) is not None and near(clock_minutes(text), utc_now) else text, "ok")
+    check("time: date is the same command", c.command("date"), "It is ", "Today is ")
+    lst = c.command("time -timezone")
+    check("time -timezone lists the regions with offsets", lst, "North America", "Europe", "Asia", "Oceania", "South America", "Africa", "UTC", "America/New_York UTC-", "Asia/Tokyo UTC+9", "Europe/London UTC")
+    check("time -timezone says any zone name works and how to list a region", lst, "Any standard zone name works", "time -timezone REGION")
+    for form in ("time -tz", "time timezone", "time zones"):
+        check(f"{form}: the same list", c.command(form), "North America")
+    check("time -timezone America lists every zone of the region", c.command("time -timezone America"), "America/New_York", "America/Argentina/Buenos_Aires", "America/Indiana/Indianapolis")
+    check("time -timezone Europe", c.command("time -timezone europe"), "Europe/London", "Europe/Paris")
+    check("time -timezone Asia", c.command("time -timezone Asia"), "Asia/Tokyo", "Asia/Kolkata")
+    # Setting.
+    ny_minutes, ny_off = zone_minutes("America/New_York")
+    for how in ("America/New_York", "america/new_york", "new_york", "new york", "New York", "eastern", "EST", "edt"):
+        out = c.command("time -timezone " + how)
+        shown = clock_minutes(out)
+        check(f"time: set by '{how}'", "ok" if shown is not None and near(shown, ny_minutes) and f"America/New_York, {offset_word(ny_off)}" in out and "Eastern time" in out else out, "ok")
+    check("time: the setting shows in plain time", c.command("time"), "Eastern time (America/New_York, " + offset_word(ny_off), "Today is ")
+    out = c.command("time -timezone utc-5")
+    check("time: a plain offset", "ok" if near(clock_minutes(out) or -99, zone_minutes("UTC")[0] - 300) and "UTC-5" in out else out, "ok")
+    out = c.command("time -timezone +5:30")
+    check("time: an offset with minutes", "ok" if near(clock_minutes(out) or -99, zone_minutes("UTC")[0] + 330) and "UTC+5:30" in out else out, "ok")
+    check("time: an offset out of range", c.command("time -timezone utc+20"), "from -12 to +14")
+    out = c.command("time -timezone london")
+    lon_minutes, lon_off = zone_minutes("Europe/London")
+    check("time: the city alone", "ok" if "Europe/London" in out and near(clock_minutes(out) or -99, lon_minutes) else out, "ok")
+    check("time: an ambiguous name lists the matches", c.command("time -timezone indiana"), "could be several zones", "America/Indiana/Indianapolis")
+    check("time: an unknown name is said and the list pointed at", c.command("time -timezone narnia"), "There is no time zone called 'narnia'", "time -timezone")
+    check("time: a typed brace is shown as typed", c.command("time -timezone {red}x"), "{red}x")
+    # Two zones at one moment differ by their offsets.
+    first = clock_minutes(c.command("time -timezone Asia/Tokyo"))
+    second = clock_minutes(c.command("time -timezone America/Los_Angeles"))
+    t_off = zone_minutes("Asia/Tokyo")[1]
+    l_off = zone_minutes("America/Los_Angeles")[1]
+    check("time: Tokyo and Los Angeles differ by their offsets", "ok" if first is not None and second is not None and near(first - second, t_off - l_off, 4) else f"{first} {second}", "ok")
+    # Saved, and nobody else sees it.
+    c.command("time -timezone Asia/Tokyo")
+    c.command("save")
+    c.command("quit")
+    time.sleep(0.8)
+    c = login("tzed")
+    a.drain(c, 0.4)
+    check("time: the zone survives quit and login", c.command("time"), "Asia/Tokyo (UTC+9)")
+    other = login("tzother")
+    a.drain(other, 0.4)
+    check("time: another player's time is unaffected", other.command("time"), "UTC, the server's time", absent=("Tokyo",))
+    check("time: who does not show the zone", other.command("who"), "Tzed", absent=("Tokyo", "UTC+9"))
+    check("time: look at the player does not show it", other.command("look at tzed"), absent=("Tokyo", "UTC+9"))
+    other.command("quit")
+    c.raw_reset()
+    check("time: charset ascii", c.command("charset ascii"), "plain ASCII")
+    for cmd in ("time", "time -timezone", "time -timezone America"):
+        text = c.raw_command(cmd)
+        check(f"time: '{cmd}' is 7-bit with charset ascii", "ok" if all(ord(ch) < 128 for ch in text) else "non-ASCII", "ok")
+    c.command("charset utf8")
+    check("time: clear", c.command("time -timezone none"), "cleared", "UTC, the server's time", "Set your own with")
+    check("time: usage", c.command("time banana"), "Usage: time")
     c.command("quit")
 
 

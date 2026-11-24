@@ -59,6 +59,26 @@ Owner's decision: "the refill should count the corpse of the creature too." Toda
 - With creature corpses lasting ten minutes at most (less once emptied), a spawn returns no later than the first reset after that.
 
 
+## 11. Leftovers from the owner's play log (24 November 2026)
+- **Plural corpses.** "Three corpses of large rats are here." The room's grouping pluralises the creature's name after "corpse of" (a name without an article, a player's, stays as it is) and knows the irregular words (wolf/wolves, thief/thieves, deer, sheep, fish, mouse/mice, -man/-men). "corpse 2" targeting is unchanged: the ids are not touched.
+- **A find after it is taken.** The room lists it as a sentence of its own (`TakenHere` / `EmptyHere` in `/std/find`; default "A purse lies here; you have taken what it held." / "... lies here, picked clean."); the Hidden Cache's bundle reads "A long oilcloth wrapping lies folded open here." The old `TakenShort` still serves `look at`.
+- **`get all` and finds.** Finds are deliberately left out of "all": each is searched once, by name, and a search is loud for a sneaking Scout. `get all` says "Something here must be taken by name." when a find here can still be taken from.
+- **`flee`.** "You flee west!" is told to the character directly, before the move, so it always comes before the new room.
+- **News after the room.** The Renown, title and "mapped" lines that arriving earns are told after the command has finished (`EventService.Later`), so they come under the room description.
+- **`aim` with no target** says "You are not fighting anyone: name a target, as in 'aim rat'."
+
+## 12. `charset ascii`
+Owner: "generate an ASCII fallback for score". A saved per-player setting, default UTF-8: `charset ascii` / `charset utf8` (`ascii on` / `ascii off`); `charset` alone shows it. In ASCII mode everything sent to the player is 7-bit: the one translation is `Thing.Asciify`, applied in `Player.CatchTell`. Box characters become + - |, a bullet at the start of a line becomes *, a bullet between words becomes " - ", curly quotes straight, dashes -, the ellipsis ..., accented letters lose their accents, anything else ?. GMCP is not touched. The new-character greeting and `help` name the command. See docs/specs/score.md.
+
+## 13. `time` and the player's time zone
+Owner: "I would like a time command that shows the users current time, it should have a timezone option to pick/set a timezone, if no timezone is provided it should show all timezones available."
+- `time` (and `date`, the same command) shows the date and time in the player's zone, with the zone's name and offset, daylight saving followed: "It is 9:40 am on Tuesday 24 November 2026, Eastern time (America/New_York, UTC-5)." and, under it, the in-world date as before. With no zone set it shows UTC and "Set your own with time -timezone ZONE."
+- `time -timezone` (also `-tz`, `timezone`, `zones`) lists about forty common zones by region with their offsets now, says any standard zone name is accepted, and says `time -timezone REGION` (America, Europe, Asia, Africa, Australia, Indian, Antarctica, Arctic, and `Pacific/`, `Atlantic/` with the slash, because "pacific" and "atlantic" mean US/Canadian time zones) lists every zone of that region.
+- `time -timezone ZONE` sets it: an exact IANA name (any case, spaces for underscores), the city alone when unambiguous ("london", "new york"), the short names (eastern, central, mountain, pacific, alaska, hawaii, est, cst, mst, pst, edt ... mapped to the regional zone so that daylight saving is right), a fixed offset ("utc-5", "+1", "gmt+5:30"; -12 to +14). More than one match: the matches are listed. Unknown: said, and the list is pointed at. `none` (or `clear`) unsets.
+- Saved with the character; nobody else sees it (not `who`, `finger`, `look`, `score`).
+- The zone data comes from two driver efuns, `TimeZoneNames()` and `LocalTime(zone)` (src/LesMudOS.Driver/KernelTime.cs), because the mudlib sandbox does not allow TimeZoneInfo. A name typed by a player is only ever compared with the driver's own list; it never reaches the file system or the log. Without a zone database on the machine the list says so and only UTC and fixed offsets work.
+- The logic is in `/secure/clock`; the player body keeps only the setting and the command.
+
 ## Where a login begins
 
 A character who leaves the game, by `quit`, by the idle timeout or by a dropped connection (NetDead), is saved in the room they stand in, and the next login puts them back in it. The room path is the saved `logoutRoom`, refreshed at every save and at the moment of leaving. The arrival is the ordinary move into the room, so an aggressive creature there engages as it would for anyone walking in. Silent fallbacks to the Village Square: no saved room (a new character, an old save), the room no longer loads, or the room is not a legitimate place to wake: the void, any clone, anything under /wiz (a wizard's own /wiz/NAME home is allowed for that wizard). Death is separate: a dead character wakes in the Guest Rooms. On a dropped connection or timeout in a fight the body is saved and destroyed at once (no lingering body, the fight ends with it).
