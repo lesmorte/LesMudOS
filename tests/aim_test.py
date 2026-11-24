@@ -502,7 +502,7 @@ def step_aim(chief):
     check("no bow: a plain refusal", out, "Aimed Shot needs a bow in your hands.")
     check("no bow: no fight begun and no Endurance spent", out + str(stat(s)["end"] >= e0), "True", absent=("You attack",))
     s.command("wield evenbow")
-    check("no target: a plain refusal", s.command("aim"), "Use it on whom? You are not fighting anyone.")
+    check("no target: a plain refusal", s.command("aim"), "You are not fighting anyone: name a target, as in 'aim rat'.")
     check("no such target: a plain refusal", s.command("aim nobody"), "You see no 'nobody' here.")
     other = login("aimother", "warrior")
     to(other, "arena")

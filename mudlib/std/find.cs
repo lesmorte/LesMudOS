@@ -41,6 +41,11 @@ public class Find : Thing
     /// <summary>The long description for a character who has not taken it, when nothing is left.</summary>
     protected string? EmptyLong;
 
+    /// <summary>The room's listing line (a whole sentence) for a character who has already taken it. Default: "&lt;The short description&gt; lies here; you have taken what it held."</summary>
+    protected string? TakenHere;
+    /// <summary>The room's listing line (a whole sentence) for a character who finds it empty. Default: "&lt;The short description&gt; lies here, picked clean."</summary>
+    protected string? EmptyHere;
+
     /// <summary>What the finder is told when gold is paid; "%gold%" is the amount. Default: "You take %gold% gold from the &lt;name&gt;."</summary>
     protected string? GoldLine;
     /// <summary>What the finder is told when an item is given; "%item%" is its short description. Default: "You also take %item%."</summary>
@@ -99,6 +104,25 @@ public class Find : Thing
             _ => full,
         };
     }
+
+    /// <summary>
+    /// The room's listing of this find for the looker, as a sentence, once they have taken from it or found it empty; "" while it is still
+    /// there to be taken (then the room lists it like any object: "A purse is here.").
+    /// </summary>
+    public string QueryHereLine()
+    {
+        var full = ShortDesc ?? Name;
+        var cap = full.Length == 0 ? full : char.ToUpper(full[0]) + full.Substring(1);
+        return StatusFor(ThisPlayer()) switch
+        {
+            WasTaken => TakenHere ?? cap + " lies here; you have taken what it held.",
+            WasEmpty => EmptyHere ?? cap + " lies here, picked clean.",
+            _ => "",
+        };
+    }
+
+    /// <summary>True while the looker may still take from this find: "get all" skips finds (each is searched once, by name) and says so when this is true.</summary>
+    public bool QueryTakeByName() => StatusFor(ThisPlayer()) == Open;
 
     public override string Long()
     {

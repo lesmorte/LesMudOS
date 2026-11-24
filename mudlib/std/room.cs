@@ -613,11 +613,14 @@ public abstract class Room : MudObject
         var order = new List<string>();
         var floor = new Dictionary<string, (string single, int n)>();
         var sitting = new List<string>();
+        var sentences = new List<string>();
         foreach (var ob in AllInventory())
         {
             if (ob == viewer) continue;
             var desc = ob.Call<string>("Short");
             if (desc == null) continue;
+            // A find that this viewer has taken from (or found empty) lists itself as a sentence of its own ("A long oilcloth wrapping lies folded open here.").
+            if (!Living(ob) && ob.Call<string>("QueryHereLine") is { Length: > 0 } hereLine) { sentences.Add(hereLine); continue; }
             if (!Living(ob) && ob.Call<int>("QueryQuantity") > 0)
             {
                 var single = ob.Call<int>("QueryAmount") > 0 || ob.Call<int>("QueryQuantity") == 1 ? desc : ob.Call<string>("DescribeCount", 1) ?? desc;
@@ -645,6 +648,7 @@ public abstract class Room : MudObject
             text.Append(n == 1 ? " is here.\n" : " are here.\n");
         }
         foreach (var desc in sitting) text.Append(Cap(desc)).Append(" is resting here.\n");
+        foreach (var line in sentences) text.Append(line).Append('\n');
         return text.ToString();
     }
 
@@ -659,15 +663,32 @@ public abstract class Room : MudObject
 
     private static string Cap(string text) => text.Length == 0 ? text : char.ToUpper(text[0]) + text.Substring(1);
 
-    /// <summary>"a giant rat" becomes "giant rats".</summary>
+    /// <summary>"a giant rat" becomes "giant rats"; "the corpse of a large rat" becomes "corpses of large rats" (a name without an article stays as it is).</summary>
     private static string Plural(string desc)
     {
         foreach (var article in new[] { "a ", "an ", "the " })
             if (desc.StartsWith(article)) { desc = desc.Substring(article.Length); break; }
         var of = desc.IndexOf(" of ", StringComparison.Ordinal);
-        if (of > 0) return Plural(desc.Substring(0, of)) + desc.Substring(of);
+        if (of > 0)
+        {
+            var head = desc.Substring(0, of);
+            var tail = desc.Substring(of);
+            if (head == "corpse" && (tail.StartsWith(" of a ") || tail.StartsWith(" of an "))) return "corpses of " + Plural(tail.Substring(4));
+            return Plural(head) + tail;
+        }
+        var cut = desc.LastIndexOf(' ') + 1;
+        var front = desc.Substring(0, cut);
+        var word = desc.Substring(cut);
+        string[] same = { "deer", "sheep", "fish" };
+        if (Array.IndexOf(same, word) >= 0) return desc;
+        if (word == "mouse") return front + "mice";
+        if (word == "goose") return front + "geese";
+        if (word.EndsWith("man") && word != "human" && word != "german" && word != "roman") return front + word.Substring(0, word.Length - 2) + "en";
+        foreach (var f in new[] { "wolf", "thief", "elf", "dwarf", "calf", "leaf", "loaf", "shelf" })
+            if (word == f) return front + f.Substring(0, f.Length - 1) + "ves";
+        foreach (var fe in new[] { "knife", "wife", "life" })
+            if (word == fe) return front + fe.Substring(0, fe.Length - 2) + "ves";
         if (desc.EndsWith("s") || desc.EndsWith("x") || desc.EndsWith("ch") || desc.EndsWith("sh")) return desc + "es";
-        if (desc.EndsWith("f")) return desc.Substring(0, desc.Length - 1) + "ves";
         return desc + "s";
     }
 

@@ -658,7 +658,8 @@ Fields, all set in `Create()`:
 | `MinimumGold` | when the next finder's amount would be below this, the find is empty for everyone after | 1 |
 | `ItemPath` | a file of an item that each finder receives, one each (a cloned item into the inventory; at their feet if they cannot carry it) | none |
 | `ItemFinders` | how many of the first finders receive the item; 0 means every finder while gold remains (every character, for a keepsake) | 0 |
-| `TakenShort`, `TakenLong` | what a character who has already taken it sees | the short description and "(taken by you)"; a plain line |
+| `TakenShort`, `TakenLong` | what a character who has already taken it sees when they look at it | the short description and "(taken by you)"; a plain line |
+| `TakenHere`, `EmptyHere` | the room's listing of it, a whole sentence, for a character who has taken it or found it empty ("A long oilcloth wrapping lies folded open here.") | "The short description lies here; you have taken what it held." / "... lies here, picked clean." |
 | `EmptyShort`, `EmptyLong` | what a character who has not taken it sees, when nothing is left | the short description and "(picked clean)"; a plain line |
 | `GoldLine`, `ItemLine` | what the finder is told; `%gold%` and `%item%` stand for the amount and the item | "You take %gold% gold from the (name)." and "You also take %item%." |
 | `TakenLine`, `EmptyLine` | what a character is told who tries again, or who comes after it is empty | one plain line each |

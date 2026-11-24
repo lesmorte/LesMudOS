@@ -270,9 +270,30 @@ DODGER_CLASS = h.NOVICE_CLASS.replace("NoviceClass", "DodgerClass").replace('"No
 DODGER_TRAIT = h.NOVICE_FISTS.replace("NoviceFistsTrait", "DodgerFistsTrait").replace("Novice Fists", "Dodger Fists").replace('Mods["unarmed_min"] = 1;', 'Mods["dodge"] = 75; Mods["unarmed_min"] = 1;')
 
 
+# A room that reports a discovery to the Chronicle when a player walks in (so the player earns Renown on arrival).
+NEWS_ROOM = '''// @inherit /std/room
+public class PfNews : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "News Room"; LongDesc = "A room made for the arrival-order test.";
+        Exits["out"] = "/domains/test/hub";
+    }
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try { LoadObject("/secure/events").Call<string>("Report", "discover.hidden", who, new List<ObjectRef> { who }, Self, "pf-news", new Dictionary<string, string> { ["name"] = "the News Room" }); }
+        catch (MudRuntimeException) { }
+    }
+}
+'''
+
+
 def files():
     hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite", "den": TEST + "den", "twoden": TEST + "twoden", "calmden": TEST + "calmden", "mild": TEST + "mild",
-                "burrow": TEST + "burrow", "burrow2": TEST + "burrow2", "warren": TEST + "warren", "trail": TEST + "trail"}
+                "burrow": TEST + "burrow", "burrow2": TEST + "burrow2", "warren": TEST + "warren", "trail": TEST + "trail", "news": TEST + "news"}
     out = {"out": TEST + "hub"}
     return {
         "hub": a.room("PfHub", "Play Hub", hub_exits, safe=True),
@@ -297,6 +318,7 @@ def files():
         "burrow2": a.room("PfBurrow2", "Second Burrow", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n', reset=3000),
         "warren": a.room("PfWarren", "Hare Warren", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n        AddSpawn("{TEST}hare");\n', reset=3000),
         "trail": a.room("PfTrail", "Hare Trail", {"out": TEST + "hub"}, f'        AddEncounter("{TEST}hare", 100);\n', reset=3000),
+        "news": NEWS_ROOM,
         "wolf": WOLF, "hare": HARE, "pftool": PFTOOL,
         "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 40);\n', reset=3000),
         "zapper": ZAPPER,
@@ -372,6 +394,14 @@ def run(work, mudlib, box):
     wiz = login("wiz")
     check("setup: the first wizard", wiz.command("promote " + SECRET), "level 10 wizard")
     wiz.command("goto " + TEST + "hub")
+    if os.environ.get("PF_ONLY") == "quick":  # the arrival, bare-skill and flee checks only
+        run_arrival_news()
+        run_bare_skill_command()
+        run_fleeing(wiz)
+        wiz.command("save")
+        wiz.command("shutdown")
+        box[0].wait(timeout=15)
+        return
     if os.environ.get("PF_ONLY") == "logfix":  # a quick run of the last fixes only
         run_logfix(wiz)
         wiz.command("save")
@@ -388,6 +418,8 @@ def run(work, mudlib, box):
     run_verbose(wiz)
     run_prompt(wiz)
     run_logfix(wiz)
+    run_arrival_news()
+    run_bare_skill_command()
     wiz.command("save")
     wiz.command("shutdown")
     box[0].wait(timeout=15)
@@ -421,7 +453,7 @@ def run_numbers(wiz):
     check("numbers: the first rat is still there", "ok" if stat_name(wiz, "rat") == first else "differs", "ok")
     wiz.command("slay rat")
     text = wiz.command("look")
-    check("numbers: two corpses are in the room", text, "corpses of")
+    check("numbers: two corpses are in the room, the creature pluralised", text, "corpses of ratlings are here")
     check("numbers: the corpses answer to numbers", wiz.command("look at corpse 2"), "The lifeless body of a ratling lies here.")
     check("numbers: get from corpse 2 takes only from the second corpse", wiz.command("get sword from corpse 2"), "You take a rusty sword from the corpse of a ratling.")
     check("numbers: corpse 2 is now without the sword", wiz.command("look in corpse 2"), "The lifeless body", absent=("rusty sword",))
@@ -514,6 +546,31 @@ def run_corpses(wiz):
 
 # ===== 3. combat restrictions and flee =====
 
+def run_bare_skill_command():
+    """A skill command with no target and no fight answers at once, in one sentence, before the next prompt."""
+    c = h.Client("aimless", archetype="scout")
+    c.read_until("> ")
+    a.drain(c, 0.4)
+    out = c.command("strike")
+    check("no target: one clear sentence, right after the command", out, "You are not fighting anyone: name a target, as in 'strike rat'.", absent=("Use it on whom",))
+    check("and the prompt follows it, with nothing after", "ok" if out.rstrip().endswith(">") or "> " in out[-40:] else out[-120:], "ok")
+    c.command("quit")
+
+
+def run_arrival_news():
+    """Renown and title lines earned by walking into a room come after the room's description, not before it."""
+    c = login("newsy")
+    a.drain(c, 0.4)
+    c.command("down")
+    text = c.command("news") + a.quiet(c, 1.5)
+    check("arrival: the room is described", text, "News Room")
+    check("arrival: the renown news is told", text, "Your renown grows", "You have earned the title:")
+    if "News Room" in text and "Your renown grows" in text:
+        check("arrival: the renown line comes after the room description", "ok" if text.index("News Room") < text.index("Your renown grows") and text.index("Obvious exits") < text.index("Your renown grows") else text[:400], "ok")
+        check("arrival: the title line comes after the room description", "ok" if text.index("Obvious exits") < text.index("You have earned the title:") else text[:400], "ok")
+    c.command("quit")
+
+
 def flee_until(c, command, tries=40):
     """Repeat a flee command until it is not the 1-in-4 failure. Returns the text of the last try."""
     text = ""
@@ -550,6 +607,7 @@ def run_fleeing(wiz):
     # With a direction.
     text = flee_until(wiz, "flee east")
     check("fleeing: with a direction you go that way", text, "You flee east!", "Second Pit")
+    check("fleeing: the flee line comes before the new room is described", "ok" if "You flee east!" in text and text.index("You flee east!") < text.index("Second Pit") else text[:200], "ok")
     check("fleeing: the fight is over for you", wiz.command("flee"), "You are not fighting anyone.")
     check("fleeing: you can walk and pick things up again", wiz.command("west"), "Fighting Pit")
     wiz.command("kill dummy")
@@ -564,6 +622,7 @@ def run_fleeing(wiz):
         wiz.command("kill dummy")
         text = flee_until(wiz, "flee")
         check(f"fleeing: with no direction you go back the way you came (round {round_})", text, "You flee east!", "Second Pit")
+        check(f"fleeing: the line comes before the room (round {round_})", "ok" if "You flee east!" in text and text.index("You flee east!") < text.index("Second Pit") else text[:200], "ok")
     # The way back cannot be used (not arrived by an exit): any usable exit, never the locked one.
     seen = set()
     for _ in range(12):
@@ -655,13 +714,13 @@ def run_aggro(wiz):
 # ===== 10. a room does not refill while the creature's corpse is there =====
 
 def look_hares(c):
-    """(hares alive, corpses of hares) in the room, from the room description ("A hare", "Two hares", "the corpse of a hare", "Two corpses of a hare")."""
+    """(hares alive, corpses of hares) in the room, from the room description ("A hare", "Two hares", "the corpse of a hare", "Two corpses of hares")."""
     text = ansi_free(c.command("look"))
     words = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3}
     corpses = 0
-    for m in re.finditer(r"(?i)\b(?:(a|one|two|three) corpses? of a hare|the corpse of a hare)", text):
+    for m in re.finditer(r"(?i)\b(?:(a|one|two|three) corpses of hares|the corpse of a hare)", text):
         corpses += words.get((m.group(1) or "a").lower(), 1)
-    rest = re.sub(r"(?i)\b(?:(a|one|two|three) corpses? of a hare|the corpse of a hare)", "", text)
+    rest = re.sub(r"(?i)\b(?:(a|one|two|three) corpses of hares|the corpse of a hare)", "", text)
     alive = 0
     for m in re.finditer(r"(?i)\b(a|one|two|three) hares?\b", rest):
         alive += words[m.group(1).lower()]
