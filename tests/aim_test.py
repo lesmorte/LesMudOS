@@ -131,6 +131,21 @@ public class {cls} : Weapon
 """
 
 
+def capmob(cls, level, vit):
+    """A creature of a given level and Vitality for the opener's cap (docs/specs/skill-ranks.md, Aimed Shot)."""
+    return f"""// @inherit /std/monster
+public class {cls} : Monster
+{{
+    public override void Create()
+    {{
+        Name = "Capmob"; Ids.Add("capmob"); ShortDesc = "capmob"; LongDesc = "A creature made for the cap test.";
+        Level = {level}; MaxVitality = {vit}; DamageMin = 1; DamageMax = 1; ToHit = -40; Armor = 0; Dodge = 0; XpValue = 0;
+        Aggressive = false; BaseReaction = 6.0;
+    }}
+}}
+"""
+
+
 def mob(cls, name, ident, reaction, to_hit=-40, aggressive=False, dmg=1):
     return f"""// @inherit /std/monster
 public class {cls} : Monster
@@ -151,6 +166,8 @@ def test_files():
     f[T + "bow"] = weapon("AimBow", "Even Bow", "evenbow", "bow", 10, 10)
     f[T + "sword"] = weapon("AimSword", "Even Sword", "evensword", "sword", 10, 10, 0.0)
     f[T + "dummy"] = mob("AimDummy", "Dummy", "dummy", 6.0)
+    for name, level, vit in (("cap_d0", 1, 40), ("cap_dm1", 2, 40), ("cap_dm2", 3, 40), ("cap_dm4", 5, 40), ("cap_d2", 1, 20), ("cap_d3", 1, 20), ("cap_mid", 3, 50)):
+        f[T + name] = capmob("Aim" + name.title().replace("_", ""), level, vit)
     f[T + "alpha"] = mob("AimAlpha", "Alpha", "alpha", 2.0)
     f[T + "beta"] = mob("AimBeta", "Beta", "beta", 2.0)
     f[T + "aggro"] = mob("AimAggro", "Raider", "raider", 2.0, aggressive=True)
@@ -585,6 +602,93 @@ def step_aim(chief):
     old.command("quit")
 
 
+CAPLINE = "twists away at the last moment"
+
+
+def first_landed(c, spawn, line, tries=5):
+    """A fresh creature `spawn`, one command `line`; the damage of the first shot that lands and the whole text. Retries after a miss."""
+    text = ""
+    for _ in range(tries):
+        c.command("afill")
+        c.command("aslay")
+        c.command("aspawn " + spawn)
+        a.drain(c, 0.3)
+        c.send(line)
+        text = ""
+        end = time.time() + 12
+        while time.time() < end and "(+" not in text and "You miss" not in text and "dodges" not in text:
+            text += a.quiet(c, 0.25)
+        d = damages(text)
+        if d:
+            return d[0], text + a.quiet(c, 0.6)
+    return None, text
+
+
+def step_cap(chief):
+    """The Aimed Shot opener's cap (docs/specs/skill-ranks.md, owner's decision 24 Nov 2026): 60% + 15% x d of maximum Vitality, floor 30%, none from d = +3."""
+    s = login("aimcap", "scout")
+    s.command("agive bow")
+    s.command("agive sword")
+    s.command("wield evenbow")
+    s.command("verbose on")
+    to(s, "arena")
+    check("the simulator's G2 is the one the game has: 60% at d = 0, 45% at -1, 30% from -2, 90% at +2, none at +3",
+          str([None if x is None else round(x, 4) for x in (sim.g_share(sim.G2, d) for d in (0, -1, -2, -4, 2, 3))]), "[0.6, 0.45, 0.3, 0.3, 0.9, None]")
+    for spawn, d, cap in (("cap_d0", 0, 24), ("cap_dm1", -1, 18), ("cap_dm2", -2, 12), ("cap_dm4", -4, 12)):
+        dmg, text = first_landed(s, spawn, "aim capmob")
+        check(f"opener at d = {d}: capped to {cap} of 40", str(dmg), str(cap))
+        check(f"opener at d = {d}: the player is told why", text, CAPLINE)
+        s.command("aslay")
+    # An ordinary Aimed Shot (a fight already begun) is not capped: a level 3 creature with 50 Vitality (cap would be 15) takes the full x1.75 (18, or 27).
+    s.command("afill")
+    s.command("aspawn cap_mid")
+    s.send("kill capmob")
+    a.quiet(s, 1.0)
+    mid = []
+    for _ in range(3):
+        mid = shots(s, "aim capmob", "capmob", 1, False)
+        if mid:
+            break
+    text = ""
+    check("an ordinary aimed shot at d = -2 is not capped (not 12, no excuse line)", "ok" if mid and mid[0] in (18, 27) else str(mid), "ok")
+    check("and says nothing about twisting", text, absent=(CAPLINE,))
+    s.command("stop")
+    s.command("aslay")
+    # Precision Strike's ambush from hiding is not capped (x1.5 of 10 is 15, 23 with a critical; a cap at the floor would be 12).
+    s.command("wield evensword")
+    got = None
+    for _ in range(5):
+        s.command("afill")
+        s.command("aslay")
+        s.command("sneak on")
+        s.command("aspawn cap_dm4")
+        a.drain(s, 0.3)
+        s.send("strike capmob")
+        text = ""
+        end = time.time() + 8
+        while time.time() < end and "(+" not in text and "You miss" not in text:
+            text += a.quiet(s, 0.25)
+        if damages(text):
+            got = damages(text)[0]
+            break
+    check("Precision Strike's ambush at d = -4 is not capped", "ok" if got in (15, 23) else str(got), "ok")
+    check("and says nothing about twisting", text, absent=(CAPLINE,))
+    s.command("aslay")
+    s.command("wield evenbow")
+    # d = +2 at level 3 (90% of 20 = 18), d = +3 at level 4: no cap, the shot takes the whole 20.
+    s.command("alevel 3")
+    dmg, text = first_landed(s, "cap_d2", "aim capmob")
+    check("opener at d = +2: capped to 18 of 20", str(dmg), "18")
+    check("opener at d = +2: told", text, CAPLINE)
+    s.command("aslay")
+    s.command("alevel 4")
+    dmg, text = first_landed(s, "cap_d3", "aim capmob")
+    check("opener at d = +3: no cap, the whole 20", str(dmg), "20")
+    check("opener at d = +3: no excuse line", text, absent=(CAPLINE,))
+    check("skills says the opener is limited", skill_line(s, "(Aimed Shot)"), "never takes more than part of the target's full Vitality")
+    s.command("quit")
+
+
 # ---------------------------------------------------------------- 5. the probe
 
 def step_security(chief, mudlib):
@@ -620,7 +724,7 @@ def run(work, mudlib):
     chief.command("down")
     only = [x for x in os.environ.get("AIM_STEPS", "").split(",") if x]
     for name, step in (("heal", lambda: step_heal(chief)), ("double", lambda: step_double(chief)), ("opening", lambda: step_opening(chief)),
-                       ("aim", lambda: step_aim(chief)), ("security", lambda: step_security(chief, mudlib))):
+                       ("aim", lambda: step_aim(chief)), ("cap", lambda: step_cap(chief)), ("security", lambda: step_security(chief, mudlib))):
         if not only or name in only:
             step()
     return chief

@@ -2,6 +2,8 @@
 
 *24 November 2026. Written with `python3 tests/balance_sim.py scout` (new). Nothing in the game has been changed: every option below is a switch in the simulator for the owner to choose from. Branch `work/scout-sim`.*
 
+**24 November 2026: the owner chose G2 ("slow cap to aimed shot"), on the Aimed Shot opener only. It is in the game and is the simulator's default; see docs/specs/skill-ranks.md.** The text below was written before that and describes the game without the cap unless it says G2.
+
 ## 1. Recommendation
 
 **What the owner saw is real, and the simulator reproduces it.** A played Scout who sneaks, with the starting Hunting Bow, no armour and one potion, goes from level 1 to level 5 through the cellars in **30.7 simulated minutes** (the owner: 29), with **2.7 potions** (the owner: 2) and **0.39 deaths** a run (68% of runs have no death at all, so "no deaths" was an ordinary evening, not a lucky one; the Warrior's run has 0.17). The first action (the unnoticed opener) kills 19% of everything he kills, and 16% of the creatures die before they have done anything at all.

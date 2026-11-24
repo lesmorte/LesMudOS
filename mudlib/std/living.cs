@@ -46,6 +46,8 @@ public class CombatAction
     public int WaitSeconds;
     /// <summary>Being hit while this action's Preparation runs spoils it and the cost stays spent (Aimed Shot). Set by UseSkill from the skill's data.</summary>
     public bool Spoilable;
+    /// <summary>The action is the opener (the shot that starts the fight at its opener factor): its skill may cap the damage (Aimed Shot, level-scaled).</summary>
+    public bool Opener;
 }
 
 /// <summary>
@@ -1393,6 +1395,15 @@ public abstract class Living : Thing
         var blocked = Random(100) < target.Call<int>("QueryBlock");
         if (blocked) damage = Math.Max(1, damage / 2);
 
+        // The opener's cap (Aimed Shot): after every other step, a share of the target's maximum Vitality that depends on the level difference.
+        var capped = false;
+        if (action.Opener && action.Skill != null)
+        {
+            var capPercent = action.Skill.Call<int>("QueryOpenerCapPercent", Level - target.Call<int>("QueryLevel"));
+            var most = Math.Max(1, (int)((long)capPercent * target.Call<int>("QueryMaxVitality") / 100));
+            if (capPercent > 0 && damage > most) { damage = most; capped = true; }
+        }
+
         // The damage is applied first, so that the lines can say how much of it really was; the death waits until they are told.
         var applied = Math.Max(0, target.Call<int>("ApplyDamage", damage, Self));
         // The wording follows the damage really dealt (not what a dying target had left to lose beyond it) as a share of the target's
@@ -1406,6 +1417,7 @@ public abstract class Living : Thing
         Tell($"You {youWord} {theirs}{how}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + mine + "\n");
         TellObject(target, $"{label} {themWord} you{how}." + (critical ? " A critical hit!" : "") + (blocked ? " You block part of the blow." : "") + theirNote + "\n");
         TellRoom(room, $"{label} {themWord} {theirs}{how}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n", Self, target);
+        if (capped) Tell($"The shot is true, but {theirs} twists away at the last moment and takes only part of it.\n");
         target.Call("FinishDamage", Self);
         if (target.IsAlive && !target.Call<bool>("IsDead")) target.Call("SpoilPreparation", Self); // a shot being aimed at this moment is spoiled
         action.Skill?.Call("OnHit", Self, target, damage);
@@ -1531,7 +1543,7 @@ public abstract class Living : Thing
             WaitSeconds = skill.Call<int>("QueryWaitSeconds", skill.Call<int>("QueryRankFor", Self)), Spoilable = skill.Call<bool>("QuerySpoilable"),
         };
         // The action that starts a fight may hit harder (Aimed Shot x2.5): the skill's own opener factor replaces its usual one.
-        if (opening && skill.Call<double>("QueryOpenerFactorFor", Self) is > 0 and var openerFactor) action.DamageFactor = openerFactor;
+        if (opening && skill.Call<double>("QueryOpenerFactorFor", Self) is > 0 and var openerFactor) { action.DamageFactor = openerFactor; action.Opener = true; }
         // From hiding, as the blow that starts the fight (Precision Strike): the skill's own ambush factor replaces its usual one.
         if (ambush && skill.Call<double>("QueryAmbushFactorFor", Self) is > 0 and var ambushFactor) action.DamageFactor = ambushFactor;
         if (!CanPay(action))
