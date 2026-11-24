@@ -70,8 +70,24 @@ internal sealed class Connection
         return _outbox.Writer.TryWrite(Net.Gmcp.Frame(package, json));
     }
 
-    /// <summary>Flush what is queued, then close the socket.</summary>
-    public void Close() => _outbox.Writer.TryComplete();
+    /// <summary>The player's name as last seen, for the log line when the connection ends. Game thread only.</summary>
+    public string? PlayerName;
+
+    private readonly DateTime _startedUtc = DateTime.UtcNow;
+    private string? _endedBy;
+
+    /// <summary>Who ended the connection, first writer wins; never anything a player typed.</summary>
+    private void Ended(string reason) => Interlocked.CompareExchange(ref _endedBy, reason, null);
+
+    public string EndedBy => _endedBy ?? "unknown";
+    public TimeSpan Lasted => DateTime.UtcNow - _startedUtc;
+
+    /// <summary>Flush what is queued, then close the socket. The reason is for the log ("destruct", "shutdown").</summary>
+    public void Close(string reason = "closed by the game")
+    {
+        Ended(reason);
+        _outbox.Writer.TryComplete();
+    }
 
     public async Task RunAsync()
     {
@@ -83,8 +99,8 @@ internal sealed class Connection
                 await foreach (var bytes in _outbox.Reader.ReadAllAsync())
                     await stream.WriteAsync(bytes);
             }
-            catch (IOException) { }
-            catch (ObjectDisposedException) { }
+            catch (IOException e) { Ended($"write error: {e.GetType().Name}: {e.Message}"); }
+            catch (ObjectDisposedException e) { Ended($"write error: {e.GetType().Name}: {e.Message}"); }
             finally { _client.Close(); } // also unblocks the reader
         });
 
@@ -92,8 +108,8 @@ internal sealed class Connection
         {
             await ReadLinesAsync(stream);
         }
-        catch (IOException) { }
-        catch (ObjectDisposedException) { }
+        catch (IOException e) { Ended($"read error: {e.GetType().Name}: {e.Message}"); }
+        catch (ObjectDisposedException e) { Ended($"read error: {e.GetType().Name}: {e.Message}"); }
 
         _outbox.Writer.TryComplete();
         await writer;
@@ -112,7 +128,7 @@ internal sealed class Connection
         while (true)
         {
             var read = await stream.ReadAsync(buffer);
-            if (read == 0) return;
+            if (read == 0) { Ended("client closed"); return; }
             for (var i = 0; i < read; i++)
             {
                 var b = buffer[i];

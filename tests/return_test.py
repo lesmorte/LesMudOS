@@ -102,6 +102,14 @@ def main():
         c.command("promote " + h.SECRET)
         c.command("shutdown")
         proc.wait(timeout=15)
+        log.flush()
+        logged = open(os.path.join(work, "driver.log")).read()
+        ended = [l for l in logged.splitlines() if "connection ended:" in l]
+        check("the driver logs one line for every ended connection", str(len(ended) >= 15), "True")
+        check("a dropped socket is logged as the client closing, with the player's name", "\n".join(l for l in ended if "player Dave" in l), "client closed", "lasted", "since last input")
+        check("a quit is logged as closed by the game", "\n".join(l for l in ended if "player Rita" in l), "closed by the game")
+        check("the idle timeout is logged as closed by the game", "\n".join(l for l in ended if "player Ida" in l), "closed by the game")
+        check("the log line carries the remote address", ended[0], "127.0.0.1:")
     finally:
         if proc.poll() is None:
             proc.kill()
