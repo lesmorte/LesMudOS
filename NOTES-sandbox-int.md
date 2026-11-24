@@ -77,3 +77,11 @@ Runs:
   class, item, world, find, chronicle, chronicle_play, craft, craft_content, comm, playfeel, attribute, rest (rerun; first run one
   timing flake), rename, rank, aim, sneak (rerun; first run one patrol-timing flake), story, hollow_expansion, corridor_mob, ansi.
 - Killed by the restart, still to run: timing, city, corridor, then playthrough last.
+- build exit=0 secs=24 last: Build succeeded.
+- timing_test exit=0 secs=552 last: 0 failure(s)
+- city_test exit=0 secs=634 last: 4685 checks, 4685 passed, 0 failed (wolves killed: 0; 634 s in the game)
+- corridor_test exit=0 secs=1300 last: 6861 checks, 6861 passed, 0 failed (1299 s in the game)
+- playthrough_test exit=1 secs=1568 last: 1 failure(s)
+- playthrough_test exit=0 secs=1516 last: 0 failure(s)
+- playthrough first run: 1 failure (the Overseer died from above half Vitality before his next action, so no summon: combat chance,
+  /domains code untouched); rerun: 0 failures, 1516 s. Full run complete on tree 30dd846/ffabb42: every suite passes.
