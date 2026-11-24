@@ -291,9 +291,22 @@ public class PfNews : Room
 '''
 
 
+# A room whose text is full of typographic characters, for the charset test.
+UNI_ROOM = '''// @inherit /std/room
+public class PfUni : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Caf\u00e9 Room"; LongDesc = "She said \u201chello\u201d and \u2018goodbye\u2019 \u2014 then waited\u2026 \u2022 Se\u00f1or Ren\u00e9e \u2013 na\u00efve.";
+        Exits["out"] = "/domains/test/hub";
+    }
+}
+'''
+
+
 def files():
     hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite", "den": TEST + "den", "twoden": TEST + "twoden", "calmden": TEST + "calmden", "mild": TEST + "mild",
-                "burrow": TEST + "burrow", "burrow2": TEST + "burrow2", "warren": TEST + "warren", "trail": TEST + "trail", "news": TEST + "news"}
+                "burrow": TEST + "burrow", "burrow2": TEST + "burrow2", "warren": TEST + "warren", "trail": TEST + "trail", "news": TEST + "news", "uni": TEST + "uni"}
     out = {"out": TEST + "hub"}
     return {
         "hub": a.room("PfHub", "Play Hub", hub_exits, safe=True),
@@ -318,7 +331,7 @@ def files():
         "burrow2": a.room("PfBurrow2", "Second Burrow", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n', reset=3000),
         "warren": a.room("PfWarren", "Hare Warren", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n        AddSpawn("{TEST}hare");\n', reset=3000),
         "trail": a.room("PfTrail", "Hare Trail", {"out": TEST + "hub"}, f'        AddEncounter("{TEST}hare", 100);\n', reset=3000),
-        "news": NEWS_ROOM,
+        "news": NEWS_ROOM, "uni": UNI_ROOM,
         "wolf": WOLF, "hare": HARE, "pftool": PFTOOL,
         "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 40);\n', reset=3000),
         "zapper": ZAPPER,
@@ -395,6 +408,7 @@ def run(work, mudlib, box):
     check("setup: the first wizard", wiz.command("promote " + SECRET), "level 10 wizard")
     wiz.command("goto " + TEST + "hub")
     if os.environ.get("PF_ONLY") == "quick":  # the arrival, bare-skill and flee checks only
+        run_charset()
         run_arrival_news()
         run_bare_skill_command()
         run_fleeing(wiz)
@@ -420,6 +434,7 @@ def run(work, mudlib, box):
     run_logfix(wiz)
     run_arrival_news()
     run_bare_skill_command()
+    run_charset()
     wiz.command("save")
     wiz.command("shutdown")
     box[0].wait(timeout=15)
@@ -555,6 +570,51 @@ def run_bare_skill_command():
     check("no target: one clear sentence, right after the command", out, "You are not fighting anyone: name a target, as in 'strike rat'.", absent=("Use it on whom",))
     check("and the prompt follows it, with nothing after", "ok" if out.rstrip().endswith(">") or "> " in out[-40:] else out[-120:], "ok")
     c.command("quit")
+
+
+def run_charset():
+    """charset ascii: every byte of what a player is sent is 7-bit, the score box lines up, the setting is saved; utf8 is unchanged."""
+    c = login("charly")
+    a.drain(c, 0.4)
+    check("charset: the default shows UTF-8", c.command("charset"), "UTF-8")
+    utf = c.command("score")
+    check("charset: utf8 score has the box characters", utf, "\u2554", "\u2557", "\u255a", "\u2551")
+    c.command("down")
+    uni = c.command("uni")
+    check("charset: utf8 room text is unchanged", uni, "\u201chello\u201d", "\u00e9", "\u2026")
+    check("charset: ascii is accepted", c.command("charset ascii"), "plain ASCII")
+    check("charset: and shown", c.command("charset"), "plain ASCII")
+    c.command("out")
+    for cmd in ("score", "look", "help", "who", "inventory", "uni", "ascii", "charset", "skills"):
+        text = c.raw_command(cmd)
+        bad = sorted({ch for ch in text if ord(ch) > 127})
+        check(f"charset: every byte of '{cmd}' is below 128", "ok" if not bad else str(bad), "ok")
+    score = c.command("score")
+    box = [l for l in score.split("\n") if l.startswith(("+", "|"))]
+    lens = {len(l.rstrip("\r")) for l in box}
+    check("charset: the score box is drawn with + - |", score, "+" + "-" * 46 + "+", "|")
+    check("charset: every box line has the same length", "ok" if len(box) >= 3 and len(lens) == 1 else str(lens), "ok")
+    check("charset: the calling and level are separated by a hyphen", score, " - Level 1")
+    check("charset: the rules under the headings are hyphens", score, "-" * 25)
+    uni = c.command("look")
+    check("charset: typographic characters are plain", uni, "\"hello\"", "'goodbye'", "- then waited...", "- Senor", "Renee - naive.", "Cafe Room")
+    check("charset: the usage line", c.command("charset klingon"), "Usage: charset [ascii|utf8]")
+    c.command("save")
+    c.command("quit")
+    time.sleep(0.8)
+    c = login("charly")
+    a.drain(c, 0.4)
+    check("charset: the setting survives quit and login", c.command("charset"), "plain ASCII")
+    check("charset: and the score is still 7-bit", "ok" if all(ord(ch) < 128 for ch in c.raw_command("score")) else "non-ASCII", "ok")
+    check("charset: ascii off is the alias for utf8", c.command("ascii off"), "UTF-8")
+    check("charset: and the box is back", c.command("score"), "\u2554")
+    check("charset: ascii on is the alias", c.command("ascii on"), "plain ASCII")
+    c.command("quit")
+    # A new character is told the command exists.
+    n = h.Client("newcomer")
+    first = n.read_until("> ")
+    check("charset: the greeting of a new character names the command", first, "charset ascii")
+    n.command("quit")
 
 
 def run_arrival_news():

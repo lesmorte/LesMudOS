@@ -35,6 +35,8 @@ public class Player : Adventurer
     [Saved] private string passwordHash = "";
     // ANSI colour. On by default, also for characters saved before this setting existed.
     [Saved] private bool colour = true;
+    // `charset ascii`: every message to this player is turned into 7-bit ASCII (see Asciify). Off (UTF-8) by default, also for older saves.
+    [Saved] private bool asciiOnly;
 
     private bool ready;
     // True only while WriteRaw is sending file text: CatchTell then passes it on exactly as stored.
@@ -61,7 +63,7 @@ public class Player : Adventurer
     public override void CatchTell(string message)
     {
         messagesShown++;
-        base.CatchTell(rawOutput ? message : Render(message));
+        base.CatchTell(asciiOnly ? Asciify(rawOutput ? message : Render(message)) : rawOutput ? message : Render(message));
     }
 
     // ---- Colour ----
@@ -228,6 +230,8 @@ public class Player : Adventurer
         AddAction("save", CmdSave);
         AddAction("quit", CmdQuit);
         AddAction("help", CmdHelp);
+        AddAction("charset", CmdCharset);
+        AddAction("ascii", CmdCharset);
         AddAction("ansi", CmdAnsi);
         AddAction("color", CmdAnsi);
         AddAction("colour", CmdAnsi);
@@ -253,7 +257,7 @@ public class Player : Adventurer
         AddAction("mudstat", CmdMudstat);
         AddAction("shutdown", CmdShutdown);
 
-        Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type '{{cmd}}help{{/}}' for commands.\n\n");
+        Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type '{{cmd}}help{{/}}' for commands. If the boxes and bullets of {{cmd}}score{{/}} look wrong, type {{cmd}}charset ascii{{/}}.\n\n");
         EnsureHome(); // a wizard whose home is missing gets it back
         EnterWorld(StartRoom);
         ClaimLostProperty();
@@ -406,7 +410,7 @@ public class Player : Adventurer
         }
         Write(
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
-            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
+            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}charset{/} [ascii|utf8] (or {cmd}ascii{/} [on|off]: plain 7-bit characters if the boxes of {cmd}score{/} look wrong), {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
             "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}vitality{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
@@ -479,6 +483,26 @@ public class Player : Adventurer
         if (word != "on" && word != "off") { NotifyFail("Usage: {cmd}ansi{/} [{cmd}on{/}|{cmd}off{/}]"); return false; }
         colour = word == "on";
         Write(colour ? "ANSI colour is now on. Commands you can type, like {cmd}help{/}, are highlighted.\n" : "ANSI colour is now off.\n");
+        return true;
+    }
+
+    /// <summary>"charset" shows the setting; "charset ascii" and "charset utf8" change it; "ascii on" and "ascii off" do the same.</summary>
+    private bool CmdCharset(string args)
+    {
+        var word = args.Trim().ToLowerInvariant();
+        var alias = QueryVerb() == "ascii";
+        if (word == "")
+        {
+            Write(asciiOnly ? "Characters: plain ASCII (boxes drawn with + - |). Type {cmd}charset utf8{/} to use the full character set.\n"
+                : "Characters: UTF-8 (boxes, bullets and dashes). If they look like garbage in your client, type {cmd}charset ascii{/}.\n");
+            return true;
+        }
+        bool? want = alias ? (word == "on" ? true : word == "off" ? false : null)
+            : word is "ascii" ? true : word is "utf8" or "utf-8" or "unicode" ? false : null;
+        if (want == null) { NotifyFail(alias ? "Usage: {cmd}ascii{/} [{cmd}on{/}|{cmd}off{/}]" : "Usage: {cmd}charset{/} [{cmd}ascii{/}|{cmd}utf8{/}]"); return false; }
+        asciiOnly = want.Value;
+        Write(asciiOnly ? "Characters: plain ASCII from now on. Boxes are drawn with + - | and everything you see is 7-bit.\n"
+            : "Characters: UTF-8 from now on.\n");
         return true;
     }
 
