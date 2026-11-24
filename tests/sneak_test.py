@@ -633,7 +633,7 @@ def step_sneak(chief):
     check("score shows it with the rank and the cost", text, "You are sneaking (rank I): each room costs 5 Endurance")
     check("score renders the colour tags of the sneaking line (no raw markup)", text, "(sneak off to stop)", absent=("{cmd}", "{/}", "}}", "{{"))
     check("a player's time is the date command", s.command("time"), "Today is ", absent=("What?",))
-    check("a player's bare stat is score", s.command("stat"), "Level 1", "Calling Scout", absent=("What?",))
+    check("a player's bare stat is score", s.command("stat"), "Level 1", "Scout • Level 1", absent=("What?",))
     check("a player's stat of a thing is still not a command", s.command("stat me"), "What?")
     check("a wizard's bare stat is still the wizard's own", chief.command("stat"), "Stat what?", absent=("Calling",))
     check("the prompt token {sneak}", s.command("prompt {sneak}> ") + s.command("look"), "(sneaking) >")
@@ -976,7 +976,7 @@ def step_ranks(chief):
     out = s.command("train sneak")
     check("Wenna teaches Sneak II", out, "You pay Wenna Farrow", "Sneak II")
     check("rank II: room cost 4", s.command("sneak"), "Each room you enter costs 4 Endurance.")
-    check("score shows rank II and the notice change", s.command("score"), "You are sneaking (rank II): each room costs 4 Endurance, and creatures notice you 10 points less often")
+    check("score shows rank II and the notice change", " ".join(s.command("score").split()), "You are sneaking (rank II): each room costs 4 Endurance, and creatures notice you 10 points less often")
     check("Wenna teaches no further", s.command("train sneak"), "no further than rank II")
     s.command("sneak off")
     g = stat(s)["grace"]
@@ -1004,7 +1004,7 @@ def step_ranks(chief):
     out = s.command("train sneak")
     check("Veyla teaches Sneak III", out, "Sneak III")
     check("rank III: room cost 3", s.command("sneak"), "Each room you enter costs 3 Endurance.")
-    check("score shows rank III", s.command("score"), "You are sneaking (rank III): each room costs 3 Endurance, and creatures notice you 20 points less often")
+    check("score shows rank III", " ".join(s.command("score").split()), "You are sneaking (rank III): each room costs 3 Endurance, and creatures notice you 20 points less often")
     s.command("sneak off")
     g = stat(s)["grace"]
     c = chance(g, 10, 1, True, -20)   # an Alert creature: the chance is not at its floor

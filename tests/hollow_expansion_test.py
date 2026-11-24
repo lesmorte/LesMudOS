@@ -322,7 +322,7 @@ def newchar(name, archetype=None, gold=0):
 
 def score(c):
     text = c.command("score")
-    m = re.search(r"(?:HP|Vitality) (\d+)/(\d+)", text)
+    m = re.search(r"(?:HP|Vitality)\s+(\d+)/(\d+)", text)
     dmg = re.search(r"Damage (\d+)-(\d+)", text)
     return {
         "text": text,

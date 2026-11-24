@@ -244,8 +244,8 @@ def score_of(c):
     return {
         "level": number(r"Level (\d+)", text),
         "xp": number(r"Experience (\d+)", text),
-        "hp": number(r"Vitality (\d+)/", text),
-        "max": number(r"Vitality \d+/(\d+)", text),
+        "hp": number(r"Vitality\s+(\d+)/", text),
+        "max": number(r"Vitality\s+\d+/(\d+)", text),
         "gold": number(r"Gold (\d+)", text),
         "text": text,
     }
@@ -535,8 +535,8 @@ def run(work, mudlib):
 
     # ===== character sheet, help =====
     s = score_of(hero)
-    check("a new character: level 1, 30 Vitality, 25 gold, unarmed 2-5, Reaction Time 2.5", s["text"], "Level 1   Experience 0 (100 more for level 2)",
-          "Vitality 30/30", "Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
+    check("a new character: level 1, 30 Vitality, 25 gold, unarmed 2-5, Reaction Time 2.5", s["text"], "Level 1", "Experience 0 (100 more for level 2)",
+          "Vitality   30/30", "Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
     check("hp command", hero.command("vitality"), "Vitality 30/30")
     text = hero.command("help")
     check("help lists the new commands", text, "kill (or attack)", "flee", "consider", "wield", "wear", "browse", "buy", "accept", "report", "quests", "score",
@@ -585,7 +585,7 @@ def run(work, mudlib):
     check("wear", hero.command("wear shield"), "You put on a small shield.")
     s = score_of(hero)
     check("score shows the equipment and derived numbers", s["text"], "Damage 9-14", "Armor 1", "weapon: a rusty sword", "shield: a small shield",
-          "Reaction Time 3.5 (base 2.5, a rusty sword +0.5, a small shield +0.5). Your attack takes 9.0 seconds.")
+          "Reaction Time 3.5 (base 2.5, a rusty sword +0.5, a small shield +0.5).", "Your attack takes 9.0 seconds.")
     check("unwield", hero.command("unwield"), "You stop wielding a rusty sword.")
     check("unarmed again", score_of(hero)["text"], "Damage 2-5", "Your attack takes 7.0 seconds.")
     hero.command("wield sword")

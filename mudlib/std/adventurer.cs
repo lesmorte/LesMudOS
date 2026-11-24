@@ -1891,42 +1891,52 @@ public abstract class Adventurer : Living
 
     private bool CmdScore(string args)
     {
+        // The layout is /secure/scoresheet's (docs/specs/score.md); the numbers are this body's own.
+        var sheet = LoadObject("/secure/scoresheet");
+        var wizard = QueryWizLevel();
         var text = new StringBuilder();
-        text.Append($"{Short()}\n");
-        text.Append($"Level {Level}   Experience {xp}");
-        text.Append(Level >= MaxLevel ? " (highest level)\n" : $" ({QueryXpForLevel(Level + 1) - xp} more for level {Level + 1})\n");
-        var calling = archetypeName == "" ? "none yet" : archetypeName;
-        text.Append($"Calling {calling}" + (advancedClass != "" || subclass != "" || prestigeClass != "" ? $"   Class {classTitle}" : "") + "\n");
+        var renownTitle = wizard > 0 ? "" : LoadObject("/secure/renown").Call<string>("QueryActiveTitle", QueryName()) ?? "";
+        text.Append(sheet.Call<string>("Box", (Short() ?? Name).Replace("{{", "{"), renownTitle));
+        var calling = archetypeName == "" ? "No calling yet" : archetypeName;
+        text.Append($"\n{calling}" + (advancedClass != "" || subclass != "" || prestigeClass != "" ? $" • Class {classTitle}" : "") + $" • Level {Level}\n");
+        if (wizard == 0) text.Append(sheet.Call<string>("RankLine", QueryName()));
+        text.Append($"\nVitality   {Vitality}/{QueryMaxVitality()}\nEndurance  {QueryEndurance()}/{QueryMaxEndurance()}\nFocus      {QueryFocus()}/{QueryMaxFocus()}\n\n");
+        text.Append(sheet.Call<string>("Standing", QueryName(), wizard) + "\n");
+        var power = QueryStat("physical_power");
+        text.Append(sheet.Call<string>("Heading", "Combat Summary"));
+        text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}" + (power != 0 ? $" ({(power > 0 ? "+" : "")}{Pct(power)}%)" : "") +
+                    $"   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}\nDodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {Pct(QueryCrit())}%\n");
+        text.Append(sheet.Call<string>("Wrap", ReactionReport()) + "\n");
+        text.Append(sheet.Call<string>("Heading", "Attributes"));
+        text.Append(sheet.Call<string>("Columns", AttributeNames.Select(a =>
+        {
+            var total = QueryAttribute(a);
+            var basis = QueryBaseAttribute(a);
+            return $"{AttributeTitle(a)} {total}" + (total != basis ? $" ({basis})" : "");
+        }).ToList()));
+        var points = QueryAttributePoints();
+        if (points > 0) text.Append($"Attribute points to place: {points} ({{cmd}}improve{{/}} ATTRIBUTE)\n");
+        text.Append(sheet.Call<string>("Columns", QueryStatDisplay().Select(s => $"{s.name} {s.value}").ToList()));
+        var effectLines = QueryEffectLines();
+        if (effectLines.Count > 0) text.Append(sheet.Call<string>("Wrap", "Effects: " + string.Join(", ", effectLines)));
+        text.Append("\n" + sheet.Call<string>("Heading", "Progress"));
+        text.Append($"Experience {xp}" + (Level >= MaxLevel ? " (highest level)" : $" ({QueryXpForLevel(Level + 1) - xp} more for level {Level + 1})") + $"   Gold {Gold}   Carry Capacity {QueryCarryCapacity()} lb\n");
         var area = Environment()?.Call<string>("QueryAreaName") ?? "";
         var region = Environment()?.Call<string>("QueryRegionName") ?? "";
         if (area != "" || region != "") text.Append($"Area {area}   Region {region}\n");
-        try { text.Append(LoadObject("/secure/renown").Call<string>("TierLine", QueryName()) ?? ""); }
-        catch (MudRuntimeException) { }
-        text.Append($"Vitality {Vitality}/{QueryMaxVitality()}   Endurance {QueryEndurance()}/{QueryMaxEndurance()}   Focus {QueryFocus()}/{QueryMaxFocus()}   Gold {Gold}\n");
-        if (QueryResting()) text.Append($"You are resting: Vitality, Endurance and Focus return {RestFactor:0.#} times as fast. ({{cmd}}stand{{/}} to get up)\n");
+        var gear = new List<string>();
+        foreach (var slot in new[] { "weapon", "shield", "body", "head", "trinket" })
+            if (QueryEquipped(slot) is { } item) gear.Add($"{slot}: {item.Call<string>("Short")}");
+        text.Append(sheet.Call<string>("Wrap", gear.Count == 0 ? "You have nothing equipped." : "Equipment: " + string.Join(", ", gear)));
+        text.Append(sheet.Call<string>("Wrap", QuestLog()));
+        if (QueryResting()) text.Append(sheet.Call<string>("Wrap", $"You are resting: Vitality, Endurance and Focus return {RestFactor:0.#} times as fast. ({{cmd}}stand{{/}} to get up)"));
         if (sneaking)
         {
             var sneakRank = Math.Max(1, QuerySkillRank("sneak"));
             var sneakSkill = LoadObject("/skills/sneak");
             var notice = sneakSkill.Call<int>("QueryNoticeAt", sneakRank);
-            text.Append($"You are sneaking (rank {Skill.Roman(sneakRank)}): each room costs {sneakSkill.Call<int>("QueryRoomCostAt", sneakRank)} Endurance" + (notice != 0 ? $", and creatures notice you {-notice} points less often" : "") + $". ({{cmd}}sneak off{{/}} to stop)\n");
+            text.Append(sheet.Call<string>("Wrap", $"You are sneaking (rank {Skill.Roman(sneakRank)}): each room costs {sneakSkill.Call<int>("QueryRoomCostAt", sneakRank)} Endurance" + (notice != 0 ? $", and creatures notice you {-notice} points less often" : "") + $". ({{cmd}}sneak off{{/}} to stop)"));
         }
-        var power = QueryStat("physical_power");
-        text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}" + (power != 0 ? $" ({(power > 0 ? "+" : "")}{Pct(power)}%)" : "") +
-                    $"   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}   Dodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {Pct(QueryCrit())}%\n");
-        text.Append(AttributeLine());
-        var points = QueryAttributePoints();
-        if (points > 0) text.Append($"Attribute points to place: {points} ({{cmd}}improve{{/}} ATTRIBUTE)\n");
-        var shown = QueryStatDisplay().Select(s => $"{s.name} {s.value}").ToList();
-        text.Append(string.Join("   ", shown.Take(5)) + "\n" + string.Join("   ", shown.Skip(5)) + $"   Carry Capacity {QueryCarryCapacity()} lb\n");
-        var effectLines = QueryEffectLines();
-        if (effectLines.Count > 0) text.Append("Effects: " + string.Join(", ", effectLines) + "\n");
-        var gear = new List<string>();
-        foreach (var slot in new[] { "weapon", "shield", "body", "head", "trinket" })
-            if (QueryEquipped(slot) is { } item) gear.Add($"{slot}: {item.Call<string>("Short")}");
-        text.Append(gear.Count == 0 ? "You have nothing equipped.\n" : "Equipment: " + string.Join(", ", gear) + "\n");
-        text.Append(ReactionReport());
-        text.Append(QuestLog());
         Write(text.ToString());
         return true;
     }
