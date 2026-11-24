@@ -378,3 +378,159 @@ python3 tests/balance_sim.py scout hall 1500       # 5.7
 python3 tests/balance_sim.py scout spread 1500     # 7.2
 ```
 The switches: `scout_option(mode, opener, second, per_level, elite, cap, cost, floor)` for the options; `SIM_REROLL` and `SIM_BOW_STRIKE` for the two fixes of section 2; `OPT` holds the state.
+
+
+## 10. Option G: a cap that depends on the level difference (added 24 November 2026)
+
+The owner asked: what if the opener's cap were a formula of d = Scout level - creature level, lower when the creature is above the Scout, higher when the Scout is above it, so that a strong character one-shots rats? Measured like D2 (same seeds, 1500 runs a cell). The cap is a share of the target's maximum Vitality, and **no cap** once the share reaches 100%.
+
+- **G1:** 60% + 20% x d, floor 40%, no cap from d = +2.
+- **G2:** 60% + 15% x d, floor 30%, no cap from d = +3.
+- **G3:** 50% + 25% x d, floor 25%, no cap from d = +2.
+- Each is run twice: on the Aimed Shot opener only, and ("+ Precision Strike") on every from-hiding opener, so the melee Scout's ambush is capped the same way. For the archer the two are identical, so only the melee Scout's table tells them apart. D = the level used is the Scout's level at the moment the shot lands.
+
+### 10.1 What d is
+
+| creature | Vitality | level | d at Scout level 1 | d at level 3 | d at level 5 |
+|---|---|---|---|---|---|
+| Large Rat | 12 | 1 | +0 | +2 | +4 |
+| Giant Rat | 15 | 1 | +0 | +2 | +4 |
+| Goblin Scavenger | 13 | 2 | -1 | +1 | +3 |
+| Spore Bat | 9 | 2 | -1 | +1 | +3 |
+| Goblin Guard | 26 | 2 | -1 | +1 | +3 |
+| Giant Cave Toad | 66 | 3 | -2 | +0 | +2 |
+| Goblin Warrior | 28 | 3 | -2 | +0 | +2 |
+| Goblin Elite Guard | 40 | 4 | -3 | -1 | +1 |
+| Goblin Overseer | 114 | 5 | -4 | -2 | +0 |
+
+The cap by d:
+
+| option | d=-3 | d=-2 | d=-1 | d=0 | d=+1 | d=+2 | d=+3 |
+|---|---|---|---|---|---|---|---|
+| G1 60% + 20% x d, floor 40% | 40% | 40% | 40% | 60% | 80% | none | none |
+| G2 60% + 15% x d, floor 30% | 30% | 30% | 45% | 60% | 75% | 90% | none |
+| G3 50% + 25% x d, floor 25% | 25% | 25% | 25% | 50% | 75% | none | none |
+
+So a level 1 Scout meets rats at d = 0 (60% cap: a rat takes 7 at most from the opener) and everything else below him (d -1 to -3: 30% to 40%); a level 3 Scout is at d = +2 against rats (uncapped under G1 and G3, 90% under G2) and at d = +1 against scavengers, bats and guards; a level 5 Scout is at +3 or +4 against the rats, scavengers, bats and guards (uncapped in all three), +2 against the toad and warriors (uncapped under G1 and G3, 90% under G2), and +1 against the Elite Guards (75% to 80%).
+
+### 10.2 Standard test (1500 runs a cell, seed 1)
+
+| option | rank | warrior | scout (melee) | priest | mage | adventurer | archer | mean of five | archer - mean | scout - mean | scout, no sneak | archer, no sneak |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline: the game now | I | 81.1 | 83.7 | 76.4 | 72.5 | 82.3 | 90.1 | 79.2 | +10.9 | +4.5 | 82.2 | 89.2 |
+| baseline: the game now | II | 94.1 | 86.9 | 97.6 | 92.3 | 88.3 | 93.3 | 91.9 | +1.5 | -4.9 | 83.7 | 92.5 |
+| D2 flat cap 60% | I | 81.1 | 83.7 | 76.4 | 72.5 | 82.3 | 89.8 | 79.2 | +10.6 | +4.5 | 82.2 | 89.2 |
+| D2 flat cap 60% | II | 94.1 | 86.9 | 97.6 | 92.3 | 88.3 | 93.4 | 91.9 | +1.5 | -4.9 | 83.7 | 92.5 |
+| G1 60% + 20% x d, floor 40% | I | 81.1 | 83.7 | 76.4 | 72.5 | 82.3 | 89.2 | 79.2 | +10.0 | +4.5 | 82.2 | 89.2 |
+| G1 60% + 20% x d, floor 40% | II | 94.1 | 86.9 | 97.6 | 92.3 | 88.3 | 94.3 | 91.9 | +2.4 | -4.9 | 83.7 | 92.5 |
+| G2 60% + 15% x d, floor 30% | I | 81.1 | 83.7 | 76.4 | 72.5 | 82.3 | 89.9 | 79.2 | +10.7 | +4.5 | 82.2 | 89.2 |
+| G2 60% + 15% x d, floor 30% | II | 94.1 | 86.9 | 97.6 | 92.3 | 88.3 | 93.6 | 91.9 | +1.7 | -4.9 | 83.7 | 92.5 |
+| G3 50% + 25% x d, floor 25% | I | 81.1 | 83.7 | 76.4 | 72.5 | 82.3 | 89.4 | 79.2 | +10.2 | +4.5 | 82.2 | 89.2 |
+| G3 50% + 25% x d, floor 25% | II | 94.1 | 86.9 | 97.6 | 92.3 | 88.3 | 93.3 | 91.9 | +1.4 | -4.9 | 83.7 | 92.5 |
+| G1 + Precision Strike | I | 81.1 | 83.7 | 76.4 | 72.5 | 82.3 | 89.2 | 79.2 | +10.0 | +4.5 | 82.2 | 89.2 |
+| G1 + Precision Strike | II | 94.1 | 86.9 | 97.6 | 92.3 | 88.3 | 94.3 | 91.9 | +2.4 | -4.9 | 83.7 | 92.5 |
+| G2 + Precision Strike | I | 81.1 | 83.7 | 76.4 | 72.5 | 82.3 | 89.9 | 79.2 | +10.7 | +4.5 | 82.2 | 89.2 |
+| G2 + Precision Strike | II | 94.1 | 84.8 | 97.6 | 92.3 | 88.3 | 93.6 | 91.4 | +2.2 | -6.6 | 83.7 | 92.5 |
+| G3 + Precision Strike | I | 81.1 | 83.7 | 76.4 | 72.5 | 82.3 | 89.4 | 79.2 | +10.2 | +4.5 | 82.2 | 89.2 |
+| G3 + Precision Strike | II | 94.1 | 86.9 | 97.6 | 92.3 | 88.3 | 93.3 | 91.9 | +1.4 | -4.9 | 83.7 | 92.5 |
+
+Nothing moves outside the noise (section 3): the archer is 89.2 to 89.9 at rank I and 93.3 to 94.3 at rank II against 90.1 / 93.3 now; the five callings are identical; the non-sneaking columns are untouched. The one cell that moves is the melee Scout at rank II under G2 + Precision Strike (86.9 to 84.8), 2 points, at the edge of the noise.
+
+### 10.3 The archer's cellar run
+
+Hunting Bow:
+
+| option | deaths a run | potions used | killed by the first action | killed before they acted | fights with no damage | minutes to level 5 | first-action kills at level 1-2 | level 3 | level 4-5 |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline: the game now | 0.39 | 2.72 | 19% | 16% | 6% | 30.7 (+-0.2) | 19% | 19% | 18% |
+| D2 flat cap 60% | 0.41 | 2.74 | 7% | 11% | 4% | 33.7 (+-0.3) | 11% | 4% | 5% |
+| G1 60% + 20% x d, floor 40% | 0.42 | 2.74 | 13% | 12% | 5% | 32.6 (+-0.2) | 11% | 11% | 16% |
+| G2 60% + 15% x d, floor 30% | 0.40 | 2.73 | 9% | 11% | 4% | 33.5 (+-0.3) | 11% | 5% | 10% |
+| G3 50% + 25% x d, floor 25% | 0.42 | 2.79 | 13% | 12% | 5% | 33.7 (+-0.3) | 11% | 11% | 17% |
+| G1 + Precision Strike | 0.42 | 2.74 | 13% | 12% | 5% | 32.6 (+-0.2) | 11% | 11% | 16% |
+| G2 + Precision Strike | 0.40 | 2.73 | 9% | 11% | 4% | 33.5 (+-0.3) | 11% | 5% | 10% |
+| G3 + Precision Strike | 0.42 | 2.79 | 13% | 12% | 5% | 33.7 (+-0.3) | 11% | 11% | 17% |
+
+Warden's Recurve from level 3:
+
+| option | deaths a run | potions used | killed by the first action | killed before they acted | fights with no damage | minutes to level 5 | first-action kills at level 1-2 | level 3 | level 4-5 |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline: the game now | 0.26 | 1.94 | 22% | 17% | 8% | 24.9 (+-0.2) | 20% | 22% | 26% |
+| D2 flat cap 60% | 0.29 | 2.06 | 10% | 12% | 6% | 27.2 (+-0.2) | 11% | 7% | 10% |
+| G1 60% + 20% x d, floor 40% | 0.29 | 2.10 | 15% | 13% | 7% | 27.0 (+-0.2) | 11% | 12% | 24% |
+| G2 60% + 15% x d, floor 30% | 0.26 | 2.10 | 12% | 13% | 6% | 27.4 (+-0.2) | 11% | 7% | 16% |
+| G3 50% + 25% x d, floor 25% | 0.27 | 2.12 | 15% | 13% | 6% | 27.7 (+-0.3) | 11% | 13% | 24% |
+| G1 + Precision Strike | 0.29 | 2.10 | 15% | 13% | 7% | 27.0 (+-0.2) | 11% | 12% | 24% |
+| G2 + Precision Strike | 0.26 | 2.10 | 12% | 13% | 6% | 27.4 (+-0.2) | 11% | 7% | 16% |
+| G3 + Precision Strike | 0.27 | 2.12 | 15% | 13% | 6% | 27.7 (+-0.3) | 11% | 13% | 24% |
+
+Archer who does not sneak (identical in every row: G reaches only an opener from hiding):
+
+| option | deaths a run | potions used | killed by the first action | killed before they acted | fights with no damage | minutes to level 5 | first-action kills at level 1-2 | level 3 | level 4-5 |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline: the game now | 0.41 | 2.87 | 18% | 0% | 2% | 33.7 (+-0.3) | 19% | 17% | 16% |
+| D2 flat cap 60% | 0.41 | 2.87 | 18% | 0% | 2% | 33.7 (+-0.3) | 19% | 17% | 16% |
+| G1 60% + 20% x d, floor 40% | 0.41 | 2.87 | 18% | 0% | 2% | 33.7 (+-0.3) | 19% | 17% | 16% |
+| G2 60% + 15% x d, floor 30% | 0.41 | 2.87 | 18% | 0% | 2% | 33.7 (+-0.3) | 19% | 17% | 16% |
+| G3 50% + 25% x d, floor 25% | 0.41 | 2.87 | 18% | 0% | 2% | 33.7 (+-0.3) | 19% | 17% | 16% |
+| G1 + Precision Strike | 0.41 | 2.87 | 18% | 0% | 2% | 33.7 (+-0.3) | 19% | 17% | 16% |
+| G2 + Precision Strike | 0.41 | 2.87 | 18% | 0% | 2% | 33.7 (+-0.3) | 19% | 17% | 16% |
+| G3 + Precision Strike | 0.41 | 2.87 | 18% | 0% | 2% | 33.7 (+-0.3) | 19% | 17% | 16% |
+
+Reading it: **G does what was asked in shape.** At levels 1 and 2 it behaves like D2 (11% of creatures killed by the first action against 19% now) because everything is at or above the Scout. From level 3 it opens up: with the Hunting Bow G1 and G3 give 11% at level 3 and 16% to 17% at level 4 and 5 (now 18% to 19%; D2 5%), G2 5% and 10%. So **G1 and G3 give back almost the whole one-shot at level 4 and 5, G2 about half of it**; D2 stays at 4% to 5% throughout. Overall first-action kills: baseline 19%, D2 7%, G2 9%, G1 and G3 13%. The cost in pace is 2 to 3 minutes (30.7 to 32.6 for G1, 33.5 for G2, 33.7 for G3, 33.7 for D2). Deaths (0.39 to 0.42), potions (2.72 to 2.79) and killed-before-acting (16% to 11-12%) are the same as D2 within noise.
+
+### 10.4 The melee Scout, and the Elite Guards
+
+| option | deaths a run | potions used | killed by the first action | killed before they acted | minutes to level 5 | first-action kills at level 1-2 | level 3 | level 4-5 |
+|---|---|---|---|---|---|---|---|---|
+| baseline: the game now | 0.43 | 2.91 | 13% | 14% | 33.6 | 12% | 15% | 13% |
+| D2 flat cap 60% | 0.43 | 2.91 | 13% | 14% | 33.6 | 12% | 15% | 13% |
+| G1 60% + 20% x d, floor 40% | 0.43 | 2.91 | 13% | 14% | 33.6 | 12% | 15% | 13% |
+| G2 60% + 15% x d, floor 30% | 0.43 | 2.91 | 13% | 14% | 33.6 | 12% | 15% | 13% |
+| G3 50% + 25% x d, floor 25% | 0.43 | 2.91 | 13% | 14% | 33.6 | 12% | 15% | 13% |
+| G1 + Precision Strike | 0.47 | 2.92 | 8% | 11% | 35.1 | 4% | 8% | 13% |
+| G2 + Precision Strike | 0.42 | 2.88 | 4% | 9% | 35.2 | 4% | 2% | 7% |
+| G3 + Precision Strike | 0.44 | 2.95 | 8% | 11% | 35.2 | 4% | 8% | 13% |
+
+G on the Aimed Shot alone leaves the melee Scout exactly as he is (identical rows). Applied to Precision Strike's ambush as well, his first-action kills fall from 13% to 8% (G1, G3) or 4% (G2), his pace slows from 33.6 to 35.1 / 35.2 minutes and deaths rise 0.43 to 0.47 for G1: a real cost to the line the owner did not call too easy.
+
+The Elite Guards pair (win%, in brackets the share of runs without damage):
+
+| option | archer L3 | archer L3 + Recurve | archer L4 | archer L4 + Recurve | melee Scout L3 | warrior L3 |
+|---|---|---|---|---|---|---|
+| baseline: the game now | 91 (0) | 97 (1) | 98 (0) | 100 (2) | 83 (0) | 91 (0) |
+| D2 flat cap 60% | 89 (0) | 97 (1) | 98 (0) | 100 (1) | 83 (0) | 91 (0) |
+| G1 60% + 20% x d, floor 40% | 89 (0) | 97 (1) | 98 (0) | 100 (1) | 83 (0) | 91 (0) |
+| G2 60% + 15% x d, floor 30% | 90 (0) | 96 (1) | 98 (0) | 100 (1) | 83 (0) | 91 (0) |
+| G3 50% + 25% x d, floor 25% | 89 (0) | 98 (0) | 98 (0) | 99 (1) | 83 (0) | 91 (0) |
+| G1 + Precision Strike | 89 (0) | 97 (1) | 98 (0) | 100 (1) | 83 (0) | 91 (0) |
+| G2 + Precision Strike | 90 (0) | 96 (1) | 98 (0) | 100 (1) | 83 (0) | 91 (0) |
+| G3 + Precision Strike | 89 (0) | 98 (0) | 98 (0) | 99 (1) | 83 (0) | 91 (0) |
+
+Unchanged by every variant (88 to 91% at level 3 and 98% at level 4 with the Hunting Bow): the guards are 40 Vitality at d = -1 (level 3) or d = 0 (level 4) and are capped at 40% to 60%, so a cap on the opener never was what decides that fight.
+
+### 10.5 For reference: a Warrior's first action
+
+| level 1-2 | level 3 | level 4-5 | all |
+|---|---|---|---|
+| 4.0% | 3.7% | 4.6% | 4.1% |
+
+The Warrior kills 4% of what he kills with his first action at every level from 1 to 5, and none before it acts. This is not because his blow is weak: he does not open the fights. Every cellar creature is Aggressive and starts its own fight, and a Warrior (Reaction Time 3.0, so 6 s) waits longer than most creatures before his first action, which is usually the Shield Bash.
+
+Extrapolation, not a simulator run: the chance that an ordinary blow that **hits** kills a full-Vitality Large Rat (12 Vitality) outright, for a Warrior who places one point in Might each level (Might 8 + level - 1) at +2% damage a point above 5, rounded as the game does it, no critical, no block:
+
+| level | Might | rusty sword 9-14 | woodcutter axe 14-21 | fine longsword 12-18 |
+|---|---|---|---|---|
+| 1 | 8 | 66% | 100% | 100% |
+| 3 | 10 | 66% | 100% | 100% |
+| 5 | 12 | 66% | 100% | 100% |
+| 8 | 15 | 83% | 100% | 100% |
+| 10 | 17 | 83% | 100% | 100% |
+| 12 | 19 | 100% | 100% | 100% |
+| 15 | 22 | 100% | 100% | 100% |
+
+With the starting rusty sword a Warrior's ordinary hit already kills a rat two times in three at level 1 (the damage rolls of 12 to 14 after the Might bonus), and it is a certainty from **level 12** (Might 19). With the woodcutter axe or the fine longsword (the Warrior's next two weapons) it is a certainty from level 1. So "a strong character one-shots rats" is a matter of weapon more than of level in these numbers; what the Scout has that the Warrior has not is the first action, the surprised target and the 10 s before the rat acts.
+
+### 10.6 Recommendation on G
+
+Of the three, **G2 (60% + 15% x d, floor 30%)** is the one to take if the owner prefers a level-scaled cap to the flat D2: it keeps the first-action kills at 9% overall (D2 7%), 5% at level 3 and 10% at level 4 and 5, so a Scout who is well above the room gets back some of the feeling of strength but not the whole of the one-shot, and it costs the same three minutes as D2. G1 and G3 un-cap at d = +2 and so restore 16% to 17% first-action kills at level 4 and 5 (the owner's complaint was about level 1 to 4, where they match D2 until level 3), and cost less pace (G1: 32.6 minutes). Apply it to **the Aimed Shot only**: putting G on Precision Strike's ambush lowers the melee Scout (first-action kills 13% to 4-8%, 1.5 minutes slower, deaths +0.04 for G1) and, at rank II, G2 + Precision Strike took the melee Scout's standard test from 86.9 to 84.8. As before, none of the G variants moves the standard-test number for the archer (89 to 94 against 90 to 93), so if that number must be in the 72 to 83 band the lever is still E2 (section 1, step 2).
