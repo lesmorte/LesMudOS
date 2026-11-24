@@ -874,7 +874,7 @@ public abstract class Adventurer : Living
             if (IsEquipped(item)) carriedEquipped.Add(carried.Count - 1);
         }
         var room = Environment();
-        logoutRoom = room != null && room.Call<bool>("QueryLogoutRoom") ? room.Name : "";
+        logoutRoom = room != null && WakeRoomOk(room.Name) ? room.Name : ""; // wherever they are (docs/specs/play-feel.md, "Where a login begins")
     }
 
     /// <summary>Remove the carried items from the game, as the player leaves. They return at the next login.</summary>
@@ -989,10 +989,15 @@ public abstract class Adventurer : Living
         PersistNow();
     }
 
+    /// <summary>A room a character may wake in: not a wizard's sandbox (their own home excepted, for a wizard), not the void, not a clone.</summary>
+    private bool WakeRoomOk(string path) =>
+        path != "" && path != "/std/void" && !path.Contains('#') &&
+        (!path.StartsWith("/wiz/") || (QueryWizLevel() > 0 && path.StartsWith("/wiz/" + Name.ToLowerInvariant() + "/")));
+
     /// <summary>Move the player into the world: the saved logout room, if there is one, else the start room.</summary>
     protected void EnterWorld(string startRoom)
     {
-        var destination = logoutRoom != "" ? logoutRoom : startRoom;
+        var destination = logoutRoom != "" && WakeRoomOk(logoutRoom) ? logoutRoom : startRoom;
         logoutRoom = "";
         try
         {
