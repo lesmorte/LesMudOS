@@ -1,12 +1,12 @@
 /// <summary>
 /// The look of `score` (docs/specs/score.md): the box with the name, the rule under each heading, the one sentence for a Renown rank, the
-/// Chronicle Standing section from the character's own records, and the wrapping of long lines to 78 columns. It holds no state and
+/// Chronicle Standing section from the character's own records, and the wrapping of long lines to 80 columns. It holds no state and
 /// changes nothing; the numbers come from the character's own body, which asks for the pieces it cannot make itself.
 /// </summary>
 public class ScoreSheet : MudObject
 {
     private const int BoxInside = 46;   // the box is 48 columns wide
-    private const int MaxColumns = 78;  // nothing wider than 80
+    private const int MaxColumns = 80;  // nothing wider than 80
     private const string Ledger = "/secure/renown";
     private const string Chronicle = "/secure/chronicle";
 
@@ -92,7 +92,7 @@ public class ScoreSheet : MudObject
         return count;
     }
 
-    /// <summary>Wrap every line of the text that is wider than 78 columns at a space (markup tags do not count towards the width).</summary>
+    /// <summary>Wrap every line of the text that is wider than 80 columns at a space (markup tags do not count towards the width).</summary>
     public string Wrap(string text)
     {
         var result = new System.Text.StringBuilder();
@@ -109,7 +109,7 @@ public class ScoreSheet : MudObject
         return result.ToString();
     }
 
-    /// <summary>Items joined by three spaces, as many to a line as fit in 78 columns.</summary>
+    /// <summary>Items joined by three spaces, as many to a line as fit in 80 columns.</summary>
     public string Columns(List<string> items)
     {
         var text = "";

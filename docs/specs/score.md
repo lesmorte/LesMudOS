@@ -50,7 +50,7 @@ You are resting: ...                      state lines, only while true
 You are sneaking (rank I): ...
 ```
 
-No line is wider than 78 columns: a longer line is wrapped at a space (`Wrap`), a row of items is filled in as many to a line as fit (`Columns`). Headings are bold and the name is in the title style; with colour off the layout reads the same.
+No line is wider than 80 columns: a longer line is wrapped at a space (`Wrap`), a row of items is filled in as many to a line as fit (`Columns`). Headings are bold and the name is in the title style; with colour off the layout reads the same.
 
 ## Mappings
 

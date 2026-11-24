@@ -1906,7 +1906,9 @@ public abstract class Adventurer : Living
         text.Append(sheet.Call<string>("Heading", "Combat Summary"));
         text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}" + (power != 0 ? $" ({(power > 0 ? "+" : "")}{Pct(power)}%)" : "") +
                     $"   To hit +{QueryAttack()}   Defense {QueryDefense()}   Armor {QueryArmor()}\nDodge {QueryDodge()}%   Block {QueryBlock()}%   Critical {Pct(QueryCrit())}%\n");
-        text.Append(sheet.Call<string>("Wrap", ReactionReport()) + "\n");
+        var reaction = ReactionReport().TrimEnd('\n');
+        if (reaction.Length > 80) reaction = reaction.Replace(". Your attack", ".\nYour attack"); // two sentences, two lines, when one line is too wide
+        text.Append(sheet.Call<string>("Wrap", reaction) + "\n");
         text.Append(sheet.Call<string>("Heading", "Attributes"));
         text.Append(sheet.Call<string>("Columns", AttributeNames.Select(a =>
         {
