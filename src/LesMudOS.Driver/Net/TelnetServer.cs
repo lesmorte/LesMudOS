@@ -40,6 +40,7 @@ internal sealed class Connection
 
     /// <summary>True when the last thing sent was a prompt and the player has typed nothing since: unprompted output then starts on a new line. Game thread only.</summary>
     public bool AtPrompt;
+    public long PromptSentMs; // when the prompt was sent: a line typed within a round trip of it may have crossed it on the wire
 
     /// <summary>
     /// When this connection last sent a real line (not an empty one: a client keep-alive is not activity), in the kernel's clock.

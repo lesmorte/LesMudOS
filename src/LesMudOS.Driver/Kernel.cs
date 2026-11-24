@@ -173,6 +173,7 @@ internal sealed partial class Kernel : IDriverServices
     // someone arriving) leaves the player looking at old text, so every connection that received output during an execution gets a
     // fresh prompt when it ends, if its owner is a player body that asks for it and is not in the middle of a question.
 
+    private const long PromptCrossingMs = 300;
     private readonly HashSet<Connection> _owing = new();
     private Connection? _promptSkip; // the connection whose line is being handled: its prompt is sent when the line is done
 
@@ -208,8 +209,9 @@ internal sealed partial class Kernel : IDriverServices
             _thisPlayer = null;
             _callStack.Clear();
         }
-        connection.Send(text);
+        connection.Send(connection.AtPrompt ? "\n" + text : text); // still at a prompt (a line crossed it): a fresh line first
         connection.AtPrompt = true;
+        connection.PromptSentMs = afterOutput ? TimeMs() : 0; // only a prompt that followed unprompted output can be crossed by a line typed meanwhile
     }
 
     private void ReportError(ObjectRef? player, Exception error)
@@ -268,7 +270,9 @@ internal sealed partial class Kernel : IDriverServices
             connection.Send("\n");
         }
         if (line.Trim().Length > 0) connection.LastInputMs = TimeMs(); // an empty line is a client keep-alive, not activity
-        connection.AtPrompt = false; // the player pressed Enter: the cursor is on a fresh line
+        // The player pressed Enter: the cursor is on a fresh line, unless the line crossed the prompt on the wire (typed before the prompt
+        // arrived): a line within a round trip of a prompt that followed unprompted output leaves the prompt pending, so that the reply starts on a fresh line.
+        if (TimeMs() - connection.PromptSentMs > PromptCrossingMs) connection.AtPrompt = false;
         _promptSkip = connection;
         Execute(owner, () =>
         {
