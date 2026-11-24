@@ -574,7 +574,7 @@ def run(work, mudlib, box):
         if rm:
             truth(f"{short}: Reaction Time line shows +{rm}", re.search(pat, s["text"]) is not None, s["text"][-300:])
         else:
-            truth(f"{short}: no reaction modifier in the Reaction Time line", short not in s["text"].split("Reaction Time")[-1], s["text"][-300:])
+            truth(f"{short}: no reaction modifier in the Reaction Time line", short not in s["text"].split("Reaction Time")[-1].replace("\r", "").split("\n\n")[0], s["text"][-300:])
         if item in ATTRIBUTE:
             attr, bonus = ATTRIBUTE[item]
             total, basis = attribute(s["text"], attr)
