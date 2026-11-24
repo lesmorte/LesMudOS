@@ -3404,7 +3404,7 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
     avail = {room: 0.0 for room, c in CELL_ROUTE}
     avoid = {}
     potion_ready, left = 0.0, START_POTIONS
-    st = dict(deaths=0, fled=0, potions=0, kills=0, first=0, free=0, dmg=0.0, by={}, first_fights=0, fights=0, nodmg=0, laps=0, opened=0, noticed=0, second=0, reached=None, level_at={})
+    st = dict(waited=0.0, deaths=0, fled=0, potions=0, kills=0, first=0, free=0, dmg=0.0, by={}, first_fights=0, fights=0, nodmg=0, laps=0, opened=0, noticed=0, second=0, reached=None, level_at={})
     carry_ms, carry_t = 0, 0.0
     pos = "Village"
     kills_now = [0, 0, 0]
@@ -3539,6 +3539,7 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
             wait = max(0.0, min(absent) - t) if absent else 60.0
             rest(p, wait, model.rest_factor)
             t += wait
+            st["waited"] += wait
     return st
 
 
@@ -3577,7 +3578,7 @@ def cell_stats(calling, runs, sneak=True, recurve=False, seed=20261124, model=No
                 first=sum(r["first"] for r in rows) / kills * 100, free=sum(r["free"] for r in rows) / kills * 100, dmg=sum(r["dmg"] for r in rows) / fights * 100,
                 by=by_kind(rows), first_fights=sum(r["first_fights"] for r in rows) / fights * 100, nodmg=sum(r["nodmg"] for r in rows) / fights * 100,
                 minutes=mean_se([r["reached"] / 60.0 for r in reached]), reached=len(reached) / runs * 100, fights=sum(r["fights"] for r in rows) / runs,
-                laps=sum(r["laps"] for r in rows) / runs, opened=sum(r["opened"] for r in rows) / fights * 100, second=sum(r["second"] for r in rows) / runs,
+                laps=sum(r["laps"] for r in rows) / runs, waited=mean_se([r["waited"] / 60.0 for r in reached])[0], opened=sum(r["opened"] for r in rows) / fights * 100, second=sum(r["second"] for r in rows) / runs,
                 died_runs=sum(1 for r in rows if r["deaths"]) / runs * 100,
                 level_min={lv: mean_se([r["level_at"][lv] / 60.0 for r in rows if r["level_at"].get(lv)])[0] for lv in (2, 3, 4, 5)})
 
@@ -3691,14 +3692,14 @@ def yardstick_table(runs=1000):
 def pace_table(runs=1000):
     print(f"Pace: simulated minutes to reach each level, the cellar progression, starting kit, one potion, the game's experience table, middle human with `rest` "
           f"({runs} runs a row, seed 20261124). The Scouts sneak.")
-    print("| calling | level 2 | level 3 | level 4 | level 5 | reached level 5 | deaths a run | potions used |")
-    print("|---|---|---|---|---|---|---|---|")
+    print("| calling | level 2 | level 3 | level 4 | level 5 | of which waiting for resets | reached level 5 | deaths a run | potions used |")
+    print("|---|---|---|---|---|---|---|---|---|")
     with sneaking(), scout_option(mode="none"):
         for label, calling, sn in (("warrior", "warrior", True), ("scout (melee, sneaking)", "scout", True), ("priest", "priest", True), ("mage", "mage", True),
                                    ("adventurer", "adventurer", True), ("archer, sneaking", ARCHER, True), ("archer, not sneaking", ARCHER, False)):
             c = cell_stats(calling, runs, sn)
             lm = c["level_min"]
-            print(f"| {label} | {lm[2]:.1f} | {lm[3]:.1f} | {lm[4]:.1f} | {lm[5]:.1f} (+-{c['minutes'][1]:.1f}) | {c['reached']:.0f}% | {c['deaths'][0]:.2f} | {c['potions'][0]:.2f} |", flush=True)
+            print(f"| {label} | {lm[2]:.1f} | {lm[3]:.1f} | {lm[4]:.1f} | {lm[5]:.1f} (+-{c['minutes'][1]:.1f}) | {c['waited']:.1f} | {c['reached']:.0f}% | {c['deaths'][0]:.2f} | {c['potions'][0]:.2f} |", flush=True)
 
 
 def hall_table(runs=1500, options=None):
