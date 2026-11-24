@@ -53,7 +53,7 @@ internal sealed partial class Kernel : IDriverServices
     private int _restricted;    // how many frames on _callStack belong to restricted objects (a domain other than "")
     private int _masterDepth;   // > 0 while the master answers a question: its own calls are not put to ValidCall
     private int _refusals;      // ValidCall refusals in this execution, for the log
-    private volatile string? _lastRestricted; // the sandbox domain whose frame was pushed last, for the stall watchdog
+    private volatile string? _stepDomain; // the first sandbox domain entered in this execution: what a stall or its time is charged to
     private readonly byte[]? _adminSecretHash;
     private int _adminSecretFailures;
 
@@ -117,7 +117,7 @@ internal sealed partial class Kernel : IDriverServices
         if (ob.Domain.Length > 0)
         {
             _restricted++;
-            _lastRestricted = ob.Domain;
+            _stepDomain ??= ob.Domain;
         }
         Runtime.CurrentDomain = ob.Domain;
     }
@@ -175,7 +175,6 @@ internal sealed partial class Kernel : IDriverServices
             Pop();
             _masterDepth = masterDepth;
             if (crossing) Runtime.Ticks = ticks;
-            if (outermost) LeaveDomain(ob.Domain);
         }
     }
 
@@ -187,60 +186,82 @@ internal sealed partial class Kernel : IDriverServices
     // the driver if one step of the game loop runs longer than the stall limit with sandbox code on the stack, after writing that
     // domain into the quarantine file, so that the restarted driver does not load its code until an administrator reopens it.
 
-    private static readonly long DomainWindow = System.Diagnostics.Stopwatch.Frequency * 2;  // two seconds
-    private static readonly long DomainShare = System.Diagnostics.Stopwatch.Frequency;       // one second of each window
+    // The limits (second review, class B). Time is charged to the FIRST sandbox domain entered in an execution, for the whole of that
+    // execution (compiling left out): what real code does afterwards with values that code returned (rendering its text, sorting
+    // its lists) is that home's time too. A home whose share is used up, or a sandbox whose total share is used up, cannot be
+    // entered until the window ends.
+    private static readonly long Second = System.Diagnostics.Stopwatch.Frequency;
+    private static readonly long DomainWindow = 2 * Second;      // the window
+    private static readonly long DomainShare = Second / 2;       // what one home may use of each window: 0.5 s of 2 s
+    private static readonly long SandboxShare = Second;          // what all homes together may use of each window: 1 s of 2 s
+    private static readonly long CompileWindow = 60 * Second;    // compiling a home's programs: at most 15 s of every minute
+    private static readonly long CompileShare = 15 * Second;
     private readonly Dictionary<string, (long Start, long Used)> _domainTime = new();
-    private long _domainEnteredAt;
-    private long _compileTimeAtEntry;
+    private readonly Dictionary<string, (long Start, long Used)> _compileUse = new();
+    private (long Start, long Used) _sandboxTime;
+    private long _executionStarted;
+    private long _compileTimeAtStart;
     private long _compileTime;         // total time spent compiling, so that a domain's share leaves it out
     private long _compileStarted;
     private int _compileDepth;
-    private long _busySince;           // Stopwatch time at which the current step of the game loop began; 0 while waiting or compiling
+    private long _busySince;           // Stopwatch time at which the current execution began; 0 while waiting or compiling
     private readonly HashSet<string> _quarantined = new(StringComparer.Ordinal);
     private readonly string _quarantineFile;
+
+    private static bool Spent((long Start, long Used) use, long now, long window, long share) => now - use.Start <= window && use.Used > share;
 
     private void EnterDomain(string domain)
     {
         var now = System.Diagnostics.Stopwatch.GetTimestamp();
-        var (start, used) = _domainTime.GetValueOrDefault(domain);
-        if (now - start > DomainWindow) _domainTime[domain] = (now, 0);
-        else if (used > DomainShare)
-        {
-            if (used < long.MaxValue / 2)
-            {
-                Log.Info($"sandbox: {domain} has used its share of time in this window: its code waits");
-                _domainTime[domain] = (start, long.MaxValue / 2);
-            }
-            throw new SandboxBudgetException("This workshop's code has used its share of time. It runs again in a moment.");
-        }
-        _domainEnteredAt = now;
-        _compileTimeAtEntry = _compileTime;
+        if (!Spent(_domainTime.GetValueOrDefault(domain), now, DomainWindow, DomainShare) && !Spent(_sandboxTime, now, DomainWindow, SandboxShare)) return;
+        SandboxLog(domain, $"sandbox: {domain} has used its share of time (or the sandbox all of its share): its code waits");
+        throw new SandboxBudgetException("This workshop's code has used its share of time. It runs again in a moment.");
     }
 
-    private void LeaveDomain(string domain)
+    private static (long Start, long Used) Charge((long Start, long Used) use, long now, long window, long amount)
+        => now - use.Start > window ? (now, amount) : (use.Start, use.Used + amount);
+
+    private void ExecutionBegins()
     {
-        var spent = System.Diagnostics.Stopwatch.GetTimestamp() - _domainEnteredAt - (_compileTime - _compileTimeAtEntry);
-        var (start, used) = _domainTime.GetValueOrDefault(domain);
-        if (used < long.MaxValue / 2) _domainTime[domain] = (start, used + Math.Max(0, spent));
+        _executionStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+        _compileTimeAtStart = _compileTime;
+        _stepDomain = null;
+        if (_inStep) Volatile.Write(ref _busySince, _executionStarted);
+    }
+
+    private void ExecutionEnds()
+    {
+        if (_stepDomain is not { } domain) return;
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        var spent = Math.Max(0, now - _executionStarted - (_compileTime - _compileTimeAtStart));
+        _domainTime[domain] = Charge(_domainTime.GetValueOrDefault(domain), now, DomainWindow, spent);
+        _sandboxTime = Charge(_sandboxTime, now, DomainWindow, spent);
     }
 
     private volatile string? _compilingDomain; // the sandbox domain whose program is being compiled (outermost compile), for the watchdog
 
     private void CompileStarted(string domain)
     {
+        if (_compileDepth == 0 && domain.Length > 0
+            && Spent(_compileUse.GetValueOrDefault(domain), System.Diagnostics.Stopwatch.GetTimestamp(), CompileWindow, CompileShare))
+        {
+            SandboxLog(domain, $"sandbox: {domain} has used its compile time for this minute");
+            throw new MudRuntimeException("This home has used its compile time for now (15 seconds a minute). Try again in a minute.");
+        }
         if (_compileDepth++ == 0)
         {
             _compileStarted = System.Diagnostics.Stopwatch.GetTimestamp();
             _compilingDomain = domain.Length > 0 ? domain : null;
         }
-        Volatile.Write(ref _busySince, 0); // a compile is the driver's own work: the stall clock waits (but see the watchdog)
+        Volatile.Write(ref _busySince, 0); // a compile is the driver's own work: the step clock waits (the compile has a clock of its own)
     }
 
     private void CompileEnded()
     {
         if (--_compileDepth > 0) return;
-        _compilingDomain = null;
         var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (_compilingDomain is { } domain) _compileUse[domain] = Charge(_compileUse.GetValueOrDefault(domain), now, CompileWindow, now - _compileStarted);
+        _compilingDomain = null;
         _compileTime += now - _compileStarted;
         if (_inStep) Volatile.Write(ref _busySince, now);
     }
@@ -251,7 +272,7 @@ internal sealed partial class Kernel : IDriverServices
     {
         _inStep = true;
         Volatile.Write(ref _busySince, System.Diagnostics.Stopwatch.GetTimestamp());
-        _lastRestricted = null;
+        _stepDomain = null;
     }
 
     private void StepEnds()
@@ -264,20 +285,20 @@ internal sealed partial class Kernel : IDriverServices
     public void StartWatchdog()
     {
         var limit = (long)(_settings.StallSeconds * System.Diagnostics.Stopwatch.Frequency);
-        // Source written to make the compiler work for minutes is a stall too: a home's program may take six times the stall limit
-        // (at least 30 seconds, so that a large file on a busy machine is not mistaken for one) to compile.
-        var compileLimit = Math.Max(30 * System.Diagnostics.Stopwatch.Frequency, 6 * limit);
+        // A compile of a home's program has the same limit as a step (one file of source written to keep the compiler busy is a
+        // stall like any other); and a home may compile for at most 15 seconds a minute (CompileStarted).
         var thread = new Thread(() =>
         {
             while (true)
             {
                 Thread.Sleep(100);
-                if (_compilingDomain is { } compiling && System.Diagnostics.Stopwatch.GetTimestamp() - Volatile.Read(ref _compileStarted) > compileLimit)
+                if (_compilingDomain is { } compiling && System.Diagnostics.Stopwatch.GetTimestamp() - Volatile.Read(ref _compileStarted) > limit)
                     Stall(compiling);
                 var since = Volatile.Read(ref _busySince);
                 if (since == 0 || System.Diagnostics.Stopwatch.GetTimestamp() - since < limit) continue;
-                if (Volatile.Read(ref _restricted) == 0 || _lastRestricted is not { } domain) continue; // the game's own code: trusted
-                Stall(domain);
+                // An execution that entered no sandbox code is the game's own: trusted. One that did is charged to the first home
+                // entered, whatever is on the stack now (real code may be working on what that home's code returned).
+                if (_stepDomain is { } domain) Stall(domain);
             }
         }) { IsBackground = true, Name = "sandbox watchdog" };
         thread.Start();
@@ -362,7 +383,19 @@ internal sealed partial class Kernel : IDriverServices
     /// A copy of a value that may cross between domains, or false if it may not cross. With clean (a value going from sandbox code to
     /// real code), every string in it loses the characters PlainText removes, so that no terminal control reaches a screen that way.
     /// </summary>
+    // What sandbox code hands to real code is bounded (the second review's W2 and memory): a string at most MaxCrossingChars
+    // characters (longer is cut, with "..."), at most MaxCrossingElements elements in all the arrays, lists, sets and dictionaries of
+    // one value together (more refuses the value).
+    public const int MaxCrossingChars = 16_384;
+    public const int MaxCrossingElements = 10_000;
+
     private static bool TryCross(object? value, out object? copy, bool clean = false, int depth = 0)
+    {
+        var budget = MaxCrossingElements;
+        return TryCross(value, out copy, clean, depth, ref budget);
+    }
+
+    private static bool TryCross(object? value, out object? copy, bool clean, int depth, ref int budget)
     {
         copy = value;
         if (value == null) return true;
@@ -370,7 +403,12 @@ internal sealed partial class Kernel : IDriverServices
         var type = value.GetType();
         if (type == typeof(string))
         {
-            if (clean) copy = PlainText.Clean((string)value);
+            if (clean)
+            {
+                var text = (string)value;
+                if (text.Length > MaxCrossingChars) text = text[..MaxCrossingChars] + "...";
+                copy = PlainText.Clean(text);
+            }
             return true;
         }
         if (PlainTypes.Contains(type) || type.IsEnum) return true;
@@ -379,10 +417,11 @@ internal sealed partial class Kernel : IDriverServices
             var element = type.GetElementType()!;
             if (!PlainElement(element)) return false;
             var source = (Array)value;
+            if (clean && (budget -= source.Length) < 0) return false;
             var array = Array.CreateInstance(element, source.Length);
             for (var i = 0; i < source.Length; i++)
             {
-                if (!TryCross(source.GetValue(i), out var item, clean, depth + 1)) return false;
+                if (!TryCross(source.GetValue(i), out var item, clean, depth + 1, ref budget)) return false;
                 array.SetValue(item, i);
             }
             copy = array;
@@ -410,9 +449,11 @@ internal sealed partial class Kernel : IDriverServices
         {
             var result = Activator.CreateInstance(type)!;
             var add = type.GetMethod("Add")!;
+            var count = value is System.Collections.ICollection collection ? collection.Count : (int)type.GetProperty("Count")!.GetValue(value)!;
+            if (clean && (budget -= count) < 0) return false;
             foreach (var item in (System.Collections.IEnumerable)value)
             {
-                if (!TryCross(item, out var plain, clean, depth + 1)) return false;
+                if (!TryCross(item, out var plain, clean, depth + 1, ref budget)) return false;
                 add.Invoke(result, [plain]);
             }
             copy = result;
@@ -421,9 +462,10 @@ internal sealed partial class Kernel : IDriverServices
         if (definition == typeof(Dictionary<,>))
         {
             var result = (System.Collections.IDictionary)Activator.CreateInstance(type)!; // the default comparer, whatever the original had
+            if (clean && (budget -= ((System.Collections.IDictionary)value).Count) < 0) return false;
             foreach (System.Collections.DictionaryEntry entry in (System.Collections.IDictionary)value)
             {
-                if (!TryCross(entry.Key, out var key, clean, depth + 1) || key == null || !TryCross(entry.Value, out var item, clean, depth + 1)) return false;
+                if (!TryCross(entry.Key, out var key, clean, depth + 1, ref budget) || key == null || !TryCross(entry.Value, out var item, clean, depth + 1, ref budget)) return false;
                 result[key] = item;
             }
             copy = result;
@@ -462,28 +504,62 @@ internal sealed partial class Kernel : IDriverServices
     private string? TextFor(ObjectRef listener, string message)
     {
         if (!Restricted || _master is not { IsAlive: true }) return message;
+        if (message.Length > MaxCrossingChars) message = message[..MaxCrossingChars] + "...\n";
         message = PlainText.Clean(message);
         if (Permit(listener, "CatchTell", quiet: true)) return message;
         if (Permit(listener, "CatchTellQuoted")) return Quoted(message, RestrictedCaller()?.Domain ?? "");
         return null;
     }
 
+    /// <summary>
+    /// Text for a visitor, marked on every screen line (the second review's S1): runs of spaces and tabs become one space, and a line
+    /// longer than fits on an 80-column screen with its mark is cut into pieces, each on a line of its own with the mark.
+    /// </summary>
     private static string Quoted(string message, string domain)
     {
         var mark = "[" + (domain.StartsWith("wiz:", StringComparison.Ordinal) ? domain[4..] + "'s workshop" : domain) + "] ";
+        var width = Math.Max(20, 79 - mark.Length);
+        var text = new StringBuilder();
         var lines = message.Split('\n');
         for (var i = 0; i < lines.Length; i++)
-            if (lines[i].Length > 0) lines[i] = mark + lines[i];
-        return string.Join('\n', lines);
+        {
+            if (i > 0) text.Append('\n');
+            var line = System.Text.RegularExpressions.Regex.Replace(lines[i], "[ \t]+", " ").Trim();
+            for (var at = 0; at < line.Length; at += width)
+            {
+                if (at > 0) text.Append('\n');
+                text.Append(mark).Append(line, at, Math.Min(width, line.Length - at));
+            }
+        }
+        return text.ToString();
     }
 
     /// <summary>A refusal goes to the log, a few per execution at most, so that a loop of refused calls cannot fill the disk.</summary>
     private void NoteRefusal(string text)
     {
         _refusals++;
-        if (_refusals <= 3) Log.Info("sandbox: " + text);
+        if (_refusals <= 3) SandboxLog(RestrictedCaller()?.Domain ?? _stepDomain ?? "", "sandbox: " + text);
         else if (_refusals == 4) Log.Info("sandbox: further refusals in this execution are not logged");
     }
+
+    // ---- The log, for what sandbox code causes (the second review's L3) ----
+    // Every line that sandbox code can cause (its Write with nobody to read it, its errors, refusals, the file commands in a home)
+    // counts against its home: at most 30 lines a minute, each at most 500 characters, then one line saying the rest are not written.
+    private const int LogLinesPerMinute = 30;
+    private readonly Dictionary<string, (long Start, int Lines)> _logUse = new();
+
+    private void SandboxLog(string domain, string line)
+    {
+        if (domain.Length == 0) { Log.Info(line); return; }
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        var (start, lines) = _logUse.GetValueOrDefault(domain);
+        if (now - start > 60 * System.Diagnostics.Stopwatch.Frequency) (start, lines) = (now, 0);
+        _logUse[domain] = (start, ++lines);
+        if (lines <= LogLinesPerMinute) Log.Info(line.Length > 500 ? line[..500] + "..." : line);
+        else if (lines == LogLinesPerMinute + 1) Log.Info($"sandbox: {domain}: further log lines in this minute are not written");
+    }
+
+    private string HomeOf(string mudPath) => _compiler.DomainOf(mudPath);
 
     /// <summary>
     /// A delayed call, an action handler or an input handler runs later in its owner's frame, so it must be the owner's own code:
@@ -565,6 +641,7 @@ internal sealed partial class Kernel : IDriverServices
         while (budget-- > 0 && _callOuts.TryPeek(out var entry, out var due) && due <= now)
         {
             _callOuts.Dequeue();
+            if (entry.Owner.Domain.Length > 0) _homeCallOuts[entry.Owner.Domain]--;
             if (_cancelledCallOuts.Remove(entry.Id) || !entry.Owner.IsAlive) continue;
             Execute(entry.Player is { IsAlive: true } ? entry.Player : null, () => In(entry.Owner, entry.Function));
             now = DateTime.UtcNow;
@@ -578,6 +655,7 @@ internal sealed partial class Kernel : IDriverServices
     /// </summary>
     private void Execute(ObjectRef? player, Action work)
     {
+        ExecutionBegins();
         Runtime.Ticks = 0;
         _thisPlayer = player;
         _verb = "";
@@ -602,6 +680,7 @@ internal sealed partial class Kernel : IDriverServices
         // on top of the faulting stack, which after runaway recursion is nearly full.
         if (failure is not null) ReportError(player, failure);
         FlushPrompts();
+        ExecutionEnds();
     }
 
     // ---- Prompts ----
@@ -670,7 +749,7 @@ internal sealed partial class Kernel : IDriverServices
         }
         // A move the master refused is policy at work, not a fault: it is logged as a refusal.
         if (error is not SandboxBudgetException)
-            Log.Info(error is RefusedException ? $"refused ({player?.Name ?? "driver"}): {text}" : $"ERROR ({player?.Name ?? "driver"}): {text}");
+            SandboxLog(_stepDomain ?? "", error is RefusedException ? $"refused ({player?.Name ?? "driver"}): {text}" : $"ERROR ({player?.Name ?? "driver"}): {text}");
         Runtime.Ticks = 0; // give the error handlers a budget of their own
         try
         {
@@ -827,6 +906,8 @@ internal sealed partial class Kernel : IDriverServices
         handle.Domain = _master is { IsAlive: true } ? AskMaster(m => m.ObjectDomain(program.Path, isClone)) ?? "" : "";
         if (_quarantined.Contains(handle.Domain))
             throw new MudRuntimeException($"This workshop ({handle.Domain}) is closed: its code held up the whole game. An administrator reopens it.");
+        if (handle.Domain.Length > 0 && _homeObjects.GetValueOrDefault(handle.Domain) >= MaxObjectsPerHome)
+            throw new MudRuntimeException($"This workshop already holds {MaxObjectsPerHome} objects, as many as a home may have.");
         List<ObjectRef>? outer = null;
         var outerMasterDepth = _masterDepth;
         var outerTicks = Runtime.Ticks;
@@ -865,6 +946,7 @@ internal sealed partial class Kernel : IDriverServices
             }
 
             _objects[name] = handle;
+            if (handle.Domain.Length > 0) _homeObjects[handle.Domain] = _homeObjects.GetValueOrDefault(handle.Domain) + 1;
             try
             {
                 In(handle, () => handle.Target!.Create());
@@ -888,6 +970,12 @@ internal sealed partial class Kernel : IDriverServices
         }
     }
 
+    // Bounds per home (the second review's memory items): objects in existence, and call-outs waiting.
+    private const int MaxObjectsPerHome = 2000;
+    private const int MaxCallOutsPerHome = 1000;
+    private readonly Dictionary<string, int> _homeObjects = new();
+    private readonly Dictionary<string, int> _homeCallOuts = new();
+
     public ObjectRef? FindObject(string name)
     {
         name = name.Trim();
@@ -907,7 +995,10 @@ internal sealed partial class Kernel : IDriverServices
         Destroy(target);
     }
 
-    private void Destroy(ObjectRef target)
+    private void Destroy(ObjectRef target) => Destroy(target, detach: true);
+
+    /// <summary>detach false: the container is being destroyed too and drops its whole inventory at once (linear, not one search per item).</summary>
+    private void Destroy(ObjectRef target, bool detach)
     {
         if (!target.IsAlive) return;
         var environment = target.Environment;
@@ -919,12 +1010,14 @@ internal sealed partial class Kernel : IDriverServices
         foreach (var item in target.Inventory.ToArray())
         {
             if (!item.IsAlive) continue;
-            if (sandboxGoes && item.Domain.Length > 0) Destroy(item);
+            if (sandboxGoes && item.Domain.Length > 0) Destroy(item, detach: false);
             else if (environment is { IsAlive: true } && MoveRefusalFor(item, environment, target) == null) MoveCore(item, environment);
-            else Destroy(item);
+            else Destroy(item, detach: false);
         }
+        target.Inventory.Clear();
 
-        if (environment is not null)
+        if (environment is not null && !detach) target.Environment = null;
+        else if (environment is not null)
         {
             environment.Inventory.Remove(target);
             UnbindActionsOwnedBy(target, environment);
@@ -942,7 +1035,7 @@ internal sealed partial class Kernel : IDriverServices
         }
 
         target.Target = null; // every handle to the object is now dead
-        _objects.Remove(target.Name);
+        if (_objects.Remove(target.Name) && target.Domain.Length > 0) _homeObjects[target.Domain]--;
     }
 
     public IReadOnlyList<string> UpdateProgram(ObjectRef caller, string path)
@@ -1110,6 +1203,8 @@ internal sealed partial class Kernel : IDriverServices
 
     public IReadOnlyList<ObjectRef> CallerChain() => _callStack.ToArray();
 
+    public bool ProgramCurrent(string path) => _compiler.IsCurrent(path);
+
     /// <summary>The restricted object nearest the top of the call stack (the sandbox code acting most directly), or a restricted ThisPlayer.</summary>
     public ObjectRef? RestrictedCaller()
     {
@@ -1209,7 +1304,8 @@ internal sealed partial class Kernel : IDriverServices
     public void Write(string message)
     {
         if (_thisPlayer is { IsAlive: true } player) { if (TextFor(player, message) is { } text) In(player, () => player.Target!.CatchTell(text)); }
-        else Log.Info($"write: {PlainText.Clean(message).TrimEnd()}");
+        else if (Restricted) SandboxLog(RestrictedCaller()?.Domain ?? "", $"write: {PlainText.Clean(message).TrimEnd()}");
+        else Log.Info($"write: {message.TrimEnd()}");
     }
 
     public void TellObject(ObjectRef ob, string message)
@@ -1245,6 +1341,12 @@ internal sealed partial class Kernel : IDriverServices
     public int CallOut(ObjectRef owner, Action function, double delaySeconds)
     {
         RequireOwnCode(owner, function, "CallOut");
+        if (owner.Domain.Length > 0)
+        {
+            if (_homeCallOuts.GetValueOrDefault(owner.Domain) >= MaxCallOutsPerHome)
+                throw new MudRuntimeException($"This workshop already has {MaxCallOutsPerHome} delayed calls waiting, as many as a home may have.");
+            _homeCallOuts[owner.Domain] = _homeCallOuts.GetValueOrDefault(owner.Domain) + 1;
+        }
         var id = ++_nextCallOutId;
         var due = DateTime.UtcNow + TimeSpan.FromSeconds(Math.Max(0, delaySeconds));
         _callOuts.Enqueue(new CallOutEntry(id, owner, _thisPlayer, function), due);
@@ -1341,12 +1443,38 @@ internal sealed partial class Kernel : IDriverServices
         return File.ReadAllText(fullPath);
     }
 
+    /// <summary>
+    /// A wizard's home has a quota (DriverSettings: bytes, files, directories, depth), checked before anything is added to it. The
+    /// home is /wiz/&lt;name&gt; (the first directory under /wiz); every other path is not checked.
+    /// </summary>
+    private void CheckHomeQuota(string[] segments, long addBytes, long replacedBytes, bool newFile, bool newDir)
+    {
+        if (segments.Length < 3 || !segments[0].Equals("wiz", StringComparison.OrdinalIgnoreCase)) return;
+        var home = Path.Combine(_mudlibRoot, segments[0], segments[1]);
+        if (!Directory.Exists(home)) return;
+        long bytes = 0;
+        int files = 0, dirs = 0;
+        foreach (var entry in new DirectoryInfo(home).EnumerateFileSystemInfos("*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0, IgnoreInaccessible = true }))
+        {
+            if (entry is FileInfo f) { files++; bytes += f.Length; }
+            else dirs++;
+        }
+        var name = segments[1];
+        if (segments.Length - 2 > _settings.HomeDepth) throw new MudRuntimeException($"/wiz/{name} may be at most {_settings.HomeDepth} directories deep.");
+        if (newDir && dirs + 1 > _settings.HomeDirs) throw new MudRuntimeException($"/wiz/{name} may hold at most {_settings.HomeDirs} directories.");
+        if (newFile && files + 1 > _settings.HomeFiles) throw new MudRuntimeException($"/wiz/{name} may hold at most {_settings.HomeFiles} files.");
+        if (bytes - replacedBytes + addBytes > _settings.HomeBytes)
+            throw new MudRuntimeException($"/wiz/{name} may hold at most {_settings.HomeBytes / 1000} KB; it holds {bytes / 1000} KB.");
+    }
+
     public void WriteFile(ObjectRef caller, string path, string content)
     {
         var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "write-file", path);
         if (segments.Length == 0 || Directory.Exists(fullPath)) throw new MudRuntimeException($"{mudPath} is a directory");
         if (!Directory.Exists(Path.GetDirectoryName(fullPath))) throw new MudRuntimeException($"No such directory for {mudPath}");
         if (Encoding.UTF8.GetByteCount(content) > MaxFileBytes) throw new MudRuntimeException($"Content for {mudPath} is too large");
+        var existing = new FileInfo(fullPath);
+        CheckHomeQuota(segments, Encoding.UTF8.GetByteCount(content), existing.Exists ? existing.Length : 0, !existing.Exists, false);
 
         // The temporary name starts with a dot, so it is invisible to GetDir and cannot be addressed.
         var temp = Path.Combine(Path.GetDirectoryName(fullPath)!, $".{segments[^1]}.{Guid.NewGuid():N}.tmp");
@@ -1360,7 +1488,7 @@ internal sealed partial class Kernel : IDriverServices
             try { File.Delete(temp); } catch (Exception) { }
             throw new MudRuntimeException($"Could not write {mudPath}"); // a read-only mudlib (DEPLOY.md, MUDLIB_WRITABLE) and the like
         }
-        Log.Info($"file written: {mudPath} by {caller.Name} ({content.Length} chars)");
+        SandboxLog(HomeOf(mudPath), $"file written: {mudPath} by {caller.Name} ({content.Length} chars)");
     }
 
     public bool CopyFile(ObjectRef caller, string from, string to)
@@ -1370,6 +1498,7 @@ internal sealed partial class Kernel : IDriverServices
         if (!CheckFileTransfer(source, target)) return false;
         var length = new FileInfo(source.FullPath).Length;
         if (length > MaxFileBytes) throw new MudRuntimeException($"{source.MudPath} is too large to copy ({length} bytes)");
+        CheckHomeQuota(target.Segments, length, 0, true, false);
 
         // Copy under a hidden temporary name, then move it into place without
         // overwriting, so readers never see half a file.
@@ -1384,7 +1513,7 @@ internal sealed partial class Kernel : IDriverServices
             File.Delete(temp);
             throw new MudRuntimeException($"Could not copy {source.MudPath} to {target.MudPath}");
         }
-        Log.Info($"file copied: {source.MudPath} to {target.MudPath} by {caller.Name} ({length} bytes)");
+        SandboxLog(HomeOf(target.MudPath), $"file copied: {source.MudPath} to {target.MudPath} by {caller.Name} ({length} bytes)");
         return true;
     }
 
@@ -1393,6 +1522,11 @@ internal sealed partial class Kernel : IDriverServices
         var source = ResolveMudlibPath(caller, "write-file", from);
         var target = ResolveMudlibPath(caller, "write-file", to);
         if (!CheckFileTransfer(source, target)) return false;
+        // Moving within one home changes nothing in its totals; into a home from elsewhere, it adds the file.
+        if (target.Segments.Length < 2 || source.Segments.Length < 2 || !source.Segments[0].Equals(target.Segments[0], StringComparison.OrdinalIgnoreCase)
+            || !source.Segments[1].Equals(target.Segments[1], StringComparison.OrdinalIgnoreCase))
+            CheckHomeQuota(target.Segments, new FileInfo(source.FullPath).Length, 0, true, false);
+        else CheckHomeQuota(target.Segments, 0, 0, false, false);
         try
         {
             File.Move(source.FullPath, target.FullPath, overwrite: false);
@@ -1401,7 +1535,7 @@ internal sealed partial class Kernel : IDriverServices
         {
             throw new MudRuntimeException($"Could not move {source.MudPath} to {target.MudPath}");
         }
-        Log.Info($"file renamed: {source.MudPath} to {target.MudPath} by {caller.Name}");
+        SandboxLog(HomeOf(target.MudPath), $"file renamed: {source.MudPath} to {target.MudPath} by {caller.Name}");
         return true;
     }
 
@@ -1435,7 +1569,7 @@ internal sealed partial class Kernel : IDriverServices
         {
             throw new MudRuntimeException($"Could not remove {mudPath}");
         }
-        Log.Info($"file removed: {mudPath} by {caller.Name}");
+        SandboxLog(HomeOf(mudPath), $"file removed: {mudPath} by {caller.Name}");
         return true;
     }
 
@@ -1462,7 +1596,7 @@ internal sealed partial class Kernel : IDriverServices
         {
             throw new MudRuntimeException($"Could not remove {mudPath}");
         }
-        Log.Info($"directory removed: {mudPath} by {caller.Name}");
+        SandboxLog(HomeOf(mudPath), $"directory removed: {mudPath} by {caller.Name}");
         return true;
     }
 
@@ -1490,9 +1624,10 @@ internal sealed partial class Kernel : IDriverServices
         var (mudPath, fullPath, segments) = ResolveMudlibPath(caller, "make-dir", path);
         if (segments.Length == 0 || Directory.Exists(fullPath) || File.Exists(fullPath)) return false;
         if (!Directory.Exists(Path.GetDirectoryName(fullPath))) throw new MudRuntimeException($"No such parent directory for {mudPath}");
+        CheckHomeQuota(segments, 0, 0, false, true);
         try { Directory.CreateDirectory(fullPath); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { throw new MudRuntimeException($"Could not create {mudPath}"); }
-        Log.Info($"directory created: {mudPath} by {caller.Name}");
+        SandboxLog(HomeOf(mudPath), $"directory created: {mudPath} by {caller.Name}");
         return true;
     }
 

@@ -25,6 +25,22 @@ internal sealed class DriverSettings
     public double TimeoutSeconds { get; private set; } = DefaultTimeoutMinutes * 60;
     public double StallSeconds { get; private set; } = 5;
 
+    // A wizard's home (/wiz/<name>), checked by the driver on every write, copy, move and mkdir into it (the second review's D2a).
+    public long HomeBytes { get; private set; } = 3_000_000;
+    public int HomeFiles { get; private set; } = 1000;
+    public int HomeDirs { get; private set; } = 64;
+    public int HomeDepth { get; private set; } = 8;
+
+    /// <summary>LESMUDOS_HOME_BYTES, LESMUDOS_HOME_FILES, LESMUDOS_HOME_DIRS, LESMUDOS_HOME_DEPTH: whole positive numbers.</summary>
+    public void SetHomeQuota(Func<string, string?> environment)
+    {
+        static long? Number(string? text) => long.TryParse(text, out var n) && n > 0 ? n : null;
+        if (Number(environment("LESMUDOS_HOME_BYTES")) is { } bytes) HomeBytes = bytes;
+        if (Number(environment("LESMUDOS_HOME_FILES")) is { } files) HomeFiles = (int)Math.Min(files, int.MaxValue);
+        if (Number(environment("LESMUDOS_HOME_DIRS")) is { } dirs) HomeDirs = (int)Math.Min(dirs, int.MaxValue);
+        if (Number(environment("LESMUDOS_HOME_DEPTH")) is { } depth) HomeDepth = (int)Math.Min(depth, 64);
+    }
+
     public void SetStall(string? text, string source)
     {
         if (string.IsNullOrWhiteSpace(text)) return;

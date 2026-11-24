@@ -243,8 +243,9 @@ public class Publish : MudObject
     {
         var line = 1;
         var column = 0;
-        foreach (var c in text)
+        for (var at = 0; at < text.Length; at++)
         {
+            var c = text[at];
             column++;
             if (c == '\n') { line++; column = 0; continue; }
             int u = c;
@@ -252,7 +253,7 @@ public class Publish : MudObject
                       || u == 0xFEFF || u == 0x180E || (u >= 0x200B && u <= 0x200F) || (u >= 0x202A && u <= 0x202E) || (u >= 0x2060 && u <= 0x2069)
                       || u == 0x00AD || u == 0x034F || u == 0x115F || u == 0x1160 || u == 0x3164 || (u >= 0xFFF0 && u <= 0xFFFF)
                       || (u >= 0xE000 && u <= 0xF8FF) || (u >= 0xFE00 && u <= 0xFE0F) || char.IsSurrogate(c);
-            if (u == 0x0D) bad = false; // a Windows line end is harmless
+            if (u == 0x0D) bad = at + 1 >= text.Length || text[at + 1] != '\n'; // CR only as part of a Windows line end: alone it ends a // comment
             if (bad) return $"line {line}, column {column}: U+{u:X4}";
         }
         return null;
@@ -398,14 +399,24 @@ public class Publish : MudObject
         var size = contents.Values.Sum(t => t.Length);
         if (size > MaxRequestChars) return $"Not submitted: {source} holds {size} characters; a request can hold at most {MaxRequestChars}.\n";
 
-        // Every file must compile where it is now, in the workshop.
+        // Every file must compile where it is now, in the workshop. A file already compiled from exactly its present text is not
+        // compiled again; the others are, for at most three seconds in this command (the second review's C2: one command must not
+        // hold the game while it compiles two hundred files). What is left is named: update it, then submit again.
         var errors = new List<string>();
+        var later = new List<string>();
+        var started = TimeMs();
         foreach (var file in contents.Keys.OrderBy(f => f, StringComparer.Ordinal))
         {
-            try { UpdateProgram(ProgramOf(source, file)); }
+            var program = ProgramOf(source, file);
+            if (ProgramCurrent(program)) continue;
+            if (TimeMs() - started > 3000) { later.Add(file); continue; }
+            try { UpdateProgram(program); }
             catch (MudRuntimeException e) { errors.Add(e.Message); }
         }
         if (errors.Count > 0) return "Not submitted: these files do not compile.\n" + string.Join("\n", errors.Take(5)) + "\n";
+        if (later.Count > 0)
+            return $"Not submitted yet: {later.Count} file(s) still to be compiled ({string.Join(", ", later.Take(5))}{(later.Count > 5 ? ", ..." : "")}). " +
+                   "Compile them with update (or wait a moment and submit again: each submit compiles for a few seconds).\n";
 
         var rewritten = contents.ToDictionary(kv => kv.Key, kv => Rewrite(kv.Value, source, dest));
         var content = ContentProblem(rewritten, dest);

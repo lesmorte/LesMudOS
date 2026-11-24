@@ -175,6 +175,7 @@ internal interface IDriverServices
 
     ObjectRef? PreviousObject(ObjectRef self);
     IReadOnlyList<ObjectRef> CallerChain();
+    bool ProgramCurrent(string path);
     ObjectRef? RestrictedCaller();
     bool MayView(ObjectRef target);
     ObjectRef? ThisPlayer { get; }

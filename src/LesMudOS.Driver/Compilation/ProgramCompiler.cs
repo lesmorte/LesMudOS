@@ -19,6 +19,8 @@ internal sealed class MudProgram
     public required MetadataReference Reference { get; init; }
     /// <summary>The MudObject subclass the file defines; null if the file only defines an abstract class.</summary>
     public required Type? ObjectType { get; init; }
+    /// <summary>The source text it was compiled from.</summary>
+    public string Source { get; init; } = "";
     /// <summary>Transitive closure of the programs this one inherits or uses.</summary>
     public required IReadOnlyList<MudProgram> Dependencies { get; init; }
 }
@@ -103,6 +105,16 @@ internal sealed partial class ProgramCompiler
     {
         path = NormalizePath(path);
         return _current.TryGetValue(path, out var program) ? program : Compile(path);
+    }
+
+    /// <summary>Is there a current program for the path, compiled from the file as it is now?</summary>
+    public bool IsCurrent(string path)
+    {
+        path = NormalizePath(path);
+        if (!_current.TryGetValue(path, out var program)) return false;
+        var file = SourceFile(path);
+        try { return File.Exists(file) && File.ReadAllText(file) == program.Source; }
+        catch (IOException) { return false; }
     }
 
     /// <summary>Drop the program for a path and every program that depends on it. Returns what was dropped.</summary>
@@ -233,6 +245,7 @@ internal sealed partial class ProgramCompiler
                 Reference = MetadataReference.CreateFromImage(image.ToArray()),
                 ObjectType = objectTypes[0].IsAbstract ? null : objectTypes[0],
                 Dependencies = dependencies,
+                Source = source,
             };
             _current[path] = program;
             _everLoaded.Add((assemblyName, new WeakReference(context)));

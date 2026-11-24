@@ -111,6 +111,9 @@ public abstract class MudObject
     /// </summary>
     protected IReadOnlyList<string> UpdateProgram(string path) => D.UpdateProgram(Self, path);
 
+    /// <summary>True if the program at this path is compiled from its file exactly as the file is now.</summary>
+    protected bool ProgramCurrent(string path) => D.ProgramCurrent(path);
+
     // ---- Containment ----
 
     /// <summary>Move this object into a destination object.</summary>

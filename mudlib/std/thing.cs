@@ -21,6 +21,7 @@ public abstract class Thing : MudObject
     public virtual string Stat() => $"{Self.Name}: {Name}\n";
 
     private const string AnsiReset = "\u001b[0m";
+    private const int MaxTagLength = 8; // the longest style tag ("bmagenta")
 
     /// <summary>The SGR parameters for a style tag, or null if it is not one.</summary>
     private static string? StyleCode(string tag) => tag switch
@@ -58,7 +59,8 @@ public abstract class Thing : MudObject
             }
             if (c != '{') { result.Append(c); i++; continue; }
             if (i + 1 < text.Length && text[i + 1] == '{') { result.Append('{'); i += 2; continue; }
-            var end = text.IndexOf('}', i + 1);
+            // A tag is a few letters: look for its end only that far, so that text full of "{" costs one pass, not one per brace.
+            var end = text.IndexOf('}', i + 1, Math.Min(MaxTagLength + 1, text.Length - i - 1));
             var tag = end < 0 ? null : text.Substring(i + 1, end - i - 1);
             var code = tag == null || tag == "/" ? null : StyleCode(tag);
             if (tag == "/" || code != null)

@@ -37,6 +37,7 @@ Log.Info(string.IsNullOrEmpty(adminSecret)
 settings.SetIdle(Environment.GetEnvironmentVariable("LESMUDOS_IDLE_MINUTES"), "LESMUDOS_IDLE_MINUTES");
 settings.SetTimeout(Environment.GetEnvironmentVariable("LESMUDOS_TIMEOUT_MINUTES"), "LESMUDOS_TIMEOUT_MINUTES");
 settings.SetStall(Environment.GetEnvironmentVariable("LESMUDOS_SANDBOX_STALL"), "LESMUDOS_SANDBOX_STALL");
+settings.SetHomeQuota(Environment.GetEnvironmentVariable);
 settings.Settle();
 Log.Info($"idle after {settings.IdleSeconds:0.##}s without input, disconnect after {settings.TimeoutSeconds:0.##}s");
 var kernel = new Kernel(mudlib, save, adminSecret, settings);
