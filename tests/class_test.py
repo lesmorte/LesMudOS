@@ -376,8 +376,8 @@ def run(work, mudlib):
         chars[arch] = c
         hp, st, ma, gold, kit, eq1, eq2 = expect[arch]
         s = a.score_of(c)["text"]
-        check(f"{arch}: Vitality {hp}, Endurance {st}, Focus {ma}, gold {gold}", s, f"Vitality {hp}/{hp}", f"Endurance {st}/{st}", f"Focus {ma}/{ma}", f"Gold {gold}",
-              f"Calling {arch.capitalize()}")
+        check(f"{arch}: Vitality {hp}, Endurance {st}, Focus {ma}, gold {gold}", s, f"{hp}/{hp}", f"Endurance  {st}/{st}", f"Focus      {ma}/{ma}", f"Gold {gold}",
+              f"{arch.capitalize()} • Level")
         inv = c.command("i")
         check(f"{arch}: the starting kit", inv, *kit)
         check(f"{arch}: weapon (and shield) put on", s, eq1, eq2)
@@ -827,15 +827,15 @@ def run(work, mudlib):
     for n in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 25, 50, 99):
         ma.command(f"setlevel {n}")
         s = a.score_of(ma)
-        want = f"Level {n}   Experience {xp_for(n)} ({xp_for(n + 1) - xp_for(n)} more for level {n + 1})"
-        if want not in s["text"]:
+        want = f"Experience {xp_for(n)} ({xp_for(n + 1) - xp_for(n)} more for level {n + 1})"
+        if want not in s["text"] or not re.search(rf"Level {n}\r?\n", s["text"]):
             bad.append((n, want))
     check("experience to reach level n: the table to level 10, the power law beyond: levels 1 to 99", str(bad), "[]")
     check("the table of the design: 100, 300, 600, 1000", f"{xp_for(2)} {xp_for(3)} {xp_for(4)} {xp_for(5)}", "100 300 600 1000")
     check("the corridor table: 5400, 12000, 21700, 34100, 49300", f"{xp_for(6)} {xp_for(7)} {xp_for(8)} {xp_for(9)} {xp_for(10)}", "5400 12000 21700 34100 49300")
     check("beyond level 10 the provisional power law: level 11 needs 65618, level 20 needs 394400", f"{xp_for(11)} {xp_for(20)}", "65618 394400")
     ma.command("setlevel 100")
-    check("level 100 is the highest", a.score_of(ma)["text"], f"Level 100   Experience {xp_for(100)} (highest level)")
+    check("level 100 is the highest", a.score_of(ma)["text"], "Level 100", f"Experience {xp_for(100)} (highest level)")
     check("above the cap is refused", ma.command("setlevel 101"), "Usage")
     ma.command("setlevel 1")
     check("the renamed wizard command: restore", ma.command("restore"), "You are restored to full Vitality.")
@@ -904,7 +904,7 @@ def run(work, mudlib):
     ar2 = h.Client("tmage")
     ar2.read_until("> ")
     s = a.score_of(ar2)["text"]
-    check("archetype, advanced class and level persist", s, "Calling Mage", "Class Zealot", "Level 100")
+    check("archetype, advanced class and level persist", s, "Mage • Class Zealot • Level 100")
     hp, st, mn = res(ar2)
     check("resources persist (drained before logout, not refilled)", str(mn <= 12 and st <= 4), "True")
     check("the granted skills are back after login", ar2.command("skills"), "zap")

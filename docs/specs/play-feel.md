@@ -57,3 +57,12 @@ Owner's decision: "the refill should count the corpse of the creature too." Toda
 - Encounters (`AddEncounter`) follow the same rule: no new encounter of a creature whose corpse from this room still lies here.
 - A player's corpse never blocks anything.
 - With creature corpses lasting ten minutes at most (less once emptied), a spawn returns no later than the first reset after that.
+
+
+## Where a login begins
+
+A character who leaves the game, by `quit`, by the idle timeout or by a dropped connection (NetDead), is saved in the room they stand in, and the next login puts them back in it. The room path is the saved `logoutRoom`, refreshed at every save and at the moment of leaving. The arrival is the ordinary move into the room, so an aggressive creature there engages as it would for anyone walking in. Silent fallbacks to the Village Square: no saved room (a new character, an old save), the room no longer loads, or the room is not a legitimate place to wake: the void, any clone, anything under /wiz (a wizard's own /wiz/NAME home is allowed for that wizard). Death is separate: a dead character wakes in the Guest Rooms. On a dropped connection or timeout in a fight the body is saved and destroyed at once (no lingering body, the fight ends with it).
+
+## The prompt after a crossed line
+
+A prompt that followed unprompted output (a combat round, someone arriving) can cross, on the wire, a line the player had already sent. If a line arrives within 300 ms of such a prompt, the driver does not assume the player's Enter moved the cursor to a fresh line: the reply (or the next prompt, if there is no reply) starts with a newline.

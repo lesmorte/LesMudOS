@@ -49,7 +49,7 @@ def main():
         do(hero, "look")
         check("renown starts at Unknown", do(hero, "renown"), "Unknown")
         check("date names the year", do(hero, "date"), "Today is", "Year 1")
-        check("score shows the renown tier", do(hero, "score"), "Renown: Unknown")
+        check("score shows the renown tier", do(hero, "score"), "Renown Rank: Unknown")
         do(hero, "west")
         check("the ledger stands in the guild", do(hero, "look"), "chronicle ledger")
         check("the ledger reads, and is empty of deeds", do(hero, "read chronicle").rsplit("\n", 1)[0], "Chronicle", absent=("Bryn",))

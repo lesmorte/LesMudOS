@@ -12,6 +12,8 @@ public class OakRoot : Find
         Ids.Add("oak");
         Ids.Add("wand");
         Ids.Add("heartwood");
+        Ids.Add("rod");
+        Ids.Add("staff");
         ShortDesc = "a pale root grown through the cavern wall";
         LongDesc = "Between two glowing clusters of mushrooms a root as thick as your arm has forced its way through the stone, pale as bone and wholly out of place: it is oak, and there is no oak for a mile. Here and there it has thrown up a straight rod of heartwood, as long as a staff and clean of bark, as if it grew them for whoever came asking. One would come away in the hand.";
         TakenShort = "a pale root grown through the cavern wall, with a clean-cut stump where you took a rod";

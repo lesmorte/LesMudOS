@@ -244,8 +244,8 @@ def score_of(c):
     return {
         "level": number(r"Level (\d+)", text),
         "xp": number(r"Experience (\d+)", text),
-        "hp": number(r"Vitality (\d+)/", text),
-        "max": number(r"Vitality \d+/(\d+)", text),
+        "hp": number(r"Vitality\s+(\d+)/", text),
+        "max": number(r"Vitality\s+\d+/(\d+)", text),
         "gold": number(r"Gold (\d+)", text),
         "text": text,
     }
@@ -535,8 +535,8 @@ def run(work, mudlib):
 
     # ===== character sheet, help =====
     s = score_of(hero)
-    check("a new character: level 1, 30 Vitality, 25 gold, unarmed 2-5, Reaction Time 2.5", s["text"], "Level 1   Experience 0 (100 more for level 2)",
-          "Vitality 30/30", "Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
+    check("a new character: level 1, 30 Vitality, 25 gold, unarmed 2-5, Reaction Time 2.5", s["text"], "Level 1", "Experience 0 (100 more for level 2)",
+          "Vitality   30/30", "Gold 25", "Damage 2-5", "nothing equipped", "Reaction Time 2.5 (base 2.5). Your attack takes 6.0 seconds.", "no quests")
     check("hp command", hero.command("vitality"), "Vitality 30/30")
     text = hero.command("help")
     check("help lists the new commands", text, "kill (or attack)", "flee", "consider", "wield", "wear", "browse", "buy", "accept", "report", "quests", "score",
@@ -585,7 +585,7 @@ def run(work, mudlib):
     check("wear", hero.command("wear shield"), "You put on a small shield.")
     s = score_of(hero)
     check("score shows the equipment and derived numbers", s["text"], "Damage 9-14", "Armor 1", "weapon: a rusty sword", "shield: a small shield",
-          "Reaction Time 3.5 (base 2.5, a rusty sword +0.5, a small shield +0.5). Your attack takes 9.0 seconds.")
+          "Reaction Time 3.5 (base 2.5, a rusty sword +0.5, a small shield +0.5).", "Your attack takes 9.0 seconds.")
     check("unwield", hero.command("unwield"), "You stop wielding a rusty sword.")
     check("unarmed again", score_of(hero)["text"], "Damage 2-5", "Your attack takes 7.0 seconds.")
     hero.command("wield sword")
@@ -725,7 +725,7 @@ def run(work, mudlib):
     check("100 experience reach level 2", text, "You gain 100 experience.", "You have reached level 2!", "Maximum Vitality is now 38")
     drain(hero)
     s = score_of(hero)
-    check("level 2: experience, the rest to level 3, full healed 38 Vitality", s["text"], f"Level 2   Experience {base + 100} ({200 - base} more for level 3)", "Vitality 38/38")
+    check("level 2: experience, the rest to level 3, full healed 38 Vitality", s["text"], f"Level 2", f"Experience {base + 100} ({200 - base} more for level 3)", "38/38")
     levels = [("dummy_b", 200, "", 3, 46), ("dummy_c", 300, "", 4, 54), ("dummy_d", 400, "", 5, 62)]
     for dummy, xp, total, level, max_hp in levels:
         wiz.command("clone " + TEST + dummy)
@@ -734,13 +734,13 @@ def run(work, mudlib):
         check(f"level {level} is reached", text, f"You gain {xp} experience.", f"You have reached level {level}!", f"Maximum Vitality is now {max_hp}")
         drain(hero)
     s = score_of(hero)
-    check("level 5 reached at 1000 experience; level 6 needs 5400", s["text"], f"Level 5   Experience {base + 1000} ({4400 - base} more for level 6)", "Vitality 62/62")
+    check("level 5 reached at 1000 experience; level 6 needs 5400", s["text"], f"Level 5", f"Experience {base + 1000} ({4400 - base} more for level 6)", "Vitality   62/62")
     wiz.command("clone " + TEST + "dummy_a")
     hero.command("kill dummy")
     text = fight_until(hero, "gain 100 experience", timeout=120)
     drain(hero)
     s = score_of(hero)
-    check("100 more experience does not level at 5, and still counts", s["text"], f"Level 5   Experience {final_xp} ({4300 - base} more for level 6)")
+    check("100 more experience does not level at 5, and still counts", s["text"], f"Level 5", f"Experience {final_xp} ({4300 - base} more for level 6)")
     check("no second level-up message", text, absent=("reached level",))
     check("kill credit is recorded for the killer", s["text"], "Level 5")
     hero.command("out")
@@ -851,7 +851,7 @@ def run(work, mudlib):
     text = hero.command("look at corpse")
     check("the corpse shows what it holds", text, "It holds:", "7 gold coins", "a rusty sword", absent=("felled moments ago",))
     check("a stranger sees the lock", wiz.command("look in corpse"), "It was felled moments ago; only those involved may touch it.")
-    check("a stranger cannot loot", wiz.command("loot"), "The corpse of looter is not yours to loot yet.")
+    check("a stranger cannot loot", wiz.command("loot"), "The corpse of a looter is not yours to loot yet.")
     check("a stranger cannot get from it", wiz.command("get sword from corpse"), "is not yours to loot yet.")
     check("a stranger cannot get all from it", wiz.command("get all from corpse"), "is not yours to loot yet.")
     check("plain get cannot reach into a corpse", wiz.command("get sword"), "Get what?")
@@ -874,7 +874,7 @@ def run(work, mudlib):
     fight_until(hero, "dies.", timeout=90)
     wiz.command("timers 0 120 3")
     text = quiet(hero, 6)
-    check("a full monster corpse rots with its contents", text, "The corpse of looter crumbles to dust.")
+    check("a full monster corpse rots with its contents", text, "The corpse of a looter crumbles to dust.")
     check("nothing fell to the floor", hero.command("look"), absent=("corpse", "7 gold"))
     # the coins item loot rolled: no more corpses; leave
     wiz.command("get sword")
@@ -893,7 +893,7 @@ def run(work, mudlib):
     drain(hero, 1.0)
     s = score_of(hero)
     check("death: 10% of the gold lost", str(s["gold"]), str(gold - fee))
-    check("death: full Vitality, experience and level kept", s["text"], f"Level 5   Experience {final_xp}", "Vitality 62/62")
+    check("death: full Vitality, experience and level kept", s["text"], f"Level 5", f"Experience {final_xp}", "Vitality   62/62")
     check("death: carried items went into the corpse", hero.command("i"), "You are empty-handed.")
     check("death: nothing is equipped", score_of(hero)["text"], "nothing equipped", "Damage 2-5")
     check("the guest rooms are safe: nothing fights here", hero.command("kill brute"), "Kill what?")
@@ -941,7 +941,7 @@ def run(work, mudlib):
     check("after recovery the items persist, with their state", text, "Guest Rooms")
     check("recovered items are wielded and worn again", hero.command("i"), "a woodcutter axe (wielded)", "a small shield (worn)")
     s = score_of(hero)
-    check("character data is restored", s["text"], f"Level 5   Experience {final_xp}", f"Gold {s['gold']}", "weapon: a woodcutter axe", "shield: a small shield")
+    check("character data is restored", s["text"], f"Level 5", f"Experience {final_xp}", f"Gold {s['gold']}", "weapon: a woodcutter axe", "shield: a small shield")
     saved = open(os.path.join(work, "save", "players", "hero.json")).read()
     check("the save file holds item paths and plain data only", saved, '"/domains/hollow/obj/woodcutter_axe"', '"Level": 5', f'"xp": {final_xp}')
     hero.command("d")

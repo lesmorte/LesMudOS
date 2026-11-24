@@ -694,12 +694,12 @@ def run(work, mudlib, box):
     check("the warden shortens the empty-corpse timer of both", w.command("ctimers 1800 3 3600"), "TIMERS 2")
     a.drain(ann, 0.2)
     text = a.quiet(ann, 5)
-    check("an empty corpse with nothing to take crumbles as before", text, "The corpse of test dummy crumbles to dust.")
+    check("an empty corpse with nothing to take crumbles as before", text, "The corpse of a test dummy crumbles to dust.")
     check("an empty corpse with a hide still to take does not", text + ann.command("look"), "corpse of a test wolf", absent=("test wolf crumbles",))
     act(ann, "skin corpse", *RESULT, settle=GATHER_SETTLE)
     act(ann, "bleed corpse", *RESULT, settle=0)
     text = a.quiet(ann, 5)
-    check("once its parts are taken it crumbles like any empty corpse", text, "The corpse of test wolf crumbles to dust.")
+    check("once its parts are taken it crumbles like any empty corpse", text, "The corpse of a test wolf crumbles to dust.")
 
     # ----- creature corpses rot at their lifetime, skin or no skin; a player's keeps its hour -----
     ann.command("spawn tc_wolf")
@@ -713,7 +713,7 @@ def run(work, mudlib, box):
     time.sleep(2)
     check("and still there partway", ann.command("look at corpse of test wolf"), "Its hide could still be taken")
     text = a.quiet(ann, 5)
-    check("with the hide still on it, the corpse rots at its lifetime", text, "The corpse of test wolf crumbles to dust.", "The corpse of test boar crumbles to dust.")
+    check("with the hide still on it, the corpse rots at its lifetime", text, "The corpse of a test wolf crumbles to dust.", "The corpse of a test boar crumbles to dust.")
     check("and is gone", ann.command("look"), absent=("corpse of a test wolf",))
     eve = fresh("eve")
     eve.command("tele " + T + "decayroom")

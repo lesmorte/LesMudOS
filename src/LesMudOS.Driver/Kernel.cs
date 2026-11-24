@@ -105,7 +105,7 @@ internal sealed partial class Kernel : IDriverServices
             if (_events.TryTake(out var work, wait)) work();
             RunTimers();
         }
-        foreach (var connection in _connections.ToArray()) connection.Close();
+        foreach (var connection in _connections.ToArray()) connection.Close("closed by the game (shutdown)");
         Log.Info("driver stopped");
     }
 
@@ -173,6 +173,7 @@ internal sealed partial class Kernel : IDriverServices
     // someone arriving) leaves the player looking at old text, so every connection that received output during an execution gets a
     // fresh prompt when it ends, if its owner is a player body that asks for it and is not in the middle of a question.
 
+    private const long PromptCrossingMs = 300;
     private readonly HashSet<Connection> _owing = new();
     private Connection? _promptSkip; // the connection whose line is being handled: its prompt is sent when the line is done
 
@@ -208,8 +209,9 @@ internal sealed partial class Kernel : IDriverServices
             _thisPlayer = null;
             _callStack.Clear();
         }
-        connection.Send(text);
+        connection.Send(connection.AtPrompt ? "\n" + text : text); // still at a prompt (a line crossed it): a fresh line first
         connection.AtPrompt = true;
+        connection.PromptSentMs = afterOutput ? TimeMs() : 0; // only a prompt that followed unprompted output can be crossed by a line typed meanwhile
     }
 
     private void ReportError(ObjectRef? player, Exception error)
@@ -253,7 +255,7 @@ internal sealed partial class Kernel : IDriverServices
             _thisPlayer = login;
             CallOther(login, "Logon", []);
         });
-        if (connection.Owner is null) connection.Close();
+        if (connection.Owner is null) connection.Close("closed by the game (no login object)");
     }
 
     public void OnLine(Connection connection, string line)
@@ -268,7 +270,9 @@ internal sealed partial class Kernel : IDriverServices
             connection.Send("\n");
         }
         if (line.Trim().Length > 0) connection.LastInputMs = TimeMs(); // an empty line is a client keep-alive, not activity
-        connection.AtPrompt = false; // the player pressed Enter: the cursor is on a fresh line
+        // The player pressed Enter: the cursor is on a fresh line, unless the line crossed the prompt on the wire (typed before the prompt
+        // arrived): a line within a round trip of a prompt that followed unprompted output leaves the prompt pending, so that the reply starts on a fresh line.
+        if (TimeMs() - connection.PromptSentMs > PromptCrossingMs) connection.AtPrompt = false;
         _promptSkip = connection;
         Execute(owner, () =>
         {
@@ -286,6 +290,8 @@ internal sealed partial class Kernel : IDriverServices
         });
         // The owner may have changed (Exec) or gone away (quit) during the command.
         _promptSkip = null;
+        if (connection.Owner is { IsAlive: true } named)
+            try { Runtime.Ticks = 0; if (CallOther(named, "QueryName", []) is string who && who != "") connection.PlayerName = who; } catch (Exception) { }
         _owing.Remove(connection);
         if (connection.Owner is { IsAlive: true, InputTo: null } now) SendPrompt(connection, now, false);
         FlushPrompts(); // the other connections that received output while this line was handled
@@ -293,6 +299,8 @@ internal sealed partial class Kernel : IDriverServices
 
     public void OnDisconnect(Connection connection)
     {
+        Log.Info($"connection ended: {connection.RemoteAddress}, player {connection.PlayerName ?? "(none)"}, lasted {(int)connection.Lasted.TotalSeconds}s, " +
+                 $"{(TimeMs() - connection.LastInputMs) / 1000}s since last input, {connection.EndedBy}");
         _connections.Remove(connection);
         _owing.Remove(connection);
         if (connection.Owner is not { IsAlive: true } owner) return;
@@ -447,7 +455,7 @@ internal sealed partial class Kernel : IDriverServices
         {
             connection.Owner = null;
             target.Connection = null;
-            connection.Close();
+            connection.Close("closed by the game (the player's object was destructed: quit, idle timeout or removal)");
         }
 
         target.Target = null; // every handle to the object is now dead

@@ -10,6 +10,9 @@ public class FbTombCoins : Find
         Ids.Add("spilled coins");
         Ids.Add("tarnished coins");
         Ids.Add("purse");
+        Ids.Add("spill");
+        Ids.Add("spill of coins");
+        Ids.Add("spill of tarnished coins");
         ShortDesc = "a spill of tarnished coins";
         LongDesc = "Coins from a split purse, black with tarnish and worn so smooth that no face can be made out on them. A mint that no longer strikes made them, but gold is gold. Picking them up adds them to your purse.";
         TakenShort = "a split purse, its coins gone";

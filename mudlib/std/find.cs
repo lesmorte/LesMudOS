@@ -131,10 +131,11 @@ public class Find : Thing
         AddAction("get", TryTake);
         AddAction("take", TryTake);
         AddAction("loot", TryTake);
+        foreach (var verb in new[] { "open", "unwrap", "untie", "unroll", "search", "grab", "pick" }) AddAction(verb, TryTake); // the other obvious words
     }
 
     /// <summary>
-    /// "get purse", "take purse", "loot purse". Handled only when the words name this find and it is the first thing in
+    /// "get purse", "take purse", "loot purse", and open, unwrap, untie, unroll, search, grab, pick up. Handled only when the words name this find and it is the first thing in
     /// the room that answers to them; everything else goes on to the ordinary commands.
     /// </summary>
     private bool TryTake(string args)
@@ -142,6 +143,7 @@ public class Find : Thing
         var who = ThisPlayer();
         var room = Environment();
         var word = args.Trim().ToLowerInvariant();
+        if (QueryVerb() == "pick" && word.StartsWith("up ")) word = word.Substring(3).Trim(); // "pick up bundle"
         if (who == null || room == null || word == "" || Environment(who) != room || !Id(word) || Present(word, room) != Self) return false;
 
         List<int>? answer;

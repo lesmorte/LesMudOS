@@ -9,6 +9,9 @@ public class OaOldCoins : Find
         Ids.Add("coins");
         Ids.Add("old coins");
         Ids.Add("pile");
+        Ids.Add("scatter");
+        Ids.Add("scatter of coins");
+        Ids.Add("scatter of old coins");
         ShortDesc = "a scatter of old coins";
         LongDesc = "A little drift of thick, dull coins lies in the dust, stamped on one face with a ring and a bar and on the other with nothing at all. No mint in Greenvale made them, but gold is gold.";
         TakenShort = "a bare patch of dust where old coins lay";
