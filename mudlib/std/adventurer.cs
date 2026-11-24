@@ -1204,7 +1204,8 @@ public abstract class Adventurer : Living
         unaware.Remove(creature);
         if (!spotters.Contains(creature)) spotters.Add(creature);
         sneaking = false;
-        Tell($"{Cap(creature.Call<string>("QueryLabel") ?? "it")} has noticed you!\n");
+        var noticer = Cap(creature.Call<string>("QueryLabel") ?? "it");
+        CallOut(() => { if (!Dead) Tell($"{noticer} has noticed you!\n"); }, 0); // after the arrival, so the room is described first
         creature.Call("Engage");
     }
 
@@ -1903,7 +1904,7 @@ public abstract class Adventurer : Living
             var sneakRank = Math.Max(1, QuerySkillRank("sneak"));
             var sneakSkill = LoadObject("/skills/sneak");
             var notice = sneakSkill.Call<int>("QueryNoticeAt", sneakRank);
-            text.Append($"You are sneaking (rank {Skill.Roman(sneakRank)}): each room costs {sneakSkill.Call<int>("QueryRoomCostAt", sneakRank)} Endurance" + (notice != 0 ? $", and creatures notice you {-notice} points less often" : "") + ". ({{cmd}}sneak off{{/}} to stop)\n");
+            text.Append($"You are sneaking (rank {Skill.Roman(sneakRank)}): each room costs {sneakSkill.Call<int>("QueryRoomCostAt", sneakRank)} Endurance" + (notice != 0 ? $", and creatures notice you {-notice} points less often" : "") + $". ({{cmd}}sneak off{{/}} to stop)\n");
         }
         var power = QueryStat("physical_power");
         text.Append($"Damage {QueryDamageMin()}-{QueryDamageMax()}" + (power != 0 ? $" ({(power > 0 ? "+" : "")}{Pct(power)}%)" : "") +
@@ -1999,7 +2000,7 @@ public abstract class Adventurer : Living
 
     private bool CmdStat(string args)
     {
-        if (!IsWizard(LevelStat)) return false;
+        if (!IsWizard(LevelStat)) return args.Trim() == "" && CmdScore(args); // a player's bare stat is score
         var thing = args.Trim() == "" ? null : FindHere(args.Trim());
         if (thing == null) { NotifyFail("Stat what? (a name, me, or here)"); return false; }
         Write(thing.Call<string>("Stat") ?? thing.Name + "\n");
