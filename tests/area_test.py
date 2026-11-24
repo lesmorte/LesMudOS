@@ -851,7 +851,7 @@ def run(work, mudlib):
     text = hero.command("look at corpse")
     check("the corpse shows what it holds", text, "It holds:", "7 gold coins", "a rusty sword", absent=("felled moments ago",))
     check("a stranger sees the lock", wiz.command("look in corpse"), "It was felled moments ago; only those involved may touch it.")
-    check("a stranger cannot loot", wiz.command("loot"), "The corpse of looter is not yours to loot yet.")
+    check("a stranger cannot loot", wiz.command("loot"), "The corpse of a looter is not yours to loot yet.")
     check("a stranger cannot get from it", wiz.command("get sword from corpse"), "is not yours to loot yet.")
     check("a stranger cannot get all from it", wiz.command("get all from corpse"), "is not yours to loot yet.")
     check("plain get cannot reach into a corpse", wiz.command("get sword"), "Get what?")
@@ -874,7 +874,7 @@ def run(work, mudlib):
     fight_until(hero, "dies.", timeout=90)
     wiz.command("timers 0 120 3")
     text = quiet(hero, 6)
-    check("a full monster corpse rots with its contents", text, "The corpse of looter crumbles to dust.")
+    check("a full monster corpse rots with its contents", text, "The corpse of a looter crumbles to dust.")
     check("nothing fell to the floor", hero.command("look"), absent=("corpse", "7 gold"))
     # the coins item loot rolled: no more corpses; leave
     wiz.command("get sword")
