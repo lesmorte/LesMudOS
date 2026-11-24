@@ -10,6 +10,10 @@ public class FbBowlToken : Find
         Ids.Add("grave token");
         Ids.Add("disc");
         Ids.Add("stone disc");
+        Ids.Add("flat token");
+        Ids.Add("flat stone token");
+        Ids.Add("stone token");
+        Ids.Add("bowl token");
         ShortDesc = "a flat stone token in one of the bowls";
         LongDesc = "A disc of green-grey stone no bigger than a coin, ground perfectly flat, lies in the crust of one of the bowls. One face is cut with a ring crossed by a bar; the other is blank. It is laid there as if for whoever comes.";
         TakenShort = "a bowl with a disturbed crust where a token lay";

@@ -814,6 +814,13 @@ def run(work, mudlib, box):
     check("the bundle now reads as taken", finder.command("look at bundle"), "folded open")
     check("a second try finds nothing more", finder.command("get bundle"), "already")
     truth("only one recurve in the pack", count(finder, "warden's recurve") == 1, finder.command("i"))
+    # Every obvious verb and every noun of the find's line takes it (a fresh character each time: a find is taken once).
+    for who, phrase in (("ada", "open bundle"), ("beth", "unwrap bundle"), ("cora", "untie bundle"), ("dina", "take oilcloth"), ("elsa", "get oilcloth"),
+                        ("faye", "untie cord"), ("gina", "pick up bundle"), ("hana", "open oilcloth"), ("iris", "take cord"), ("jana", "get long bundle"), ("kira", "unroll bundle")):
+        c = newchar(who, gold=0)
+        c.command("tele " + CELLARS + "hidden_cache")
+        check(f"the bundle answers to '{phrase}'", c.command(phrase), "warden's recurve", absent=("What?",))
+        c.command("quit")
     calm_bats(w)
     finder.command("tele " + CELLARS + "mushroom_cavern")
     check("the Mushroom Cavern shows the root", finder.command("look"), "pale root")
