@@ -85,3 +85,21 @@ Runs:
 - playthrough_test exit=0 secs=1516 last: 0 failure(s)
 - playthrough first run: 1 failure (the Overseer died from above half Vitality before his next action, so no summon: combat chance,
   /domains code untouched); rerun: 0 failures, 1516 s. Full run complete on tree 30dd846/ffabb42: every suite passes.
+
+## Second independent review (tree 422e00d): findings to close (written first; proofs in tests/redteam2, from work/redteam2)
+CLASS A (real multi-step code on the budget sandbox code left; checkpoint/restore not atomic): T2 (goto loads a sandbox room whose
+Create burns ticks; EnterWorkshop dies half-way: unmarked, or stale checkpoint + duplicated relic), T3 (burn then move out: OnMoved
+throws before ScheduleRestore; marked body in real room never swept), D2b (IOException at the checkpoint; host path shown), by reading:
+visitor stale checkpoint, approval rollback half done. Required: own budget per entry into sandbox code with the caller's count put back;
+checkpoint+mark in the driver/master move path before hooks, refuse entry on any failure; restore scheduled by the move path;
+heartbeat invariant with sandbox: log lines; no host path in player text; audit every multi-step sequence.
+CLASS B (watchdog/share blind and misattributing): W1 (_lastRestricted never restored on Pop: wrong home quarantined), W2 ("{a"*0.2MB
+LongDesc, quadratic Markup with no sandbox frame: 45 s), C2 (compile per file limit; submit compiles 200 files: 79 s), suspected
+quadratic destroy; several homes at once (global cap). Required: domain from frames on the stack (outermost); TryCross caps; linear
+Markup; step attributed to first sandbox domain entered; compile time charged; per-command/window compile budget; lower per-file limit;
+objects per home cap; linear destroy; global share cap.
+Individual: T1 (tickless bodies: expression ctor, field/auto-prop initialisers, ctor initialiser args; enumerate all places; depth
+counter), D2a (home quota in the driver: bytes, files, dirs, depth; settings), L3 (Write log flood; cap every log line restricted code
+causes), S1 (visitor mark per line: collapse spaces, wrap/cut, mark every piece), lone CR (only before LF), N1 (fixed on main 07bb29f;
+also cap a non-reading connection's outbox), memory (TryCross caps, objects per home, call-outs per home; state what remains).
+At the end: tests/redteam2 run_all all PASS, tests/redteam run_all 13/13, sandbox_test, every suite one at a time; docs "Second review".
