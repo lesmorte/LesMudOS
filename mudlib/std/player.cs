@@ -1354,25 +1354,61 @@ public class Player : Adventurer
         base.OnMoved(from);
         if (!ready || leavingWorkshop) return;
         var inside = InSandboxSpace();
-        if (inside && !inWorkshop) EnterWorkshop(from);
+        // The checkpoint and the mark were set by the master in the move itself (WorkshopCheckpoint); here the wizard is only told.
+        if (inside && inWorkshop && !workshopAnnounced) AnnounceWorkshop();
         else if (!inside && inWorkshop) ScheduleRestore(false);
     }
 
-    private void EnterWorkshop(ObjectRef? from)
+    private bool workshopAnnounced;
+
+    private static bool FromMaster(ObjectRef? caller) => caller is { IsClone: false, ProgramPath: "/secure/master", Domain: "" };
+
+    /// <summary>
+    /// Called by the master in the move that takes this character into sandbox space, before the move happens: write the checkpoint
+    /// (the save file, with the room they came from as the place to log in again) and set the mark. False, with nothing changed, if
+    /// the checkpoint cannot be written for any reason; the master then refuses the move.
+    /// </summary>
+    public bool WorkshopCheckpoint(ObjectRef? origin)
     {
-        if (QueryWizLevel() < 1) return; // the master lets nobody else in
-        var origin = from is { IsAlive: true } ? Outermost(from) : null;
+        if (!FromMaster(PreviousObject()) || !ready || inWorkshop || leavingWorkshop || QueryWizLevel() < 1) return false;
         try
         {
-            PrepareSave(origin); // the room they came from is where they would log in again
+            PrepareSave(origin);
             SaveObject(SaveFile);
         }
-        catch (MudRuntimeException)
+        catch (Exception)
         {
-            // The last save stands as the checkpoint: restoring to it can only lose what happened since, never gain.
+            return false;
         }
-        checkpointRoom = origin != null && origin.Domain == "" ? origin.Name : "";
+        checkpointRoom = origin != null && origin.Domain == "" && !origin.IsClone ? origin.Name : "";
         inWorkshop = true;
+        workshopAnnounced = false;
+        return true;
+    }
+
+    /// <summary>Called by the master when this marked character arrives outside sandbox space (and by its heartbeat invariant).</summary>
+    public void WorkshopLeaving()
+    {
+        if (FromMaster(PreviousObject()) && inWorkshop && !leavingWorkshop) ScheduleRestore(false);
+    }
+
+    /// <summary>The master's repair of an unmarked character found in sandbox space: what the workshop made goes, and they go out.</summary>
+    public void WorkshopRepair()
+    {
+        if (!FromMaster(PreviousObject()) || inWorkshop || leavingWorkshop) return;
+        SweepSandboxThings();
+        try { MoveObject(LoadObject(StartRoom)); } catch (Exception) { }
+    }
+
+    /// <summary>The master's repair of an unmarked character carrying something made in a workshop.</summary>
+    public void WorkshopSweep()
+    {
+        if (FromMaster(PreviousObject()) && !inWorkshop && !leavingWorkshop) SweepSandboxThings();
+    }
+
+    private void AnnounceWorkshop()
+    {
+        workshopAnnounced = true;
         Tell("You step into the workshop. Nothing that happens here will follow you out.\n");
         var space = "";
         for (var e = Environment(); e != null && space == ""; e = Environment(e)) space = e.Domain;

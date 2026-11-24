@@ -16,6 +16,8 @@ public class Master : MudObject, IMaster
 
     public ObjectRef Connect() => CloneObject("/secure/login");
 
+    public override void Create() => SetHeartBeat(true); // the workshop invariant, below
+
     public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/crafting", "/secure/comm", "/secure/channels", "/secure/roomids", "/secure/gmcp", Publish, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
 
     // Save files: player bodies own /players/*, the wizard registry owns its own file. Restricted code owns none, and a character in
@@ -134,6 +136,49 @@ public class Master : MudObject, IMaster
 
     private static bool InWorkshop(ObjectRef body) => body.IsAlive && body.Call<bool>("QueryInWorkshop");
 
+    /// <summary>The outermost real container around a place, the room a checkpoint is taken in; null in sandbox space or nowhere.</summary>
+    private ObjectRef? OutermostOf(ObjectRef? place)
+    {
+        var top = place;
+        while (top != null && Environment(top) is { } up) top = up;
+        return top != null && top.Domain == "" ? top : null;
+    }
+
+    /// <summary>
+    /// The workshop invariant, kept every heartbeat whatever any body's own code did (the second review's class A): a character in
+    /// sandbox space is marked; a marked character outside sandbox space is restored; an unmarked character carries nothing made
+    /// in a workshop. A repair is logged with a "sandbox:" line.
+    /// </summary>
+    public override void HeartBeat()
+    {
+        foreach (var body in Users())
+        {
+            if (!IsPlayerBody(body) || !body.IsAlive) continue;
+            try
+            {
+                var inside = PlaceOf(Environment(body)) == Place.Sandbox;
+                var marked = InWorkshop(body);
+                if (body.Call<bool>("QueryLeavingWorkshop")) continue;
+                if (inside && !marked)
+                {
+                    Write($"sandbox: invariant: {body.Name} was in sandbox space without the workshop mark; moved out, workshop things removed\n");
+                    body.Call("WorkshopRepair");
+                }
+                else if (!inside && marked)
+                {
+                    Write($"sandbox: invariant: {body.Name} was marked as in the workshop outside sandbox space; restored\n");
+                    body.Call("WorkshopLeaving");
+                }
+                else if (!marked && AllInventory(body).Any(item => item.Domain != ""))
+                {
+                    Write($"sandbox: invariant: {body.Name} carried something made in a workshop outside it; removed\n");
+                    body.Call("WorkshopSweep");
+                }
+            }
+            catch (Exception) { }
+        }
+    }
+
     private enum Place { Real, Workshop, Sandbox }
 
     /// <summary>Where a container is: inside sandbox space, inside a character in the workshop, or in the real game.</summary>
@@ -199,7 +244,23 @@ public class Master : MudObject, IMaster
             }
             // Into a workshop only by the character's own command (goto, an exit): nothing else may carry a wizard in, the level 10
             // included (C1 of the November 2026 review: the wizard was dragged in to be shown a fake prompt).
-            if (to == Place.Sandbox && !InWorkshop(what) && ThisPlayer() != what) return "Only a wizard's own command takes them into a workshop.";
+            var marked = InWorkshop(what);
+            if (to == Place.Sandbox && !marked && ThisPlayer() != what) return "Only a wizard's own command takes them into a workshop.";
+            // The checkpoint is taken and the mark set here, in the move itself, before the move happens and before any code of the
+            // workshop or of the body runs (the second review's class A): if it cannot be taken, for any reason, the wizard does not
+            // enter. And a marked body that arrives outside sandbox space has its restore scheduled here, whatever its own hooks do.
+            if (to == Place.Sandbox && !marked)
+            {
+                bool taken;
+                try { taken = what.Call<bool>("WorkshopCheckpoint", OutermostOf(Environment(what))); }
+                catch (Exception) { taken = false; }
+                if (!taken) return "The workshop could not take your checkpoint, so you stay where you are. Try again in a moment.";
+            }
+            if (to != Place.Sandbox && marked)
+            {
+                try { what.Call("WorkshopLeaving"); }
+                catch (Exception) { } // the heartbeat invariant restores the body if even this fails
+            }
             return null;
         }
         if (what.Domain != "")

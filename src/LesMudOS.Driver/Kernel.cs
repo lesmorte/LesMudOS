@@ -94,9 +94,17 @@ internal sealed partial class Kernel : IDriverServices
     /// <summary>Ask the master object a question, with the master on the call stack.</summary>
     private T AskMaster<T>(Func<IMaster, T> question)
     {
+        // The master answers on a budget of its own: whatever the code asking has spent, a policy decision (and the workshop
+        // checkpoint it may take) is never cut short by the tick limit.
+        var ticks = Runtime.Ticks;
+        Runtime.Ticks = 0;
         _masterDepth++;
         try { return In(_master!, () => question(MasterObject)); }
-        finally { _masterDepth--; }
+        finally
+        {
+            _masterDepth--;
+            Runtime.Ticks = ticks;
+        }
     }
 
     // ---- Call stack: which object's code is running, for PreviousObject() ----
@@ -150,9 +158,15 @@ internal sealed partial class Kernel : IDriverServices
         var outermost = ob.Domain.Length > 0 && _restricted == 0;
         if (outermost) EnterDomain(ob.Domain);
         if (ob.Domain.Length > 0) _masterDepth = 0;
+        // Each side of a domain boundary runs on its own tick budget (the second review's class A): code entered across the
+        // boundary starts at zero, and the caller's count is put back when it returns, so sandbox code can never spend the ticks of
+        // the real code that called it (or that it called), and the rest of a real sequence never stops for want of them.
+        var crossing = ob.Domain != below;
+        var ticks = Runtime.Ticks;
+        if (crossing) Runtime.Ticks = 0;
         Push(ob);
         try { return work(); }
-        catch (Exception error) when (ob.Domain != below && !CrossesAsIs(error))
+        catch (Exception error) when (crossing && !CrossesAsIs(error))
         {
             throw new MudRuntimeException(CrossingText(error, ob));
         }
@@ -160,6 +174,7 @@ internal sealed partial class Kernel : IDriverServices
         {
             Pop();
             _masterDepth = masterDepth;
+            if (crossing) Runtime.Ticks = ticks;
             if (outermost) LeaveDomain(ob.Domain);
         }
     }
@@ -632,6 +647,10 @@ internal sealed partial class Kernel : IDriverServices
         connection.AtPrompt = true;
     }
 
+    /// <summary>Text for a player never shows where the game lives on the host (the second review's D2b).</summary>
+    private string Scrub(string text)
+        => text.Replace(_mudlibRoot, "<mudlib>", StringComparison.Ordinal).Replace(_saves.Root, "<save>", StringComparison.Ordinal);
+
     private void ReportError(ObjectRef? player, Exception error)
     {
         // The call stack is empty here. Every exception that left a sandbox frame was converted on the way out (In), so this reads
@@ -654,7 +673,7 @@ internal sealed partial class Kernel : IDriverServices
         Runtime.Ticks = 0; // give the error handlers a budget of their own
         try
         {
-            if (player is { IsAlive: true }) Receive(player, $"*** {message}\n");
+            if (player is { IsAlive: true }) Receive(player, $"*** {Scrub(error is MudRuntimeException ? message : error.GetType().Name + ": " + message)}\n");
             if (_master is { IsAlive: true }) AskMaster(m => { m.LogError(player?.Name ?? "driver", text); return true; });
         }
         catch (Exception nested)
@@ -809,8 +828,10 @@ internal sealed partial class Kernel : IDriverServices
             throw new MudRuntimeException($"This workshop ({handle.Domain}) is closed: its code held up the whole game. An administrator reopens it.");
         List<ObjectRef>? outer = null;
         var outerMasterDepth = _masterDepth;
+        var outerTicks = Runtime.Ticks;
         if (!isClone)
         {
+            Runtime.Ticks = 0; // a blueprint is made on a budget of its own, as it is made with a call stack of its own
             outer = new List<ObjectRef>(_callStack);
             ClearStack();
             _thisPlayer = null; // Instantiate gives the creator's back afterwards
@@ -819,6 +840,8 @@ internal sealed partial class Kernel : IDriverServices
         {
             _pending = (handle, program.ObjectType);
             var belowDomain = TopDomain;
+            var ctorTicks = Runtime.Ticks;
+            if (handle.Domain != belowDomain) Runtime.Ticks = 0;
             Push(handle);
             try
             {
@@ -837,6 +860,7 @@ internal sealed partial class Kernel : IDriverServices
             {
                 _pending = null;
                 Pop();
+                if (handle.Domain != belowDomain) Runtime.Ticks = ctorTicks;
             }
 
             _objects[name] = handle;
@@ -858,6 +882,7 @@ internal sealed partial class Kernel : IDriverServices
                 ClearStack();
                 foreach (var ob in outer) Push(ob);
                 _masterDepth = outerMasterDepth;
+                Runtime.Ticks = outerTicks;
             }
         }
     }
@@ -1246,7 +1271,12 @@ internal sealed partial class Kernel : IDriverServices
     {
         path = ProgramCompiler.NormalizePath(path);
         if (!AskMaster(m => m.ValidWrite(path, caller))) throw new MudRuntimeException($"{caller.Name} may not write {path}");
-        _saves.Save(caller.Target!, path);
+        try { _saves.Save(caller.Target!, path); }
+        catch (Exception e) when (e is not MudRuntimeException)
+        {
+            Log.Info($"ERROR saving {path}: {e.GetType().Name}: {SafeMessage(e)}"); // the host's path goes to the log, not to a player
+            throw new MudRuntimeException($"The save file {path} could not be written");
+        }
         return true;
     }
 
@@ -1254,7 +1284,12 @@ internal sealed partial class Kernel : IDriverServices
     {
         path = ProgramCompiler.NormalizePath(path);
         if (!AskMaster(m => m.ValidRead(path, caller))) throw new MudRuntimeException($"{caller.Name} may not read {path}");
-        return _saves.Restore(caller.Target!, path);
+        try { return _saves.Restore(caller.Target!, path); }
+        catch (Exception e) when (e is not MudRuntimeException)
+        {
+            Log.Info($"ERROR restoring {path}: {e.GetType().Name}: {SafeMessage(e)}");
+            throw new MudRuntimeException($"The save file {path} could not be read");
+        }
     }
 
     // ---- Mudlib file access ----
