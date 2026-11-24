@@ -132,6 +132,15 @@ A value is minutes (`0.5` is allowed), or a number with `s` or `m` (`30s`); the 
 
 When it fires (SANDBOX.md section 7, "A stall"), the log says `sandbox: STALL: code of wiz:<name> ...`, the driver exits with code 3 and systemd starts it again. The wizard's home is closed: `save/sandbox_quarantine.txt` holds one line per closed home (`wiz:<name> <time> ...`), and the driver makes no object of a listed home. To reopen it, read the code that stalled, delete its line, and restart the service.
 
+### A wizard's home
+
+| Environment | Default | Meaning |
+|---|---|---|
+| `LESMUDOS_HOME_BYTES` | `3000000` | Bytes a home (`/wiz/<name>`) may hold |
+| `LESMUDOS_HOME_FILES` | `1000` | Files a home may hold |
+| `LESMUDOS_HOME_DIRS` | `64` | Directories a home may hold |
+| `LESMUDOS_HOME_DEPTH` | `8` | How deep a home's directories may go |
+
 ## 4. Make yourself the first wizard
 
 1. Connect: `telnet <droplet ip> 4000` (or any MUD client).

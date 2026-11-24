@@ -223,6 +223,7 @@ public class Lantern : Item
 | `tests/rename_test.py` | Vitality, Endurance and Focus: the old prompt tokens, a save from before the rename, content written against the old names, and a scan that no player-visible text says HP, hit points, Mana or Stamina (port 4850, about 2 minutes) |
 | `tests/sandbox_test.py` | The wizard sandbox and publishing: every attempt to cross the boundary from seven origins, the workshop checkpoint and every route out, the publication register (port 4840) |
 | `tests/redteam/` | The independent review of November 2026: its report and one proof per finding, each printing PASS where the hole is closed; `run_all.py` runs them one after another (port 4852, about 25 minutes) |
+| `tests/redteam2/` | The second independent review (November 2026): one proof per finding, `run_all.py` (port 4853) |
 | `tests/load_check.py` | Quick check that every area file compiles and loads (port 4821, under a minute) |
 | `tests/timing_test.py` | Measures real intervals between combat actions against the timing formula (port 4815, about 3 minutes) |
 | `tests/balance_sim.py` | Standalone combat balance simulation (event clock); `check` compares it with the mudlib numbers |
@@ -250,6 +251,7 @@ LESMUDOS_TEST_PORT=4815 python3 tests/timing_test.py
 LESMUDOS_TEST_PORT=4841 python3 tests/gmcp_test.py
 LESMUDOS_TEST_PORT=4840 python3 tests/sandbox_test.py
 LESMUDOS_TEST_PORT=4852 python3 tests/redteam/run_all.py
+LESMUDOS_TEST_PORT=4853 python3 tests/redteam2/run_all.py
 python3 tests/balance_sim.py
 python3 tests/balance_sim.py ranks [runs] [level5 heal double gap bolt focus climb aim wait aimfix healcost selfheal]
 ```
