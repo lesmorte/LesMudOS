@@ -20,6 +20,7 @@ internal sealed class TickInjector : CSharpSyntaxRewriter
 
     private readonly StatementSyntax Tick;
     private readonly ExpressionSyntax? _filterCheck;
+    private readonly ExpressionSyntax _pass; // Runtime.Pass(...): the tick as an expression, true or an exception
     private readonly IReadOnlySet<int> _voidLambdas;
 
     /// <param name="domain">The sandbox domain the program belongs to, or null for real code. Sandbox code's ticks also check that a
@@ -33,12 +34,14 @@ internal sealed class TickInjector : CSharpSyntaxRewriter
         {
             Tick = ParseStatement("global::LesMudOS.Api.Runtime.Tick();");
             _filterCheck = null;
+            _pass = ParseExpression("global::LesMudOS.Api.Runtime.Pass()");
         }
         else
         {
             var literal = SymbolDisplay.FormatLiteral(domain, quote: true);
             Tick = ParseStatement($"global::LesMudOS.Api.Runtime.Tick({literal});");
             _filterCheck = ParseExpression($"global::LesMudOS.Api.Runtime.Filter({literal})");
+            _pass = ParseExpression($"global::LesMudOS.Api.Runtime.Pass({literal})");
         }
     }
 
@@ -136,6 +139,7 @@ internal sealed class TickInjector : CSharpSyntaxRewriter
     public override SyntaxNode? VisitPropertyDeclaration(PropertyDeclarationSyntax node)
     {
         node = (PropertyDeclarationSyntax)base.VisitPropertyDeclaration(node)!;
+        if (node.Initializer is not null) node = node.WithInitializer(GuardedInitializer(node.Initializer, node.Type));
         if (node.ExpressionBody is null) return node;
         // "int X => expr;"  ->  "int X { get { Tick(); return expr; } }"
         var getter = AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
@@ -160,7 +164,74 @@ internal sealed class TickInjector : CSharpSyntaxRewriter
     public override SyntaxNode? VisitConstructorDeclaration(ConstructorDeclarationSyntax node)
     {
         node = (ConstructorDeclarationSyntax)base.VisitConstructorDeclaration(node)!;
-        return node.Body is null ? node : node.WithBody(WithTick(node.Body));
+        if (node.Body is not null) return node.WithBody(WithTick(node.Body));
+        if (node.ExpressionBody is null) return node; // extern
+        return node
+            .WithBody(ToBlock(node.ExpressionBody, node.SemicolonToken, returnsValue: false))
+            .WithExpressionBody(null)
+            .WithSemicolonToken(default);
+    }
+
+    // ---- code that runs outside any body (the second review's T1) ----
+    // Field and property initialisers run before a constructor's body, and so do the arguments of ": base(...)", ": this(...)" and
+    // of a primary constructor's base type: "R n = new R();" recursed with no tick at all. Each such expression becomes
+    // "Runtime.Pass() ? (expr) : default!", which ticks (and checks the stack and, for sandbox code, its frame) before the
+    // expression is evaluated, and has the same type (a target-typed conditional where the expression has none of its own).
+
+    private ExpressionSyntax Guarded(ExpressionSyntax value)
+        => ConditionalExpression(_pass, ParenthesizedExpression(value.WithoutTrivia()),
+                PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, LiteralExpression(SyntaxKind.DefaultLiteralExpression)))
+            .WithTriviaFrom(value);
+
+    private EqualsValueClauseSyntax GuardedInitializer(EqualsValueClauseSyntax clause, TypeSyntax? type)
+    {
+        var value = clause.Value;
+        // An array initialiser ("= { a, b }") is not an expression: it is given its type first.
+        if (value is InitializerExpressionSyntax list && type is ArrayTypeSyntax arrayType)
+            value = ArrayCreationExpression(arrayType.WithoutTrivia(), list.WithoutTrivia()).WithTriviaFrom(list);
+        else if (value is InitializerExpressionSyntax) return clause;
+        return clause.WithValue(Guarded(value));
+    }
+
+    public override SyntaxNode? VisitFieldDeclaration(FieldDeclarationSyntax node)
+    {
+        node = (FieldDeclarationSyntax)base.VisitFieldDeclaration(node)!;
+        if (node.Modifiers.Any(SyntaxKind.ConstKeyword)) return node; // a constant: evaluated by the compiler
+        var type = node.Declaration.Type;
+        return node.WithDeclaration(node.Declaration.WithVariables(SeparatedList(node.Declaration.Variables.Select(v =>
+            v.Initializer is null ? v : v.WithInitializer(GuardedInitializer(v.Initializer, type))), node.Declaration.Variables.GetSeparators())));
+    }
+
+    public override SyntaxNode? VisitEventFieldDeclaration(EventFieldDeclarationSyntax node)
+    {
+        node = (EventFieldDeclarationSyntax)base.VisitEventFieldDeclaration(node)!;
+        var type = node.Declaration.Type;
+        return node.WithDeclaration(node.Declaration.WithVariables(SeparatedList(node.Declaration.Variables.Select(v =>
+            v.Initializer is null ? v : v.WithInitializer(GuardedInitializer(v.Initializer, type))), node.Declaration.Variables.GetSeparators())));
+    }
+
+    private ArgumentListSyntax GuardedArguments(ArgumentListSyntax list)
+    {
+        // The first argument that is passed by value is evaluated first of those that can run code: guarding it ticks before any.
+        for (var i = 0; i < list.Arguments.Count; i++)
+        {
+            var argument = list.Arguments[i];
+            if (argument.RefKindKeyword.IsKind(SyntaxKind.None) && argument.NameColon is null)
+                return list.WithArguments(list.Arguments.Replace(argument, argument.WithExpression(Guarded(argument.Expression))));
+        }
+        return list;
+    }
+
+    public override SyntaxNode? VisitConstructorInitializer(ConstructorInitializerSyntax node)
+    {
+        node = (ConstructorInitializerSyntax)base.VisitConstructorInitializer(node)!;
+        return node.ArgumentList.Arguments.Count == 0 ? node : node.WithArgumentList(GuardedArguments(node.ArgumentList));
+    }
+
+    public override SyntaxNode? VisitPrimaryConstructorBaseType(PrimaryConstructorBaseTypeSyntax node)
+    {
+        node = (PrimaryConstructorBaseTypeSyntax)base.VisitPrimaryConstructorBaseType(node)!;
+        return node.ArgumentList.Arguments.Count == 0 ? node : node.WithArgumentList(GuardedArguments(node.ArgumentList));
     }
 
     public override SyntaxNode? VisitOperatorDeclaration(OperatorDeclarationSyntax node)

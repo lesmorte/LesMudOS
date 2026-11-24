@@ -101,6 +101,37 @@ public static class Runtime
         if (!string.Equals(domain, CurrentDomain, StringComparison.Ordinal)) throw new SandboxFrameException(domain);
         if (++Ticks > Limit) throw new EvalCostExceededException();
         RuntimeHelpers.EnsureSufficientExecutionStack();
+        // Sandbox code may use only the first part of the game thread's stack, so that whatever runs below it without a tick
+        // (framework code, the driver) still has most of the stack left: a depth limit that does not depend on counting ticks.
+        if (StackStart != 0 && StackStart - StackHere() > SandboxStackBytes) throw new InsufficientExecutionStackException();
+    }
+
+    /// <summary>The address of the game thread's stack where the driver's loop runs (set by the driver); 0 if unknown.</summary>
+    internal static nuint StackStart;
+    internal static nuint SandboxStackBytes = 4 * 1024 * 1024;
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static unsafe nuint StackHere()
+    {
+        byte probe = 0;
+        return (nuint)(&probe);
+    }
+
+    /// <summary>Called by the driver on the game thread, near the bottom of its stack.</summary>
+    internal static void MarkStackStart() => StackStart = StackHere();
+
+    /// <summary>The tick as an expression, for code that runs outside any body (field and property initialisers, constructor initialisers).</summary>
+    public static bool Pass()
+    {
+        Tick();
+        return true;
+    }
+
+    /// <summary>The same for sandbox code: the tick of its domain.</summary>
+    public static bool Pass(string domain)
+    {
+        Tick(domain);
+        return true;
     }
 
     /// <summary>Set by the driver: may code of this domain run now as a catch filter (see Filter)?</summary>

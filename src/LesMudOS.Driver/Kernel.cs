@@ -510,6 +510,7 @@ internal sealed partial class Kernel : IDriverServices
 
     public void Run()
     {
+        Runtime.MarkStackStart();
         Boot();
         while (!_shutdown)
         {
