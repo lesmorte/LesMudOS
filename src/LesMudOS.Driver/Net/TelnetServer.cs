@@ -132,7 +132,7 @@ internal sealed class Connection
                         break;
 
                     // Telnet negotiation is recognised and, except for GMCP, discarded.
-                    case TelnetState.Iac when b == 255: line.Add(255); telnet = TelnetState.Data; break;
+                    case TelnetState.Iac when b == 255: if (line.Count < MaxLineLength) line.Add(255); telnet = TelnetState.Data; break; // an escaped 255 is a data byte: same limit as any other
                     case TelnetState.Iac when b is >= 251 and <= 254: command = b; telnet = TelnetState.Option; break;
                     case TelnetState.Iac when b == 250: sub.Clear(); subOverflow = false; telnet = TelnetState.Subnegotiation; break;
                     case TelnetState.Iac: telnet = TelnetState.Data; break;
