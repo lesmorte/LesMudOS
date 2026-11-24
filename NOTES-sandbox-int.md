@@ -103,3 +103,11 @@ counter), D2a (home quota in the driver: bytes, files, dirs, depth; settings), L
 causes), S1 (visitor mark per line: collapse spaces, wrap/cut, mark every piece), lone CR (only before LF), N1 (fixed on main 07bb29f;
 also cap a non-reading connection's outbox), memory (TryCross caps, objects per home, call-outs per home; state what remains).
 At the end: tests/redteam2 run_all all PASS, tests/redteam run_all 13/13, sandbox_test, every suite one at a time; docs "Second review".
+- class A committed; T1 committed (t1 redteam2 4/4, t1_every_body 28/28, load_check 0 failed)
+- class B + individual committed (w1 w2 c2 d2 l3 s1 n1 t1 t2 t3 PASS individually)
+- build exit=0 secs=2 last: Build succeeded.
+- redteam2/run_all exit=0 secs=355 last: 10 of 10 proofs pass
+- redteam/run_all exit=1 secs=501 last: 13 of 14 proofs pass: open in t1_every_body
+- sandbox_test exit=0 secs=159 last: 0 failure(s)
+- ab34f4a + 8a5f0b1 (docs): redteam2/run_all 10 of 10; redteam/run_all 13 of 14 (t1_every_body hit the 0.5 s share: my test fired
+  commands faster than the window; now paced, passes); sandbox_test 0 failures. Next: full run, one suite at a time.

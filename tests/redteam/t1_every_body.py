@@ -60,12 +60,22 @@ def main():
     try:
         g.setup_people()
         g.wren.command("goto /wiz/wren/lab")
+        def paced(line):
+            # Each recursion spends a whole tick budget, which is more than the home's share of time (0.5 s of every 2 s): a
+            # command refused for that is tried again once the window has passed, as a wizard would.
+            for _ in range(4):
+                out = g.wren.command(line, timeout=60)
+                if "used its share of time" not in out:
+                    return out
+                time.sleep(2.5)
+            return out
+
         for i, name in enumerate(names):
-            out = g.wren.command(f"clone /wiz/wren/t/f{i}", timeout=60)
+            out = paced(f"clone /wiz/wren/t/f{i}")
             if "Cloned" not in out:
                 rtlib.check(f"T1 {name}: the form compiles (setup)", False, out)
                 continue
-            out = g.wren.command(f"rt{i}", timeout=60)
+            out = paced(f"rt{i}")
             time.sleep(0.2)
             rtlib.check(f"T1 {name}: endless recursion ends in an error for the wizard, and the driver lives",
                         g.alive() and "***" in out and "SURVIVED" not in out, out[-300:] if g.alive() else "driver died: " + g.driver_log()[-300:])
