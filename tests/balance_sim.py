@@ -468,8 +468,9 @@ SNEAK_ELITE = ("Goblin Elite Guard",)   # only for the options of docs/BALANCE_S
 
 # The options of docs/BALANCE_SCOUT.md. Every one is off (the present game) unless `scout_option` switches it on. "second": None, or how the target's
 # second notice roll (while an unnoticed Scout draws Aimed Shot) is made; "per_level": extra notice points per creature level above the Scout
-# (option C); "elite": extra notice points for SNEAK_ELITE (option C); "cap": the share of the target's maximum Vitality an Aimed Shot opener may deal.
-OPT = dict(second=None, second_plus=0, second_scale=1.0, per_level=0, elite=0, cap=None)
+# (option C); "elite": extra notice points for SNEAK_ELITE (option C); "cap": the share of the target's maximum Vitality an Aimed Shot opener may deal;
+# "floor": the lowest base notice chance in percent (the game: 10; option F, not in the owner's list).
+OPT = dict(second=None, second_plus=0, second_scale=1.0, per_level=0, elite=0, cap=None, floor=10)
 SIM_REROLL = True      # a fix to match the game: a creature that has not noticed the Scout re-rolls every 10 s at half the chance while he types his command
 SIM_BOW_STRIKE = True  # a fix to match the game: the ranged opening (2 s) goes to any Scout whose weapon is a bow, Precision Strike included (the melee Scout of the standard test holds the Hunting Bow)
 
@@ -478,7 +479,7 @@ def notice_chance(grace, scout_level, creature_level, alert, adjust, elite=False
     """mudlib/secure/sneak.cs NoticeChance, in percent (plus the options of docs/BALANCE_SCOUT.md, all off by default)."""
     diff = creature_level - scout_level
     c = 50 - 5 * (grace - 5) + 5 * diff + (OPT["per_level"] * diff if diff > 0 else 0)
-    c = max(10, min(90, c))
+    c = max(OPT["floor"], min(90, c))
     return max(5, min(100, c + (30 if alert else 0) + (OPT["elite"] if elite else 0) + adjust))
 
 
@@ -3288,14 +3289,14 @@ def aim_table(opener_delta=0.0, cost=None):
 
 
 @contextmanager
-def scout_option(mode=None, opener=0.0, second=None, per_level=0, elite=0, cap=None, cost=None):
+def scout_option(mode=None, opener=0.0, second=None, per_level=0, elite=0, cap=None, cost=None, floor=10):
     """Switch on the options of docs/BALANCE_SCOUT.md for a block: opener = change to Aimed Shot's opener multiplier (A); second = None, "same",
     "plus15" or "half" (B); per_level, elite (C); cap = share of the target's maximum Vitality (D); cost = Aimed Shot's Endurance at rank I (E).
     mode: the rank mode of ranked()."""
     saved = dict(OPT)
     try:
         scale, plus = SECOND_MODES[second] if second else (1.0, 0)
-        OPT.update(second=second, second_scale=scale, second_plus=plus, per_level=per_level, elite=elite, cap=cap)
+        OPT.update(second=second, second_scale=scale, second_plus=plus, per_level=per_level, elite=elite, cap=cap, floor=floor)
         with ranked(mode=mode, table=aim_table(opener, cost) if (opener or cost) else None):
             yield
     finally:
@@ -3317,22 +3318,38 @@ SCOUT_OPTIONS = [
     ("C4 Elite +30 only", dict(elite=30)),
     ("D1 opener cap 75% of max Vitality", dict(cap=0.75)),
     ("D2 opener cap 60% of max Vitality", dict(cap=0.60)),
-    ("E Aimed Shot costs 40", dict(cost=40)),
+    ("E1 Aimed Shot costs 40", dict(cost=40)),
+    ("E2 Aimed Shot costs 45", dict(cost=45)),
+    ("E3 Aimed Shot costs 50", dict(cost=50)),
+    ("F1 notice floor 20% (not in the brief)", dict(floor=20)),
+    ("F2 notice floor 30% (not in the brief)", dict(floor=30)),
 ]
-SCOUT_COMBOS = []   # (label, kwargs): the sensible combinations, filled in below
+SCOUT_COMBOS = [   # the sensible combinations
+    ("combo D2+B2", dict(cap=0.60, second="plus15")),
+    ("combo E1+D2", dict(cost=40, cap=0.60)),
+    ("combo E1+B2", dict(cost=40, second="plus15")),
+    ("combo E1+D2+B2", dict(cost=40, cap=0.60, second="plus15")),
+    ("combo E2+D2", dict(cost=45, cap=0.60)),
+    ("combo E1+D2+F1", dict(cost=40, cap=0.60, floor=20)),
+    ("combo D2+B2+F1", dict(cap=0.60, second="plus15", floor=20)),
+]
 
 
 def std_cells(runs, seed=1, callings=None):
     """The standard test (level 5, starting gear, 4 potions, points placed, middle human, RestFactor 5, Overseer from the cellar entrance), the Scouts sneaking.
     Returns {calling: kill%} for the five callings and the archer."""
     with sneaking():
-        return l5_kills(callings or list(ARCHS) + [ARCHER], runs, seed)
+        out = l5_kills(callings or list(ARCHS) + [ARCHER], runs, seed)
+    if callings is None:
+        ns = l5_kills(["scout", ARCHER], runs, seed)   # SNEAKING off: the Scouts who do not sneak
+        out["scout_ns"], out["archer_ns"] = ns["scout"], ns[ARCHER]
+    return out
 
 
 def std_table(runs=1500, options=None, modes=(("I", "none"), ("II", "cap")), seed=1):
     print(f"Standard test, kill% against the Overseer from the cellar entrance, {runs} runs a cell, seed {seed}; the Scouts sneak. Rank I = nobody has bought a rank; rank II = everyone holds rank II.")
-    print("| option | rank | warrior | scout (melee) | priest | mage | adventurer | archer | mean of five | archer - mean | scout - mean |")
-    print("|---|---|---|---|---|---|---|---|---|---|---|")
+    print("| option | rank | warrior | scout (melee) | priest | mage | adventurer | archer | mean of five | archer - mean | scout - mean | scout, no sneak | archer, no sneak |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     out = {}
     for label, kw in options or SCOUT_OPTIONS:
         for mname, mode in modes:
@@ -3341,7 +3358,7 @@ def std_table(runs=1500, options=None, modes=(("I", "none"), ("II", "cap")), see
             five = [v[c] for c in ARCHS]
             mean = sum(five) / 5
             out[(label, mname)] = v
-            print(f"| {label} | {mname} | " + " | ".join(f"{x:.1f}" for x in five) + f" | {v[ARCHER]:.1f} | {mean:.1f} | {v[ARCHER] - mean:+.1f} | {v['scout'] - mean:+.1f} |", flush=True)
+            print(f"| {label} | {mname} | " + " | ".join(f"{x:.1f}" for x in five) + f" | {v[ARCHER]:.1f} | {mean:.1f} | {v[ARCHER] - mean:+.1f} | {v['scout'] - mean:+.1f} | {v['scout_ns']:.1f} | {v['archer_ns']:.1f} |", flush=True)
     return out
 
 
@@ -3387,10 +3404,10 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
     avail = {room: 0.0 for room, c in CELL_ROUTE}
     avoid = {}
     potion_ready, left = 0.0, START_POTIONS
-    st = dict(deaths=0, fled=0, potions=0, kills=0, first=0, first_fights=0, fights=0, nodmg=0, laps=0, opened=0, noticed=0, second=0, reached=None, level_at={})
+    st = dict(deaths=0, fled=0, potions=0, kills=0, first=0, free=0, dmg=0.0, by={}, first_fights=0, fights=0, nodmg=0, laps=0, opened=0, noticed=0, second=0, reached=None, level_at={})
     carry_ms, carry_t = 0, 0.0
     pos = "Village"
-    kills_now = [0, 0]
+    kills_now = [0, 0, 0]
 
     def on_kill(pl, enemy):
         nonlocal xp, level
@@ -3398,6 +3415,11 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
         if k.name != "Goblin Minion":
             kills_now[0] += 1
             kills_now[1] += pl.n_act == 1
+            kills_now[2] += enemy.taken == 0   # killed before it ever began an action
+            row = st["by"].setdefault(k.name, [0, 0, 0])
+            row[0] += 1
+            row[1] += pl.n_act == 1
+            row[2] += enemy.taken == 0
         xp += k.xp
         while level < goal and xp >= xp_for_level(level + 1):
             level += 1
@@ -3466,7 +3488,7 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
                 second = second_chance(chances[0]) if archer else None
                 start = (typed, [typed + 2 * round(enemies[0].reaction * UNIT_MS) + ranged] + [typed + round(e.reaction * UNIT_MS) for e in enemies[1:]])
                 st["opened"] += 1
-            kills_now[0] = kills_now[1] = 0
+            kills_now[0] = kills_now[1] = kills_now[2] = 0
             carry = max(0, round(carry_ms - (t - carry_t) * 1000))
             r = fight(p, enemies, left, boss=room == "Overseer Chamber", human=policy, start=start, stop_at_boss=True, heal_carry=carry, ambush=hidden,
                       second=second, on_kill=on_kill)
@@ -3480,6 +3502,8 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
             st["nodmg"] += p.dmg_in == 0
             st["kills"] += kills_now[0]
             st["first"] += kills_now[1]
+            st["free"] += kills_now[2]
+            st["dmg"] += p.dmg_in / p.max_hp
             st["first_fights"] += kills_now[1] > 0
             for lv in st["level_at"]:
                 if st["level_at"][lv] is None:
@@ -3518,6 +3542,18 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
     return st
 
 
+def by_kind(rows):
+    """{creature: (kills a run, share killed by the first action, share killed before it acted)} over the runs."""
+    tot = {}
+    for r in rows:
+        for k, (n, f, z) in r["by"].items():
+            a = tot.setdefault(k, [0, 0, 0])
+            a[0] += n
+            a[1] += f
+            a[2] += z
+    return {k: (a[0] / len(rows), a[1] / a[0] * 100, a[2] / a[0] * 100) for k, a in tot.items()}
+
+
 def cell_stats(calling, runs, sneak=True, recurve=False, seed=20261124, model=None, goal=5):
     """Many cellar_runs. Means and standard errors (of the mean) of: deaths a run, flights, potions used, the share of creatures killed by the first action, the
     share of fights in which no Vitality was lost, simulated minutes to reach level `goal`, the share of runs that reached it within CELL_MAX_SECONDS."""
@@ -3538,7 +3574,8 @@ def cell_stats(calling, runs, sneak=True, recurve=False, seed=20261124, model=No
     kills = sum(r["kills"] for r in rows) or 1
     fights = sum(r["fights"] for r in rows) or 1
     return dict(runs=runs, deaths=mean_se([r["deaths"] for r in rows]), fled=mean_se([r["fled"] for r in rows]), potions=mean_se([r["potions"] for r in rows]),
-                first=sum(r["first"] for r in rows) / kills * 100, first_fights=sum(r["first_fights"] for r in rows) / fights * 100, nodmg=sum(r["nodmg"] for r in rows) / fights * 100,
+                first=sum(r["first"] for r in rows) / kills * 100, free=sum(r["free"] for r in rows) / kills * 100, dmg=sum(r["dmg"] for r in rows) / fights * 100,
+                by=by_kind(rows), first_fights=sum(r["first_fights"] for r in rows) / fights * 100, nodmg=sum(r["nodmg"] for r in rows) / fights * 100,
                 minutes=mean_se([r["reached"] / 60.0 for r in reached]), reached=len(reached) / runs * 100, fights=sum(r["fights"] for r in rows) / runs,
                 laps=sum(r["laps"] for r in rows) / runs, opened=sum(r["opened"] for r in rows) / fights * 100, second=sum(r["second"] for r in rows) / runs,
                 died_runs=sum(1 for r in rows if r["deaths"]) / runs * 100,
@@ -3547,12 +3584,12 @@ def cell_stats(calling, runs, sneak=True, recurve=False, seed=20261124, model=No
 
 def cell_line(label, c):
     m, se = c["minutes"]
-    return (f"| {label} | {c['deaths'][0]:.2f} (+-{c['deaths'][1]:.2f}) | {c['potions'][0]:.2f} | {c['first']:.0f}% | {c['first_fights']:.0f}% | {c['nodmg']:.0f}% | {m:.1f} (+-{se:.1f}) | {c['reached']:.0f}% | "
+    return (f"| {label} | {c['deaths'][0]:.2f} (+-{c['deaths'][1]:.2f}) | {c['potions'][0]:.2f} | {c['first']:.0f}% | {c['free']:.0f}% | {c['nodmg']:.0f}% | {c['dmg']:.0f}% | {m:.1f} (+-{se:.1f}) | {c['reached']:.0f}% | "
             f"{c['fights']:.1f} | {c['opened']:.0f}% |")
 
 
-CELL_HEAD = ("| option | deaths a run | potions used | creatures killed by the first action | fights where the first action killed one | fights with no damage taken | minutes to level 5 | reached level 5 | fights a run | fights opened from hiding |\n"
-             "|---|---|---|---|---|---|---|---|---|---|")
+CELL_HEAD = ("| option | deaths a run | potions used | creatures killed by the first action | creatures killed before they acted | fights with no damage taken | Vitality lost a fight | minutes to level 5 | reached level 5 | fights a run | fights opened from hiding |\n"
+             "|---|---|---|---|---|---|---|---|---|---|---|")
 
 
 def hall_stats(calling, level, runs, recurve=False, potions=2, seed=20261125, sneak=True):
@@ -3618,13 +3655,28 @@ def all_options():
     return SCOUT_OPTIONS + SCOUT_COMBOS
 
 
-def cell_table(runs=1000, options=None, recurve=False):
-    print(f"Archer Scout sneaking, a played progression level 1 to 5 through the cellars ({runs} runs a row, seed 20261124), "
+def cell_table(runs=1000, options=None, recurve=False, sneak=True):
+    print(f"Archer Scout {'sneaking' if sneak else 'NOT sneaking'}, a played progression level 1 to 5 through the cellars ({runs} runs a row, seed 20261124), "
           f"{'with the Warden' + chr(39) + 's Recurve from level 3' if recurve else 'with the Hunting Bow throughout'}. Standard errors of the mean in brackets.")
     print(CELL_HEAD)
     for label, kw in options or all_options():
         with sneaking(), scout_option(mode="none", **kw):
-            print(cell_line(label, cell_stats(ARCHER, runs, True, recurve)), flush=True)
+            print(cell_line(label, cell_stats(ARCHER, runs, sneak, recurve)), flush=True)
+
+
+def kind_table(runs=1000, options=None):
+    """Which creatures die to the first action, and which die before they have acted at all (archer, sneaking, Hunting Bow)."""
+    options = options or [o for o in all_options() if o[0][:2] in ("ba", "A3", "B2", "D1", "D2") or o[0].startswith("combo")]
+    kinds = ["Large Rat", "Giant Rat", "Goblin Scavenger", "Spore Bat", "Goblin Guard", "Goblin Warrior", "Goblin Elite Guard", "Giant Cave Toad"]
+    print(f"Archer sneaking, Hunting Bow, {runs} runs: of the creatures of each kind that the archer kills, the share killed by his first action / killed before they have acted at all.")
+    print("| creature (Vitality) | kills a run | " + " | ".join(l for l, _ in options) + " |")
+    print("|---|---|" + "---|" * len(options))
+    res = []
+    for label, kw in options:
+        with sneaking(), scout_option(mode="none", **kw):
+            res.append(cell_stats(ARCHER, runs, True)["by"])
+    for k in kinds:
+        print(f"| {k} ({KINDS[k].hp}) | {res[0].get(k, (0, 0, 0))[0]:.2f} | " + " | ".join(f"{r.get(k, (0, 0, 0))[1]:.0f}% / {r.get(k, (0, 0, 0))[2]:.0f}%" for r in res) + " |", flush=True)
 
 
 def yardstick_table(runs=1000):
@@ -3686,9 +3738,13 @@ def scout_report(parts=("std",), runs=1500):
         elif part == "std":
             std_table(runs, all_options())
         elif part == "cell":
-            cell_table(max(500, runs // 1), None, False)
+            cell_table(max(500, runs), None, False)
             print()
-            cell_table(max(500, runs // 1), None, True)
+            cell_table(max(500, runs), None, True)
+            print()
+            cell_table(max(500, runs), None, False, False)
+            print()
+            kind_table(max(500, runs))
         elif part == "pace":
             pace_table(max(500, runs))
             print()
