@@ -221,9 +221,50 @@ systemctl start lesmudos
 | In-game `edit` or `mkdir` fails outside a wizard's home | That is `MUDLIB_WRITABLE=wiz` working as intended (section 3). |
 | The game restarts over and over | It is crashing at start: read the log. `systemctl stop lesmudos` to stop the loop while you look. |
 
-## 11. Not done yet
+## 11. The browser client ("Play in your browser")
+
+Players can also play from a web page, on a phone or a computer: the page at `https://legendsofhollowmere.com/play`. It is built into the website (`lesmudos-web`), which opens one ordinary telnet connection to the game for each web player (the "bridge"). The design, every setting and the test plan are in [specs/web-client.md](specs/web-client.md); the website's own settings are in [WEBSITE.md](WEBSITE.md).
+
+**It is switched off until you switch it on.** Deploying the code changes nothing: `Site__Play__Enabled` is `false`, `/play` says the client is switched off, and "Play Now" still leads to the instructions. Telnet on the game port is never touched.
+
+### Switching it on, step by step
+
+The order matters: the game first (it gets the second, loopback-only listener), then the website.
+
+1. **Update the game.** `shutdown` in the game, then `bash /opt/lesmudos/src/deploy/update-droplet.sh`. This rewrites the game's service so it starts with `--bridge-port 4001` (`BRIDGE_PORT=4001`, a setting of `setup-droplet.sh`; the driver reads `--bridge-port` or `LESMUDOS_BRIDGE_PORT`). That listener is bound to `127.0.0.1` only, requires a PROXY version 1 line as its first bytes, and is **not** opened in `ufw`: do not open it. Check: `journalctl -u lesmudos -n 20` shows it listening, and `ss -ltn | grep 4001` shows `127.0.0.1:4001`, never `0.0.0.0` or `*`.
+2. **Update the website.** `UPDATE_SOURCE=yes WEB_DOMAIN=legendsofhollowmere.com bash /opt/lesmudos/src/deploy/setup-website.sh`. It publishes the site, appends the new `Site__Play__...` lines to `/etc/lesmudos-web.env` (an existing file is never overwritten), fetches Cloudflare's address ranges into `/etc/caddy/cloudflare-ranges.txt`, rewrites the Caddyfile (the client's true address, WebSocket pass-through) and restarts the site. It prints `caddy version`: the Caddyfile needs Caddy 2.7 or newer (`apt-get install --only-upgrade caddy` if it is older; `caddy validate` fails otherwise and the script stops). **This restarts the website, which disconnects any web player** (there are none yet while the client is off).
+3. **Check Cloudflare** (dashboard for the domain). All of these are in the spec, section 10.5:
+   - Network: **WebSockets on** (the default). SSL/TLS mode **Full (strict)**.
+   - Caching: a Cache Rule "bypass cache" for paths starting with `/play/ws` and `/play/status`; do not "Cache Everything" on `/play`.
+   - **Rocket Loader, Auto Minify, Mirage, Email Obfuscation and Web Analytics auto-injection off** for `/play` (they rewrite or inject scripts; the page's policy would block the injected beacon and the console would fill with errors).
+   - Security: **Bot Fight Mode / Super Bot Fight Mode and any WAF challenge rule** must not challenge `/play/ws` and `/play/status` (a WebSocket handshake cannot solve a challenge): add a skip rule for those two paths, then test from a phone on mobile data. Optional extra layer: a rate-limiting rule on `/play/ws` (for example 30 requests a minute per address).
+   - The telnet name `play.legendsofhollowmere.com` stays a **DNS-only** (grey cloud) record. The web client never uses that name.
+4. **Switch it on.** In `/etc/lesmudos-web.env` change `Site__Play__Enabled=false` to `Site__Play__Enabled=true`, then `systemctl restart lesmudos-web`.
+5. **Check it works.**
+   - `curl -s https://legendsofhollowmere.com/play/status` answers `{"v":1,"enabled":true,"full":false}`.
+   - Open `https://legendsofhollowmere.com/play` in a browser, press **Enter Hollowmere**, make or enter a character. Then compare the address in `journalctl -u lesmudos-web | grep 'play: open'` with the "what is my IP" page: it must be **your** address, not a Cloudflare one (if it is a Cloudflare address, the Caddy ranges are wrong or stale: re-run `setup-website.sh`, and keep the client off meanwhile). The game's log (`journalctl -u lesmudos`) shows the same address on its `connection from ... (web)` line.
+   - Leave the page open without typing: after 5 minutes the game warns you of the idle time and after 10 it disconnects you, even though the page keeps pinging (the pings are not input).
+   - Work through the manual checklist, [specs/web-client.md](specs/web-client.md) section 12.3, on a phone and a desktop before announcing it.
+6. Tell nobody yet that the site can be told apart from telnet: players type their name and password in the page each time (it does not store them), and the page warns that Cloudflare carries the password.
+
+### Switching it off, and back on, without a restart
+
+- Off for new connections and new page views: `touch /var/lib/lesmudos-web/play.off` (looked at every 5 seconds; sessions already open continue). On again: `rm /var/lib/lesmudos-web/play.off`.
+- Off for good (and for everyone): `Site__Play__Enabled=false` in `/etc/lesmudos-web.env` and `systemctl restart lesmudos-web`.
+
+### Updating later
+
+- A change to the website's code: run step 2 again. It restarts the site and **every web player must sign in again** (the page says so and reconnects by itself). Do it when few are online (`who` in the game). A news post is a Markdown file and needs no restart.
+- A change to the game: the usual `shutdown` and `update-droplet.sh`. Web players see "The game closed your connection" with a Reconnect button, then "The game is not running" until it is back.
+- If website deploys disturb players, the bridge can run as a second copy of the site on its own port with its own service (spec section 2.1, option c): no code change.
+
+### Limits and what to watch
+
+The limits are settings of the website (`Site__Play__MaxConnections=60` web players at once, 5 per address, connect and input rates; the full list is in WEBSITE.md). The page says "The game is full right now" at the cap. To find the real memory cost of a web player before raising the cap, run `python3 tests/web_client_test.py --load 20` on a test machine (or read `systemctl status lesmudos lesmudos-web` with 0, 20 and 60 players) and write the numbers into the spec's capacity section. Web connection addresses are written to the system journal (`journalctl`), never anything typed: say so in your privacy text and decide how long `journald` keeps them (`MaxRetentionSec` in `/etc/systemd/journald.conf`).
+
+## 12. Not done yet
 
 - **A clean stop from outside.** The driver does not yet treat a stop signal as a planned shutdown. Until it does, always use the in-game `shutdown`.
-- **Encrypted connections** (TLS) and a web client.
+- **Encrypted connections** (TLS) on the telnet port itself. (The browser client is HTTPS from the page to Cloudflare and to Caddy; see section 11.)
 - **Copying live-world edits back to the repository** automatically, for `MUDLIB_WRITABLE=all`.
 - **Off-droplet backups** on a schedule.
