@@ -1351,7 +1351,10 @@ def run_prompt(wiz):
     wiz.command("goto " + TEST + "hub")
     # Saved with the character.
     pat.command("prompt <{vitality}> ")
-    pat.command("quit")
+    for _ in range(12):   # quit is refused in a fight: break away first
+        if "cannot leave" not in pat.command("quit"):
+            break
+        pat.command("flee")
     pat.closed(3)
     again = login("prue")
     check("prompt: saved with the character", again.command("prompt"), "Your prompt is: <{vitality}>")

@@ -17,6 +17,8 @@ public class FbBowlToken : Find
         ShortDesc = "a flat stone token in one of the bowls";
         LongDesc = "A disc of green-grey stone no bigger than a coin, ground perfectly flat, lies in the crust of one of the bowls. One face is cut with a ring crossed by a bar; the other is blank. It is laid there as if for whoever comes.";
         TakenShort = "a bowl with a disturbed crust where a token lay";
+        TakenHere = "A bowl lies here with a disturbed crust where a token lay.";
+        EmptyHere = "A bowl lies here with a disturbed crust.";
         TakenLong = "The crust of one of the bowls is broken where you lifted a flat stone token out of it. The other bowls hold only dust.";
         EmptyShort = "a bowl with a disturbed crust";
         EmptyLong = "The crust of one of the bowls is broken, as if something had been lifted out of it. Nothing is left in it.";

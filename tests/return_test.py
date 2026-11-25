@@ -117,9 +117,8 @@ def main():
     proc, log = a.start_driver(work, mudlib)
     try:
         run(work)
-        c = h.Client("wiz")
+        c = h.Client("wizz")   # the wizard of the link-dead tests (the secret makes only one)
         c.read_until("> ")
-        c.command("promote " + h.SECRET)
         c.command("shutdown")
         proc.wait(timeout=15)
         log.flush()

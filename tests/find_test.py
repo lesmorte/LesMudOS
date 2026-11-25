@@ -501,7 +501,7 @@ def run(work, mudlib, box):
     a.drain(wiz, 0.3)
     text = wiz.command("look")
     check("the larder keeps its description (the chest under its scrap of hide)", text, "a small chest lies under a scrap of hide")
-    check("a wizard sees the larder's chest as it is: nothing is left after eight finders", text, "A small chest, its lid propped open is here.")
+    check("a wizard sees the larder's chest as it is: nothing is left after eight finders", text, "A small chest lies here with its lid propped open.")
 
     # ================= quit, kill, restart, update =================
     quitter = login("Quitter")
