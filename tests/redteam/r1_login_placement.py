@@ -19,6 +19,7 @@ public class WrenWand : Item
     {
         base.Init();
         AddAction("rtrich", a => { ThisPlayer()!.Call("AddGold", 100000); Write("RICH\n"); return true; });
+        AddAction("rtlinger", a => { Write("LINGER " + (LoadObject("/secure/linkdead").Call("Register", ThisPlayer()) ?? "null") + "\n"); return true; });
         AddAction("rtsave", a =>
         {
             var me = ThisPlayer()!;
@@ -91,6 +92,22 @@ def main():
         time.sleep(2)
         d = relogin(g)
         rtlib.check("R1: a drop in the own home: the same", "env=/domains/hollow/village/square" in d and "workshop=False" in d and f"gold={gold} " in d, d)
+
+        # The link-dead linger (main): no body ever lingers in sandbox space, even a wizard demoted while inside; sandbox code
+        # cannot register its owner as link-dead.
+        os.environ.setdefault("LESMUDOS_LINGER_SECONDS", "30")
+        g.wren.command("goto /wiz/wren/lab")
+        g.wren.command("clone /wiz/wren/wand")
+        g.wren.command("rtrich")
+        out = g.wren.command("rtlinger")
+        rtlib.check("R1: sandbox code cannot register its owner with /secure/linkdead", "LINGER null" in out, out)
+        g.chief.command("promote wren 0")
+        g.wren.sock.close()
+        time.sleep(2)
+        d = relogin(g)
+        rtlib.check("R1: a wizard demoted in the workshop who drops does not linger there: the next login is outside, unmarked, real gold",
+                    "env=/domains/hollow/village/square" in d and "workshop=False" in d and f"gold={gold} " in d, d)
+        g.chief.command("promote wren 1")
 
         for value, label in (("/wiz/wren/lab", "the own home"), ("/wiz/chief/hall", "another wizard's home"), ("/Wiz/wren/lab", "the own home spelled otherwise")):
             g.wren.command("quit", marker="Goodbye", timeout=10)

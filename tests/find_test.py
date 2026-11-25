@@ -291,6 +291,8 @@ def run(work, mudlib, box):
     expected = table(100)
     check("the rule gives 100, 60, 36, 21, 12, 7, 4, 2, 1 and then nothing", str(expected), "[100, 60, 36, 21, 12, 7, 4, 2, 1]")
     check("a character who has not taken it sees the full line in the room", P[0].command("look"), "A test stash is here.")
+    check("get all leaves a find alone and says it must be taken by name", P[0].command("get all"), "by name")
+    check("and the find is still there to take", P[0].command("look"), "A test stash is here.")
     check("look at it: the full description", P[0].command("look at stash"), "full to the brim")
     g0 = gold(P[0])
     check("it cannot be picked up as an object (get all leaves it)", P[0].command("get all"), absent=("You take",))
@@ -306,8 +308,8 @@ def run(work, mudlib, box):
     ok("a repeat take gives nothing", gained == 0, gained)
     check("a repeat take is told so in one line", text, "You have already taken what was here")
     check("a repeat take is not told it is empty", text, absent=("Someone has been here",))
-    check("someone who took it sees it as taken by them", P[3].command("look"), "A test stash you have emptied is here.")
-    check("someone who found it empty sees it picked clean", P[9].command("look"), "A test stash, picked clean is here.")
+    check("someone who took it sees it as taken by them", P[3].command("look"), "A test stash lies here; you have taken what it held.")
+    check("someone who found it empty sees it picked clean", P[9].command("look"), "A test stash lies here, picked clean.")
     check("look at it, for a character who has taken it: no promise of treasure", P[1].command("look at stash"), "nothing more in it for you", absent=("full to the brim",))
     check("look at it, for a character who finds it empty", P[9].command("look at stash"), "Someone has been here before you. Nothing is left.", absent=("full to the brim",))
     rec = record()
@@ -383,7 +385,7 @@ def run(work, mudlib, box):
     enter(late)
     t, g = take(late, "charm")
     check("charm: the eleventh character still gets one (no end)", t, "You also take a brass trinket.")
-    check("charm: a keepsake that was taken shows as taken", late.command("look"), "A test charm you have emptied is here.")
+    check("charm: a keepsake that was taken shows as taken", late.command("look"), "A test charm lies here; you have taken what it held.")
     t0, _ = take(P[0], "relic")
     t1, _ = take(P[1], "relic")
     t2, _ = take(P[2], "relic")
@@ -462,7 +464,7 @@ def run(work, mudlib, box):
             got.append(g)
             if i == 0:
                 check(f"{title}: the first finder is told how much ({first})", text, f"{first} gold")
-                check(f"{title}: and then sees it as taken by them", c.command("look"), "is here.", absent=("Someone has been here",))
+                check(f"{title}: and then sees it as taken by them", c.command("look"), "lies here", absent=("Someone has been here",))
             if i == len(want):
                 check(f"{title}: after the last amount the next finder is told someone has been here", text, "Someone has been here before you")
             c.command("tele " + T + "hub")
@@ -505,7 +507,7 @@ def run(work, mudlib, box):
     a.drain(wiz, 0.3)
     text = wiz.command("look")
     check("the larder keeps its description (the chest under its scrap of hide)", text, "a small chest lies under a scrap of hide")
-    check("a wizard sees the larder's chest as it is: nothing is left after eight finders", text, "A small chest, its lid propped open is here.")
+    check("a wizard sees the larder's chest as it is: nothing is left after eight finders", text, "A small chest lies here with its lid propped open.")
 
     # ================= quit, kill, restart, update =================
     quitter = login("Quitter")

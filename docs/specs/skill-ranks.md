@@ -123,3 +123,15 @@ Builders get openable doors: see `docs/specs/sneak.md`, which needs one before t
 ## Owner's later decisions (22 November 2026, after sneak was measured)
 - **Minor Heal on the caster gives a third**, rounded half up: 7 / 13 / 20 at ranks I / II / III (then 22, 24). Half left the solo Priest at 95% and 100% in the standard test; a quarter was level at rank II but dropped the rank I Priest to 50%, because the Priest's result falls sharply between a self-heal of 7 and 5. A third measured 76% at rank I (level with the others) and 98% with everyone at rank II (about 6 over). This replaces "half" wherever this document says it.
 - **Precision Strike gains +2 to hit at every rank**: +4 / +5 / +6 / +7 (was +2 / +3 / +4 / +5). Sneak's ambush did not lift the melee Scout, which sat 10 to 15 points under the other callings; with this it measures about 83% at rank I and 87% at rank II with sneaking, within about 5 points.
+
+## Aimed Shot: the opener's cap (Owner's decision, 24 Nov 2026)
+Owner: "slow cap to aimed shot". When an Aimed Shot is the action that starts a fight (the x2.5 opener at rank I, x3.0 to x4.5 at the later ranks), the damage it deals is capped at a share of the target's **maximum** Vitality: **60% + 15% x d**, where d = the Scout's level minus the creature's level at the moment the shot lands, **floor 30%**, and **no cap at all** once the share reaches 100% (d = +3 or more). This is option G2 of docs/BALANCE_SCOUT.md section 10, and `tests/balance_sim.py` uses it by default (`check` compares the three numbers with `mudlib/skills/aimed_shot.cs`).
+
+| d | -2 or less | -1 | 0 | +1 | +2 | +3 or more |
+|---|---|---|---|---|---|---|
+| share of maximum Vitality | 30% | 45% | 60% | 75% | 90% | none |
+
+- The cap is applied to the final damage, after Might, the factor, the critical hit and the block, and before the target's absorption. It is `max(1, floor(share x maximum Vitality))`.
+- It applies only to this opener (hidden or not, the engine knows no difference: the x2.5 shot at the start of a fight). Not to an ordinary Aimed Shot (x1.75, a shot at a second creature in a fight), not to Precision Strike's ambush, not to any other attack.
+- When the cap really lowers the damage the shooter is told so ("The shot is true, but the creature twists away at the last moment and takes only part of it."); verbose damage shows the damage dealt.
+- Built in `Skill.QueryOpenerCapPercent` (0: no cap) overridden by `AimedShotSkill`, applied in `Living.Attack`; tests in `tests/aim_test.py`.

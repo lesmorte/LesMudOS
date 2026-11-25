@@ -16,6 +16,8 @@ public class FbTombCoins : Find
         ShortDesc = "a spill of tarnished coins";
         LongDesc = "Coins from a split purse, black with tarnish and worn so smooth that no face can be made out on them. A mint that no longer strikes made them, but gold is gold. Picking them up adds them to your purse.";
         TakenShort = "a split purse, its coins gone";
+        TakenHere = "A split purse lies here, its coins gone.";
+        EmptyHere = "A split purse lies here, its coins gone.";
         TakenLong = "A split purse lies among the rust and rag by the seat, with nothing in it now. You have taken what spilled from it.";
         EmptyShort = "a split purse, its coins gone";
         EmptyLong = "A split purse lies among the rust and rag by the seat, with nothing in it. Someone has been here before you, and nothing is left of what spilled from it.";

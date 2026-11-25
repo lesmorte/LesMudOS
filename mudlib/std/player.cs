@@ -35,6 +35,10 @@ public class Player : Adventurer
     [Saved] private string passwordHash = "";
     // ANSI colour. On by default, also for characters saved before this setting existed.
     [Saved] private bool colour = true;
+    // The player's own time zone for `time` (an IANA name, "UTC" or "UTC-5"); "" until set. Only this player ever sees it.
+    [Saved] private string timeZone = "";
+    // `charset ascii`: every message to this player is turned into 7-bit ASCII (see Asciify). Off (UTF-8) by default, also for older saves.
+    [Saved] private bool asciiOnly;
 
     private bool ready;
     // True only while WriteRaw is sending file text: CatchTell then passes it on exactly as stored.
@@ -61,7 +65,7 @@ public class Player : Adventurer
     public override void CatchTell(string message)
     {
         messagesShown++;
-        base.CatchTell(rawOutput ? message : Render(message));
+        base.CatchTell(asciiOnly ? Asciify(rawOutput ? message : Render(message)) : rawOutput ? message : Render(message));
     }
 
     // ---- Colour ----
@@ -131,7 +135,7 @@ public class Player : Adventurer
 
     public override string? Short() => $"{Name} {Esc(title)}";
 
-    public override string Long() => $"{Name} {Esc(title)}, who has visited {logins} time(s).\n" + HealthLine();
+    public override string Long() => $"{Name} {Esc(title)}, who has visited {logins} time(s).\n" + HealthLine() + (linkDead ? $"{Name} stares at nothing, and does not answer.\n" : "");
 
     // ---- Login ----
     // These public methods decide who gets into an account, so each one checks
@@ -232,12 +236,14 @@ public class Player : Adventurer
         AddAction("who", CmdWho);
         AddAction("title", CmdTitle);
         AddAction("renown", a => { Write(LoadObject("/secure/renown").Call<string>("RenownText", Name) ?? ""); return true; });
-        AddAction("date", a => { Write(LoadObject("/secure/chronicle").Call<string>("DateCommand") ?? ""); return true; });
-        AddAction("time", a => { Write(LoadObject("/secure/chronicle").Call<string>("DateCommand") ?? ""); return true; }); // the same as date
+        AddAction("date", CmdTime);
+        AddAction("time", CmdTime); // the same as date
         AddAction("password", CmdPassword);
         AddAction("save", CmdSave);
         AddAction("quit", CmdQuit);
         AddAction("help", CmdHelp);
+        AddAction("charset", CmdCharset);
+        AddAction("ascii", CmdCharset);
         AddAction("ansi", CmdAnsi);
         AddAction("color", CmdAnsi);
         AddAction("colour", CmdAnsi);
@@ -277,7 +283,7 @@ public class Player : Adventurer
             Look();
             return;
         }
-        Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type '{{cmd}}help{{/}}' for commands.\n\n");
+        Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type '{{cmd}}help{{/}}' for commands. If the boxes and bullets of {{cmd}}score{{/}} look wrong, type {{cmd}}charset ascii{{/}}.\n\n");
         EnsureHome(); // a wizard whose home is missing gets it back
         EnterWorld(StartRoom);
         ClaimLostProperty();
@@ -325,7 +331,7 @@ public class Player : Adventurer
         if (idle >= timeout)
         {
             Write("You have been idle for too long. Your character is saved and you are disconnected.\n");
-            CmdQuit("");
+            if (!DropConnection()) CmdQuit(""); // the connection ends like a dropped one: NetDead follows (the body lingers a minute)
             return;
         }
         if (idleWarned) return;
@@ -342,6 +348,7 @@ public class Player : Adventurer
             .Where(u => u.Call<string>("Short") != null)
             .Select(u => u.Call<string>("Short") + (u.Call<int>("QueryWizLevel") > 0 ? $" [wizard {u.Call<int>("QueryWizLevel")}]" : "") + (u.Call<bool>("QueryIdle") ? IdleSuffix(u.Call<int>("QueryIdleSeconds")) : ""))
             .ToList();
+        foreach (var dropped in LoadObject("/secure/linkdead").Call<List<ObjectRef>>("All") ?? new List<ObjectRef>()) users.Add(dropped.Call<string>("Short") + " (link-dead)");
         Write($"{users.Count} player(s) online:\n  " + string.Join("\n  ", users) + "\n");
         return true;
     }
@@ -410,6 +417,9 @@ public class Player : Adventurer
 
     private bool CmdQuit(string args)
     {
+        // Quitting is not an escape: a fight is left by fleeing (the body of a dropped connection stays for a minute, so quit must not be
+        // cheaper). In the workshop it is: nothing there is kept, and the save file is the checkpoint.
+        if (QueryInCombat() && !inWorkshop) { Write("You cannot leave in the middle of a fight. Flee first.\n"); return true; }
         try
         {
             Save();
@@ -441,13 +451,13 @@ public class Player : Adventurer
         }
         Write(
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
-            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
+            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}time{/} [-timezone [ZONE|REGION|none]] (your own time zone), {cmd}charset{/} [ascii|utf8] (or {cmd}ascii{/} [on|off]: plain 7-bit characters if the boxes of {cmd}score{/} look wrong), {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
             "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}vitality{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "           A bow in your hands gives you a head start when you choose the fight: the target's first action waits two seconds more (never when a creature attacks you first).\n" +
-            "           A Scout's {cmd}aim{/} (Aimed Shot, bow only) hits hardest as the shot that starts a fight, and is spoiled if a blow lands while you aim. A Priest cannot cast {cmd}heal{/} again for 15 seconds after one, and what it heals in the Priest who casts it is a third of what it gives another.\n" +
+            "           A Scout's {cmd}aim{/} (Aimed Shot, bow only) hits hardest as the shot that starts a fight (never more than a share of the target's full Vitality, unless you are three levels above it), and is spoiled if a blow lands while you aim. A Priest cannot cast {cmd}heal{/} again for 15 seconds after one, and what it heals in the Priest who casts it is a third of what it gives another.\n" +
             "Sneaking:  a Scout's {cmd}sneak{/} [on|off] (turn it on before you enter a room): each room costs Endurance, and the creatures there may not notice you. Attacking, any skill but Tracking, picking things up, opening a door or chest, {cmd}say{/} and {cmd}shout{/} end it and wake the room;\n" +
             "           {cmd}look{/}, {cmd}rest{/}, {cmd}tell{/} and {cmd}track{/} do not. A creature that has seen you keeps you from sneaking until it dies or you leave. The {cmd}prompt{/} token for it is sneak.\n" +
             "Resting:   {cmd}rest{/} (or {cmd}sit{/}) sits you down: Vitality, Endurance and Focus return five times as fast, until you {cmd}stand{/}, move, fight, pick up, drop, wear, buy, sell or craft;\n" +
@@ -518,6 +528,48 @@ public class Player : Adventurer
         if (word != "on" && word != "off") { NotifyFail("Usage: {cmd}ansi{/} [{cmd}on{/}|{cmd}off{/}]"); return false; }
         colour = word == "on";
         Write(colour ? "ANSI colour is now on. Commands you can type, like {cmd}help{/}, are highlighted.\n" : "ANSI colour is now off.\n");
+        return true;
+    }
+
+    /// <summary>`time` and `date`: the time in the player's zone. `time -timezone` lists zones, `time -timezone ZONE` sets one (see /secure/clock).</summary>
+    private bool CmdTime(string args)
+    {
+        var word = args.Trim();
+        var lower = word.ToLowerInvariant();
+        var clock = LoadObject("/secure/clock");
+        string rest;
+        if (lower is "-timezone" or "-tz" or "timezone" or "zones" or "-zones" or "tz") rest = "";
+        else if (lower.StartsWith("-timezone ") || lower.StartsWith("-tz ") || lower.StartsWith("timezone ") || lower.StartsWith("zones ") || lower.StartsWith("tz ")) rest = word.Substring(word.IndexOf(' ') + 1).Trim();
+        else if (word == "") { Write(clock.Call<string>("Show", timeZone, LoadObject("/secure/chronicle").Call<string>("DateCommand") ?? "") ?? ""); return true; }
+        else { NotifyFail("Usage: {cmd}time{/} [{cmd}-timezone{/} [ZONE|REGION|none]]"); return false; }
+        if (rest == "") { Write(clock.Call<string>("Zones") ?? ""); return true; }
+        var region = clock.Call<string>("Region", rest) ?? "";
+        if (region != "") { Write(region); return true; }
+        var answer = clock.Call<string>("Resolve", rest) ?? "MSG:Nothing comes of it.\n";
+        if (answer.StartsWith("MSG:")) { Write(answer.Substring(4)); return true; }
+        timeZone = answer.StartsWith("NONE:") ? "" : answer.Substring(5);
+        Write(timeZone == "" ? "Your time zone is cleared: {cmd}time{/} shows UTC again.\n" : "Your time zone is set.\n");
+        Write(clock.Call<string>("Show", timeZone, "") ?? "");
+        return true;
+    }
+
+    /// <summary>"charset" shows the setting; "charset ascii" and "charset utf8" change it; "ascii on" and "ascii off" do the same.</summary>
+    private bool CmdCharset(string args)
+    {
+        var word = args.Trim().ToLowerInvariant();
+        var alias = QueryVerb() == "ascii";
+        if (word == "")
+        {
+            Write(asciiOnly ? "Characters: plain ASCII (boxes drawn with + - |). Type {cmd}charset utf8{/} to use the full character set.\n"
+                : "Characters: UTF-8 (boxes, bullets and dashes). If they look like garbage in your client, type {cmd}charset ascii{/}.\n");
+            return true;
+        }
+        bool? want = alias ? (word == "on" ? true : word == "off" ? false : null)
+            : word is "ascii" ? true : word is "utf8" or "utf-8" or "unicode" ? false : null;
+        if (want == null) { NotifyFail(alias ? "Usage: {cmd}ascii{/} [{cmd}on{/}|{cmd}off{/}]" : "Usage: {cmd}charset{/} [{cmd}ascii{/}|{cmd}utf8{/}]"); return false; }
+        asciiOnly = want.Value;
+        Write(asciiOnly ? "Characters: plain ASCII from now on. Boxes are drawn with + - | and everything you see is 7-bit.\n"
+            : "Characters: UTF-8 from now on.\n");
         return true;
     }
 
@@ -1167,6 +1219,7 @@ public class Player : Adventurer
             TellObject(user, $"{Name} shuts the game down.\n");
             user.Call("SaveForShutdown");
         }
+        foreach (var dropped in LoadObject("/secure/linkdead").Call<List<ObjectRef>>("All") ?? new List<ObjectRef>()) dropped.Call("SaveForShutdown"); // bodies of dropped connections too
         Shutdown();
         return true;
     }
@@ -1174,6 +1227,7 @@ public class Player : Adventurer
     public override void NetDead()
     {
         if (!ready) return;
+        if (QueryLingerSeconds() > 0) { StartLinger(); return; }
         try
         {
             Save();
@@ -1184,6 +1238,60 @@ public class Player : Adventurer
         {
             Destruct();
         }
+    }
+
+    // ---- A dropped connection: the body lingers (docs/specs/play-feel.md section 14) ----
+    // Without `quit`, the body stays where it stands for LingerSeconds() (a minute), link-dead: creatures fight it, it fights back with ordinary
+    // attacks only, and it can be killed. The character is saved at the drop and again when the body goes or dies. /secure/linkdead lists the
+    // bodies, so that the login object can give a returning connection back to the same one.
+
+    private int lingerCall;
+
+    /// <summary>How long a body of this player would linger if its connection ended now: 0 for a wizard, a body already lingering, a dead one or one not yet in the game. Read by the driver for the log.</summary>
+    /// A body in or leaving the workshop, or standing in sandbox space at all, never lingers: its save file is the checkpoint, and it goes
+    /// at once like any wizard's (docs/SANDBOX.md), whatever its wizard level reads now.
+    public int QueryLingerSeconds() => ready && !linkDead && !Dead && QueryWizLevel() < 1 && !inWorkshop && !leavingWorkshop && !InSandboxSpace() ? LingerSeconds() : 0;
+
+    private void StartLinger()
+    {
+        Save(); // a driver stopped in the minute loses nothing
+        linkDead = true;
+        LeaveRest();
+        EndSneakLoud();
+        AbandonActions();
+        LoadObject("/secure/linkdead").Call("Register", Self);
+        if (Environment() is { } room) TellRoom(room, $"{Name}'s eyes go blank.\n", Self);
+        lingerCall = CallOut(EndLinger, LingerSeconds());
+    }
+
+    private void EndLinger()
+    {
+        if (linkDead && Self.IsAlive) RemoveDroppedBody();
+    }
+
+    protected override void LinkDeadDied() => RemoveDroppedBody();
+
+    private void RemoveDroppedBody()
+    {
+        linkDead = false;
+        Save();
+        if (Environment() is { } room) TellRoom(room, $"{Name} fades from sight.\n", Self);
+        LoadObject("/secure/linkdead").Call("Unregister", Self);
+        ReleaseInventory();
+        Destruct();
+    }
+
+    /// <summary>The login object gives a returning player's connection to the body they left standing. Only the login object, and only to a body that lingers.</summary>
+    public void Reconnected()
+    {
+        var caller = PreviousObject();
+        if (!linkDead || caller == null || !caller.IsClone || caller.ProgramPath != "/secure/login" || !Interactive(Self)) return;
+        linkDead = false;
+        RemoveCallOut(lingerCall);
+        LoadObject("/secure/linkdead").Call("Unregister", Self);
+        Write("\nYou shake off the daze and find yourself where you stood.\n\n");
+        if (Environment() is { } room) TellRoom(room, $"{Name}'s eyes regain their focus.\n", Self);
+        Look();
     }
 
     // ---- Communication (docs/specs/communication.md) ----

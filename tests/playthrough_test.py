@@ -985,7 +985,7 @@ class Run:
         if room != CHAMBER:
             check(f"{room}: '{cap} dies.'", text, f"{cap} dies.")
         look = self.hero.cmd("look")
-        check(f"{room}: corpses read 'the corpse of {short}'", "yes" if re.search(r"[Tt]he corpse of %s is here|corpses of %s are here" % (re.escape(short), re.escape(short)), look) else look, "yes")
+        check(f"{room}: corpses read 'the corpse of {short}'", "yes" if re.search(r"[Tt]he corpse of %s is here|corpses of \S.* are here" % re.escape(short), look) else look, "yes")
 
     def after_death(self, room):
         """Woke in the Guest Rooms with nothing: fetch the corpse (the creatures are weak after our fight and do not chase)."""

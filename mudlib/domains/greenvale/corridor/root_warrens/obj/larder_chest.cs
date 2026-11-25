@@ -15,6 +15,8 @@ public class RwLarderChest : Find
         TakenShort = "a small chest, its lid propped open";
         TakenLong = "The small iron-bound chest stands with its lid propped open and the dried hide pushed aside. You have taken what it held.";
         EmptyShort = "a small chest, its lid propped open";
+        TakenHere = "A small chest lies here with its lid propped open.";
+        EmptyHere = "A small chest lies here with its lid propped open.";
         EmptyLong = "The small iron-bound chest stands with its lid propped open and the dried hide pushed aside. Someone has been here before you, and the hoard is gone.";
         GoldLine = "You lift the dried hide, force the lid and count %gold% gold out of the digger's hoard.";
         ItemLine = "At the bottom lies %item%, and you take it too.";

@@ -38,6 +38,86 @@ public abstract class Thing : MudObject
     };
 
     /// <summary>
+    /// The text with every character above 127 replaced by plain ASCII (the `charset ascii` setting): the box characters of `score` become
+    /// + - |, a bullet at the start of a line becomes *, a bullet between two words becomes " - " (its spaces stay), curly quotes become straight,
+    /// dashes become -, the ellipsis becomes ..., accented letters lose their accents, and anything else becomes ?. Text that is already ASCII
+    /// is returned as it is. The one place it is applied is Player.CatchTell, where every message to a player passes.
+    /// </summary>
+    protected static string Asciify(string text)
+    {
+        var plain = true;
+        foreach (var c in text) if (c > 127) { plain = false; break; }
+        if (plain) return text;
+        var result = new StringBuilder();
+        var words = false;   // something other than spaces and colour codes has been written on this line
+        var escape = false;  // inside a colour code
+        foreach (var c in text)
+        {
+            if (c <= 127)
+            {
+                result.Append(c);
+                if (c == '\u001b') escape = true;
+                else if (escape) escape = !char.IsLetter(c);
+                else if (c == '\n') words = false;
+                else if (c > ' ') words = true;
+                continue;
+            }
+            switch (c)
+            {
+                case '\u2022': case '\u25CF': case '\u25AA': case '\u00B7': case '\u2023':
+                    // At the start of a line a bullet; between words a separator.
+                    result.Append(words ? '-' : '*');
+                    words = true;
+                    break;
+                case '\u2554': case '\u2557': case '\u255A': case '\u255D': case '\u250C': case '\u2510': case '\u2514': case '\u2518': case '\u253C': result.Append('+'); break;
+                case '\u2550': case '\u2500': case '\u2501': result.Append('-'); break;
+                case '\u2551': case '\u2502': case '\u2503': result.Append('|'); break;
+                case '\u2018': case '\u2019': case '\u201A': case '\u2032': case '\u00B4': case '\u0060': result.Append('\''); break;
+                case '\u201C': case '\u201D': case '\u201E': case '\u2033': case '\u00AB': case '\u00BB': result.Append('"'); break;
+                case '\u2013': case '\u2014': case '\u2012': case '\u2015': case '\u2212': case '\u2010': case '\u2011': result.Append('-'); break;
+                case '\u2026': result.Append("..."); break;
+                case '\u00A0': case '\u2002': case '\u2003': case '\u2009': case '\u202F': result.Append(' '); break;
+                case '\u2192': result.Append("->"); break;
+                case '\u2190': result.Append("<-"); break;
+                case '\u00D7': result.Append('x'); break;
+                case '\u00B0': result.Append("deg"); break;
+                case '\u00BD': result.Append("1/2"); break;
+                case '\u00DF': result.Append("ss"); break;
+                case '\u00C6': result.Append("AE"); break;
+                case '\u00E6': result.Append("ae"); break;
+                case '\u0152': result.Append("OE"); break;
+                case '\u0153': result.Append("oe"); break;
+                default:
+                    var folded = FoldLetter(c);
+                    if (folded != '\0') result.Append(folded); else result.Append('?');
+                    break;
+            }
+            if (c != '\u00A0' && c != '\u2002' && c != '\u2003' && c != '\u2009' && c != '\u202F') words = true;
+        }
+        return result.ToString();
+    }
+
+    private static readonly string[] LetterGroups =
+    {
+        "A\u00C0\u00C1\u00C2\u00C3\u00C4\u00C5\u0100\u0102\u0104", "a\u00E0\u00E1\u00E2\u00E3\u00E4\u00E5\u0101\u0103\u0105",
+        "C\u00C7\u0106\u010C", "c\u00E7\u0107\u010D", "D\u00D0\u010E\u0110", "d\u00F0\u010F\u0111",
+        "E\u00C8\u00C9\u00CA\u00CB\u0112\u0118\u011A", "e\u00E8\u00E9\u00EA\u00EB\u0113\u0119\u011B",
+        "I\u00CC\u00CD\u00CE\u00CF\u012A\u0130", "i\u00EC\u00ED\u00EE\u00EF\u012B\u0131", "L\u0141", "l\u0142",
+        "N\u00D1\u0143\u0147", "n\u00F1\u0144\u0148", "O\u00D2\u00D3\u00D4\u00D5\u00D6\u00D8\u014C\u0150", "o\u00F2\u00F3\u00F4\u00F5\u00F6\u00F8\u014D\u0151",
+        "S\u015A\u0160\u015E", "s\u015B\u0161\u015F", "T\u0162\u0164", "t\u0163\u0165",
+        "U\u00D9\u00DA\u00DB\u00DC\u016A\u016E\u0170", "u\u00F9\u00FA\u00FB\u00FC\u016B\u016F\u0171", "Y\u00DD\u0178", "y\u00FD\u00FF",
+        "Z\u0179\u017B\u017D", "z\u017A\u017C\u017E",
+    };
+
+    /// <summary>The plain letter an accented letter stands for, or '\0'.</summary>
+    private static char FoldLetter(char c)
+    {
+        foreach (var group in LetterGroups)
+            if (group.IndexOf(c, 1) > 0) return group[0];
+        return '\0';
+    }
+
+    /// <summary>
     /// Render the markup: known tags become ANSI sequences (or nothing, with
     /// colour off), "{{" becomes "{", and anything else in braces stays as
     /// written. A style still open at the end of a line is closed there, so

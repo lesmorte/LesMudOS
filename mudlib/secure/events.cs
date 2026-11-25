@@ -514,6 +514,12 @@ public class EventService : MudObject
         return $"ok ess={ess} class={ClassNames[cls].Replace(" ", "").Replace("-", "")} first={(first ? 1 : 0)} entry={entryId} rumor={(rumored ? 1 : 0)} credited={string.Join(",", creditedNames.Select(n => n.ToLowerInvariant()))}";
     }
 
+    /// <summary>
+    /// Tell a player a piece of news, after the command that earned it has finished: a character who has just arrived in a room is shown the room
+    /// first, and the news comes under it (as "has noticed you!" does).
+    /// </summary>
+    private void Later(ObjectRef player, string message) => CallOut(() => TellObject(player, message), 0);
+
     /// <summary>Tell a player what their Renown just earned them, and raise the events for the tiers reached.</summary>
     private void Announce(ObjectRef player, List<string>? changes, ObjectRef? room, int depth)
     {
@@ -523,10 +529,10 @@ public class EventService : MudObject
             var parts = change.Split(':', 2);
             if (parts[0] == "title")
             {
-                TellObject(player, $"You have earned the title: {parts[1]}.\n");
+                Later(player, $"You have earned the title: {parts[1]}.\n");
                 continue;
             }
-            TellObject(player, $"Your renown grows. You are now known as {parts[1]}.\n");
+            Later(player, $"Your renown grows. You are now known as {parts[1]}.\n");
             var tierEvent = Find("renown." + parts[1].ToLowerInvariant());
             if (tierEvent != null && depth < 3)
                 Process(tierEvent, new List<ObjectRef> { player }, room, "", new Dictionary<string, string> { ["name"] = parts[1] }, true, depth + 1);
@@ -547,8 +553,8 @@ public class EventService : MudObject
             if (!needed.All(found.Contains) || !needed.Contains(discoveryKey)) continue;
             if (!ledger.Call<bool>("MarkDone", name, "region|" + region[0])) continue;
             if (ledger.Call<bool>("GrantTitle", name, "Pathfinder"))
-                TellObject(player, "You have earned the title: Pathfinder.\n");
-            TellObject(player, $"You have mapped all of {region[0]}.\n");
+                Later(player, "You have earned the title: Pathfinder.\n");
+            Later(player, $"You have mapped all of {region[0]}.\n");
             Announce(player, ledger.Call<List<string>>("Award", name, 50, "map " + region[0]), null, 0);
         }
     }

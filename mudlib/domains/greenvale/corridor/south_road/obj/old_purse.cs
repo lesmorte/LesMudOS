@@ -13,6 +13,8 @@ public class SrOldPurse : Find
         ShortDesc = "a mouldering purse";
         LongDesc = "A small leather purse gone green with age, the strings rotted but the coins inside still good.";
         TakenShort = "a mouldering purse, emptied by you";
+        TakenHere = "A mouldering purse lies here, emptied by you.";
+        EmptyHere = "A mouldering purse lies here, slack and flat.";
         TakenLong = "The purse you emptied lies slack in the leaves, its strings rotted through and its mouth open. There is nothing more in it for you.";
         EmptyShort = "a mouldering purse, slack and flat";
         EmptyLong = "A small leather purse gone green with age, lying open with its strings rotted through. It is flat. Someone has been here before you, and nothing is left in it.";

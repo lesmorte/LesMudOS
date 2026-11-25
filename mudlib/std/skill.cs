@@ -192,6 +192,9 @@ public abstract class Skill : MudObject
     /// <summary>The damage factor when the skill is the action that starts the fight (the "opener" Effect), or 0 if it has no such bonus.</summary>
     public double QueryOpenerFactorFor(ObjectRef? user) => RankValue("opener", RankOf(user));
 
+    /// <summary>The most, in percent of the target's maximum Vitality, the opener (the action that starts the fight) may deal to a target levelDiff levels below the user (negative: above); 0: no cap. Only Aimed Shot has one.</summary>
+    public virtual int QueryOpenerCapPercent(int levelDiff) => 0;
+
     /// <summary>The damage factor when the attack starts the fight from hiding (the "ambush" Effect: Precision Strike), or 0 if it has no such bonus.</summary>
     public double QueryAmbushFactorFor(ObjectRef? user) => RankValue("ambush", RankOf(user));
 

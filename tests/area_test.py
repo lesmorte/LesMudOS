@@ -661,12 +661,12 @@ def run(work, mudlib):
     s = score_of(hero)
     check("experience was added", str(s["xp"]), "16")
     check("fight text shows both directions", text, "a large rat")
-    check("the rats left corpses, not rats", hero.command("look"), "Rat Pit", "Two corpses of a large rat are here.")
+    check("the rats left corpses, not rats", hero.command("look"), "Rat Pit", "Two corpses of large rats are here.")
     hero.command("vitality")
 
     # ----- reset top-up: a killed creature is not replaced while its corpse lies here; then the rats come back, no more than two -----
     time.sleep(7)  # a reset passes (6 seconds)
-    check("the rats are not replaced while their corpses lie in the room", hero.command("look"), "Two corpses of a large rat are here.", absent=("large rats are here", "A large rat is here"))
+    check("the rats are not replaced while their corpses lie in the room", hero.command("look"), "Two corpses of large rats are here.", absent=("Two large rats are here", "A large rat is here"))
     wiz.command("goto " + TEST + "rats")
     wiz.command("clone " + TEST + "timers")
     for _ in range(2):  # the corpses rot after a second each (the tool sets the first one it finds)
@@ -1158,7 +1158,7 @@ def run(work, mudlib):
     text = wiz.command("look")
     check("one rat left after a kill", text, "A large rat is here.", absent=("Two large rats",))
     wiz.command("slay rat")
-    check("the corpses hold their places: no rat comes while they lie here", (time.sleep(7), wiz.command("look"))[1], "Two corpses of a large rat are here.", absent=("A large rat is here",))
+    check("the corpses hold their places: no rat comes while they lie here", (time.sleep(7), wiz.command("look"))[1], "Two corpses of large rats are here.", absent=("A large rat is here",))
     for _ in range(2):  # the corpses rot after a second each (the timers tool sets the first one it finds)
         wiz.command("timers 600 600 1")
         time.sleep(2.2)

@@ -18,6 +18,7 @@ public class CacheBundle : Find
         ShortDesc = "a long bundle wrapped in oilcloth";
         LongDesc = "A long bundle wrapped in greased oilcloth and tied with green cord has been laid carefully across the top of the chests, away from the damp. Whatever is inside it has been looked after better than anything else in the cache.";
         TakenShort = "a long oilcloth wrapping, folded open";
+        TakenHere = "A long oilcloth wrapping lies folded open here.";
         TakenLong = "The oilcloth lies folded open across the chests, and the green cord is looped neatly beside it. Whatever it held is yours now.";
         ItemLine = "You pick the knots out of the green cord, unroll the oilcloth, and lift out %item%.";
         TakenLine = "You have already unwrapped the bundle; there is only oilcloth left in it.";

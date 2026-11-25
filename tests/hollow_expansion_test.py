@@ -815,6 +815,7 @@ def run(work, mudlib, box):
     check("the first character takes the Warden's Recurve from the bundle", text, "warden's recurve")
     check("it is in the pack", finder.command("i"), "warden's recurve")
     check("the bundle now reads as taken", finder.command("look at bundle"), "folded open")
+    check("the room lists the taken bundle as a sentence", finder.command("look"), "A long oilcloth wrapping lies folded open here.", absent=("folded open is here",))
     check("a second try finds nothing more", finder.command("get bundle"), "already")
     truth("only one recurve in the pack", count(finder, "warden's recurve") == 1, finder.command("i"))
     # Every obvious verb and every noun of the find's line takes it (a fresh character each time: a find is taken once).
