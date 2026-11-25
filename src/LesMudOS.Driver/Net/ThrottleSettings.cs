@@ -16,7 +16,7 @@ internal static class ThrottleSettings
         ["NameLock"] = ("LESMUDOS_THROTTLE_NAME_LOCK_SECONDS", 300, 86400 * 7),
         ["NameLockMax"] = ("LESMUDOS_THROTTLE_NAME_LOCK_MAX_SECONDS", 3600, 86400 * 7),
         ["Quiet"] = ("LESMUDOS_THROTTLE_RESET_SECONDS", 86400, 86400 * 30),
-        ["AddressFailures"] = ("LESMUDOS_THROTTLE_ADDRESS_FAILURES", 20, 100000),
+        ["AddressFailures"] = ("LESMUDOS_THROTTLE_ADDRESS_FAILURES", 40, 100000),
         ["AddressLock"] = ("LESMUDOS_THROTTLE_ADDRESS_LOCK_SECONDS", 900, 86400 * 7),
         ["AddressLockMax"] = ("LESMUDOS_THROTTLE_ADDRESS_LOCK_MAX_SECONDS", 14400, 86400 * 7),
         ["KnownTries"] = ("LESMUDOS_THROTTLE_KNOWN_TRIES", 3, 100),

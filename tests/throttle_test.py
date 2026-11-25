@@ -37,7 +37,7 @@ ENV = {
     "LESMUDOS_MAX_CONNECTIONS": "0", "LESMUDOS_MAX_PER_ADDRESS": "0", "LESMUDOS_CONNECTS_PER_MINUTE": "0",
     "LESMUDOS_THROTTLE_NAME_FAILURES": "5", "LESMUDOS_THROTTLE_WINDOW_SECONDS": "60",
     "LESMUDOS_THROTTLE_NAME_LOCK_SECONDS": "10", "LESMUDOS_THROTTLE_NAME_LOCK_MAX_SECONDS": "40", "LESMUDOS_THROTTLE_RESET_SECONDS": "300",
-    "LESMUDOS_THROTTLE_ADDRESS_FAILURES": "12", "LESMUDOS_THROTTLE_ADDRESS_LOCK_SECONDS": "6", "LESMUDOS_THROTTLE_ADDRESS_LOCK_MAX_SECONDS": "24",
+    "LESMUDOS_THROTTLE_ADDRESS_FAILURES": "12", "LESMUDOS_THROTTLE_ADDRESS_LOCK_SECONDS": "9", "LESMUDOS_THROTTLE_ADDRESS_LOCK_MAX_SECONDS": "36",
     "LESMUDOS_THROTTLE_KNOWN_TRIES": "3", "LESMUDOS_THROTTLE_FAIL_DELAY_MS": "1000",
     "LESMUDOS_THROTTLE_NEW_PER_HOUR": "3", "LESMUDOS_THROTTLE_NEW_PER_DAY": "5",
     "LESMUDOS_THROTTLE_NEW_HOUR_SECONDS": "40", "LESMUDOS_THROTTLE_NEW_DAY_SECONDS": "3600",
@@ -165,7 +165,7 @@ def main():
 
         # ---- accounts: each made from its own address, which the character then knows
         owners = {}
-        for name in ("Vera", "Wendy", "Rita", "Nora", "Dora", "Pat", "Quin", "Ruth", "Sam", "Wizz", "Edna", "Fay"):
+        for name in ("Vera", "Wendy", "Rita", "Nora", "Dora", "Pat", "Quin", "Ruth", "Sam", "Wizz", "Edna", "Fay", "Ivy", "Hal", "Ian", "Jo", "Kit", "Lee", "Mo", "Ned", "Oz"):
             owners[name] = fresh()
             result, text = create(name, owners[name])
             h.check(f"account {name} made", result, "created")
@@ -262,9 +262,48 @@ def main():
         h.check("the refusal is the same bytes for a name that exists and one that does not", str(existing[1] == unknown[1]), "True")
         h.check("... and the words are the plain ones", existing[1], REFUSED)
         h.check("an address of another /64 is not affected", login("Sam", [], "2001:db8:78::1")[0], "prompt")
-        h.check("the address lock is logged", "\n".join(n.lines_with(log, "address locked:")), "address locked: 2001:0db8:0077:0000::/64 for 6 s")
-        time.sleep(7)
+        h.check("the address lock is logged", "\n".join(n.lines_with(log, "address locked:")), "address locked: 2001:0db8:0077:0000::/64 for 9 s")
+        time.sleep(10)
         h.check("an address lock runs out", login("Sam", [], f"{subnet}5")[0], "prompt")
+
+        # ---- an address lock does not lock out a character's owner (the address is shared: a household, a school, a web proxy)
+        def lock_address(addr, victims):
+            for nm in victims:
+                login(nm, [BAD, BAD, BAD], addr)
+
+        g1 = fresh()
+        h.check("Gail is made from the shared address", create("Gail", g1)[0], "created")
+        lock_address(g1, ("Hal", "Ian", "Jo", "Kit"))
+        h.check("the shared address is locked (a stranger's name is refused)", login("Hal", [], g1)[0], "refused")
+        stranger = login("Nobodyelse", [], g1)
+        h.check("... as is a name that does not exist, with the same words", stranger[0] + " " + stranger[1].replace("\r", "").strip().splitlines()[-1][-len(REFUSED):], "refused " + REFUSED)
+        r = login("Gail", [], g1)
+        h.check("Gail's owner, from that address, still reaches the password prompt of Gail", r[0], "prompt")
+        r = login("Gail", [BAD, GOOD], g1)
+        h.check("... and gets in with the right password within three tries", r[0], "in")
+        r = login("Gail", [], fresh())
+        h.check("an address that Gail has not used is refused only if it is itself locked: this one is not, so Gail is not locked", r[0], "prompt")
+        n.settle(0.2)
+        time.sleep(10)
+
+        g2 = fresh()
+        h.check("Gus is made from another shared address", create("Gus", g2)[0], "created")
+        lock_address(g2, ("Lee", "Mo", "Ned", "Oz"))
+        r = login("Gus", [BAD, BAD, BAD], g2)
+        h.check("the owner behind a locked address has only three tries of their own", r[0], "goodbye")
+        h.check("... and then that address is refused for Gus as well", login("Gus", [], g2)[0], "refused")
+        time.sleep(10)
+
+        # ---- the fifth wrong password on a name tells the owner what to do; the owner's own address still has its three tries
+        a5 = fresh()
+        r1 = login("Ivy", [BAD, BAD, BAD], a5)
+        h.check("the third wrong password of a connection ends it as before", r1[1].replace("\r", "").strip().splitlines()[-1], "Wrong password. Goodbye.")
+        h.check("... without any advice", r1[1], absent=("wait a few minutes",))
+        r2 = login("Ivy", [BAD, BAD], a5)
+        h.check("the fifth wrong password on the name ends the connection and tells the owner to wait and try again", r2[1], "Wrong password. Goodbye.", "If it is your character, wait a few minutes and try again.")
+        h.check("... and the name is locked", login("Ivy", [], fresh())[0], "refused")
+        r3 = login("Ivy", [BAD, BAD, GOOD], owners["Ivy"])
+        h.check("the owner reconnecting from a known address gets three tries of their own (two typos and the right password)", r3[0], "in")
 
         # ---- creating characters
         z = fresh()

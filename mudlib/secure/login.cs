@@ -33,7 +33,6 @@ public class Login : MudObject
     {
         if (!Interactive(Self)) return; // only a login object the driver gave a connection to
         address = ConnectionAddress();
-        if (Throttle().Call<bool>("AddressBlocked", address)) { Refuse(); return; }
         Write("\nWelcome to Legends of Hollowmere.\n\nBy what name are you known? ");
         InputTo(GotName);
     }
@@ -83,6 +82,11 @@ public class Login : MudObject
         }
         name = char.ToUpper(input[0]) + input.Substring(1).ToLower();
 
+        // A locked address is not turned away at connect: a character's owner who shares it with someone who guessed too often may still try that
+        // character (below, "known" mode). Everyone else, whatever the name, hears the same refusal, and learns nothing about the name.
+        address = ConnectionAddress();
+        var addressLocked = Throttle().Call<bool>("AddressBlocked", address);
+        if (addressLocked && IsOnline(name)) { Refuse(); return; }
         if (IsOnline(name))
         {
             Write($"{name} is already here. Another name? ");
@@ -90,8 +94,6 @@ public class Login : MudObject
             return;
         }
 
-        address = ConnectionAddress();
-        if (Throttle().Call<bool>("AddressBlocked", address)) { Refuse(); return; }
         body = CloneObject("/std/player");
         accountState = body.Call<string>("BeginLogin", name) ?? "";
         attempts = 0;
@@ -108,6 +110,7 @@ public class Login : MudObject
                 return;
             case "new":
             case "unset":
+                if (addressLocked) { Refuse(); return; }
                 if (accountState == "new" && !Throttle().Call<bool>("CanCreate", address)) { Fail("Too many new characters have been made from your address. Try again later.\n"); return; }
                 if (Users().Any(u => u != Self && u.Call<string>("QueryClaim") == name))
                 {
@@ -142,6 +145,13 @@ public class Login : MudObject
             return;
         }
         var mayTryAgain = Throttle().Call<bool>("Failed", name, address, knownMode);
+        if (!mayTryAgain && attempts + 1 < MaxPasswordAttempts)
+        {
+            // The throttle ended this connection before its third try (a lock has just begun, or an address used up its own three). The words say
+            // nothing about which; they only tell the character's owner what to do.
+            Later(() => Fail("Wrong password. Goodbye.\nToo many wrong passwords on this name for now. If it is your character, wait a few minutes and try again.\n"));
+            return;
+        }
         if (!mayTryAgain || ++attempts >= MaxPasswordAttempts)
         {
             Later(() => Fail("Wrong password. Goodbye.\n"));

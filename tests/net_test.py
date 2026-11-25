@@ -283,6 +283,7 @@ def main():
         data, _ = read(extra, None, 3)
         h.check("the fifth from the same claimed address is refused", data.decode(errors="replace"), TOO_MANY)
         extra.close()
+        settle(0.5)  # the log line is written just after the refusal is sent
         h.check("... and logged with the claimed address", "\n".join(lines_with(log, "connection refused")), "too many from address: 203.0.113.50 (web)")
         pub = connect(PORT)
         h.check("the loopback address has its own count", str(banner(pub)[0]), "True")
@@ -305,6 +306,31 @@ def main():
         h.check("another /64 is not affected", str(banner(diff)[0]), "True")
         diff.close()
         for x in v6:
+            x.close()
+        settle(1.0)
+
+        # a lingering body holds no connection: its dead socket's slot is free the moment the socket ends
+        la = "203.0.113.90"
+        holders = [connect(BRIDGE, proxy(la)) for _ in range(3)]
+        h.check("three bystanders hold three of the four slots of one address", str([banner(x)[0] for x in holders]), "[True, True, True]")
+        ghost = bridge_client("linga", proxy(la))
+        h.check("the fourth connection (a new character) logs in", ghost.read_until("> "), "Welcome, Linga")
+        ghost.sock.close()  # the connection drops without a quit: the body lingers
+        settle(1.5)
+        h.check("the log shows the body lingering", "\n".join(lines_with(log, "connection ended:")), "player Linga")
+        back = bridge_client("linga", proxy(la))
+        h.check("a reconnect inside the linger window is not refused for the dead socket's slot, and resumes the same body", back.read_until("> ", 15),
+                "shake off the daze")
+        sixth = connect(BRIDGE, proxy(la))
+        data, _ = read(sixth, None, 3)
+        h.check("the address is at its cap again with the resumed player (the body itself is not counted)", data.decode(errors="replace"), TOO_MANY)
+        sixth.close()
+        back.command("quit")
+        settle()
+        again = connect(BRIDGE, proxy(la))
+        h.check("after the player quits, a slot is free", str(banner(again)[0]), "True")
+        again.close()
+        for x in holders:
             x.close()
         settle(1.0)
 

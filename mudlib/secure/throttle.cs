@@ -80,17 +80,19 @@ public class Throttle : MudObject
     }
 
     /// <summary>
-    /// Before the password prompt for an existing account: "ok", "known" (the name is locked but this address has logged in before, so it gets a few tries of its
-    /// own) or "refused". The address and the name are both checked; the answer never says which was the cause.
+    /// Before the password prompt for an existing account: "ok", "known" (the name is locked, or the address is, but this address has logged into this
+    /// character before, so it gets a few tries of its own under the strict limit) or "refused". The address and the name are both checked; the answer
+    /// never says which was the cause.
     /// </summary>
     public string BeginPassword(string name, string? address, bool knownAddress)
     {
         if (!FromLogin()) return "refused";
         var now = Time();
-        if (AddressBlocked(address)) return "refused";
-        if (S("NameFailures") <= 0) return "ok";
-        if (!names.TryGetValue(name, out var rec) || !FreshName(rec, now) || rec.LockUntil <= now) return "ok";
-        if (knownAddress && KnownCount(name, Key(address), now) < S("KnownTries")) return "known";
+        var key = Key(address);
+        var addressLocked = key != "" && S("AddressFailures") > 0 && addrs.TryGetValue(key, out var arec) && Fresh(arec, now) && arec.LockUntil > now;
+        var nameLocked = S("NameFailures") > 0 && names.TryGetValue(name, out var rec) && FreshName(rec, now) && rec.LockUntil > now;
+        if (!addressLocked && !nameLocked) return "ok";
+        if (knownAddress && KnownCount(name, key, now) < S("KnownTries")) return "known";
         return "refused";
     }
 
