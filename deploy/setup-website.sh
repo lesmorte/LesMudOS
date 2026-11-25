@@ -55,6 +55,9 @@ export DEBIAN_FRONTEND=noninteractive DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOG
 [ -f "$GAME_UNIT" ] || die "$GAME_UNIT is missing: run setup-droplet.sh first."
 id "$GAME_USER" >/dev/null 2>&1 || die "The game's user '$GAME_USER' does not exist: run setup-droplet.sh first."
 GAME_PORT="$(grep -oP -- '--port \K[0-9]+' "$GAME_UNIT" || echo 4000)"
+# The game's loopback-only bridge listener (the browser client connects to it). 0: this game has none yet (setup-droplet.sh adds --bridge-port).
+BRIDGE_PORT="$(grep -oP -- '--bridge-port \K[0-9]+' "$GAME_UNIT" || echo 0)"
+CF_RANGES_FILE="${CF_RANGES_FILE:-/etc/caddy/cloudflare-ranges.txt}"   # Cloudflare's published address ranges, kept between runs
 
 if [ "$UPDATE_SOURCE" = yes ] || [ ! -d "$SRC_DIR/web/LesMudOS.Web" ]; then
     say "Fetching the latest source ($BRANCH)"
@@ -209,7 +212,7 @@ rm -rf "$WEB_DIR.old"
 chown -R root:root "$WEB_DIR"
 chmod -R go-w "$WEB_DIR"
 
-# ---- 6. Settings the owner edits (created once, never overwritten) ----
+# ---- 6. Settings the owner edits (created once, never overwritten; new settings are appended to an existing file) ----
 if [ ! -f "$WEB_ENV" ]; then
     say "Creating $WEB_ENV"
     cat > "$WEB_ENV" <<ENV
@@ -224,6 +227,26 @@ Site__MudletDocsUrl=
 Site__SupportContact=
 ENV
 fi
+# The browser client (docs/WEBSITE.md, section "The browser client"; docs/DEPLOY.md has the steps to switch it on). OFF until the owner
+# changes the first line to true AND the game has its bridge listener (setup-droplet.sh adds --bridge-port; update the game first).
+add_setting() {   # add_setting KEY LINE: append LINE unless a line for KEY (set or commented out) is already there
+    grep -qE "^#? ?$1=" "$WEB_ENV" || printf '%s\n' "$2" >> "$WEB_ENV"
+}
+if ! grep -q '^Site__Play__Enabled=' "$WEB_ENV"; then
+    {
+        echo
+        echo "# The browser client. Switch on with true (after the game has its bridge listener), then: systemctl restart lesmudos-web"
+        echo "Site__Play__Enabled=false"
+    } >> "$WEB_ENV"
+fi
+if [ "$BRIDGE_PORT" -gt 0 ]; then
+    add_setting Site__Play__GameBridgePort "Site__Play__GameBridgePort=$BRIDGE_PORT"
+else
+    echo "NOTE: the game's unit has no --bridge-port yet, so the browser client cannot work. Run setup-droplet.sh (or update-droplet.sh), then this script again."
+fi
+add_setting Site__Play__MaxConnections "# Site__Play__MaxConnections=60"
+add_setting Site__Play__AllowedOrigins__0 "# Site__Play__AllowedOrigins__0=https://$WEB_DOMAIN"
+add_setting Site__Play__KillSwitchFile "# Site__Play__KillSwitchFile=/var/lib/lesmudos-web/play.off   (touch it to switch the client off at once, rm it to switch it on again; no restart)"
 chown root:"$WEB_USER" "$WEB_ENV"
 chmod 640 "$WEB_ENV"
 
@@ -275,15 +298,46 @@ if [ -f "$CADDYFILE" ] && ! grep -qF "$MARK" "$CADDYFILE" && [ ! -f "$CADDYFILE.
     cp "$CADDYFILE" "$CADDYFILE.before-hollowmere"
     echo "The Caddyfile that was there is saved as $CADDYFILE.before-hollowmere"
 fi
+# The visitor's true address. Cloudflare puts it in CF-Connecting-IP; Caddy trusts that header ONLY from Cloudflare's own ranges (any
+# other peer's header is ignored and its TCP address is used), then writes the result into X-Hollowmere-Client-Ip, replacing whatever
+# the client sent under that name. The website's browser client reads that header (and only from a loopback peer).
+say "Fetching Cloudflare's address ranges"
+CF_NEW="$(mktemp)"
+{ curl -fsS --max-time 20 https://www.cloudflare.com/ips-v4; echo; curl -fsS --max-time 20 https://www.cloudflare.com/ips-v6; } 2>/dev/null \
+    | tr -d '\r' | grep -E '^[0-9a-fA-F:.]+/[0-9]+$' > "$CF_NEW" || true
+if [ -s "$CF_NEW" ]; then
+    install -m 644 "$CF_NEW" "$CF_RANGES_FILE"
+elif [ -s "$CF_RANGES_FILE" ]; then
+    echo "Could not fetch Cloudflare's ranges; using the list from the last run ($CF_RANGES_FILE)."
+else
+    echo "WARNING: could not fetch Cloudflare's ranges and there is no earlier list. The Caddyfile is written WITHOUT trusted proxies: every web"
+    echo "         visitor will then look like one Cloudflare address to the browser client (the safe failure: the per-address limit refuses the"
+    echo "         surplus). Run this script again when the network works, BEFORE switching the browser client on."
+fi
+rm -f "$CF_NEW"
+CF_SERVERS=""
+if [ -s "$CF_RANGES_FILE" ]; then
+    CF_SERVERS="$(printf '\t\ttrusted_proxies static %s\n\t\tclient_ip_headers CF-Connecting-IP' "$(tr '\n' ' ' < "$CF_RANGES_FILE" | sed 's/ *$//')")"
+fi
+echo "Caddy: $(caddy version 2>&1 | head -1)   (trusted_proxies, client_ip_headers and {client_ip} need 2.7 or newer)"
 cat > "$CADDYFILE" <<CADDY
 $MARK
+{
+	servers {
+$CF_SERVERS
+	}
+}
+
 www.$WEB_DOMAIN {
 	redir https://$WEB_DOMAIN{uri} permanent
 }
 
 $WEB_DOMAIN {
 	encode zstd gzip
-	reverse_proxy 127.0.0.1:$WEB_PORT
+	reverse_proxy 127.0.0.1:$WEB_PORT {
+		header_up X-Hollowmere-Client-Ip {client_ip}
+		stream_close_delay 1h
+	}
 	header -Server
 }
 CADDY
@@ -321,5 +375,14 @@ echo " Settings:         $WEB_ENV   (Discord link, contact line; then: systemctl
 echo " News:             add a Markdown file to $WEB_DIR/content/news/ , or to web/content/news in the repository and run this script again"
 echo " Data the site reads: $DATA_DIR   (refreshed every 30 s from the game by lesmudos-web-sync)"
 echo " Logs:             journalctl -u lesmudos-web -f"
+if grep -q '^Site__Play__Enabled=true' "$WEB_ENV"; then
+    if [ "$BRIDGE_PORT" -gt 0 ]; then
+        echo " Browser client:   ON (game bridge port $BRIDGE_PORT). Off without a restart:  touch /var/lib/lesmudos-web/play.off"
+    else
+        echo " Browser client:   switched on in $WEB_ENV but the game has no --bridge-port: it will say the game is not running."
+    fi
+else
+    echo " Browser client:   off (Site__Play__Enabled in $WEB_ENV). The steps to switch it on are in docs/DEPLOY.md."
+fi
 echo "=================================================================="
 [ "$ok" = yes ]

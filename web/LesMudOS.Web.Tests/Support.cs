@@ -1,7 +1,12 @@
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace LesMudOS.Web.Tests;
 
@@ -49,6 +54,22 @@ public sealed class Site : WebApplicationFactory<Program>
         builder.UseContentRoot(Paths.ProjectDir);
         builder.UseEnvironment("Production");
         builder.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(_settings));
+        // The in-memory server has no TCP peer: say the requests come from the loopback, as they do behind Caddy.
+        builder.ConfigureServices(s => s.AddTransient<IStartupFilter>(_ => new LoopbackPeer()));
+        if (Logs != null) builder.ConfigureLogging(l => l.AddProvider(Logs));
+        if (Time != null) builder.ConfigureTestServices(s => s.AddSingleton<TimeProvider>(Time));
+    }
+
+    public CaptureLogs? Logs { get; set; }
+    public TimeProvider? Time { get; set; }
+
+    private sealed class LoopbackPeer : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use((ctx, n) => { ctx.Connection.RemoteIpAddress ??= IPAddress.Loopback; return n(ctx); });
+            next(app);
+        };
     }
 
     public HttpClient NoRedirectClient() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -70,4 +91,23 @@ public static class Html
 {
     public static int Count(string html, string pattern) => Regex.Matches(html, pattern, RegexOptions.IgnoreCase).Count;
     public static string Text(string html) => System.Net.WebUtility.HtmlDecode(Regex.Replace(Regex.Replace(html, "<(script|style)[^>]*>.*?</\\1>", " ", RegexOptions.Singleline), "<[^>]+>", " "));
+}
+
+/// <summary>Every log line the site wrote, as rendered text, so tests can check what is (and is not) logged.</summary>
+public sealed class CaptureLogs : ILoggerProvider
+{
+    private readonly object _lock = new();
+    private readonly List<string> _lines = new();
+    public List<string> Lines { get { lock (_lock) return _lines.ToList(); } }
+    public ILogger CreateLogger(string categoryName) => new L(this, categoryName);
+    public void Dispose() { }
+    private sealed class L(CaptureLogs owner, string category) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            lock (owner._lock) owner._lines.Add(category + ": " + formatter(state, exception) + (exception == null ? "" : " [" + exception.GetType().Name + ": " + exception.Message + "]"));
+        }
+    }
 }

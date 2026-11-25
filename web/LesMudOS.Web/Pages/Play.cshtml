@@ -1,83 +1,70 @@
 @page "/play"
 @{
-    ViewData["Title"] = "How to Play";
-    ViewData["Description"] = "How to enter Hollowmere: what a MUD is, the address to connect to, step-by-step instructions for Windows, macOS, Linux and phones, and what happens at your first login.";
-    ViewData["Script"] = true;
-    var host = Site.Value.GameHost;
-    var port = Site.Value.GamePort;
-    var command = $"telnet {host} {port}";
+    ViewData["Title"] = "Play in your browser";
+    ViewData["Description"] = "Play Legends of Hollowmere in your web browser, on a computer or a phone.";
+    ViewData["NoIndex"] = true;
+    var on = PlayClient.IsOn();
+    ViewData["PlayPage"] = on;
 }
-<section class="band">
-    <div class="wrap">
-        <p class="eyebrow">Enter Hollowmere</p>
-        <h1>How to play</h1>
-        <div class="prose">
-            <p>Legends of Hollowmere is a MUD: a multiplayer role-playing game told in text, a little like an RPG whose graphics are written out as prose. You read what is around you, type what you want to do, and the world answers, alongside other players.</p>
-            <p>There is no download from this site and no account form on it. You connect to the game with a free MUD client (or plain telnet), and you make your character inside the game the first time you log in.</p>
+@if (!on)
+{
+    <section class="band">
+        <div class="wrap">
+            <p class="eyebrow">Enter Hollowmere</p>
+            <h1>The browser client is switched off</h1>
+            <div class="prose">
+                <p>Playing in the browser is not available right now. You can still play with a MUD client or plain telnet: the instructions are on the <a href="/how-to-play">How to play</a> page.</p>
+            </div>
         </div>
+    </section>
+}
+else
+{
+    <div id="play" class="play" data-ws="/play/ws" data-status="/play/status" data-protocol="hollowmere.v1">
+        <section class="play-main" aria-label="Game">
+            <header class="play-bar">
+                <h1 class="play-title">Legends of Hollowmere</h1>
+                <span id="play-state" class="play-state" role="status">Not connected</span>
+                <button type="button" id="play-pause" class="play-btn" aria-pressed="false" hidden>Pause announcements</button>
+                <a class="play-link" href="/how-to-play">How to play</a>
+            </header>
 
-        <div class="connect">
-            <dl>
-                <dt>Address</dt><dd><code>@host</code></dd>
-                <dt>Port</dt><dd><code>@port</code></dd>
-                <dt>In one line</dt><dd><code>@command</code> <button type="button" class="btn alt small" id="copy-connect" data-copy="@command" hidden>Copy</button></dd>
-            </dl>
-        </div>
+            <div id="play-start" class="play-start">
+                <noscript><p class="play-warn">The browser client needs JavaScript. You can still play with a MUD client or telnet: see <a href="/how-to-play">How to play</a>.</p></noscript>
+                <p id="play-notice" class="play-notice" hidden></p>
+                <button type="button" id="play-enter" class="play-enter" hidden>Enter Hollowmere</button>
+                <p class="play-fine">Your password travels over HTTPS to Cloudflare, which carries it to the game. Use a password you use nowhere else.</p>
+            </div>
 
-        <div class="notice">
-            <b>Your connection is not encrypted.</b> The game is played over plain telnet, so anything you type, including your password, crosses the internet as readable text. Use a password that you use nowhere else.
-        </div>
+            <div id="play-strip" class="play-strip" hidden>
+                <span>Type commands and press Enter. Try <button type="button" class="play-code" data-insert="look">look</button>, <button type="button" class="play-code" data-insert="north">north</button> and <button type="button" class="play-code" data-insert="help">help</button>.</span>
+                <button type="button" id="play-strip-hide" class="play-btn">Hide</button>
+            </div>
 
-        <h2 id="first-login">Your first login</h2>
-        <div class="prose">
-            <p>There is nothing to sign up for on the web. Connect, and the game guides you through making a character:</p>
-            <ol class="steps">
-                <li>When it asks <i>By what name are you known?</i>, type the name you want, 2 to 16 letters. A name nobody has used yet starts a new account.</li>
-                <li>Choose a password of at least eight characters, and type it again to confirm. Remember it: it is the only key to your character.</li>
-                <li>Choose your calling: Warrior, Scout, Priest, Mage or Adventurer. Type its name, or <code>help</code> and a name (for example <code>help mage</code>) to read more first.</li>
-                <li>You arrive in Vincent's Hollow. Type <code>help</code> at any time, and <code>look</code> to see where you are.</li>
-            </ol>
-            <p>To come back later, connect the same way, give the same name, and enter your password.</p>
-        </div>
+            <div class="play-logwrap">
+                <div id="play-log" class="play-log" role="log" aria-live="polite" aria-label="Game output" tabindex="0" hidden></div>
+                <button type="button" id="play-newlines" class="play-newlines" hidden></button>
+            </div>
 
-        <h2>Connect, step by step</h2>
-        <div class="platform">
-            <h3>Windows</h3>
-            <ol class="steps">
-                <li>Easiest: install a free MUD client such as Mudlet or MUSHclient, make a new connection to <code>@host</code>, port <code>@port</code>, and leave any "secure" or "SSL" option switched off (the game does not use encryption).</li>
-                <li>Or use plain telnet: open Windows Features, tick <b>Telnet Client</b>, then open a Command Prompt and type <code>@command</code>.</li>
-            </ol>
-        </div>
-        <div class="platform">
-            <h3>macOS</h3>
-            <ol class="steps">
-                <li>Easiest: install a free MUD client such as Mudlet, add a profile for <code>@host</code>, port <code>@port</code>, with encryption off.</li>
-                <li>Or in Terminal: recent macOS no longer includes telnet, but <code>nc @host @port</code> works as a plain connection, and <code>brew install telnet</code> adds telnet itself if you use Homebrew.</li>
-            </ol>
-        </div>
-        <div class="platform">
-            <h3>Linux</h3>
-            <ol class="steps">
-                <li>Install a free MUD client such as Mudlet or TinTin++ from your distribution or its website, and connect to <code>@host</code>, port <code>@port</code>.</li>
-                <li>Or in a terminal: <code>@command</code> (install the <code>telnet</code> package if needed), or <code>nc @host @port</code>.</li>
-            </ol>
-        </div>
-        <div class="platform">
-            <h3>Phones and tablets</h3>
-            <ol class="steps">
-                <li>Search your app store for a MUD client or a telnet app; several free ones exist for both Android and iPhone.</li>
-                <li>Add a connection to <code>@host</code>, port <code>@port</code>, with encryption (SSL/TLS) switched off.</li>
-                <li>A phone keyboard works, but a small external keyboard makes long sessions far more pleasant.</li>
-            </ol>
-        </div>
+            <div id="play-banner" class="play-banner" hidden>
+                <span id="play-banner-text"></span>
+                <button type="button" id="play-try" class="play-btn">Try now</button>
+                <button type="button" id="play-stop" class="play-btn">Stop</button>
+            </div>
 
-        <p>Playing in Mudlet? A map and gauges package is in the game's source: @if (!string.IsNullOrWhiteSpace(Site.Value.MudletDocsUrl)) { <a href="@Site.Value.MudletDocsUrl" rel="noopener">how to install the Mudlet map</a> } else { <text>see <code>docs/MUDLET.md</code></text> }.</p>
+            <div id="play-closed" class="play-banner" hidden>
+                <span id="play-closed-text">Disconnected.</span>
+                <button type="button" id="play-reconnect" class="play-btn">Reconnect</button>
+            </div>
 
-        <h2>A custom client</h2>
-        <p>A dedicated Legends of Hollowmere client is planned for later. Until then, any client that speaks telnet will do.</p>
-        <div class="actions"><span class="btn soon" aria-disabled="true">Download Client <small>(coming later)</small></span></div>
+            <form id="play-form" class="play-form" autocomplete="off" hidden>
+                <label for="play-input" class="play-sr">Command</label>
+                <input id="play-input" class="play-input" type="text" maxlength="1000" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" enterkeyhint="send">
+                <button type="submit" class="play-send">Send</button>
+            </form>
+        </section>
 
-        <h2>If you get stuck</h2>
-        <p>See the <a href="/support">support page</a>.</p>
+        @* The side panel (status, exits, chat, map) arrives in later stages and goes here. *@
+        <aside id="play-side" class="play-side" aria-label="Character" hidden></aside>
     </div>
-</section>
+}

@@ -17,7 +17,7 @@ An ASP.NET Core (.NET 10) Razor Pages site, server-rendered, with no JavaScript 
 | `web/fixtures/` | Save files for tests and local runs: `real/` (written by the real driver), `mixed/` (hand-built in the same shape, with hidden discoveries, a wizard and traps), `synced/` (what the deployment's sync job makes of `mixed/`). |
 | `web/tools/` | `capture_fixtures.py` (plays a few commands on a real driver and copies its save files), `make_mixed_fixture.py`, `make_art.py` (draws the two SVG illustrations). |
 
-Pages: `/`, `/chronicle` (newest first, or `?view=top` for most significant; paged with `?page=N`), `/chronicle/{id}`, `/heroes`, `/world`, `/classes`, `/factions`, `/news`, `/news/{slug}`, `/play`, `/rules`, `/support`, plus `/sitemap.xml`, `/robots.txt`, `/healthz` and a 404 page. There are no forms, no cookies, no analytics, and nothing is loaded from another host (the Content-Security-Policy forbids it).
+Pages: `/`, `/chronicle` (newest first, or `?view=top` for most significant; paged with `?page=N`), `/chronicle/{id}`, `/heroes`, `/world`, `/classes`, `/factions`, `/news`, `/news/{slug}`, `/how-to-play`, `/play` (the browser client, when switched on), `/rules`, `/support`, plus `/sitemap.xml`, `/robots.txt`, `/healthz` and a 404 page. There are no forms, no cookies, no analytics, and nothing is loaded from another host (the Content-Security-Policy forbids it).
 
 ## Running it locally
 
@@ -40,12 +40,23 @@ Set in `appsettings.json`, by environment variables (`Site__GamePort=4000`), or 
 | `Site:SaveDirectory` | empty | Where the data is read from (read only). Empty or missing: every dynamic section shows its empty state |
 | `Site:ContentDirectory` | `content` | News and `world.json`. A relative path is looked up under the content root, then in `../content` |
 | `Site:FilterFile` | `publicfilter.json` | The secrets filter |
-| `Site:GameHost`, `Site:GamePort` | `play.legendsofhollowmere.com`, `4000` | Shown on `/play` |
+| `Site:GameHost`, `Site:GamePort` | `play.legendsofhollowmere.com`, `4000` | Shown on `/how-to-play` |
 | `Site:DiscordUrl` | empty | The Discord link in the footer and on `/support`. Empty: no link anywhere |
-| `Site:MudletDocsUrl` | empty | The web address of `docs/MUDLET.md` (the Mudlet map package), linked from `/play`. Empty: `/play` names the file and links nothing |
+| `Site:MudletDocsUrl` | empty | The web address of `docs/MUDLET.md` (the Mudlet map package), linked from `/how-to-play`. Empty: `/how-to-play` names the file and links nothing |
 | `Site:SupportContact` | empty | The contact line on `/support` (an address, for example). Empty: "A contact address will be posted here soon." |
 | `Site:CacheSeconds` | `45` | How long the game's files are cached (30 to 60 is right) |
 | `Site:ChroniclePageSize` | `12` | Entries per page on `/chronicle` |
+| `Site:Play:Enabled` | `false` | The browser client's master switch. False: `/play` says it is switched off, `/play/ws` is 404, "Play Now" leads to `/how-to-play` |
+| `Site:Play:KillSwitchFile` | `/var/lib/lesmudos-web/play.off` | If this file exists the client is off for new connections and page views (looked at every 5 s, no restart) |
+| `Site:Play:GameBridgeHost`, `GameBridgePort` | `127.0.0.1`, `4001` | The game's loopback-only bridge listener. A non-loopback host stops the site from starting unless `AllowRemoteBridge` is true |
+| `Site:Play:PlainMode` | `false` | Tests only: connect to the game's ordinary telnet port and send no PROXY line |
+| `Site:Play:AllowedOrigins` | empty (the origin of `Site:BaseUrl`) | Origins allowed to open the socket (`Site__Play__AllowedOrigins__0=...`) |
+| `Site:Play:RequireClientIpHeader` | `true` | Refuse a connection without a valid `X-Hollowmere-Client-Ip` header from a loopback peer (Caddy sets it) |
+| `Site:Play:MaxConnections`, `MaxPerAddress` | `60`, `5` | Web players at once, and per address (IPv6 by /64) |
+| `Site:Play:ConnectsPerMinute`, `ConnectsPerMinutePerAddress` | `120`, `10` | New connections per minute, in all and per address |
+| `Site:Play:InputLinesPerSecond`, `InputBurst` | `10`, `20` | Typed lines per player |
+| `Site:Play:MaxInputBytes`, `MaxFrameBytes`, `MaxQueuedBytes` | `4096`, `8192`, `262144` | Longest input line, longest frame from the page, output a page may leave unread before it is cut off |
+| `Site:Play:PingSeconds`, `ClientSilenceSeconds`, `ShutdownGraceSeconds` | `25`, `75`, `5` | Keepalive, silence that closes a socket, wait when the site stops |
 
 ## The data layer
 
@@ -138,6 +149,14 @@ Contrast, WCAG 2 ratios (AA needs 4.5, the body text is held to 7):
 | plate captions | ink-2 #5a432c | card #faf4e3 | 8.41:1 |
 
 
+## The browser client
+
+`/play` is a plain text client (stage 1 of [specs/web-client.md](specs/web-client.md)): vanilla JavaScript and CSS (`wwwroot/js/play.js`, `wwwroot/css/play.css`, no framework, no build step), served under its own Content-Security-Policy (`connect-src` for its own WebSocket, nothing inline, nothing from another site). Game text only ever reaches the page through text nodes; the tests prove a line with `<script>` and `<img onerror>` is drawn as text.
+
+The server side is `LesMudOS.Web/Play/`: `PlayEndpoints` (`/play/ws`, `/play/status`), `PlayRuntime` (the handshake checks: switch and kill-switch file, Origin, subprotocol, the client address, limits), `BridgeSession` (one player: two pumps and the ending), `TelnetParser` (telnet to events: text, GMCP, the password mask), `Frames` (the JSON frames), `ConnectionGate`, `ClientAddress`, `OriginCheck`, `PlayOptions`. It is written so it could run as its own service later. The bridge logs one `play: open` and one `play: close` line per connection with the true address and nothing a player typed. The settings are in the table above; switching it on is in [DEPLOY.md](DEPLOY.md) section 11.
+
+Tests: `PlayBridgeTests` (the bridge against a fake game), `TelnetParserTests`, `FramesTests`, `PlayUnitTests`, `PlayPageTests`, `PlayContrastTests`, the Node tests in `LesMudOS.Web.Tests/js` (run by `JavaScriptTests`; the page tests inside them need `jsdom` on `NODE_PATH` and skip without it), and, against a real game, `tests/web_client_test.py`.
+
 ## Deployment
 
 `deploy/setup-website.sh` is run as root on the droplet after `setup-droplet.sh`, with the domain's DNS pointing at the droplet:
@@ -153,15 +172,15 @@ What it does:
 - Publishes the site to `/opt/lesmudos-web`, owned by root.
 - Creates the `lesmudos-web` user (no login) and a systemd unit `lesmudos-web` bound to `127.0.0.1:5080`, confined like the game's unit, with `InaccessiblePaths` on the game's save directory.
 - **Data access.** The game's save directory is mode 750 owned by the game's user, and `players/NAME.json` holds the password hash next to the level and calling, so the website user is given *no* access to it. A timer (`lesmudos-web-sync`, every 30 seconds) runs as the game's user and writes a sanitized copy into `/var/lib/lesmudos-web/data` (mode 2750, group `lesmudos-web`): exact copies of `chronicle.json`, `renown.json` and `wizlist.json` (checked to be whole JSON first), and a `roster.json` with each character's name, level, calling and advanced class, and nothing else. The only changes to existing permissions: it makes sure the save directory is still 750 and that the website user is not in the game's group. Password hashes never reach the website's user.
-- Installs Caddy from its official apt repository as the public web server with automatic HTTPS for the domain, a permanent redirect from `www`, and compression. An existing Caddyfile is saved once as `/etc/caddy/Caddyfile.before-hollowmere`.
+- Installs Caddy from its official apt repository as the public web server with automatic HTTPS for the domain, a permanent redirect from `www`, and compression. Since the browser client it also: fetches Cloudflare's address ranges (kept in `/etc/caddy/cloudflare-ranges.txt`), trusts `CF-Connecting-IP` only from those ranges, and writes the visitor's true address into `X-Hollowmere-Client-Ip` for the website (replacing anything the client sent under that name); and passes WebSocket upgrades through with `stream_close_delay 1h` so a Caddy reload does not drop players at once. An existing Caddyfile is saved once as `/etc/caddy/Caddyfile.before-hollowmere`.
 - Opens ports 80, 443/tcp and 443/udp in `ufw`.
-- Creates `/etc/lesmudos-web.env` once (Discord link, contact line, game host and port); edit it and `systemctl restart lesmudos-web`.
+- Creates `/etc/lesmudos-web.env` once (Discord link, contact line, game host and port); edit it and `systemctl restart lesmudos-web`. Later runs append any new `Site__Play__...` lines (the browser client, **off** until `Site__Play__Enabled=true`) and never change a line that is there.
 
 Needs: `setup-droplet.sh` already run; DNS for the domain and `www` pointing at the droplet (Caddy's certificates fail otherwise); `python3`, which the script installs.
 
 ## What is not built
 
-- A web client. The game is played over telnet; `/play` explains how.
+- The rest of the browser client: stage 1 (a plain text client that can log in and play) is built; the status panel and exits, the phone layout and install, and the chat pane and map are stages 2 to 4 of [specs/web-client.md](specs/web-client.md).
 - Accounts or sign-up on the web. Accounts are made in the game at first login. The site collects no personal data.
 - Discord: only a link, shown when `Site:DiscordUrl` is set.
 - A downloadable client: shown as "coming later", visibly not a link.

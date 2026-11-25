@@ -6,7 +6,7 @@ namespace LesMudOS.Web.Tests;
 
 public class SiteTests
 {
-    private static readonly string[] Fixed = { "/", "/chronicle", "/heroes", "/world", "/classes", "/factions", "/news", "/play", "/rules", "/support" };
+    private static readonly string[] Fixed = { "/", "/chronicle", "/heroes", "/world", "/classes", "/factions", "/news", "/how-to-play", "/rules", "/support" };
     private static readonly string[] VisibleMixedIds = { "1", "4", "6", "7", "8", "13" };
 
     public static IEnumerable<object[]> Sources()
@@ -270,11 +270,11 @@ public class SiteTests
     public async Task The_play_page_points_to_the_mudlet_guide_and_links_it_only_when_configured()
     {
         using var without = Open("empty");
-        var (_, plain, _) = await without.Get("/play");
+        var (_, plain, _) = await without.Get("/how-to-play");
         Assert.Contains("docs/MUDLET.md", plain);
         Assert.DoesNotContain("how to install the Mudlet map", plain);
         using var with = Open("empty", new() { ["Site:MudletDocsUrl"] = "https://docs.example/MUDLET.md" });
-        var (_, linked, _) = await with.Get("/play");
+        var (_, linked, _) = await with.Get("/how-to-play");
         Assert.Contains("href=\"https://docs.example/MUDLET.md\"", linked);
         Assert.Contains("how to install the Mudlet map", linked);
     }
@@ -283,7 +283,7 @@ public class SiteTests
     public async Task Play_page_uses_the_configured_address_and_port()
     {
         using var site = Open("empty", new() { ["Site:GameHost"] = "play.example", ["Site:GamePort"] = "4242" });
-        var (_, html, _) = await site.Get("/play");
+        var (_, html, _) = await site.Get("/how-to-play");
         Assert.Contains("telnet play.example 4242", html);
         Assert.Contains("not encrypted", html);
         Assert.Contains("Download Client", html);
