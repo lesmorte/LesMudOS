@@ -235,3 +235,12 @@ Decisions:
   deputy (its functions are not read-only names and not SandboxAware, so sandbox code cannot set a real player's zone).
 - Aimed Shot cap, get all, arrival news, flee line: no sandbox interaction.
 Checks: r1_login_placement (demoted wizard drop), return_test (wizard part plus main's linger checks).
+- build exit=0 secs=1 last: Build succeeded.
+- load_check exit=0 secs=231 last: 0 file(s) failed to load
+- sandbox_test exit=0 secs=167 last: 0 failure(s)
+- redteam/run_all exit=0 secs=606 last: 16 of 16 proofs pass
+- redteam2/run_all exit=0 secs=373 last: 10 of 10 proofs pass
+- return_test exit=0 secs=350 last: 0 failure(s)
+- gmcp_test exit=0 secs=69 last: 101 checks, 0 failure(s)
+- smoke_test exit=0 secs=213 last: 0 failure(s)
+- area_test exit=0 secs=626 last: 0 failure(s)
