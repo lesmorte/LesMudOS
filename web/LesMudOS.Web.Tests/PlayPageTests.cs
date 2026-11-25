@@ -180,4 +180,12 @@ public class PlayPageTests
         Assert.DoesNotContain("@import", css);
         Assert.DoesNotContain("@font-face", css);
     }
+
+    [Fact]
+    public void The_static_file_provider_knows_the_webmanifest_type_for_stage_3()
+    {
+        // Settles one of the spec's unverified points: no explicit mapping in Program.cs is needed when this holds.
+        Assert.True(new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider().TryGetContentType("manifest.webmanifest", out var type));
+        Assert.Equal("application/manifest+json", type);
+    }
 }

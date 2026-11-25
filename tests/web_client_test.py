@@ -118,7 +118,7 @@ def start_processes(work, mudlib):
     wlog = open(os.path.join(work, "web.log"), "w")
     wenv = {**os.environ, "ASPNETCORE_URLS": f"http://127.0.0.1:{WEB_PORT}", "ASPNETCORE_ENVIRONMENT": "Production",
             "Site__BaseUrl": ORIGIN, "Site__SaveDirectory": "", "Site__Play__Enabled": "true", "Site__Play__PlainMode": "true",
-            "Site__Play__GameBridgePort": str(GAME_PORT), "Site__Play__MaxConnections": "10",
+            "Site__Play__GameBridgePort": str(GAME_PORT), "Site__Play__MaxConnections": os.environ.get("WEB_TEST_MAX_CONNECTIONS", "10"),
             "Site__Play__KillSwitchFile": os.path.join(work, "play.off")}
     web = subprocess.Popen(["dotnet", web_dll], cwd=web_dir, stdout=wlog, stderr=subprocess.STDOUT, env=wenv)
     for _ in range(150):
@@ -286,6 +286,11 @@ async def main(work, mudlib, driver, web):
                 pass
     except websockets.ConnectionClosed:
         code = c.ws.close_code
+        try:                      # a send fails as soon as the close is seen, with frames still unread: read them
+            while True:
+                await c.frame(1)
+        except (websockets.ConnectionClosed, asyncio.TimeoutError):
+            pass
     waited = time.time() - t0
     check("the idle player is disconnected on schedule although the page keeps pinging", code == 1000 and 10 <= waited <= 25, (code, round(waited, 1)))
     check("with the game's own words, then game_closed", any(f["t"] == "sys" and f["code"] == "game_closed" for f in c.frames))
@@ -342,7 +347,11 @@ async def load(n, work, driver, web):
     for i in range(n):
         ws.append(await Web.open(f"10.{i // 250}.{i % 250}.{i % 200 + 1}"))
     await asyncio.sleep(2)
-    print(f"memory with {n} sessions at the login prompt: game {rss_mb(driver.pid):.0f} MB, website {rss_mb(web.pid):.0f} MB")
+    for w in ws:
+        await w.until("known? ")
+        await w.say("loaduser")
+    await asyncio.sleep(2)
+    print(f"memory with {n} sessions (each has given a name, so the game holds a login object and a player body for it): game {rss_mb(driver.pid):.0f} MB, website {rss_mb(web.pid):.0f} MB")
 
 
 def run():

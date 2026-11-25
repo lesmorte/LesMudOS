@@ -30,7 +30,7 @@ internal sealed class BridgeSession
     // close handshake or by Abort().
     private readonly CancellationTokenSource _recvStop = new();
     private readonly TelnetParser _parser = new();
-    private readonly LineBucket _lines, _pings;
+    private readonly LineBucket _lines, _pings, _frames;
 
     private long _queued, _bytesOut, _linesIn;
     private int _ended;          // 0 running, 1 ending: the first caller of End wins
@@ -40,7 +40,7 @@ internal sealed class BridgeSession
     private bool _drain;
     private bool _gmcpOn;
     private int _replies;
-    private int _badInARow, _droppedInARow;
+    private int _badInARow, _droppedInARow, _floodInARow;
     private long _lastRateNoticeMs = long.MinValue;
     private long _lastClientMs;
     private readonly HashSet<string> _loggedDrops = new();
@@ -50,6 +50,7 @@ internal sealed class BridgeSession
         _rt = rt; _o = rt.Options; _ctx = ctx; _key = key; _who = who; _origin = origin; _log = log; _stopping = stopping; _time = rt.Time;
         _lines = new LineBucket(_o.InputLinesPerSecond, _o.InputBurst, _time);
         _pings = new LineBucket(5, 10, _time);
+        _frames = new LineBucket(Math.Max(50, _o.InputLinesPerSecond * 5), Math.Max(100, _o.InputBurst * 5), _time); // every kind of frame, so no frame type can be flooded
     }
 
     private long NowMs() => (long)(_time.GetTimestamp() / (double)_time.TimestampFrequency * 1000);
@@ -68,7 +69,13 @@ internal sealed class BridgeSession
 
     public async Task RunAsync(Microsoft.AspNetCore.Http.WebSocketAcceptContext accept)
     {
-        _ws = await _ctx.WebSockets.AcceptWebSocketAsync(accept);
+        try { _ws = await _ctx.WebSockets.AcceptWebSocketAsync(accept); }
+        catch (Exception)
+        {
+            _rt.Gate.Release(_key);   // the page went away during the handshake: give the slot back
+            _log.LogInformation("play: refused {Who} reason=handshake-failed", _who);
+            return;
+        }
         _lastClientMs = NowMs();
         _log.LogInformation("play: open {Who} origin={Origin} web={Active}/{Max}", _who, OriginCheck.Safe(_origin), _rt.Gate.Active, _o.MaxConnections);
         var started = _time.GetTimestamp();
@@ -336,6 +343,13 @@ internal sealed class BridgeSession
                     }
                 } while (!r.EndOfMessage);
                 _lastClientMs = NowMs();
+                if (!_frames.Take())
+                {
+                    Dropped("frame-flood");
+                    if (++_floodInARow >= 200) { End("rate-abuse", 1008, null, drain: false); return; }
+                    continue;   // dropped unread: not even parsed
+                }
+                _floodInARow = 0;
                 await HandleClientAsync(Frames.ParseClient(buffer.AsSpan(0, len), _o.MaxInputBytes));
             }
         }
