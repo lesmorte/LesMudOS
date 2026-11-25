@@ -1,0 +1,123 @@
+/* The browser client (docs/specs/web-client.md sections 5, 6, 7.5). Loaded only on /play, after site.css.
+   No inline styles anywhere (the page's Content-Security-Policy forbids them): the script sets styles through the CSSOM. */
+
+/* ---- terminal palette: Dark (the default) ---- every text/background pair is checked against WCAG AA by PlayContrastTests */
+html.play-page {
+  --p-bg: #15120e;      /* page and log ground */
+  --p-fg: #e8dfc9;      /* text */
+  --p-dim: #b5ab94;     /* notes, small print */
+  --p-panel: #211c15;   /* bars, banners, buttons */
+  --p-edge: #6b5d45;    /* borders (not text) */
+  --p-accent: #e8c98a;  /* focus rings, the Enter button */
+  --p-on-accent: #15120e;
+  --c30: #9a917f; --c90: #a8a090;
+  --c31: #e0786a; --c91: #ff9a8c;
+  --c32: #7fc66f; --c92: #a4e68f;
+  --c33: #d9b45a; --c93: #f0d27a;
+  --c34: #7fa6ec; --c94: #a3c2ff;
+  --c35: #c88fd8; --c95: #e3b0f0;
+  --c36: #6fc6c6; --c96: #8fe3e3;
+  --c37: #e8dfc9; --c97: #ffffff;
+  --p-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  color-scheme: dark;
+}
+/* ---- High contrast: pure black and white, at least 7:1 ---- */
+@media (prefers-contrast: more) {
+  html.play-page {
+    --p-bg: #000000; --p-fg: #ffffff; --p-dim: #e0e0e0; --p-panel: #000000; --p-edge: #ffffff; --p-accent: #ffe14d; --p-on-accent: #000000;
+    --c30: #c0c0c0; --c90: #e0e0e0;
+    --c31: #ff6b5e; --c91: #ff8a80;
+    --c32: #5dff5d; --c92: #8aff8a;
+    --c33: #ffe14d; --c93: #fff176;
+    --c34: #7aa8ff; --c94: #9bbdff;
+    --c35: #ff7aff; --c95: #ff9bff;
+    --c36: #4dffff; --c96: #80ffff;
+    --c37: #ffffff; --c97: #ffffff;
+  }
+}
+
+/* ---- the page is a fixed-height app: the log scrolls, nothing else does ---- */
+html.play-page, html.play-page body { height: 100%; overflow: hidden; background: var(--p-bg); }
+html.play-page body { height: var(--vh, 100dvh); display: flex; flex-direction: column; overscroll-behavior: none; }
+html.play-page .masthead { flex: none; }
+html.play-page .foot { display: none; }
+html.play-page main { flex: 1; min-height: 0; display: flex; }
+.play [hidden] { display: none !important; }
+.play { flex: 1; display: flex; min-width: 0; min-height: 0; background: var(--p-bg); color: var(--p-fg); font: 1rem/1.4 var(--body); }
+.play :focus-visible { outline: 3px solid var(--p-accent); outline-offset: 2px; }
+.play a { color: var(--p-accent); }
+.play-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: .4rem;
+  padding: .5rem max(.5rem, env(safe-area-inset-right)) max(.5rem, env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left)); }
+.play-side { flex: none; width: 22rem; max-width: 40%; overflow: auto; border-left: 1px solid var(--p-edge); padding: .5rem; } /* stages 2 to 4 */
+
+.play-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; flex: none; }
+.play-title { font: 600 1.05rem/1.2 var(--body); margin: 0; color: var(--p-fg); }
+.play-state { color: var(--p-dim); font-size: .9rem; margin-right: auto; }
+.play-link { font-size: .9rem; }
+.play-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.play-btn, .play-send, .play-enter {
+  font: 600 .95rem/1.2 var(--body); color: var(--p-fg); background: var(--p-panel);
+  border: 2px solid var(--p-edge); border-radius: 4px; padding: .5rem .8rem; min-height: 44px; min-width: 44px; cursor: pointer;
+}
+.play-btn[aria-pressed="true"] { border-color: var(--p-accent); background: var(--p-edge); }
+.play-btn:hover, .play-send:hover { border-color: var(--p-accent); }
+.play-enter { background: var(--p-accent); color: var(--p-on-accent); border-color: var(--p-accent); font-size: 1.15rem; padding: .8rem 1.6rem; }
+.play-start { flex: none; max-width: 40rem; padding: .5rem 0; }
+.play-notice, .play-warn { background: var(--p-panel); border-left: 4px solid var(--p-accent); padding: .6rem .8rem; margin: 0 0 .8rem; }
+.play-fine { color: var(--p-dim); font-size: .9rem; margin: .8rem 0 0; }
+
+.play-strip { flex: none; display: flex; align-items: center; justify-content: space-between; gap: .6rem; background: var(--p-panel); border: 1px solid var(--p-edge); padding: .3rem .6rem; font-size: .95rem; }
+.play-code { font: 600 .95rem/1.2 var(--p-mono); color: var(--c96); background: transparent; border: 0; border-bottom: 1px dotted var(--c96); padding: .3rem .1rem; min-height: 32px; cursor: pointer; }
+
+.play-logwrap { position: relative; flex: 1; min-height: 0; display: flex; }
+.play-log {
+  flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: .4rem .5rem;
+  background: var(--p-bg); color: var(--p-fg); border: 1px solid var(--p-edge);
+  font: 14px/1.35 var(--p-mono); white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; tab-size: 8;
+  scroll-behavior: auto; overscroll-behavior: contain;
+}
+.play-log .ln { min-height: 1.35em; }
+.play-log .echo { font-style: italic; }
+.play-log .note { color: var(--p-dim); font-style: italic; }
+.play-log .b { font-weight: 700; }
+.play-log .u { text-decoration: underline; }
+.play-log .cmd { text-decoration: underline dotted; text-underline-offset: .2em; }
+.fg30 { color: var(--c30); } .fg90 { color: var(--c90); }
+.fg31 { color: var(--c31); } .fg91 { color: var(--c91); }
+.fg32 { color: var(--c32); } .fg92 { color: var(--c92); }
+.fg33 { color: var(--c33); } .fg93 { color: var(--c93); }
+.fg34 { color: var(--c34); } .fg94 { color: var(--c94); }
+.fg35 { color: var(--c35); } .fg95 { color: var(--c95); }
+.fg36 { color: var(--c36); } .fg96 { color: var(--c96); }
+.fg37 { color: var(--c37); } .fg97 { color: var(--c97); }
+.bg40 { background: var(--c30); } .bg100 { background: var(--c90); }
+.bg41 { background: var(--c31); } .bg101 { background: var(--c91); }
+.bg42 { background: var(--c32); } .bg102 { background: var(--c92); }
+.bg43 { background: var(--c33); } .bg103 { background: var(--c93); }
+.bg44 { background: var(--c34); } .bg104 { background: var(--c94); }
+.bg45 { background: var(--c35); } .bg105 { background: var(--c95); }
+.bg46 { background: var(--c36); } .bg106 { background: var(--c96); }
+.bg47 { background: var(--c37); } .bg107 { background: var(--c97); }
+.play-log [class*="bg"]:not([class*="fg"]) { color: var(--p-bg); }   /* the game sends no backgrounds today; dark text on any of them */
+
+.play-newlines { position: absolute; left: 50%; bottom: .6rem; transform: translateX(-50%); font: 600 .9rem/1.2 var(--body);
+  color: var(--p-on-accent); background: var(--p-accent); border: 0; border-radius: 999px; padding: .5rem 1rem; min-height: 44px; cursor: pointer; }
+.play-banner { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; background: var(--p-panel); border: 1px solid var(--p-accent); padding: .4rem .6rem; }
+.play-banner span { margin-right: auto; }
+
+.play-form { flex: none; display: flex; gap: .4rem; }
+.play-input { flex: 1; min-width: 0; font: 16px/1.3 var(--p-mono); color: var(--p-fg); background: var(--p-panel); border: 2px solid var(--p-edge); border-radius: 4px; padding: .55rem .6rem; min-height: 44px; }
+.play-input:focus { border-color: var(--p-accent); }
+.play-measure { position: absolute; left: -9999px; top: 0; visibility: hidden; white-space: pre; font: 100px/1 var(--p-mono); }
+
+/* ---- phones: one column, the site's masthead out of the way ---- */
+@media (max-width: 899px) {
+  html.play-page .masthead { display: none; }
+  .play-side { display: none; }
+  .play-log { font-size: 12px; }
+}
+@media (forced-colors: active) {
+  .play-log, .play-input, .play-btn, .play-send, .play-banner { border: 1px solid CanvasText; }
+}
+@media (prefers-reduced-motion: reduce) { .play * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }

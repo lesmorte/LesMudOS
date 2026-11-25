@@ -4,9 +4,13 @@ using System.Text;
 using LesMudOS.Web;
 using LesMudOS.Web.Data;
 using Microsoft.Extensions.Options;
+using LesMudOS.Web.Play;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(k => k.AddServerHeader = false);
+// Web players hold upgraded (WebSocket) connections; leave room for the limit the bridge itself enforces.
+builder.Services.AddOptions<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>()
+    .Configure<IOptions<SiteOptions>>((k, site) => k.Limits.MaxConcurrentUpgradedConnections = site.Value.Play.MaxConnections + 20);
 builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection(SiteOptions.Section));
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -48,6 +52,7 @@ builder.Services.AddSingleton(sp =>
     return new NewsService(dir == null ? null : Path.Combine(dir, "news"), sp.GetRequiredService<TimeProvider>(), o.CacheSeconds);
 });
 builder.Services.AddSingleton<GameData>();
+builder.Services.AddSingleton<PlayRuntime>();
 // No cookies and no forms: nothing is ever protected, so no key files are written to disk.
 builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 builder.Services.AddRazorPages();
@@ -56,16 +61,36 @@ builder.Services.AddResponseCompression(o => o.EnableForHttps = true);
 var app = builder.Build();
 
 app.UseResponseCompression();
+{
+    var play = app.Services.GetRequiredService<IOptions<SiteOptions>>().Value.Play;
+    play.Validate(); // refuses to start on an unsafe bridge host
+    app.UseWebSockets(new WebSocketOptions
+    {
+        KeepAliveInterval = TimeSpan.FromSeconds(play.PingSeconds),
+        KeepAliveTimeout = TimeSpan.FromSeconds(play.ClientSilenceSeconds),
+    });
+}
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/error");
 app.UseStatusCodePagesWithReExecute("/not-found");
 
 // Plain headers: no cookies, no trackers, nothing loaded from anywhere but this site.
+const string siteCsp = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'";
+// The client page also opens its own WebSocket and installs a manifest and a worker; nothing else is added (docs/specs/web-client.md 3.6).
+var playCsp = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; "
+    + $"connect-src 'self' {WsOrigin(app.Services.GetRequiredService<IOptions<SiteOptions>>().Value.BaseUrl)}; manifest-src 'self'; worker-src 'self'; "
+    + "base-uri 'self'; form-action 'none'; frame-ancestors 'none'";
 app.Use(async (ctx, next) =>
 {
+    var isPlay = ctx.Request.Path.StartsWithSegments("/play");
     ctx.Response.OnStarting(() =>
     {
+        if (ctx.Request.Path.StartsWithSegments("/play/sw.js"))
+        {
+            ctx.Response.Headers.CacheControl = "no-cache";
+            ctx.Response.Headers["Service-Worker-Allowed"] = "/play";
+        }
         var h = ctx.Response.Headers;
-        h["Content-Security-Policy"] = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'";
+        h["Content-Security-Policy"] = isPlay ? playCsp : siteCsp;
         h["X-Content-Type-Options"] = "nosniff";
         h["Referrer-Policy"] = "strict-origin-when-cross-origin";
         h["X-Frame-Options"] = "DENY";
@@ -84,11 +109,12 @@ app.UseStaticFiles(new StaticFileOptions
         ? "public, max-age=31536000, immutable" : "public, max-age=3600"
 });
 app.MapRazorPages();
+app.MapPlay();
 
 app.MapGet("/healthz", () => Results.Text("ok", "text/plain"));
 
 app.MapGet("/robots.txt", (IOptions<SiteOptions> o) =>
-    Results.Text($"User-agent: *\nAllow: /\n\nSitemap: {o.Value.BaseUrl.TrimEnd('/')}/sitemap.xml\n", "text/plain"));
+    Results.Text($"User-agent: *\nAllow: /\nDisallow: /play/ws\nDisallow: /play/status\n\nSitemap: {o.Value.BaseUrl.TrimEnd('/')}/sitemap.xml\n", "text/plain"));
 
 app.MapGet("/sitemap.xml", (IOptions<SiteOptions> o, GameData data, NewsService news) =>
 {
@@ -104,6 +130,15 @@ app.MapGet("/sitemap.xml", (IOptions<SiteOptions> o, GameData data, NewsService 
 });
 
 app.Run();
+
+static string WsOrigin(string baseUrl)
+{
+    // https://example.org -> wss://example.org (older Safari does not count 'self' as covering WebSocket)
+    var b = baseUrl.TrimEnd('/');
+    if (b.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return "wss://" + b[8..];
+    if (b.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) return "ws://" + b[7..];
+    return "";
+}
 
 /// <summary>Lets the integration tests start the site.</summary>
 public partial class Program { }

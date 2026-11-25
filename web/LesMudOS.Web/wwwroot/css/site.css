@@ -250,3 +250,5 @@ code, kbd { overflow-wrap: anywhere; font: .95em ui-monospace, "Cascadia Mono", 
 @media print { .masthead, .foot, .skip, .actions { display: none; } body { background: #fff; } }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .lost .actions { justify-content: center; }
+.playnow h2 { font-size: 1.5rem; }
+.playnow .actions { margin-top: .25rem; }

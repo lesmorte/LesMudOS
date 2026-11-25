@@ -13,8 +13,8 @@
         <p class="tagline">The World Beyond Vincent's Hollow</p>
         <p class="lede">A text-based fantasy world where you read, type and the world answers. Start as an unknown in a quiet village, walk the roads of Greenvale, and make a name the world will remember.</p>
         <div class="actions">
-            <a class="btn" href="/play">Play Now</a>
-            <a class="btn alt" href="/play#first-login">Create Account</a>
+            <a class="btn" href="@PlayClient.PlayHref">Play Now</a>
+            <a class="btn alt" href="/how-to-play#first-login">Create Account</a>
             <a class="btn alt" href="/chronicle">Read the Chronicle</a>
         </div>
         <figure class="plate">
@@ -167,9 +167,18 @@
         <h2 id="join">The road is open</h2>
         <p>Your story begins at a quiet village gate. Everything you need to get there is on one page.</p>
         <div class="actions">
-            <a class="btn" href="/play#first-login">Create Account</a>
-            <span class="btn soon" aria-disabled="true">Download Client <small>(coming later)</small></span>
-            <a class="btn alt" href="/play">Enter Hollowmere</a>
+            @if (PlayClient.IsOn())
+            {
+                <a class="btn" href="/play">Play in your browser</a>
+                <a class="btn alt" href="/how-to-play#first-login">Create Account</a>
+                <a href="/how-to-play">Other ways to connect</a>
+            }
+            else
+            {
+                <a class="btn" href="/how-to-play#first-login">Create Account</a>
+                <span class="btn soon" aria-disabled="true">Download Client <small>(coming later)</small></span>
+                <a class="btn alt" href="/how-to-play">Enter Hollowmere</a>
+            }
         </div>
     </div>
 </section>

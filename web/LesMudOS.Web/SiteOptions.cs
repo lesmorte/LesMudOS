@@ -36,4 +36,7 @@ public sealed class SiteOptions
     public int CacheSeconds { get; set; } = 45;
 
     public int ChroniclePageSize { get; set; } = 12;
+
+    /// <summary>The browser client (docs/specs/web-client.md). Off until the owner switches it on.</summary>
+    public Play.PlayOptions Play { get; set; } = new();
 }
