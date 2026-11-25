@@ -220,3 +220,18 @@ heap limit; Restart=on-failure kept on purpose (the in-game shutdown exits 0 and
 - sneak_test exit=0 secs=338 last: 0 failure(s)
 - story_test exit=0 secs=173 last: 544 checks, 0 failure(s)
 - hollow_expansion_test exit=0 secs=57 last: 684 checks, 0 failure(s)
+
+## Second integration: main 01c738e (batch 2), merge 2eca4ef
+Decisions:
+- Linger: QueryLingerSeconds is 0 for a body in or leaving the workshop or in sandbox space at all (besides wizards): no body
+  lingers in sandbox space, a wizard demoted inside included (level 0 cannot enter: MoveRefusal; nobody is carried in: C1).
+  Quit/link death in the workshop take the old destruct path with its finally (save no-op: the file is the checkpoint).
+  Quit is refused in a fight except in the workshop. DropConnection refuses restricted callers and sandbox objects (and only a body
+  for itself). /secure/linkdead.IsBody requires domain "": a sandbox copy of /std/player is never registered or resumed; Register,
+  Find and All are not read-only names, so sandbox code is refused them anyway. Reconnect Execs only to a registered real body
+  (master's exec rule: the login object). The heartbeat invariant walks Users(); lingering bodies are never in sandbox space.
+- charset ascii: the order is kernel cleaning -> visitor mark (ASCII) -> body Render -> Asciify; Asciify only maps >127 to ASCII.
+- Time efuns TimeZoneNames/LocalTime: read-only, allowed to restricted code (direct efuns, no crossing); /secure/clock is not a
+  deputy (its functions are not read-only names and not SandboxAware, so sandbox code cannot set a real player's zone).
+- Aimed Shot cap, get all, arrival news, flee line: no sandbox interaction.
+Checks: r1_login_placement (demoted wizard drop), return_test (wizard part plus main's linger checks).
