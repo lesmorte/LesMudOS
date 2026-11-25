@@ -156,3 +156,40 @@ item, world, find 159, chronicle, chronicle_play, craft 313, craft_content 289 (
 playfeel, attribute, rest, rename, rank (first run one Arcane Bolt II sample, rerun 0), aim, sneak, story 544, hollow_expansion 673,
 corridor_mob, ansi, timing, city 4685/0, corridor 6861/0, playthrough 0 (25.7 min).
 Note: boot is ~14 s idle (was ~12 s); the suites' 20 s boot wait is tight under load.
+
+## Integration with main (merge ec3edd1, then cbb1389 and 4acad3b)
+Conflicts: adventurer.cs (PrepareSave, EnterWorld, CmdScore), TelnetServer.cs (main's N1 line taken).
+Decisions:
+1. Return-to-room vs the workshop: the saved character is the checkpoint, and its logoutRoom is the room the wizard entered the
+   workshop from (PrepareSave(at) with the master's origin). WakeRoomOk refuses every path under /wiz (any spelling), the wizard's own
+   home included, plus the Void and clones; PrepareSave also refuses any room with a domain. Quit and link death in a workshop do not
+   save (Save is a no-op while marked), so the file stays the checkpoint. Login therefore never places a body in sandbox space; the
+   only way in is the master's move with WorkshopCheckpoint. Checks: tests/redteam/r1_login_placement.py, return_test (wizard part).
+2. Disconnect line: "closed by the game (outbox limit)" for the queue cap; player name = a real body's QueryName, cleaned, <= 32 chars;
+   the rest of the line is the driver's own text (address, durations, reason). Sandbox code controls nothing in it.
+3. Score: main's layout, the workshop line printed under the box ("[in the workshop: nothing here is saved]"); score, time and stat
+   are body verbs, so a visitor's cannot be shadowed (OwnVerb rule). Check: l1_l2_and_rules (look, score, search, time, stat, get).
+4. OnLine's pending prompt: only decides whether a "\n" precedes the next output; TextFor marks and cleans before CatchTell, so every
+   visitor line still starts on its own line with the mark. No change needed.
+5. Find verbs: a real find binds get/search/... over the body's own verbs (real code: allowed). In a workshop a find is a sandbox
+   object: for the owner it may shadow body verbs; for a visitor get and search stay the visitor's own (search = hidden exits), while
+   open/unwrap/untie/unroll/grab/pick (not body verbs) reach the visitor, marked. A workshop find pays nothing anyway.
+6. timing_test: main's change is the score-layout join only; my expectations kept. Boot wait raised to 40 s in smoke_test, area_test,
+   ansi_test, chronicle_test, city_infra, gmcp_test (rtlib already 120 s).
+Memory (M1): deploy MemoryMax=768M + MemorySwapMax=0 + DOTNET_GCHeapHardLimitPercent=0x46; driver saves all players past 3/4 of the
+heap limit; Restart=on-failure kept on purpose (the in-game shutdown exits 0 and stays down; OOM kill and exit 3 are failures).
+
+## For the next batch from main (expected needs from the sandbox side)
+- Aimed Shot opener cap: none (combat rules; sandbox creatures fight only workshop characters).
+- charset ascii: the translation must come AFTER PlainText cleaning and the visitor mark (in the body's CatchTell/Receive, the one
+  point where text is sent). Cleaning removes controls first; translation only maps printable non-ASCII to ASCII. The mark is ASCII
+  already. Box-drawing in score becomes ASCII there too. Never translate before cleaning (a translation table must not produce ESC).
+- time with a player time zone, two new driver efuns: read-only efuns are fine for sandbox code; if one sets a stored value on the body,
+  it must go through a body function (not ReadOnly-named) so sandbox code cannot change a real player's zone; the zone string must be
+  validated by the driver (no host paths in errors: TimeZoneInfo exceptions name files).
+- Link-dead body lingering 60 s (vulnerable, reconnect resumes it): wizards are removed at once, so a workshop body is never link-dead.
+  What must hold: (a) a body marked in the workshop is never kept link-dead (NetDead's wizard exemption must also cover any marked
+  body, even one demoted during the visit); (b) a lingering body must not be movable into sandbox space (C1 rule: only its own
+  command; a link-dead body has no command) and sandbox code must not reach it (it is outside sandbox space); (c) reconnect must not
+  resume a body in sandbox space; (d) the heartbeat invariant iterates Users() only: a link-dead body is not a user, so the
+  invariant must also walk lingering bodies (or they must be impossible in sandbox space, which (a)-(c) give).
