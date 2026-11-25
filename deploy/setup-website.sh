@@ -55,8 +55,14 @@ export DEBIAN_FRONTEND=noninteractive DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOG
 [ -f "$GAME_UNIT" ] || die "$GAME_UNIT is missing: run setup-droplet.sh first."
 id "$GAME_USER" >/dev/null 2>&1 || die "The game's user '$GAME_USER' does not exist: run setup-droplet.sh first."
 GAME_PORT="$(grep -oP -- '--port \K[0-9]+' "$GAME_UNIT" || echo 4000)"
-# The game's loopback-only bridge listener (the browser client connects to it). 0: this game has none yet (setup-droplet.sh adds --bridge-port).
+# The game's loopback-only bridge listener (the browser client connects to it), read from the game's unit exactly as setup-droplet.sh writes
+# it ("--bridge-port N" in ExecStart). 0 or absent: the game has no bridge listener, and the browser client stays OFF (setup-droplet.sh or
+# update-droplet.sh with BRIDGE_PORT=4001 adds it). A LESMUDOS_BRIDGE_PORT line in the game's environment file overrides the unit, as it does in the driver.
 BRIDGE_PORT="$(grep -oP -- '--bridge-port \K[0-9]+' "$GAME_UNIT" || echo 0)"
+GAME_ENV="${GAME_ENV:-/etc/lesmudos.env}"
+if [ -f "$GAME_ENV" ] && grep -qE '^LESMUDOS_BRIDGE_PORT=[0-9]+' "$GAME_ENV"; then
+    BRIDGE_PORT="$(grep -E '^LESMUDOS_BRIDGE_PORT=[0-9]+' "$GAME_ENV" | tail -1 | cut -d= -f2)"
+fi
 CF_RANGES_FILE="${CF_RANGES_FILE:-/etc/caddy/cloudflare-ranges.txt}"   # Cloudflare's published address ranges, kept between runs
 
 if [ "$UPDATE_SOURCE" = yes ] || [ ! -d "$SRC_DIR/web/LesMudOS.Web" ]; then
@@ -78,6 +84,12 @@ if ! command -v caddy >/dev/null 2>&1; then
     curl -fsSL 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
     apt-get update -y
     apt-get install -y caddy
+fi
+
+# Caddy 2.7 or newer: the Caddyfile below uses trusted_proxies, client_ip_headers and {client_ip}. Checked now, before anything is changed.
+CADDY_V="$(caddy version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || true)"
+if [ -z "$CADDY_V" ] || [ "$(printf '%s\n' 2.7 "$CADDY_V" | sort -V | head -1)" != "2.7" ]; then
+    die "Caddy is '${CADDY_V:-unknown}'; this script needs 2.7 or newer. Upgrade it (apt-get update && apt-get install --only-upgrade caddy) and run this script again. Nothing has been changed."
 fi
 
 # ---- 2. .NET (setup-droplet.sh installed the SDK; it includes the ASP.NET Core runtime the site needs) ----
@@ -241,8 +253,18 @@ if ! grep -q '^Site__Play__Enabled=' "$WEB_ENV"; then
 fi
 if [ "$BRIDGE_PORT" -gt 0 ]; then
     add_setting Site__Play__GameBridgePort "Site__Play__GameBridgePort=$BRIDGE_PORT"
+    HAVE_PORT="$(grep -E '^Site__Play__GameBridgePort=' "$WEB_ENV" | tail -1 | cut -d= -f2 || true)"
+    if [ -n "$HAVE_PORT" ] && [ "$HAVE_PORT" != "$BRIDGE_PORT" ]; then
+        echo "WARNING: $WEB_ENV has Site__Play__GameBridgePort=$HAVE_PORT but the game listens for the bridge on $BRIDGE_PORT. Fix the line (then: systemctl restart lesmudos-web)."
+    fi
 else
-    echo "NOTE: the game's unit has no --bridge-port yet, so the browser client cannot work. Run setup-droplet.sh (or update-droplet.sh), then this script again."
+    # The game has no bridge listener: the client must not be on. A switch left on would show "the game is not running" to every visitor.
+    if grep -q '^Site__Play__Enabled=true' "$WEB_ENV"; then
+        sed -i 's/^Site__Play__Enabled=true/Site__Play__Enabled=false/' "$WEB_ENV"
+        echo "NOTE: the game has no --bridge-port (or it is 0), so the browser client was switched OFF in $WEB_ENV (Site__Play__Enabled=false)."
+    else
+        echo "NOTE: the game has no --bridge-port (or it is 0): the browser client stays off. To add it: BRIDGE_PORT=4001 bash $SRC_DIR/deploy/update-droplet.sh (docs/DEPLOY.md section 11)."
+    fi
 fi
 add_setting Site__Play__MaxConnections "# Site__Play__MaxConnections=60"
 add_setting Site__Play__AllowedOrigins__0 "# Site__Play__AllowedOrigins__0=https://$WEB_DOMAIN"
@@ -386,7 +408,7 @@ if grep -q '^Site__Play__Enabled=true' "$WEB_ENV"; then
     if [ "$BRIDGE_PORT" -gt 0 ]; then
         echo " Browser client:   ON (game bridge port $BRIDGE_PORT). Off without a restart:  touch /var/lib/lesmudos-web/play.off"
     else
-        echo " Browser client:   switched on in $WEB_ENV but the game has no --bridge-port: it will say the game is not running."
+        echo " Browser client:   OFF: the game has no --bridge-port."
     fi
 else
     echo " Browser client:   off (Site__Play__Enabled in $WEB_ENV). The steps to switch it on are in docs/DEPLOY.md."

@@ -24,7 +24,10 @@ fi
 # The settings the droplet was set up with are read back from the installed service.
 unit=/etc/systemd/system/lesmudos.service
 GAME_PORT="$(grep -oP -- '--port \K[0-9]+' "$unit")"
-BRIDGE_PORT="$(grep -oP -- '--bridge-port \K[0-9]+' "$unit" || echo 0)"   # absent in units written before the bridge existed
+# The bridge port: what the unit has (absent in units written before the bridge existed: 0 = off), unless you give BRIDGE_PORT yourself:
+#     BRIDGE_PORT=4001 bash update-droplet.sh     switches the browser client's game side on;   BRIDGE_PORT=0 ...  switches it off
+BRIDGE_PORT="${BRIDGE_PORT:-$(grep -oP -- '--bridge-port \K[0-9]+' "$unit" || echo 0)}"
+[[ "$BRIDGE_PORT" =~ ^[0-9]+$ ]] || { echo "BRIDGE_PORT must be a number (0 = off)." >&2; exit 1; }
 if grep -q "ReadWritePaths=.*$APP_DIR/mudlib\$" "$unit"; then MUDLIB_WRITABLE=all; else MUDLIB_WRITABLE=wiz; fi
 export APP_DIR GAME_PORT BRIDGE_PORT MUDLIB_WRITABLE
 

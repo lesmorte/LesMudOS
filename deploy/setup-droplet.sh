@@ -149,10 +149,10 @@ if ! grep -q '^# ---- network limits' "$ENV_FILE"; then
 # LESMUDOS_MAX_CONNECTIONS=200                # all connections together
 # LESMUDOS_MAX_PER_ADDRESS=10                 # per address (IPv6 by /64); a web player counts under his real address
 # LESMUDOS_CONNECTS_PER_MINUTE=20             # new connections per address per minute
-# LESMUDOS_MAX_LINES_PER_SECOND=20            # typed lines per second per connection (burst LESMUDOS_INPUT_BURST=60)
+# LESMUDOS_MAX_LINES_PER_SECOND=20            # typed lines per second per connection (burst LESMUDOS_INPUT_BURST=60); lines over it are delayed, never dropped
 # LESMUDOS_THROTTLE_NAME_FAILURES=5           # wrong passwords on one name within 15 minutes lock the name ...
 # LESMUDOS_THROTTLE_NAME_LOCK_SECONDS=300     # ... for 5 minutes, doubling each time up to LESMUDOS_THROTTLE_NAME_LOCK_MAX_SECONDS=3600
-# LESMUDOS_THROTTLE_ADDRESS_FAILURES=20       # wrong passwords from one address (any names) within 15 minutes lock the address ...
+# LESMUDOS_THROTTLE_ADDRESS_FAILURES=40       # wrong passwords from one address (any names) within 15 minutes lock the address ...
 # LESMUDOS_THROTTLE_ADDRESS_LOCK_SECONDS=900  # ... for 15 minutes, doubling up to LESMUDOS_THROTTLE_ADDRESS_LOCK_MAX_SECONDS=14400
 # LESMUDOS_THROTTLE_NEW_PER_HOUR=3            # new characters per address per hour
 # LESMUDOS_THROTTLE_NEW_PER_DAY=10            # and per day

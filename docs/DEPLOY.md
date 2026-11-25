@@ -157,16 +157,16 @@ Settings of the driver, all environment variables (put them in `/etc/lesmudos.en
 | `LESMUDOS_MAX_CONNECTIONS` (`--max-connections`) | `200` | All connections together. A newcomer gets "The game is full." |
 | `LESMUDOS_MAX_PER_ADDRESS` (`--max-per-address`) | `10` | Per address; an IPv6 address counts as its /64; a web player counts under the visitor's real address. Loopback is **not** exempt. |
 | `LESMUDOS_CONNECTS_PER_MINUTE` | `20` | New connections per address per minute (refused attempts count). |
-| `LESMUDOS_MAX_LINES_PER_SECOND` | `20` | Typed lines per second per connection, sustained; `LESMUDOS_INPUT_BURST` (`60`) may arrive at once. The surplus is dropped with one warning; `LESMUDOS_INPUT_OVERFLOW_SECONDS` (`5`) of continuous overflow ends the connection. |
-| `LESMUDOS_INPUT_BYTES_PER_SECOND` | `65536` | The same for bytes (burst: four seconds' worth). |
+| `LESMUDOS_MAX_LINES_PER_SECOND` | `20` | Typed lines per second per connection, sustained; `LESMUDOS_INPUT_BURST` (`60`) may arrive at once. Lines over the limit are **delayed, never dropped** (the connection is told once that its input is being held): a wizard who pastes a 500-line file into the editor sees it arrive whole and in order, in about 22 seconds. `LESMUDOS_INPUT_OVERFLOW_SECONDS` (`100`, about 2,000 lines) of continuous backlog ends the connection ("Too much input. Goodbye."). The backlog waits in the socket's own buffer, so it costs the driver nothing. |
+| `LESMUDOS_INPUT_BYTES_PER_SECOND` | `65536` | The same for bytes (burst: four seconds' worth); delayed the same way. |
 | `LESMUDOS_INPUT_STATS` | off | `1` logs each connection's peak input rate when it ends (to measure; not for production). |
-| `LESMUDOS_THROTTLE_*` | see [login-throttle.md](specs/login-throttle.md) | Wrong-password locks per name (5 in 15 minutes: 5 minutes, doubling to 1 hour) and per address (20 in 15 minutes: 15 minutes, doubling to 4 hours), the 1-second pause on every "no", 3 new characters per address per hour and 10 per day. In memory only. |
+| `LESMUDOS_THROTTLE_*` | see [login-throttle.md](specs/login-throttle.md) | Wrong-password locks per name (5 in 15 minutes: 5 minutes, doubling to 1 hour) and per address (40 in 15 minutes: 15 minutes, doubling to 4 hours; a character's owner whose address was used for that character before can still try that character, three times, behind a locked address), the 1-second pause on every "no", 3 new characters per address per hour and 10 per day. In memory only. |
 
 Refused connections are sent one plain line and closed, and logged as `connection refused: <reason>: <address>`; these log lines, and the input-limit and throttle lines, are rate-limited so that a flood cannot fill the journal.
 
 **The bridge port must never be exposed.** It is bound to 127.0.0.1, so the firewall is a second lock, not the first. `ufw` must not list 4001 (`ufw status` shows only SSH, the game port, 80 and 443), a DigitalOcean Cloud Firewall must not allow it, and `ss -ltnp | grep 4001` must show `127.0.0.1:4001`, never `0.0.0.0` or `[::]`. The port believes any address a PROXY line gives it, so anything that can reach it can pretend to be any visitor and get past the per-address limits and the login throttle. The public port 4000 never reads a PROXY line.
 
-The output cap of the spec (section 4.4) is not part of this change: the sandbox branch supplies it (a connection with more than 4,000,000 bytes queued is closed, logged as "closed by the game (outbox limit)").
+The output cap of the spec (section 4.4) is in the driver too: a connection with more than 4,000,000 bytes queued for it is closed, logged as "closed by the game (outbox limit)" (SANDBOX.md). A refused connection is refused before it has an outbox, so the two do not meet.
 
 ## 4. Make yourself the first wizard
 
@@ -273,34 +273,45 @@ Players can also play from a web page, on a phone or a computer: the page at `ht
 
 **It is switched off until you switch it on.** Deploying the code changes nothing: `Site__Play__Enabled` is `false`, `/play` says the client is switched off, and "Play Now" still leads to the instructions. Telnet on the game port is never touched.
 
-### Switching it on, step by step
+### Switching it on, step by step (an existing droplet)
 
-The order matters: the game first (it gets the second, loopback-only listener), then the website.
+The order matters: the game first (it gets the second, loopback-only listener), then the website. Everything here is safe to run again: `update-droplet.sh` takes a backup first, keeps the branch, the ports and `/etc/lesmudos.env` (so the admin secret is neither shown nor changed), keeps every wizard's home and every save file, and never touches `ufw` beyond the game port it already opened.
 
-1. **Update the game.** `shutdown` in the game, then `bash /opt/lesmudos/src/deploy/update-droplet.sh`. This rewrites the game's service so it starts with `--bridge-port 4001` (`BRIDGE_PORT=4001`, a setting of `setup-droplet.sh`; the driver reads `--bridge-port` or `LESMUDOS_BRIDGE_PORT`). That listener is bound to `127.0.0.1` only, requires a PROXY version 1 line as its first bytes, and is **not** opened in `ufw`: do not open it. Check: `journalctl -u lesmudos -n 20` shows it listening, and `ss -ltn | grep 4001` shows `127.0.0.1:4001`, never `0.0.0.0` or `*`.
-2. **Update the website.** `UPDATE_SOURCE=yes WEB_DOMAIN=legendsofhollowmere.com bash /opt/lesmudos/src/deploy/setup-website.sh`. It publishes the site, appends the new `Site__Play__...` lines to `/etc/lesmudos-web.env` (an existing file is never overwritten), fetches Cloudflare's address ranges into `/etc/caddy/cloudflare-ranges.txt`, rewrites the Caddyfile (the client's true address, WebSocket pass-through) and restarts the site. It prints `caddy version`: the Caddyfile needs Caddy 2.7 or newer (`apt-get install --only-upgrade caddy` if it is older; `caddy validate` fails otherwise and the script stops). **This restarts the website, which disconnects any web player** (there are none yet while the client is off).
-3. **Check Cloudflare** (dashboard for the domain). All of these are in the spec, section 10.5:
-   - Network: **WebSockets on** (the default). SSL/TLS mode **Full (strict)**.
-   - Caching: a Cache Rule "bypass cache" for paths starting with `/play/ws` and `/play/status`; do not "Cache Everything" on `/play`.
-   - **Rocket Loader, Auto Minify, Mirage, Email Obfuscation and Web Analytics auto-injection off** for `/play` (they rewrite or inject scripts; the page's policy would block the injected beacon and the console would fill with errors).
-   - Security: **Bot Fight Mode / Super Bot Fight Mode and any WAF challenge rule** must not challenge `/play/ws` and `/play/status` (a WebSocket handshake cannot solve a challenge): add a skip rule for those two paths, then test from a phone on mobile data. Optional extra layer: a rate-limiting rule on `/play/ws` (for example 30 requests a minute per address).
-   - The telnet name `play.legendsofhollowmere.com` stays a **DNS-only** (grey cloud) record. The web client never uses that name.
-4. **Switch it on.** In `/etc/lesmudos-web.env` change `Site__Play__Enabled=false` to `Site__Play__Enabled=true`, then `systemctl restart lesmudos-web`.
-5. **Check it works.**
+1. **Update the game.** In the game, as a level 10 wizard, `shutdown`. Then, as root, `bash /opt/lesmudos/src/deploy/update-droplet.sh`. This installs the new driver and mudlib (network limits, the login throttle, the bridge code) with the bridge still **off**: the unit gets `--bridge-port 0`. Check: `journalctl -u lesmudos -n 40` shows `network limits: ...` and `bridge off`; log in and play a minute. Nothing about telnet play has changed except that wrong passwords are now counted ([specs/login-throttle.md](specs/login-throttle.md)).
+2. **Turn the bridge port on.** `shutdown` in the game again, then `BRIDGE_PORT=4001 bash /opt/lesmudos/src/deploy/update-droplet.sh`. The only difference to step 1 is the unit's start line: `--bridge-port 4001` (the driver reads `--bridge-port` or the environment variable `LESMUDOS_BRIDGE_PORT`, which wins if it is set in `/etc/lesmudos.env`; `LESMUDOS_BRIDGE_BIND` can only be `127.0.0.1` or `::1`, anything else and the driver refuses to start the listener). A later `update-droplet.sh` without `BRIDGE_PORT` keeps the 4001 it finds in the unit.
+3. **Confirm the port is private.** `ss -ltnp | grep -E ':4000|:4001'` must show `127.0.0.1:4001` (the game's `:4000` is on all addresses, that is right) and **never** `0.0.0.0:4001`, `*:4001` or `[::]:4001`. `ufw status` must not list 4001, and a DigitalOcean Cloud Firewall must not allow it. `journalctl -u lesmudos -n 20` says `bridge listening on 127.0.0.1:4001 (loopback only, PROXY line required)`. If any of this is wrong, do the "turn it all off" steps below before anything else.
+4. **Check Caddy** *before* the website script: `caddy version`. It needs **2.7 or newer** (the Caddyfile uses `trusted_proxies`, `client_ip_headers` and `{client_ip}`). The website script checks too and stops with "Nothing has been changed" if it is older, but look first. If older: `apt-get update && apt-get install --only-upgrade caddy` (for a Caddy installed from the apt repository this script's earlier runs added; if you installed it another way, upgrade it that way), check `caddy version` again. If you cannot upgrade it, **stop here and leave the client off**: the website keeps running as it is, and the game side from step 2 is harmless (nobody can reach the bridge).
+5. **Run the website script.** `UPDATE_SOURCE=yes WEB_DOMAIN=legendsofhollowmere.com bash /opt/lesmudos/src/deploy/setup-website.sh`. It publishes the site; reads the bridge port from the game's unit (`--bridge-port 4001`, or `LESMUDOS_BRIDGE_PORT` in `/etc/lesmudos.env`) and writes `Site__Play__GameBridgePort=4001` into `/etc/lesmudos-web.env` (an existing file is never overwritten, new lines are appended; the script **switches the client off** and says so if the game's port is 0 or absent); fetches Cloudflare's address ranges into `/etc/caddy/cloudflare-ranges.txt`; writes the new Caddyfile beside the old one and runs `caddy validate` on it, and only a configuration that validates replaces the working one (if it does not, the script stops with the old site still serving and says so); restarts the site. **The restart disconnects any web player** (none yet while the client is off).
+6. **Enable the client.**
+   1. Check Cloudflare (dashboard for the domain; the spec, section 10.5):
+      - Network: **WebSockets on** (the default). SSL/TLS mode **Full (strict)**.
+      - Caching: a Cache Rule "bypass cache" for paths starting with `/play/ws` and `/play/status`; do not "Cache Everything" on `/play`.
+      - **Rocket Loader, Auto Minify, Mirage, Email Obfuscation and Web Analytics auto-injection off** for `/play`.
+      - Security: **Bot Fight Mode / Super Bot Fight Mode and any WAF challenge rule** must not challenge `/play/ws` and `/play/status`: add a skip rule for those two paths. Optional: a rate-limiting rule on `/play/ws` (30 requests a minute per address).
+      - The telnet name `play.legendsofhollowmere.com` stays a **DNS-only** (grey cloud) record.
+   2. In `/etc/lesmudos-web.env` change `Site__Play__Enabled=false` to `Site__Play__Enabled=true`, then `systemctl restart lesmudos-web`.
+7. **Verify, above all that the real address reaches both logs.**
    - `curl -s https://legendsofhollowmere.com/play/status` answers `{"v":1,"enabled":true,"full":false}`.
-   - Open `https://legendsofhollowmere.com/play` in a browser, press **Enter Hollowmere**, make or enter a character. Then compare the address in `journalctl -u lesmudos-web | grep 'play: open'` with the "what is my IP" page: it must be **your** address, not a Cloudflare one (if it is a Cloudflare address, the Caddy ranges are wrong or stale: re-run `setup-website.sh`, and keep the client off meanwhile). The game's log (`journalctl -u lesmudos`) shows the same address on its `connection from ... (web)` line.
-   - Leave the page open without typing: after 5 minutes the game warns you of the idle time and after 10 it disconnects you, even though the page keeps pinging (the pings are not input).
-   - Work through the manual checklist, [specs/web-client.md](specs/web-client.md) section 12.3, on a phone and a desktop before announcing it.
-6. Tell nobody yet that the site can be told apart from telnet: players type their name and password in the page each time (it does not store them), and the page warns that Cloudflare carries the password.
+   - Open `https://legendsofhollowmere.com/play`, press **Enter Hollowmere**, make or enter a character.
+   - The website's log: `journalctl -u lesmudos-web | grep 'play: open'` shows **your** address (compare with a "what is my IP" page), not a Cloudflare one and not `127.0.0.1`.
+   - The game's log: `journalctl -u lesmudos | grep 'connection from' | tail -3` shows the same address followed by `(web)`; never `127.0.0.1 (web)` and never a bare `127.0.0.1`. If either shows a Cloudflare or loopback address, **switch the client off at once (step 8)**: the Caddy ranges are wrong or stale (run `setup-website.sh` again), and until it is right every web player would share one address in the game's per-address limit and the login throttle.
+   - Leave the page open without typing: after 5 minutes the game warns you of the idle time and after 10 it disconnects you, though the page keeps pinging.
+   - Work through the manual checklist, [specs/web-client.md](specs/web-client.md) section 12.3, on a phone and a desktop before announcing it. Players type their name and password in the page each time (it does not store them), and the page warns that Cloudflare carries the password.
+8. **The kill switch** (no restart): `touch /var/lib/lesmudos-web/play.off`. It is looked at every 5 seconds: new page views and new connections are refused; **sessions already open continue**, so after touching it also `systemctl restart lesmudos-web` to cut those. `rm /var/lib/lesmudos-web/play.off` switches it on again.
 
-### Switching it off, and back on, without a restart
+### Turning it all off again
 
-- Off for new connections and new page views: `touch /var/lib/lesmudos-web/play.off` (looked at every 5 seconds; sessions already open continue). On again: `rm /var/lib/lesmudos-web/play.off`.
-- Off for good (and for everyone): `Site__Play__Enabled=false` in `/etc/lesmudos-web.env` and `systemctl restart lesmudos-web`.
+In this order; each step alone already makes the client unusable, and none touches the telnet game.
+
+1. **Off for new visitors, at once:** `touch /var/lib/lesmudos-web/play.off`, then `systemctl restart lesmudos-web` (this cuts the sessions that are open).
+2. **Off for good on the website:** `Site__Play__Enabled=false` in `/etc/lesmudos-web.env`, `systemctl restart lesmudos-web`, then `rm /var/lib/lesmudos-web/play.off`. (`setup-website.sh` sets it to false by itself whenever the game has no bridge port.)
+3. **Off in the game:** `shutdown` in the game, then `BRIDGE_PORT=0 bash /opt/lesmudos/src/deploy/update-droplet.sh`. If `/etc/lesmudos.env` has an uncommented `LESMUDOS_BRIDGE_PORT=` line, delete it (it overrides the unit), then `systemctl restart lesmudos`. Confirm: `ss -ltnp | grep 4001` prints nothing and `journalctl -u lesmudos -n 40` says `bridge off`.
+4. **Cloudflare:** remove the two skip rules and the cache rule if you added them (harmless to leave).
+5. To take the website itself down as well (not needed for the above): `systemctl disable --now lesmudos-web`, and put back the Caddyfile saved as `/etc/caddy/Caddyfile.before-hollowmere` if you want the old one.
 
 ### Updating later
 
-- A change to the website's code: run step 2 again. It restarts the site and **every web player must sign in again** (the page says so and reconnects by itself). Do it when few are online (`who` in the game). A news post is a Markdown file and needs no restart.
+- A change to the website's code: run step 5 again. It restarts the site and **every web player must sign in again** (the page says so and reconnects by itself). Do it when few are online (`who` in the game). A news post is a Markdown file and needs no restart.
 - A change to the game: the usual `shutdown` and `update-droplet.sh`. Web players see "The game closed your connection" with a Reconnect button, then "The game is not running" until it is back.
 - If website deploys disturb players, the bridge can run as a second copy of the site on its own port with its own service (spec section 2.1, option c): no code change.
 

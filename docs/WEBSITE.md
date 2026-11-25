@@ -48,7 +48,7 @@ Set in `appsettings.json`, by environment variables (`Site__GamePort=4000`), or 
 | `Site:ChroniclePageSize` | `12` | Entries per page on `/chronicle` |
 | `Site:Play:Enabled` | `false` | The browser client's master switch. False: `/play` says it is switched off, `/play/ws` is 404, "Play Now" leads to `/how-to-play` |
 | `Site:Play:KillSwitchFile` | `/var/lib/lesmudos-web/play.off` | If this file exists the client is off for new connections and page views (looked at every 5 s, no restart) |
-| `Site:Play:GameBridgeHost`, `GameBridgePort` | `127.0.0.1`, `4001` | The game's loopback-only bridge listener. A non-loopback host stops the site from starting unless `AllowRemoteBridge` is true |
+| `Site:Play:GameBridgeHost`, `GameBridgePort` | `127.0.0.1`, `4001` | The game's loopback-only bridge listener: the port the driver was started with (`--bridge-port 4001` in the game's unit, or `LESMUDOS_BRIDGE_PORT`; the driver binds `LESMUDOS_BRIDGE_BIND`, default `127.0.0.1`, and takes only a loopback address). `setup-website.sh` reads `--bridge-port` from the unit and writes `Site__Play__GameBridgePort`; with 0 or none it switches the client off. A non-loopback host stops the site from starting unless `AllowRemoteBridge` is true |
 | `Site:Play:PlainMode` | `false` | Tests only: connect to the game's ordinary telnet port and send no PROXY line |
 | `Site:Play:AllowedOrigins` | empty (the origin of `Site:BaseUrl`) | Origins allowed to open the socket (`Site__Play__AllowedOrigins__0=...`) |
 | `Site:Play:RequireClientIpHeader` | `true` | Refuse a connection without a valid `X-Hollowmere-Client-Ip` header from a loopback peer (Caddy sets it) |
