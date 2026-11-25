@@ -33,7 +33,7 @@ internal sealed class NetSettings
     public double LinesPerSecond { get; private set; } = 20;
     public double InputBurst { get; private set; } = 60;
     public double BytesPerSecond { get; private set; } = 65536;
-    public double OverflowSeconds { get; private set; } = 5;
+    public double OverflowSeconds { get; private set; } = 100;
     public bool InputStats { get; private set; }
     public string? InputStatsFile { get; private set; }
 

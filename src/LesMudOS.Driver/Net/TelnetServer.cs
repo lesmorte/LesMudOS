@@ -151,7 +151,7 @@ internal sealed partial class Connection // partial: the network-limits half is 
         {
             var read = await stream.ReadAsync(buffer);
             if (read == 0) { Ended("client closed"); return; }
-            if (!AllowBytes(read)) continue; // net-limits hook (Net/ConnectionNet.cs): a flood of bytes is dropped unread
+            if (!await AllowBytesAsync(read)) continue; // net-limits hook (Net/ConnectionNet.cs): a flood of bytes is read slowly, never lost
             for (var i = 0; i < read; i++)
             {
                 var b = buffer[i];
@@ -161,7 +161,7 @@ internal sealed partial class Connection // partial: the network-limits half is 
                     case TelnetState.Data when b == (byte)'\n':
                         var text = Encoding.UTF8.GetString(line.ToArray());
                         line.Clear();
-                        if (!AllowLine()) break; // net-limits hook (Net/ConnectionNet.cs): the input rate limit
+                        if (!await AllowLineAsync()) break; // net-limits hook (Net/ConnectionNet.cs): the input rate limit (delays, never drops)
                         _kernel.Post(() => _kernel.OnLine(this, text));
                         break;
                     case TelnetState.Data when b is (byte)'\r' or 0: break;

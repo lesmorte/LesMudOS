@@ -1,12 +1,14 @@
 namespace LesMudOS.Driver.Net;
 
-internal enum InputVerdict { Allow, Drop, DropWarn, Disconnect }
+internal enum InputVerdict { Allow, Drop, Delay, DelayWarn, Disconnect }
 
 /// <summary>
 /// The input rate limit of one connection (docs/specs/web-client.md 4.3): a token bucket on typed lines and one on bytes, so neither a
-/// flood of empty lines nor a flood of long ones reaches the game thread unchecked. A line with no token is dropped (it never reaches the
-/// game); the first drop of an overflow gives one warning; an overflow that lasts OverflowSeconds without the buckets recovering to half
-/// full ends the connection. Nothing typed is ever kept or logged here. Not thread-safe: one reader task owns it. A rate of 0 switches a bucket off.
+/// flood of empty lines nor a flood of long ones reaches the game thread unchecked. Nothing typed is ever dropped (a pasted file in the
+/// editor must arrive whole and in order): a line with no token is DELAYED, the reader simply waits for the token and the rest of the paste
+/// stays in the socket's own buffer (so nothing is queued here and memory is bounded by TCP); the first delay of an overflow gives one
+/// notice; an overflow that lasts OverflowSeconds (default 100, about 2,000 lines at the default rate) without the buckets recovering to
+/// half full ends the connection. Nothing typed is ever kept or logged here. Not thread-safe: one reader task owns it. A rate of 0 switches a bucket off.
 /// </summary>
 internal sealed class LineBucket
 {
@@ -37,34 +39,31 @@ internal sealed class LineBucket
         if (measure) _ring = new long[256];
     }
 
-    /// <summary>A completed line (empty lines count: each costs the game thread a prompt).</summary>
-    public InputVerdict OnLine(long now)
+    /// <summary>How long the caller should wait before asking again, after a Delay or DelayWarn verdict.</summary>
+    public long WaitMs { get; private set; }
+    public long Delayed { get; private set; }
+
+    /// <summary>A completed line (empty lines count: each costs the game thread a prompt). Ask again with retry after a Delay.</summary>
+    public InputVerdict OnLine(long now, bool retry = false)
     {
         if (_disconnected) return InputVerdict.Drop;
-        Lines++;
-        Measure(now);
-        if (_lines.Rate <= 0) return Check(now, true);
+        if (!retry) { Lines++; Measure(now); }
+        if (_lines.Rate <= 0) return InputVerdict.Allow;
         _lines.Refill(now);
-        return Check(now, _lines.Tokens >= 1, () => _lines.Tokens -= 1);
+        if (_lines.Tokens >= 1) { _lines.Tokens -= 1; Recovered(now); return InputVerdict.Allow; }
+        return Behind(now, 1 - _lines.Tokens, _lines.Rate, retry);
     }
 
-    /// <summary>Bytes just read from the socket, before they are looked at.</summary>
-    public InputVerdict OnBytes(int count, long now)
+    /// <summary>Bytes just read from the socket, before they are looked at. Ask again with retry after a Delay.</summary>
+    public InputVerdict OnBytes(int count, long now, bool retry = false)
     {
         if (_disconnected) return InputVerdict.Drop;
-        Bytes += count;
+        if (!retry) Bytes += count;
         if (_bytes.Rate <= 0) return InputVerdict.Allow;
         _bytes.Refill(now);
-        if (_bytes.Tokens >= count) { _bytes.Tokens -= count; Recovered(now); return InputVerdict.Allow; }
-        return Over(now);
-    }
-
-    private InputVerdict Check(long now, bool ok, Action? take = null)
-    {
-        if (!ok) return Over(now);
-        take?.Invoke();
-        Recovered(now);
-        return InputVerdict.Allow;
+        var need = Math.Min(count, _bytes.Cap);
+        if (_bytes.Tokens >= need) { _bytes.Tokens -= need; Recovered(now); return InputVerdict.Allow; }
+        return Behind(now, need - _bytes.Tokens, _bytes.Rate, retry);
     }
 
     private bool Recovered(long now)
@@ -76,12 +75,13 @@ internal sealed class LineBucket
         return false;
     }
 
-    private InputVerdict Over(long now)
+    private InputVerdict Behind(long now, double missing, double rate, bool retry)
     {
-        Dropped++;
-        if (_overSince < 0) { _overSince = now; return InputVerdict.DropWarn; }
+        if (!retry) { Delayed++; Dropped++; }
+        WaitMs = Math.Max(1, (long)Math.Ceiling(missing / rate * 1000.0));
+        if (_overSince < 0) { _overSince = now; return InputVerdict.DelayWarn; }
         if (now - _overSince >= _overflowMs) { _disconnected = true; return InputVerdict.Disconnect; }
-        return InputVerdict.Drop;
+        return InputVerdict.Delay;
     }
 
     private void Measure(long now)

@@ -33,27 +33,40 @@ internal sealed partial class Connection
 
     private LineBucket Bucket => _bucket ??= NetPolicy.NewLineBucket();
 
-    /// <summary>A completed line is about to go to the game: false if it must be dropped (and the warning or the disconnect has been dealt with).</summary>
-    private bool AllowLine() => Judge(Bucket.OnLine(Environment.TickCount64));
+    /// <summary>A completed line is about to go to the game: waits until the input rate allows it (never drops it). False only if the connection has ended or is being ended.</summary>
+    private Task<bool> AllowLineAsync() => PaceAsync((now, retry) => Bucket.OnLine(now, retry));
 
-    /// <summary>Bytes arrived from the socket: false if this chunk is dropped unread.</summary>
-    private bool AllowBytes(int count) => Judge(Bucket.OnBytes(count, Environment.TickCount64));
+    /// <summary>Bytes arrived from the socket: waits until the byte rate allows them. False only if the connection has ended or is being ended.</summary>
+    private Task<bool> AllowBytesAsync(int count) => PaceAsync((now, retry) => Bucket.OnBytes(count, now, retry));
 
-    private bool Judge(InputVerdict verdict)
+    // Input over the limit is delayed, not dropped: the reader waits for the next token, so what a player or a wizard pastes (a file into the
+    // editor, a long script) arrives complete and in order, only slower, and the rest waits in the socket's buffer, which TCP bounds. A
+    // connection that stays behind for OverflowSeconds is ended.
+    private async Task<bool> PaceAsync(Func<long, bool, InputVerdict> take)
     {
-        switch (verdict)
+        var retry = false;
+        while (true)
         {
-            case InputVerdict.Allow: return true;
-            case InputVerdict.DropWarn:
-                Send("[Too much input: some of what you typed is being ignored. Slow down.]\n");
-                NetPolicy.LogInput($"input limit: ignoring input from {RemoteAddress}");
-                return false;
-            case InputVerdict.Disconnect:
-                Send("Too much input. Goodbye.\n");
-                Close("closed by the game (too much input)");
-                NetPolicy.LogInput($"input limit: disconnecting {RemoteAddress}");
-                return false;
-            default: return false;
+            var verdict = take(Environment.TickCount64, retry);
+            retry = true;
+            switch (verdict)
+            {
+                case InputVerdict.Allow: return true;
+                case InputVerdict.DelayWarn:
+                    Send("[Input is arriving faster than the game reads it. Nothing is lost: it is being read a little at a time.]\n");
+                    NetPolicy.LogInput($"input limit: holding input from {RemoteAddress}");
+                    goto case InputVerdict.Delay;
+                case InputVerdict.Delay:
+                    if (_endedBy != null) return false;
+                    await Task.Delay((int)Math.Min(Bucket.WaitMs, 1000));
+                    continue;
+                case InputVerdict.Disconnect:
+                    Send("Too much input. Goodbye.\n");
+                    Close("closed by the game (too much input)");
+                    NetPolicy.LogInput($"input limit: disconnecting {RemoteAddress}");
+                    return false;
+                default: return false;
+            }
         }
     }
 

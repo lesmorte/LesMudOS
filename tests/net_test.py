@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Tests for the network limits of the driver (docs/specs/web-client.md section 4, docs/specs/net-limits.md if present).
 
-Boots the driver three times on one temporary copy of the mudlib:
+Boots the driver four times on one temporary copy of the mudlib:
 
   1. with the loopback bridge listener on and small limits: the PROXY line (good, bad, late, oversize, split, with game bytes right
      behind it, sent to the PUBLIC port), the connection limits (per address, total, IPv6 /64, release, a flood of connects), the input
      bucket (burst, flood, steady rate, empty lines, bytes, sustained overflow) and the log lines;
   2. with a low connect rate and no bridge port: the rate limit, and nothing listens on the bridge port;
-  3. with a bridge bind address that is not loopback: the listener refuses to start.
+  3. with a bridge bind address that is not loopback: the listener refuses to start;
+  4. with every limit at its production default: a wizard pastes 500 lines into the editor and the file arrives whole and in order.
 
 Usage (from the repository root, after `dotnet build`):
     LESMUDOS_TEST_PORT=5100 python3 tests/net_test.py        (also uses the next port, for the bridge)
@@ -122,6 +123,34 @@ def banner(s):
     return b"known?" in data, data, closed
 
 
+def editor_paste(work, mudlib, n=4):
+    """A wizard pasting a 500 line file into the in-game editor with every limit at its production default (20 lines a second, burst 60):
+    the lines over the limit are delayed, never dropped, so the file arrives whole and in order."""
+    proc, log = start(work, mudlib, n, {})
+    try:
+        h.check("the production input limit is on in this boot", logtext(log), "input 20 lines/s (burst 60)")
+        c = h.Client("scribe")
+        c.read_until("> ")
+        c.command("promote " + h.SECRET)
+        c.command("mkdir /wiz/scribe")
+        body = [f"line {i:03d} {chr(124)}{'x' * (i % 37)}" for i in range(500)]
+        h.check("the editor opens", c.command("edit /wiz/scribe/paste.cs", marker=":"), "You are in the editor")
+        c.command("a", marker="End with")
+        t0 = time.time()
+        c.sock.sendall(("\r\n".join(body) + "\r\n.\r\nx\r\n").encode())
+        text = c.read_until("Left the editor", 90)
+        took = time.time() - t0
+        h.check("the paste ends with the file written and the editor left", text, "Wrote /wiz/scribe/paste.cs, 500 lines", "Left the editor")
+        h.check("... the limit held (it took more than 15 s, the burst alone is 60 lines)", str(took > 15), "True")
+        h.check("... the player was told once that input is being held", str(text.count("Input is arriving faster than the game reads it")), "1")
+        path = os.path.join(mudlib, "wiz", "scribe", "paste.cs")
+        got = open(path).read().splitlines() if os.path.exists(path) else []
+        h.check("the file on disk is the 500 lines, complete and in order", str(got == body), "True")
+        c.command("quit")
+    finally:
+        stop(proc)
+
+
 def main():
     work = tempfile.mkdtemp(prefix="lesmudos-net-")
     mudlib = os.path.join(work, "mudlib")
@@ -131,7 +160,7 @@ def main():
         # ------------------------------------------------------------------ boot 1
         proc, log = start(work, mudlib, 1, {
             "LESMUDOS_BRIDGE_PORT": str(BRIDGE), "LESMUDOS_MAX_CONNECTIONS": "12", "LESMUDOS_MAX_PER_ADDRESS": "4",
-            "LESMUDOS_CONNECTS_PER_MINUTE": "0", "LESMUDOS_INPUT_OVERFLOW_SECONDS": "2", "LESMUDOS_BRIDGE_HANDSHAKE_SECONDS": "1.5",
+            "LESMUDOS_CONNECTS_PER_MINUTE": "0", "LESMUDOS_INPUT_OVERFLOW_SECONDS": "8", "LESMUDOS_BRIDGE_HANDSHAKE_SECONDS": "1.5",
             "LESMUDOS_INPUT_STATS": "1"})
         h.check("the driver says what it listens on", logtext(log), f"bridge listening on 127.0.0.1:{BRIDGE}", "loopback only", "network limits: 12 connections, 4 per address")
 
@@ -341,8 +370,20 @@ def main():
         x.sendall(b"x\r\n" * 1000)
         n, text, _ = count_replies(x, 3)
         elapsed = time.time() - t0
-        h.check("1000 lines in a burst: only about the burst (60) plus the refill arrive", str(55 <= n <= 60 + int(20 * elapsed) + 5), "True")
-        h.check("... and the player is warned once", str(text.count("Too much input: some of what you typed")), "1")
+        h.check("1000 lines in a burst: only about the burst (60) plus the refill are read in the first seconds", str(55 <= n <= 60 + int(20 * elapsed) + 5), "True")
+        h.check("... and the player is told once that input is being held, not lost", str(text.count("Input is arriving faster than the game reads it. Nothing is lost")), "1")
+        h.check("... and nothing says input is dropped", text, absent=("some of what you typed is being ignored",))
+        x.close()
+
+        # Delayed, never dropped: 150 lines at once (90 over the burst, 4.5 s at 20 a second) all arrive, in order, only slower.
+        x = prompt_client()
+        t0 = time.time()
+        x.sendall(b"".join(b"line%d\r\n" % i for i in range(150)))
+        data, closed = read(x, None, 9)
+        text = data.decode(errors="replace")
+        h.check("150 lines at once: every one is answered (none dropped)", str(text.count("Names are 2 to 16 letters")), "150")
+        h.check("... the connection stays open", str(closed), "False")
+        h.check("... and it took longer than a burst would (the limit held)", str(time.time() - t0 > 3.5), "True")
         x.close()
 
         x = prompt_client()
@@ -351,30 +392,36 @@ def main():
             time.sleep(0.1)
         n, text, _ = count_replies(x, 1)
         h.check("a steady 10 lines a second is untouched", f"{n} replies", "40 replies")
-        h.check("... with no warning", text, absent=("Too much input",))
+        h.check("... with no notice", text, absent=("Input is arriving faster",))
         x.close()
 
         x = prompt_client()
         x.sendall(b"\r\n" * 300)
         _, text, _ = count_replies(x, 2)
-        h.check("empty lines count against the limit", text, "Too much input: some of what you typed")
+        h.check("empty lines count against the limit", text, "Input is arriving faster than the game reads it")
         x.close()
 
         x = prompt_client()
-        x.sendall(b"a" * 100000)
-        for _ in range(4):
-            x.sendall(b"a" * 100000)
+        sent = 0
+        for _ in range(150):
+            try:
+                x.sendall(b"a" * 2000)
+                sent += 2000
+            except socket.timeout:
+                break
         _, text, _ = count_replies(x, 2)
-        h.check("a flood of bytes is limited too", text, "Too much input: some of what you typed")
+        h.check("a flood of bytes is limited too (300 KB against a 256 KB burst)", text, "Input is arriving faster than the game reads it")
         x.close()
 
         x = prompt_client()
-        end = time.time() + 6
+        end = time.time() + 14
         closed = False
         text = ""
         while time.time() < end and not closed:
             try:
                 x.sendall(b"x\r\n" * 50)
+            except socket.timeout:
+                pass
             except OSError:
                 closed = True
                 break
@@ -388,11 +435,11 @@ def main():
                 pass
             except OSError:
                 closed = True
-        h.check("sustained overflow ends the connection", str(closed), "True")
+        h.check("a flood that never lets up ends the connection after the overflow time (8 s here)", str(closed), "True")
         h.check("... with a goodbye", text, "Too much input. Goodbye.")
         x.close()
         settle()
-        h.check("the log says so, once, without anything typed", "\n".join(lines_with(log, "input limit")), "input limit: ignoring input from 127.0.0.1:", "input limit: disconnecting 127.0.0.1:")
+        h.check("the log says so, once, without anything typed", "\n".join(lines_with(log, "input limit")), "input limit: holding input from 127.0.0.1:", "input limit: disconnecting 127.0.0.1:")
         h.check("the connection ended line says why", "\n".join(lines_with(log, "connection ended:")), "closed by the game (too much input)")
         h.check("input limit log lines are rate limited", str(len(lines_with(log, "input limit")) <= 10), "True")
 
@@ -444,11 +491,14 @@ def main():
         x.close()
         stop(proc)
         proc = None
+
+        # ------------------------------------------------------------------ boot 4
+        editor_paste(work, mudlib)
     finally:
         if proc is not None:
             stop(proc)
         if h.failures:
-            for n in (1, 2, 3):
+            for n in (1, 2, 3, 4):
                 p = os.path.join(work, f"driver{n}.log")
                 if os.path.exists(p):
                     print(f"--- driver{n}.log (tail)\n" + open(p).read()[-2500:])
