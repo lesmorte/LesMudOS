@@ -111,3 +111,48 @@ At the end: tests/redteam2 run_all all PASS, tests/redteam run_all 13/13, sandbo
 - sandbox_test exit=0 secs=159 last: 0 failure(s)
 - ab34f4a + 8a5f0b1 (docs): redteam2/run_all 10 of 10; redteam/run_all 13 of 14 (t1_every_body hit the 0.5 s share: my test fired
   commands faster than the window; now paced, passes); sandbox_test 0 failures. Next: full run, one suite at a time.
+- build exit=0 secs=16 last: Build succeeded.
+- load_check exit=0 secs=226 last: 0 file(s) failed to load
+- sandbox_test exit=0 secs=170 last: 0 failure(s)
+- redteam2/run_all exit=0 secs=388 last: 10 of 10 proofs pass
+- redteam/run_all exit=0 secs=635 last: 14 of 14 proofs pass
+- gmcp_test exit=0 secs=81 last: 101 checks, 0 failure(s)
+- smoke_test exit=0 secs=222 last: 0 failure(s)
+- area_test exit=1 secs=20 last: ConnectionRefusedError: [Errno 111] Connection refused
+- area_test exit=0 secs=632 last: 0 failure(s)
+- class_test exit=1 secs=452 last: 3 failure(s)
+- item_test exit=0 secs=91 last: 0 failure(s)
+- world_test exit=0 secs=270 last: 0 failure(s)
+- find_test exit=0 secs=84 last: 159 checks, 0 failure(s)
+- chronicle_test exit=0 secs=91 last: 0 failure(s)
+- chronicle_play_test exit=0 secs=84 last: 0 failure(s)
+- craft_test exit=1 secs=313 last: ConnectionRefusedError: [Errno 111] Connection refused
+- craft_content_test exit=1 secs=20 last: ConnectionRefusedError: [Errno 111] Connection refused
+- comm_test exit=0 secs=176 last: 221 checks, 0 failure(s)
+- playfeel_test exit=0 secs=254 last: 0 failure(s)
+- class_test exit=0 secs=447 last: 0 failure(s)
+- craft_test exit=0 secs=351 last: 313 checks, 0 failure(s)
+- craft_content_test exit=0 secs=233 last: 289 checks, 0 failure(s)
+- attribute_test exit=0 secs=300 last: 0 failure(s)
+- rest_test exit=0 secs=197 last: 0 failure(s)
+- rename_test exit=0 secs=117 last: 0 failure(s)
+- rank_test exit=1 secs=636 last: 1 failure(s)
+- aim_test exit=0 secs=380 last: 0 failure(s)
+- sneak_test exit=0 secs=348 last: 0 failure(s)
+- story_test exit=0 secs=173 last: 544 checks, 0 failure(s)
+- hollow_expansion_test exit=0 secs=52 last: 673 checks, 0 failure(s)
+- rank_test exit=0 secs=646 last: 0 failure(s)
+- corridor_mob_test exit=0 secs=246 last: 0 failure(s)
+- ansi_test exit=0 secs=109 last: 0 failure(s)
+- timing_test exit=0 secs=550 last: 0 failure(s)
+- city_test exit=0 secs=625 last: 4685 checks, 4685 passed, 0 failed (wolves killed: 0; 625 s in the game)
+- corridor_test exit=0 secs=1293 last: 6861 checks, 6861 passed, 0 failed (1293 s in the game)
+- playthrough_test exit=0 secs=1556 last: 0 failure(s)
+
+## Full run after the second review's fixes (tree 81693ec), one suite at a time, port 5005 — COMPLETE, every suite passes
+build ok; load_check 0 failed; sandbox_test 0 failures; redteam2/run_all 10 of 10; redteam/run_all 14 of 14; gmcp 101/0; smoke 0;
+area 0 (first try: driver boot > the harness's 20 s wait, rerun 0); class 0 (first run 3 combat-sampling failures, "Kill what?", rerun 0);
+item, world, find 159, chronicle, chronicle_play, craft 313, craft_content 289 (first tries: boot-wait timeouts, reruns 0), comm 221,
+playfeel, attribute, rest, rename, rank (first run one Arcane Bolt II sample, rerun 0), aim, sneak, story 544, hollow_expansion 673,
+corridor_mob, ansi, timing, city 4685/0, corridor 6861/0, playthrough 0 (25.7 min).
+Note: boot is ~14 s idle (was ~12 s); the suites' 20 s boot wait is tight under load.
