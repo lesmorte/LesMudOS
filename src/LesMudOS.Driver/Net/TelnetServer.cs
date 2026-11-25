@@ -10,7 +10,7 @@ namespace LesMudOS.Driver.Net;
 /// One client connection. Reading and writing happen on thread-pool tasks;
 /// the only thing they do with game state is post events to the kernel.
 /// </summary>
-internal sealed class Connection
+internal sealed partial class Connection // partial: the network-limits half is in Net/ConnectionNet.cs
 {
     private const int MaxLineLength = 4096;
 
@@ -21,7 +21,7 @@ internal sealed class Connection
     /// <summary>The object this connection is attached to. Read and written on the game thread only.</summary>
     public ObjectRef? Owner;
 
-    public string RemoteAddress { get; }
+    public string RemoteAddress { get; private set; }
 
     public Connection(TcpClient client, Kernel kernel)
     {
@@ -129,6 +129,7 @@ internal sealed class Connection
         {
             var read = await stream.ReadAsync(buffer);
             if (read == 0) { Ended("client closed"); return; }
+            if (!AllowBytes(read)) continue; // net-limits hook (Net/ConnectionNet.cs): a flood of bytes is dropped unread
             for (var i = 0; i < read; i++)
             {
                 var b = buffer[i];
@@ -138,6 +139,7 @@ internal sealed class Connection
                     case TelnetState.Data when b == (byte)'\n':
                         var text = Encoding.UTF8.GetString(line.ToArray());
                         line.Clear();
+                        if (!AllowLine()) break; // net-limits hook (Net/ConnectionNet.cs): the input rate limit
                         _kernel.Post(() => _kernel.OnLine(this, text));
                         break;
                     case TelnetState.Data when b is (byte)'\r' or 0: break;
@@ -211,6 +213,7 @@ internal sealed class TelnetServer
     {
         _listener.Start();
         Log.Info($"listening on port {((IPEndPoint)_listener.LocalEndpoint).Port}");
+        NetPolicy.StartBridge(_kernel); // net-limits hook (Net/NetPolicy.cs): the loopback bridge listener, if switched on
         _ = AcceptLoopAsync();
     }
 
@@ -225,9 +228,10 @@ internal sealed class TelnetServer
 
             client.NoDelay = true;
             var connection = new Connection(client, _kernel);
+            if (!NetPolicy.Admit(connection, client)) continue; // net-limits hook (Net/NetPolicy.cs): total, per-address and rate limits
             Log.Info($"connection from {connection.RemoteAddress}");
             _kernel.Post(() => _kernel.OnConnect(connection));
-            _ = connection.RunAsync();
+            _ = connection.RunTrackedAsync(); // net-limits hook (Net/ConnectionNet.cs): RunAsync, then give back the connection-limit slot even if it throws
         }
     }
 }
