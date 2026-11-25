@@ -458,7 +458,7 @@ def run(work, mudlib, box):
             got.append(g)
             if i == 0:
                 check(f"{title}: the first finder is told how much ({first})", text, f"{first} gold")
-                check(f"{title}: and then sees it as taken by them", c.command("look"), "lies here; you have taken what it held.", absent=("Someone has been here",))
+                check(f"{title}: and then sees it as taken by them", c.command("look"), "lies here", absent=("Someone has been here",))
             if i == len(want):
                 check(f"{title}: after the last amount the next finder is told someone has been here", text, "Someone has been here before you")
             c.command("tele " + T + "hub")

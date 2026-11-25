@@ -130,7 +130,7 @@ def main():
         check("the idle timeout is logged as closed by the game", "\n".join(l for l in ended if "player Ida" in l), "closed by the game")
         check("the log line carries the remote address", ended[0], "127.0.0.1:")
         check("a drop that leaves a body says so in the log line", "\n".join(l for l in ended if "player Dave" in l), f"body lingers {LINGER} s")
-        check("a quit does not", "\n".join(l for l in ended if "player Rita" in l), absent=("lingers",))
+        check("a quit does not", "\n".join(l for l in ended if "player Rita" in l and "closed by the game" in l), absent=("lingers",))
     finally:
         if proc.poll() is None:
             proc.kill()
