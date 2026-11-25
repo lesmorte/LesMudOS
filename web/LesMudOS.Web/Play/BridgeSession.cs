@@ -26,6 +26,9 @@ internal sealed class BridgeSession
     private readonly Channel<byte[]> _out = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { SingleReader = true });
     private readonly CancellationTokenSource _loops = new();
     private readonly CancellationTokenSource _writerStop = new();
+    // Cancelling a pending receive aborts a WebSocket (Kestrel), which would lose the closing frames: the receive is only ever ended by the
+    // close handshake or by Abort().
+    private readonly CancellationTokenSource _recvStop = new();
     private readonly TelnetParser _parser = new();
     private readonly LineBucket _lines, _pings;
 
@@ -81,13 +84,17 @@ internal sealed class BridgeSession
                 Enqueue(Frames.Hello(_o.MaxInputBytes, _o.PingSeconds));
             }
             var writer = WriterLoopAsync();
-            Task[] loops = _net == null ? [] : [GameLoopAsync(), BrowserLoopAsync(), WatchdogLoopAsync()];
-            if (loops.Length > 0) await Task.WhenAny(loops);
+            Task game = Task.CompletedTask, browser = Task.CompletedTask, watchdog = Task.CompletedTask;
+            if (_net != null)
+            {
+                game = GameLoopAsync(); browser = BrowserLoopAsync(); watchdog = WatchdogLoopAsync();
+                await Task.WhenAny(game, browser, watchdog);
+            }
             End("client-closed", 1000, null, drain: false); // only matters if nothing ended the session yet
             _loops.Cancel();
             CloseGame();
-            if (loops.Length > 0) await Task.WhenAll(loops.Select(Quiet));
-            await FinishAsync(writer);
+            await Task.WhenAll(Quiet(game), Quiet(watchdog));
+            await FinishAsync(writer, browser);
         }
         catch (Exception e)
         {
@@ -102,7 +109,7 @@ internal sealed class BridgeSession
             _log.LogInformation("play: close {Who} lasted={Lasted}s lines_in={Lines} bytes_out={Bytes} reason={Reason} code={Code}",
                 _who, lasted, Interlocked.Read(ref _linesIn), Interlocked.Read(ref _bytesOut), _reason, _code);
             _ws.Dispose();
-            _loops.Dispose(); _writerStop.Dispose(); _gameWrite.Dispose();
+            _loops.Dispose(); _writerStop.Dispose(); _recvStop.Dispose(); _gameWrite.Dispose();
         }
     }
 
@@ -184,7 +191,7 @@ internal sealed class BridgeSession
     }
 
     /// <summary>After the loops stopped: say why (if there is something to say), let the queue empty, close the socket with the right code.</summary>
-    private async Task FinishAsync(Task writer)
+    private async Task FinishAsync(Task writer, Task browser)
     {
         var grace = TimeSpan.FromSeconds(Math.Max(1, _reason == "shutdown" ? _o.ShutdownGraceSeconds : 3));
         if (_sysCode != null && _drain) _out.Writer.TryWrite(Frames.Sys(_sysCode, Frames.Message(_sysCode)));
@@ -198,10 +205,14 @@ internal sealed class BridgeSession
             try
             {
                 var text = _sysCode != null ? Frames.Message(_sysCode) : "";
-                await _ws.CloseAsync(_ws.State == WebSocketState.CloseReceived ? WebSocketCloseStatus.NormalClosure : (WebSocketCloseStatus)_code, text, cts.Token);
+                var code = _code is 1005 or 1006 ? 1001 : _code;
+                await _ws.CloseOutputAsync(_ws.State == WebSocketState.CloseReceived ? WebSocketCloseStatus.NormalClosure : (WebSocketCloseStatus)code, text, cts.Token);
             }
             catch (Exception) { _ws.Abort(); }
         }
+        // The page's answer to our close frame ends its receive loop; if it never comes, stop waiting.
+        var quiet = Quiet(browser);
+        if (await Task.WhenAny(quiet, Task.Delay(TimeSpan.FromSeconds(2))) != quiet) { _ws.Abort(); _recvStop.Cancel(); await quiet; }
     }
 
     // ---- game to browser ----
@@ -297,13 +308,13 @@ internal sealed class BridgeSession
         var buffer = new byte[_o.MaxFrameBytes + 1];
         try
         {
-            while (!_loops.IsCancellationRequested)
+            while (_ws.State is WebSocketState.Open or WebSocketState.CloseSent)
             {
                 var len = 0;
                 ValueWebSocketReceiveResult r;
                 do
                 {
-                    r = await _ws.ReceiveAsync(buffer.AsMemory(len), _loops.Token);
+                    r = await _ws.ReceiveAsync(buffer.AsMemory(len), _recvStop.Token);
                     if (r.MessageType == WebSocketMessageType.Close)
                     {
                         _code = _ws.CloseStatus is { } cs ? (int)cs : 1005;
