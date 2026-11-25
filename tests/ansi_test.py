@@ -154,7 +154,7 @@ def start_driver(work, mudlib):
     proc = subprocess.Popen(
         ["dotnet", dll, "--mudlib", mudlib, "--save", os.path.join(work, "save"), "--port", str(h.PORT)],
         stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "LESMUDOS_ADMIN_SECRET": h.SECRET})
-    for _ in range(100):
+    for _ in range(200):  # 40 s: the driver boots in about 14 s, more on a busy machine
         try:
             socket.create_connection(("127.0.0.1", h.PORT), timeout=0.3).close()
             break

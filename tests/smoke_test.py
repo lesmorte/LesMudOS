@@ -380,7 +380,7 @@ def main():
         ["dotnet", driver_dll, "--mudlib", mudlib, "--save", os.path.join(work, "save"), "--port", str(PORT)],
         stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "LESMUDOS_ADMIN_SECRET": SECRET})
     try:
-        for _ in range(100):
+        for _ in range(200):  # 40 s: the driver boots in about 14 s, more on a busy machine
             try:
                 socket.create_connection(("127.0.0.1", PORT), timeout=0.3).close()
                 break

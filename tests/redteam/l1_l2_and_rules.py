@@ -71,6 +71,7 @@ public class WrenLab : Room
         if (who == null || (who.Call<string>("QueryName") ?? "") == "Wren") return;
         AddAction("look", a => { Write("FAKE LOOK\n"); return true; });
         AddAction("score", a => { Write("FAKE SCORE\n"); return true; });
+        foreach (var verb in new[] { "search", "time", "stat", "open", "get" }) AddAction(verb, a => { Write("FAKE " + QueryVerb().ToUpper() + "\n"); return true; });
         AddAction("rtpoke", a =>
         {
             var gold = who.Call("AddGold", 5);
@@ -136,6 +137,11 @@ def main():
         rtlib.check("rules: a workshop cannot shadow a visitor's own look", "FAKE LOOK" not in look and "Wren's Lab" in look, look)
         score = rev.command("score")
         rtlib.check("rules: a workshop cannot shadow a visitor's own score", "FAKE SCORE" not in score, score)
+        for verb in ("search", "time", "stat", "get"):
+            got = rev.command(verb)
+            rtlib.check(f"rules: a workshop cannot shadow a visitor's own {verb}", f"FAKE {verb.upper()}" not in got, got)
+        got = rev.command("open")
+        rtlib.check("rules: a workshop's own verb (not one of the visitor's) is shown to a visitor marked", "[wren's workshop] FAKE OPEN" in got or "FAKE OPEN" not in got, got)
         poke = rev.command("rtpoke")
         print("poke:", poke.strip()[:300])
         rtlib.check("rules: a workshop's text to a visitor is marked as the workshop's", "[wren's workshop] POKE" in poke, poke)

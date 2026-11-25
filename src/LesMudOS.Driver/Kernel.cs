@@ -818,7 +818,7 @@ internal sealed partial class Kernel : IDriverServices
         // The owner may have changed (Exec) or gone away (quit) during the command.
         _promptSkip = null;
         if (connection.Owner is { IsAlive: true } named)
-            try { Runtime.Ticks = 0; if (CallOther(named, "QueryName", []) is string who && who != "") connection.PlayerName = who; } catch (Exception) { }
+            try { Runtime.Ticks = 0; if (named.Domain.Length == 0 && CallOther(named, "QueryName", []) is string who && who != "") connection.PlayerName = PlainText.Clean(who.Length > 32 ? who[..32] : who); } catch (Exception) { }
         _owing.Remove(connection);
         if (connection.Owner is { IsAlive: true, InputTo: null } now) SendPrompt(connection, now, false);
         FlushPrompts(); // the other connections that received output while this line was handled

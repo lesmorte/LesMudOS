@@ -62,6 +62,7 @@ internal sealed class Connection
     {
         if (Interlocked.Add(ref _queued, bytes.Length) > MaxQueuedBytes)
         {
+            Ended("closed by the game (outbox limit)");
             _outbox.Writer.TryComplete();
             try { _client.Close(); } catch (Exception) { }
             return false;
