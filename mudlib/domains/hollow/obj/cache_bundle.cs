@@ -10,6 +10,11 @@ public class CacheBundle : Find
         Ids.Add("oilcloth");
         Ids.Add("oilcloth bundle");
         Ids.Add("long bundle");
+        Ids.Add("cord");
+        Ids.Add("green cord");
+        Ids.Add("wrapping");
+        Ids.Add("knots");
+        Ids.Add("oilcloth wrapping");
         ShortDesc = "a long bundle wrapped in oilcloth";
         LongDesc = "A long bundle wrapped in greased oilcloth and tied with green cord has been laid carefully across the top of the chests, away from the damp. Whatever is inside it has been looked after better than anything else in the cache.";
         TakenShort = "a long oilcloth wrapping, folded open";

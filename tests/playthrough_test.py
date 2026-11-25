@@ -419,8 +419,8 @@ class Run:
 
         hero = self.hero = Hero("hero", self.stats, deadline=self.t_hard)
         check("a new character arrives in the Village Square", hero.welcome, "Welcome, Hero.", "Village Square", ROOMS["Village Square"]["desc"])
-        check("score of a new character", hero.score(), "Level 1   Experience 0 (100 more for level 2)", f"Calling {ARCH.capitalize()}",
-              f"Vitality {SPEC['hp']}/{SPEC['hp']}   Endurance {SPEC['endurance']}/{SPEC['endurance']}   Focus {SPEC['focus']}/{SPEC['focus']}   Gold {SPEC['gold']}", "You have no quests.")
+        check("score of a new character", hero.score(), "Level 1", "Experience 0 (100 more for level 2)", f"{ARCH.capitalize()} • Level 1",
+              f"Vitality   {SPEC['hp']}/{SPEC['hp']}", f"Endurance  {SPEC['endurance']}/{SPEC['endurance']}", f"Focus      {SPEC['focus']}/{SPEC['focus']}", f"Gold {SPEC['gold']}", "You have no quests.")
         check("quests of a new character", hero.cmd("quests"), "You have no quests.")
         check("a new character carries the starting kit of the calling", hero.cmd("i"), *SPEC["kit"])
         check("the calling's skills are listed", hero.cmd("skills"), "Skills" if ARCH != "adventurer" else "Appraise")
@@ -606,7 +606,7 @@ class Run:
         hero.died = False
         check("the dead character wakes in the Guest Rooms", hero.pos, GUEST)
         check("the belongings stayed with the corpse", hero.cmd("i"), "You are empty-handed.")
-        check("score after the death", hero.score(), f"Vitality {SPEC['hp']}/{SPEC['hp']}", "Gold %d" % (SPEC["gold"] - max(1, SPEC["gold"] // 10)), "nothing equipped", "Active quests: Clear the Cellar")
+        check("score after the death", hero.score(), f"Vitality   {SPEC['hp']}/{SPEC['hp']}", "Gold %d" % (SPEC["gold"] - max(1, SPEC["gold"] // 10)), "nothing equipped", "Active quests: Clear the Cellar")
         self.stats["notes"].append("deliberate death in the Overseer Hall at level 1 (2 elite guards)")
 
     def second_player_sees_locked_corpse(self):

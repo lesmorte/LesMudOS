@@ -1363,8 +1363,8 @@ public abstract class Living : Thing
         if (target.Call<bool>("RollDodge"))
         {
             Tell($"{Cap(theirs)} dodges your attack.\n");
-            TellObject(target, $"You dodge {label}'s attack.\n");
-            TellRoom(room, $"{Cap(theirs)} dodges {label}'s attack.\n", Self, target);
+            TellObject(target, $"You dodge {QueryLabel()}'s attack.\n");
+            TellRoom(room, $"{Cap(theirs)} dodges {QueryLabel()}'s attack.\n", Self, target);
             action.Skill?.Call("OnMiss", Self, target);
             return;
         }
@@ -1395,9 +1395,12 @@ public abstract class Living : Thing
         var blocked = Random(100) < target.Call<int>("QueryBlock");
         if (blocked) damage = Math.Max(1, damage / 2);
 
-        var tier = damage <= 2 ? 0 : damage <= 4 ? 1 : damage <= 7 ? 2 : 3;
         // The damage is applied first, so that the lines can say how much of it really was; the death waits until they are told.
         var applied = Math.Max(0, target.Call<int>("ApplyDamage", damage, Self));
+        // The wording follows the damage really dealt (not what a dying target had left to lose beyond it) as a share of the target's
+        // MAXIMUM Vitality: under 10% scratch/graze, under 25% hit/shoot, under 40% hit hard/shoot squarely, from 40% smash brutally/clean through.
+        var share = applied * 100 / Math.Max(1, target.Call<int>("QueryMaxVitality"));
+        var tier = share < 10 ? 0 : share < 25 ? 1 : share < 40 ? 2 : 3;
         var mine = DamageNote(applied, true);
         var theirNote = target.Call<string>("DamageNote", applied, false) ?? "";
         var shot = QueryWeaponCategory() == "bow";

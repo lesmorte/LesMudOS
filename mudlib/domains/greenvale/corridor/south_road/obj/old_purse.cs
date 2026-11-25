@@ -9,6 +9,7 @@ public class SrOldPurse : Find
         Ids.Add("purse");
         Ids.Add("old purse");
         Ids.Add("coins");
+        Ids.Add("mouldering purse");
         ShortDesc = "a mouldering purse";
         LongDesc = "A small leather purse gone green with age, the strings rotted but the coins inside still good.";
         TakenShort = "a mouldering purse, emptied by you";

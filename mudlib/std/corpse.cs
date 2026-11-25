@@ -222,7 +222,7 @@ public class Corpse : Thing
         return name == "" || (name != killerName && name != deceasedName && !entitled.Contains(name));
     }
 
-    private string Refusal() => $"The corpse of {Strip(label)} is not yours to {{cmd}}loot{{/}} yet.";
+    private string Refusal() => $"{Cap(Short())} is not yours to {{cmd}}loot{{/}} yet.";
 
     /// <summary>The timers, for tests and wizards: lock length, the decay time when empty, and the lifetime of a creature's corpse
     /// (a player's corpse keeps its hour). Wizard level 10 only.</summary>
@@ -369,12 +369,12 @@ public class Corpse : Thing
         if (items.Count == 0 || !playerCorpse)
         {
             foreach (var item in items) item.Call("Vanish");
-            if (room != null) TellRoom(room, $"The corpse of {Strip(label)} crumbles to dust.\n");
+            if (room != null) TellRoom(room, $"{Cap(Short())} crumbles to dust.\n");
         }
         else
         {
             foreach (var item in items) if (room != null) MovePortion(item, QuantityOf(item), room);
-            if (room != null) TellRoom(room, $"The corpse of {Strip(label)} rots away, leaving its belongings on the ground.\n");
+            if (room != null) TellRoom(room, $"{Cap(Short())} rots away, leaving its belongings on the ground.\n");
         }
         Destruct();
     }

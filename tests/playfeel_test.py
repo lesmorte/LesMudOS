@@ -236,6 +236,40 @@ public class PfTool : Item
 '''
 
 
+# The log fixes (prompt on a fresh line, the wording of a blow by its share of the target's Vitality, "You dodge a ...").
+def lf_weapon(cls, ident, category):
+    return f"""// @inherit /std/weapon
+public class {cls} : Weapon
+{{
+    public override void Create()
+    {{
+        Name = "{ident}"; Ids.Add("{ident}"); ShortDesc = "a {ident}"; LongDesc = "Every blow the same.";
+        Category = "{category}"; DamageMin = 10; DamageMax = 10; ToHit = 30; ReactionMod = 0.0; Recovery = 0.5; Value = 1;
+    }}
+}}
+"""
+
+
+def lf_creature(cls, ident, vit, dmg):
+    return f"""// @inherit /std/monster
+public class {cls} : Monster
+{{
+    public override void Create()
+    {{
+        Name = "{ident}"; Ids.Add("{ident}"); ShortDesc = "a {ident}"; LongDesc = "Made for the wording test.";
+        Level = 1; MaxVitality = {vit}; DamageMin = {dmg}; DamageMax = {dmg}; ToHit = 30; Armor = 0; Dodge = 0; BaseReaction = 1.0; XpValue = 0;
+        Aggressive = false;
+    }}
+}}
+"""
+
+
+LF_TARGETS = (("lfbig", 1000), ("lfmid", 40), ("lfsmall", 25), ("lftiny", 12))   # a blow of about 10: 1%, 25%, 40% and the whole of it
+LF_HITTERS = (("lfh1", 1), ("lfh5", 5), ("lfh9", 9), ("lfh14", 14))
+DODGER_CLASS = h.NOVICE_CLASS.replace("NoviceClass", "DodgerClass").replace('"Novice"', '"Dodger"').replace("SortOrder = 99", "SortOrder = 98").replace("novice_fists", "dodger_fists").replace("A bare test character.", "A test character who dodges a lot.")
+DODGER_TRAIT = h.NOVICE_FISTS.replace("NoviceFistsTrait", "DodgerFistsTrait").replace("Novice Fists", "Dodger Fists").replace('Mods["unarmed_min"] = 1;', 'Mods["dodge"] = 75; Mods["unarmed_min"] = 1;')
+
+
 def files():
     hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite", "den": TEST + "den", "twoden": TEST + "twoden", "calmden": TEST + "calmden", "mild": TEST + "mild",
                 "burrow": TEST + "burrow", "burrow2": TEST + "burrow2", "warren": TEST + "warren", "trail": TEST + "trail"}
@@ -266,6 +300,9 @@ def files():
         "wolf": WOLF, "hare": HARE, "pftool": PFTOOL,
         "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 40);\n', reset=3000),
         "zapper": ZAPPER,
+        "lfbow": lf_weapon("LfBow", "lfbow", "bow"), "lfsword": lf_weapon("LfSword", "lfsword", "sword"),
+        **{name: lf_creature("Lf" + name.title(), name, vit, 1) for name, vit in LF_TARGETS},
+        **{name: lf_creature("Lf" + name.title(), name, 100000, dmg) for name, dmg in LF_HITTERS},
         "pinata": pinata("Pinata", "pinata", 100), "pinata90": pinata("Pinata90", "pinata", 90),
         "ratling": RATLING, "mouse": MOUSE, "skinner": SKINNER, "bare": BARE, "twin": TWIN,
         "red_trinket": TRINKET_RED, "blue_trinket": TRINKET_BLUE,
@@ -304,6 +341,8 @@ def main():
     os.makedirs(os.path.join(mudlib, "domains", "test"))
     for name, source in files().items():
         h.write(mudlib, TEST + name, source)
+    h.write(mudlib, "/classes/dodger", DODGER_CLASS)
+    h.write(mudlib, "/skills/dodger_fists", DODGER_TRAIT)
     h.edit(mudlib, HOLLOW + "village/square", 'Exits["south"]', f'Exits["down"] = "{TEST}hub";\n        Exits["south"]')
 
     box = [None, None]
@@ -333,6 +372,12 @@ def run(work, mudlib, box):
     wiz = login("wiz")
     check("setup: the first wizard", wiz.command("promote " + SECRET), "level 10 wizard")
     wiz.command("goto " + TEST + "hub")
+    if os.environ.get("PF_ONLY") == "logfix":  # a quick run of the last fixes only
+        run_logfix(wiz)
+        wiz.command("save")
+        wiz.command("shutdown")
+        box[0].wait(timeout=15)
+        return
     run_numbers(wiz)
     run_lists(wiz)
     run_corpses(wiz)
@@ -342,6 +387,7 @@ def run(work, mudlib, box):
     run_shared_xp(wiz)
     run_verbose(wiz)
     run_prompt(wiz)
+    run_logfix(wiz)
     wiz.command("save")
     wiz.command("shutdown")
     box[0].wait(timeout=15)
@@ -440,7 +486,7 @@ def run_corpses(wiz):
     wiz.command("slay mouse")
     check("corpse: a corpse holding loot is still there", wiz.command("look"), "corpse of a mouse is here")
     text = wiz.command("loot corpse")
-    check("corpse: taking the last item crumbles it at once, with a line to the room", text, "You take a rusty sword from the corpse of a mouse.", "The corpse of mouse crumbles to dust.")
+    check("corpse: taking the last item crumbles it at once, with a line to the room", text, "You take a rusty sword from the corpse of a mouse.", "The corpse of a mouse crumbles to dust.")
     check("corpse: it is gone", wiz.command("look at corpse"), "You see no 'corpse' here.")
     wiz.command("drop sword")
     # A creature with a skin left: looting does not make it crumble.
@@ -455,7 +501,7 @@ def run_corpses(wiz):
     wiz.command("clone " + HOLLOW + "obj/craft/skinning_knife")
     wiz.command("skin corpse")
     text = wiz.read_until("crumbles to dust", timeout=30)
-    check("corpse: taking the last yield from an empty corpse crumbles it", text, "The corpse of skinner crumbles to dust.")
+    check("corpse: taking the last yield from an empty corpse crumbles it", text, "The corpse of a skinner crumbles to dust.")
     check("corpse: it is gone", wiz.command("look at corpse"), "You see no 'corpse' here.")
     wiz.command("drop all")
     # Coins count as items: a corpse with only gold crumbles when the gold is taken.
@@ -1099,6 +1145,122 @@ def run_prompt(wiz):
     again = login("prue")
     check("prompt: saved with the character", again.command("prompt"), "Your prompt is: <{vitality}>")
     check("prompt: and used after login", "ok" if re.match(r"^<(2\d|30)> $", last_line(again.command("look"))) else "no", "ok")
+
+
+# ===== the fixes from a real play session: a fresh line after the prompt, the wording of blows, "You dodge a ..." =====
+
+LF_BOW = (("graze", ""), ("shoot", ""), ("shoot", " squarely"), ("shoot", " clean through"))
+LF_BLOW = (("scratch", ""), ("hit", ""), ("hit", " hard"), ("smash", " brutally"))
+
+
+def lf_tier(share):
+    """The tier the game uses for a blow that took this many percent of the target's maximum Vitality: under 10, 25 and 40."""
+    return 0 if share < 10 else 1 if share < 25 else 2 if share < 40 else 3
+
+
+def lf_blow(c, command, pattern, timeout=60):
+    """Send the command and read until the line matching the pattern (a blow with its verbose damage, not a critical hit) arrives."""
+    c.send(command)
+    end = time.time() + timeout
+    text = ""
+    while time.time() < end:
+        text += a.quiet(c, 0.4)
+        for m in re.finditer(pattern, text):
+            if "critical" not in m.group(0):
+                return m
+    print("      (no blow line; read:", repr(text[-400:]), ")")
+    return None
+
+
+def run_logfix(wiz):
+    # The prompt: a line that crosses the prompt on the wire (sent within a round trip of it) gets its reply on a fresh line.
+    c = h.Client("lfcross")
+    c.read_until("> ")
+    a.drain(c, 0.8)
+    wiz.command("tell lfcross one")
+    text = c.read_until("> ", timeout=5)
+    check("fresh line: unprompted output ends on a prompt", text, "Wiz tells you: one")
+    time.sleep(0.6)
+    c.send("lfnothing")
+    text = c.read_until("> ")
+    check("fresh line: a line typed well after the prompt is answered on the line the player's Enter opened", "ok" if text.lstrip("\r").startswith("What?") else repr(text[:30]), "ok")
+    a.drain(c, 0.5)
+    wiz.command("tell lfcross two")
+    c.read_until("> ", timeout=5)
+    c.send("lfnothing")  # typed before the prompt could have reached the player: the reply must not land on the prompt's line
+    text = c.read_until("> ")
+    check("fresh line: a line sent right behind a prompt that followed unprompted output is answered on a fresh line", "ok" if re.match(r"^\r?\nWhat\?", text) else repr(text[:30]), "ok")
+    a.drain(c, 0.5)
+    wiz.command("tell lfcross three")
+    c.read_until("> ", timeout=5)
+    c.send("")
+    text = a.quiet(c, 0.8)
+    check("fresh line: an empty line behind such a prompt does not leave two prompts on one line", "ok" if text and not any(line.count("> ") > 1 for line in text.replace("\r", "").split("\n")) else repr(text), "ok")
+    a.drain(c, 0.5)
+    check("fresh line: an ordinary command behind an ordinary prompt gets no extra blank line", "ok" if c.command("look", sync=False).lstrip("\r").startswith("Village Square") else "no", "ok")
+    c.command("quit")
+
+    # The wording of a blow follows the damage dealt as a share of the target's MAXIMUM Vitality (10, 25, 40 percent), bow and not.
+    wiz.command("goto " + TEST + "yard")
+    wiz.command("verbose on")
+    seen = {}
+    for weapon, words in (("lfbow", LF_BOW), ("lfsword", LF_BLOW)):
+        wiz.command("clone " + TEST + weapon)
+        wiz.command("get " + weapon)
+        check(f"wording: the {weapon} is wielded", wiz.command("wield " + weapon), "You wield")
+        for target, vit in LF_TARGETS:
+            wiz.command("clone " + TEST + target)
+            a.drain(wiz, 0.3)
+            m = lf_blow(wiz, "kill " + target, r"You (graze|shoot|scratch|hit|smash) a " + target + r"( squarely| clean through| hard| brutally)?\.[^\n]*\(\+(\d+) damage\)")
+            wiz.command("slay " + target)
+            a.drain(wiz, 0.3)
+            if m is None:
+                check(f"wording: {weapon} against {target} ({vit} Vitality) gave a blow line", "none", "ok")
+                continue
+            dealt = int(m.group(3))
+            want = lf_tier(dealt * 100 // vit)
+            got = (m.group(1), m.group(2) or "")
+            seen.setdefault(weapon, set()).add(want)
+            check(f"wording: {weapon} for {dealt} of {vit} Vitality reads as tier {want} ({'/'.join(words[want])})", "ok" if got == words[want] else str(got), "ok")
+        wiz.command("unwield " + weapon)
+        wiz.command("drop " + weapon)
+    check("wording: against targets of 1000, 40, 25 and 12 Vitality the same weapon shows at least three of the four tiers", "ok" if all(len(v) >= 3 for v in seen.values()) and len(seen) == 2 else str(seen), "ok")
+
+    # A creature's blows on a player use the same rule, by the player's maximum Vitality (the prompt shows it), and the killing blow is no special case.
+    my_max = stat3(last_line(wiz.command("look")))
+    my_max = my_max[1] if my_max else 30
+    tiers = set()
+    for hitter, dmg in LF_HITTERS:
+        wiz.command("clone " + TEST + hitter)
+        a.drain(wiz, 0.3)
+        m = lf_blow(wiz, "kill " + hitter, r"A " + hitter + r" (scratches|hits|smashes) you( hard| brutally)?\.[^\n]*\(-(\d+) damage\)")
+        wiz.command("slay " + hitter)
+        wiz.command("restore")
+        a.drain(wiz, 0.3)
+        if m is None:
+            check(f"wording: {hitter} hit the player", "none", "ok")
+            continue
+        dealt = int(m.group(3))
+        want = lf_tier(dealt * 100 // my_max)
+        words = {"scratches": 0, "smashes": 3}.get(m.group(1), 2 if m.group(2) == " hard" else 1)
+        tiers.add(want)
+        check(f"wording: a creature's blow of {dealt} on {my_max} Vitality reads as tier {want}", "ok" if words == want else m.group(0), "ok")
+    check("wording: the creatures' blows also show a spread of tiers", "ok" if len(tiers) >= 3 else str(tiers), "ok")
+    wiz.command("verbose off")
+
+    # "You dodge a ...": the attacker's name is not capitalised in the middle of the sentence.
+    d = h.Client("lfdodge", archetype="dodger")
+    d.read_until("> ")
+    d.command("down")
+    d.command("yard")
+    wiz.command("goto " + TEST + "yard")
+    wiz.command("clone " + TEST + "lfh1")
+    d.command("kill lfh1")
+    text = fight_text(d, until=lambda t: "You dodge" in t, timeout=60)
+    check("dodge: the attacker is named in lower case in the middle of the line", text, "You dodge a lfh1's attack.", absent=("You dodge A ",))
+    wiz.command("slay lfh1")
+    d.command("quit")
+    wiz.command("goto " + TEST + "hub")
 
 
 ANSI_RE = h.ANSI

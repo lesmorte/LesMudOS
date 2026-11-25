@@ -372,7 +372,7 @@ def run():
     # ===== D. haste and slow =====
     wiz.command("clone " + TIMING + "mid", 0.3)
     hero.command("speed me 20 300", 0.5)
-    check("score shows the speed factor", hero.command("score", 0.8), "speed x0.8", "Reaction Time 2.8", "Your attack takes 7.6 seconds.")
+    check("score shows the speed factor", " ".join(hero.command("score", 0.8).split()), "speed x0.8", "Reaction Time 2.8", "Your attack takes 7.6 seconds.")
     wait_ready(hero)
     m = hero.mark()
     hero.send("kill mid")
@@ -382,7 +382,7 @@ def run():
     clean_arena(wiz)
     wiz.command("clone " + TIMING + "mid", 0.3)
     hero.command("speed me -20 300", 0.5)
-    check("score shows the slow factor", hero.command("score", 0.8), "speed x1.2", "Reaction Time 4.2", "Your attack takes 10.4 seconds.")
+    check("score shows the slow factor", " ".join(hero.command("score", 0.8).split()), "speed x1.2", "Reaction Time 4.2", "Your attack takes 10.4 seconds.")
     wait_ready(hero)
     m = hero.mark()
     hero.send("kill mid")

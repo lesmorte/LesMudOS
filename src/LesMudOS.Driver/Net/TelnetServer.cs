@@ -40,6 +40,7 @@ internal sealed class Connection
 
     /// <summary>True when the last thing sent was a prompt and the player has typed nothing since: unprompted output then starts on a new line. Game thread only.</summary>
     public bool AtPrompt;
+    public long PromptSentMs; // when the prompt was sent: a line typed within a round trip of it may have crossed it on the wire
 
     /// <summary>
     /// When this connection last sent a real line (not an empty one: a client keep-alive is not activity), in the kernel's clock.
@@ -87,8 +88,24 @@ internal sealed class Connection
         return Enqueue(Net.Gmcp.Frame(package, json));
     }
 
-    /// <summary>Flush what is queued, then close the socket.</summary>
-    public void Close() => _outbox.Writer.TryComplete();
+    /// <summary>The player's name as last seen, for the log line when the connection ends. Game thread only.</summary>
+    public string? PlayerName;
+
+    private readonly DateTime _startedUtc = DateTime.UtcNow;
+    private string? _endedBy;
+
+    /// <summary>Who ended the connection, first writer wins; never anything a player typed.</summary>
+    private void Ended(string reason) => Interlocked.CompareExchange(ref _endedBy, reason, null);
+
+    public string EndedBy => _endedBy ?? "unknown";
+    public TimeSpan Lasted => DateTime.UtcNow - _startedUtc;
+
+    /// <summary>Flush what is queued, then close the socket. The reason is for the log ("destruct", "shutdown").</summary>
+    public void Close(string reason = "closed by the game")
+    {
+        Ended(reason);
+        _outbox.Writer.TryComplete();
+    }
 
     public async Task RunAsync()
     {
@@ -103,8 +120,8 @@ internal sealed class Connection
                     Interlocked.Add(ref _queued, -bytes.Length);
                 }
             }
-            catch (IOException) { }
-            catch (ObjectDisposedException) { }
+            catch (IOException e) { Ended($"write error: {e.GetType().Name}: {e.Message}"); }
+            catch (ObjectDisposedException e) { Ended($"write error: {e.GetType().Name}: {e.Message}"); }
             finally { _client.Close(); } // also unblocks the reader
         });
 
@@ -112,8 +129,8 @@ internal sealed class Connection
         {
             await ReadLinesAsync(stream);
         }
-        catch (IOException) { }
-        catch (ObjectDisposedException) { }
+        catch (IOException e) { Ended($"read error: {e.GetType().Name}: {e.Message}"); }
+        catch (ObjectDisposedException e) { Ended($"read error: {e.GetType().Name}: {e.Message}"); }
 
         _outbox.Writer.TryComplete();
         await writer;
@@ -132,7 +149,7 @@ internal sealed class Connection
         while (true)
         {
             var read = await stream.ReadAsync(buffer);
-            if (read == 0) return;
+            if (read == 0) { Ended("client closed"); return; }
             for (var i = 0; i < read; i++)
             {
                 var b = buffer[i];
@@ -153,7 +170,7 @@ internal sealed class Connection
                         break;
 
                     // Telnet negotiation is recognised and, except for GMCP, discarded.
-                    case TelnetState.Iac when b == 255: if (line.Count < MaxLineLength) line.Add(255); telnet = TelnetState.Data; break;
+                    case TelnetState.Iac when b == 255: if (line.Count < MaxLineLength) line.Add(255); telnet = TelnetState.Data; break; // an escaped 255 is a data byte: same limit as any other
                     case TelnetState.Iac when b is >= 251 and <= 254: command = b; telnet = TelnetState.Option; break;
                     case TelnetState.Iac when b == 250: sub.Clear(); subOverflow = false; telnet = TelnetState.Subnegotiation; break;
                     case TelnetState.Iac: telnet = TelnetState.Data; break;

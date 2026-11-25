@@ -137,7 +137,7 @@ public class ExampleHall : Room
 }
 ```
 
-Treasure in a hidden place is a find, not coins (see "A find" under Items). Room fields and methods: `Safe`, `LogoutRoom` (players who quit here log in here), `ResetSeconds`, `Exits`, `AddDetail`, `AddReadable`, `AddSpawn`, `AddEncounter`, `LockExit`, `BlockExit`, `HiddenExit`, `DangerBand`, `AddNode`. Override `Reset()` (and call `base.Reset()`) for anything special.
+Treasure in a hidden place is a find, not coins (see "A find" under Items). Room fields and methods: `Safe`, `LogoutRoom` (no longer needed: every player who leaves a room logs in there), `ResetSeconds`, `Exits`, `AddDetail`, `AddReadable`, `AddSpawn`, `AddEncounter`, `LockExit`, `BlockExit`, `HiddenExit`, `DangerBand`, `AddNode`. Override `Reset()` (and call `base.Reset()`) for anything special.
 
 ### A room with a locked exit
 
