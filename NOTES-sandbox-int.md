@@ -193,3 +193,30 @@ heap limit; Restart=on-failure kept on purpose (the in-game shutdown exits 0 and
   command; a link-dead body has no command) and sandbox code must not reach it (it is outside sandbox space); (c) reconnect must not
   resume a body in sandbox space; (d) the heartbeat invariant iterates Users() only: a link-dead body is not a user, so the
   invariant must also walk lingering bodies (or they must be impossible in sandbox space, which (a)-(c) give).
+- build exit=0 secs=2 last: Build succeeded.
+- load_check exit=0 secs=229 last: 0 file(s) failed to load
+- sandbox_test exit=0 secs=150 last: 0 failure(s)
+- redteam/run_all exit=0 secs=565 last: 16 of 16 proofs pass
+- redteam2/run_all exit=0 secs=341 last: 10 of 10 proofs pass
+- return_test exit=0 secs=260 last: 0 failure(s)
+- gmcp_test exit=0 secs=71 last: 101 checks, 0 failure(s)
+- smoke_test exit=0 secs=209 last: 0 failure(s)
+- area_test exit=0 secs=515 last: 0 failure(s)
+- class_test exit=0 secs=478 last: 0 failure(s)
+- item_test exit=0 secs=76 last: 0 failure(s)
+- world_test exit=0 secs=265 last: 0 failure(s)
+- find_test exit=0 secs=72 last: 159 checks, 0 failure(s)
+- chronicle_test exit=0 secs=59 last: 0 failure(s)
+- chronicle_play_test exit=0 secs=94 last: 0 failure(s)
+- craft_test exit=0 secs=341 last: 313 checks, 0 failure(s)
+- craft_content_test exit=0 secs=231 last: 289 checks, 0 failure(s)
+- comm_test exit=0 secs=165 last: 221 checks, 0 failure(s)
+- playfeel_test exit=0 secs=304 last: 0 failure(s)
+- attribute_test exit=0 secs=301 last: 0 failure(s)
+- rest_test exit=0 secs=190 last: 0 failure(s)
+- rename_test exit=0 secs=116 last: 0 failure(s)
+- rank_test exit=0 secs=633 last: 0 failure(s)
+- aim_test exit=0 secs=377 last: 0 failure(s)
+- sneak_test exit=0 secs=338 last: 0 failure(s)
+- story_test exit=0 secs=173 last: 544 checks, 0 failure(s)
+- hollow_expansion_test exit=0 secs=57 last: 684 checks, 0 failure(s)
