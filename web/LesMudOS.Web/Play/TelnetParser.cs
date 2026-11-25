@@ -90,7 +90,7 @@ public sealed class TelnetParser
         var name = Encoding.ASCII.GetString(nameBytes);
         if (!ValidPackageName(name)) return;
         if (payload.IsEmpty) { events.Add(new GmcpEvent(name, null)); return; }
-        if (payload.Length > MaxGmcpPayload) return;
+        if (payload.Length > MaxGmcpPayload || !System.Text.Unicode.Utf8.IsValid(payload)) return;
         try
         {
             using var doc = JsonDocument.Parse(payload.ToArray(), new JsonDocumentOptions { MaxDepth = MaxGmcpDepth });

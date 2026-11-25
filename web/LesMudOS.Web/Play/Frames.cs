@@ -90,6 +90,7 @@ public static class Frames
     public static ClientFrame ParseClient(ReadOnlySpan<byte> utf8, int maxInputBytes)
     {
         JsonDocument doc;
+        if (!System.Text.Unicode.Utf8.IsValid(utf8)) return new BadFrame("bad_frame"); // the JSON reader would accept bad bytes inside a string and fail later
         try { doc = JsonDocument.Parse(utf8.ToArray(), new JsonDocumentOptions { MaxDepth = 4 }); }
         catch (JsonException) { return new BadFrame("bad_frame"); }
         using (doc)

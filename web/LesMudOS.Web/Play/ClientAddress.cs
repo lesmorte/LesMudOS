@@ -50,3 +50,14 @@ public static partial class ClientAddress
         return new IPAddress(b.Take(8).Concat(new byte[8]).ToArray()).ToString() + "/64";
     }
 }
+
+/// <summary>The PROXY protocol version 1 line the game's bridge listener requires first.</summary>
+public static class ProxyProtocol
+{
+    /// <summary>The true address, the loopback as destination, source port 0 (the real port is not known behind Cloudflare), the bridge port as
+    /// destination port. IPv6 clients: PROXY TCP6. At most 107 bytes.</summary>
+    public static string Line(IPAddress client, int bridgePort)
+        => client.AddressFamily == AddressFamily.InterNetworkV6
+            ? $"PROXY TCP6 {client} ::1 0 {bridgePort}\r\n"
+            : $"PROXY TCP4 {client} 127.0.0.1 0 {bridgePort}\r\n";
+}

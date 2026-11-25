@@ -57,6 +57,9 @@ public sealed class PlayRuntime
     {
         _log.LogInformation("play: refused {Who} reason={Reason}{Extra}", who, reason, extra == null ? "" : " " + extra);
         ctx.Response.Headers.CacheControl = "no-store";
+        // The pretty 404 page is for people: the socket endpoint keeps its real status (403 origin, 429 limits, 404 switched off).
+        var pages = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IStatusCodePagesFeature>();
+        if (pages != null) pages.Enabled = false;
         ctx.Response.StatusCode = status;
         if (status == 429) ctx.Response.Headers.RetryAfter = "60";
     }
@@ -67,7 +70,7 @@ public sealed class PlayRuntime
         var peer = ctx.Connection.RemoteIpAddress;
         var peerText = peer == null ? "-" : (peer.IsIPv4MappedToIPv6 ? peer.MapToIPv4() : peer).ToString();
         if (!IsOn()) { Refuse(ctx, 404, "disabled", peerText); return; }
-        if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.Headers.CacheControl = "no-store"; ctx.Response.StatusCode = 400; return; }
+        if (!ctx.WebSockets.IsWebSocketRequest) { Refuse(ctx, 400, "not-websocket", peerText); return; }
 
         var originValues = ctx.Request.Headers.Origin;
         var origin = originValues.Count == 1 ? originValues[0] : null;

@@ -134,7 +134,7 @@ internal sealed class BridgeSession
             _net = _tcp.GetStream();
             if (!_o.PlainMode)
             {
-                var line = ProxyLine(IPAddress.Parse(_who), _o.GameBridgePort);
+                var line = ProxyProtocol.Line(IPAddress.Parse(_who), _o.GameBridgePort);
                 await _net.WriteAsync(Encoding.ASCII.GetBytes(line), _loops.Token);
             }
             return true;
@@ -145,12 +145,6 @@ internal sealed class BridgeSession
             return false;
         }
     }
-
-    /// <summary>The PROXY protocol version 1 line the game's bridge listener requires first: the true address, the loopback as destination, source port 0.</summary>
-    public static string ProxyLine(IPAddress client, int bridgePort)
-        => client.AddressFamily == AddressFamily.InterNetworkV6
-            ? $"PROXY TCP6 {client} ::1 0 {bridgePort}\r\n"
-            : $"PROXY TCP4 {client} 127.0.0.1 0 {bridgePort}\r\n";
 
     private void CloseGame()
     {
@@ -245,7 +239,10 @@ internal sealed class BridgeSession
                 foreach (var f in Frames.OutChunks(t.Text)) Enqueue(f);
                 break;
             case GmcpEvent g:
-                Enqueue(Frames.Gmcp(g.Package, g.Data));
+                byte[] frame;
+                try { frame = Frames.Gmcp(g.Package, g.Data); }
+                catch (Exception e) when (e is ArgumentException or InvalidOperationException) { break; } // text the JSON writer will not re-encode: the message is dropped
+                Enqueue(frame);
                 break;
             case MaskEvent m:
                 Enqueue(Frames.Mask(m.On));
