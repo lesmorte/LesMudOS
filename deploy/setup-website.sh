@@ -320,7 +320,9 @@ if [ -s "$CF_RANGES_FILE" ]; then
     CF_SERVERS="$(printf '\t\ttrusted_proxies static %s\n\t\tclient_ip_headers CF-Connecting-IP' "$(tr '\n' ' ' < "$CF_RANGES_FILE" | sed 's/ *$//')")"
 fi
 echo "Caddy: $(caddy version 2>&1 | head -1)   (trusted_proxies, client_ip_headers and {client_ip} need 2.7 or newer)"
-cat > "$CADDYFILE" <<CADDY
+# Written beside the live file and checked first: a configuration this Caddy cannot read must never replace a working one.
+CADDY_NEW="$CADDYFILE.new"
+cat > "$CADDY_NEW" <<CADDY
 $MARK
 {
 	servers {
@@ -341,7 +343,12 @@ $WEB_DOMAIN {
 	header -Server
 }
 CADDY
-caddy validate --config "$CADDYFILE" --adapter caddyfile
+if ! caddy validate --config "$CADDY_NEW" --adapter caddyfile; then
+    echo "ERROR: this Caddy does not accept the new configuration (see above). The working one was left as it is; the rejected one is $CADDY_NEW."
+    echo "The website keeps running as before. The browser client needs Caddy 2.7 or newer: upgrade Caddy and run this script again."
+    exit 1
+fi
+mv "$CADDY_NEW" "$CADDYFILE"
 
 # ---- 9. Firewall: the web ports (the game's port and SSH were opened by setup-droplet.sh) ----
 say "Opening ports 80 and 443"
