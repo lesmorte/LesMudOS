@@ -94,6 +94,12 @@ public class Player : Adventurer
         if (ready && PreviousObject() is { ProgramPath: "/std/player" }) Save();
     }
 
+    /// <summary>Called by the driver itself (nothing else on the call stack) when memory runs low, so that a kill loses little.</summary>
+    public void SaveForLowMemory()
+    {
+        if (ready && PreviousObject() == null && RestrictedCaller() == null) Save();
+    }
+
     /// <summary>
     /// Called by another player's body right after it gave this player something (the give command), so that both save
     /// files agree. Only a player body acting for its own command may ask.

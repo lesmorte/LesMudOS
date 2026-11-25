@@ -172,6 +172,10 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 ReadWritePaths=$RW_PATHS
 MemoryMax=768M
+MemorySwapMax=0
+# .NET's own heap limit, below the ceiling (hex percent of it: 0x46 = 70%): an allocation past it fails as an error in the code
+# that made it, instead of the kernel killing the process; the driver saves everyone at three quarters of it.
+Environment=DOTNET_GCHeapHardLimitPercent=0x46
 
 [Install]
 WantedBy=multi-user.target

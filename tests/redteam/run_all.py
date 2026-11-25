@@ -8,7 +8,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = ["f2_exception_window", "c1_chain_phish_admin", "f3_restore_abort", "f3b_sandbox_weapon_out", "f3c_restore_routes",
            "f4_tuple_cross", "f5_cross_home", "p1_publish_review", "p3_reviewer_in_workshop", "f1_dos", "f1c_stall",
-           "l1_l2_and_rules", "a1_allowlist", "t1_every_body", "r1_login_placement"]
+           "l1_l2_and_rules", "a1_allowlist", "t1_every_body", "r1_login_placement", "m1_low_memory"]
 
 failed = []
 for name in SCRIPTS:

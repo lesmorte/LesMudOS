@@ -289,9 +289,11 @@ internal sealed partial class Kernel : IDriverServices
         // stall like any other); and a home may compile for at most 15 seconds a minute (CompileStarted).
         var thread = new Thread(() =>
         {
+            var tick = 0;
             while (true)
             {
                 Thread.Sleep(100);
+                if (++tick % 10 == 0) WatchMemory();
                 if (_compilingDomain is { } compiling && System.Diagnostics.Stopwatch.GetTimestamp() - Volatile.Read(ref _compileStarted) > limit)
                     Stall(compiling);
                 var since = Volatile.Read(ref _busySince);
@@ -302,6 +304,29 @@ internal sealed partial class Kernel : IDriverServices
             }
         }) { IsBackground = true, Name = "sandbox watchdog" };
         thread.Start();
+    }
+
+    // ---- Memory (the third review's M1) ----
+    // Nothing in-process can stop one statement from allocating: a home's code can grow the process until it is killed. The service
+    // has a memory ceiling (deploy/lesmudos.service, MemoryMax), so the kernel kills only the driver and systemd starts it again.
+    // What the driver adds: once a second the watchdog compares the managed heap with the memory .NET may use (the service's ceiling,
+    // which .NET reads from the cgroup); past three quarters of it, every player is saved (once a minute at most) and the log says so,
+    // so that a kill that follows loses as little as possible. Characters in a workshop are not saved: their save file is the checkpoint.
+    private long _lowMemorySaveAt;
+
+    private void WatchMemory()
+    {
+        var available = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        if (available <= 0 || GC.GetTotalMemory(false) < available / 4 * 3) return;
+        var now = Environment.TickCount64;
+        if (now - Interlocked.Read(ref _lowMemorySaveAt) < 60_000) return;
+        Interlocked.Exchange(ref _lowMemorySaveAt, now);
+        Post(() =>
+        {
+            Log.Info($"memory: the managed heap is {GC.GetTotalMemory(false) / 1048576} MB of {available / 1048576} MB: saving every player");
+            foreach (var user in Users())
+                Execute(null, () => CallOther(user, "SaveForLowMemory", []));
+        });
     }
 
     /// <summary>The watchdog's last resort: close the domain for the next start and stop the process (the service restarts it).</summary>
