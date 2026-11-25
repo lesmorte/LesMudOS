@@ -17,6 +17,7 @@ internal sealed class SaveStore
 
     public SaveStore(string root) => _root = Path.GetFullPath(root);
 
+    /// <summary>The absolute save directory.</summary>
     public string Root => _root;
 
     private string FileFor(string mudPath) => _root + mudPath + ".json";

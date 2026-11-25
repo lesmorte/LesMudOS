@@ -200,6 +200,10 @@ internal interface IDriverServices
     string[] TimeZoneNames();
     int LingerSeconds();
     bool DropConnection(ObjectRef caller, ObjectRef target);
+    string? ConnectionAddress(ObjectRef caller);
+    string AddressTag(ObjectRef caller, string key);
+    long ThrottleSetting(ObjectRef caller, string name);
+    void ThrottleLog(ObjectRef caller, string text);
     string LocalTime(string zoneId);
     int IdleSeconds(ObjectRef ob);
     int IdleLimitSeconds();

@@ -18,6 +18,7 @@ for (var i = 0; i < args.Length - 1; i++)
         case "--idle-minutes": settings.SetIdle(args[++i], "--idle-minutes"); break;
         case "--timeout-minutes": settings.SetTimeout(args[++i], "--timeout-minutes"); break;
         case "--sandbox-stall": settings.SetStall(args[++i], "--sandbox-stall"); break;
+        case "--bridge-port" or "--max-connections" or "--max-per-address": NetPolicy.SetArgument(args[i], args[++i]); break; // net-limits hook (Net/NetSettings.cs)
     }
 }
 
@@ -39,6 +40,7 @@ settings.SetTimeout(Environment.GetEnvironmentVariable("LESMUDOS_TIMEOUT_MINUTES
 settings.SetStall(Environment.GetEnvironmentVariable("LESMUDOS_SANDBOX_STALL"), "LESMUDOS_SANDBOX_STALL");
 settings.SetHomeQuota(Environment.GetEnvironmentVariable);
 settings.Settle();
+NetPolicy.Configure(); // net-limits hook: reads the LESMUDOS_* network settings from the environment
 Log.Info($"idle after {settings.IdleSeconds:0.##}s without input, disconnect after {settings.TimeoutSeconds:0.##}s");
 var kernel = new Kernel(mudlib, save, adminSecret, settings);
 kernel.StartWatchdog();

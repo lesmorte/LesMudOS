@@ -248,6 +248,21 @@ public abstract class MudObject
     /// <summary>A player's body drops its own connection (the idle timeout); the driver then calls NetDead as for any dropped connection. False for anyone else's.</summary>
     protected bool DropConnection() => D.DropConnection(Self, Self);
 
+    /// <summary>
+    /// The address of this object's own connection as the login throttle counts it (IPv4, or an IPv6 /64), or null. Only /secure/login may ask
+    /// (the master refuses everyone else with an error), and only about itself.
+    /// </summary>
+    protected string? ConnectionAddress() => D.ConnectionAddress(Self);
+
+    /// <summary>A keyed hash of an address key, 16 hex characters. Only /secure/throttle may ask.</summary>
+    protected string AddressTag(string key) => D.AddressTag(Self, key);
+
+    /// <summary>One login-throttle setting by name (-1 if there is none). Only /secure/throttle may ask.</summary>
+    protected long ThrottleSetting(string name) => D.ThrottleSetting(Self, name);
+
+    /// <summary>One line in the driver log (rate limited). Only /secure/throttle may ask.</summary>
+    protected void ThrottleLog(string text) => D.ThrottleLog(Self, text);
+
     /// <summary>The IANA names of the time zones the server knows (sorted; empty if it has no zone database).</summary>
     protected string[] TimeZoneNames() => D.TimeZoneNames();
 

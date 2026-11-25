@@ -145,6 +145,29 @@ When it fires (SANDBOX.md section 7, "A stall"), the log says `sandbox: STALL: c
 | `LESMUDOS_HOME_DIRS` | `64` | Directories a home may hold |
 | `LESMUDOS_HOME_DEPTH` | `8` | How deep a home's directories may go |
 
+### Network limits, the bridge port and the login throttle
+
+Settings of the driver, all environment variables (put them in `/etc/lesmudos.env`; `setup-droplet.sh` adds a commented block with these defaults to a new or an existing file, and an install that never edits it runs on the defaults below). A bad value is ignored with a note in the log; `0` switches a count or rate off. Design: [specs/web-client.md](specs/web-client.md) section 4 and [specs/login-throttle.md](specs/login-throttle.md).
+
+| Environment | Default | Meaning |
+|---|---|---|
+| `LESMUDOS_BRIDGE_PORT` (`--bridge-port`) | `0` (off) | `setup-droplet.sh` writes `--bridge-port $BRIDGE_PORT` into the unit (`BRIDGE_PORT=4001 bash setup-droplet.sh` turns it on; `update-droplet.sh` keeps the value). The second listener for the website's browser client: **127.0.0.1 only**, and each connection must begin with a PROXY line giving the visitor's address. Leave it off until the website side is deployed; then `4001`. |
+| `LESMUDOS_BRIDGE_BIND` | `127.0.0.1` | Only `127.0.0.1` or `::1` are accepted. Anything else is refused: the driver logs `bridge listener NOT started` and runs without it. There is no way to make it listen on a public address. |
+| `LESMUDOS_BRIDGE_HANDSHAKE_SECONDS` | `5` | How long the PROXY line may take (it is at most 107 bytes). |
+| `LESMUDOS_MAX_CONNECTIONS` (`--max-connections`) | `200` | All connections together. A newcomer gets "The game is full." |
+| `LESMUDOS_MAX_PER_ADDRESS` (`--max-per-address`) | `10` | Per address; an IPv6 address counts as its /64; a web player counts under the visitor's real address. Loopback is **not** exempt. |
+| `LESMUDOS_CONNECTS_PER_MINUTE` | `20` | New connections per address per minute (refused attempts count). |
+| `LESMUDOS_MAX_LINES_PER_SECOND` | `20` | Typed lines per second per connection, sustained; `LESMUDOS_INPUT_BURST` (`60`) may arrive at once. The surplus is dropped with one warning; `LESMUDOS_INPUT_OVERFLOW_SECONDS` (`5`) of continuous overflow ends the connection. |
+| `LESMUDOS_INPUT_BYTES_PER_SECOND` | `65536` | The same for bytes (burst: four seconds' worth). |
+| `LESMUDOS_INPUT_STATS` | off | `1` logs each connection's peak input rate when it ends (to measure; not for production). |
+| `LESMUDOS_THROTTLE_*` | see [login-throttle.md](specs/login-throttle.md) | Wrong-password locks per name (5 in 15 minutes: 5 minutes, doubling to 1 hour) and per address (20 in 15 minutes: 15 minutes, doubling to 4 hours), the 1-second pause on every "no", 3 new characters per address per hour and 10 per day. In memory only. |
+
+Refused connections are sent one plain line and closed, and logged as `connection refused: <reason>: <address>`; these log lines, and the input-limit and throttle lines, are rate-limited so that a flood cannot fill the journal.
+
+**The bridge port must never be exposed.** It is bound to 127.0.0.1, so the firewall is a second lock, not the first. `ufw` must not list 4001 (`ufw status` shows only SSH, the game port, 80 and 443), a DigitalOcean Cloud Firewall must not allow it, and `ss -ltnp | grep 4001` must show `127.0.0.1:4001`, never `0.0.0.0` or `[::]`. The port believes any address a PROXY line gives it, so anything that can reach it can pretend to be any visitor and get past the per-address limits and the login throttle. The public port 4000 never reads a PROXY line.
+
+The output cap of the spec (section 4.4) is not part of this change: the sandbox branch supplies it (a connection with more than 4,000,000 bytes queued is closed, logged as "closed by the game (outbox limit)").
+
 ## 4. Make yourself the first wizard
 
 1. Connect: `telnet <droplet ip> 4000` (or any MUD client).

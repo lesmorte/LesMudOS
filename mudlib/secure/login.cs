@@ -20,11 +20,48 @@ public class Login : MudObject
     private bool claiming; // choosing a password for a new or password-less account
     private int attempts;
 
+    // The login throttle (docs/specs/login-throttle.md): the connection's true address as the driver counts it (null if it has none), its keyed
+    // hash, whether this login runs under the stricter rules for an address the character has used before, and whether an answer is being delayed.
+    private string? address;
+    private string tag = "";
+    private bool knownMode;
+    private bool waiting;
+
+    private ObjectRef Throttle() => LoadObject("/secure/throttle");
+
     public void Logon()
     {
         if (!Interactive(Self)) return; // only a login object the driver gave a connection to
+        address = ConnectionAddress();
+        if (Throttle().Call<bool>("AddressBlocked", address)) { Refuse(); return; }
         Write("\nWelcome to Legends of Hollowmere.\n\nBy what name are you known? ");
         InputTo(GotName);
+    }
+
+    /// <summary>
+    /// Every answer that says "no" (a wrong password, a refusal) comes after the same short pause, made with a call-out so the game goes on
+    /// meanwhile, so that how long an answer took tells nothing about why it was no. What is typed meanwhile is swallowed unseen.
+    /// </summary>
+    private void Later(Action next)
+    {
+        var ms = Throttle().Call<int>("QueryDelayMs");
+        if (ms <= 0) { next(); return; }
+        waiting = true;
+        InputTo(Swallow, true);
+        CallOut(() => { waiting = false; next(); }, ms / 1000.0);
+    }
+
+    private void Swallow(string ignored)
+    {
+        if (waiting) InputTo(Swallow, true);
+    }
+
+    /// <summary>The one refusal for every cause (a locked name, a locked address): the same words whether or not the name exists.</summary>
+    private void Refuse()
+    {
+        Discard();
+        var text = Throttle().Call<string>("QueryRefusal") + "\n";
+        Later(() => Fail(text));
     }
 
     /// <summary>
@@ -53,17 +90,25 @@ public class Login : MudObject
             return;
         }
 
+        address = ConnectionAddress();
+        if (Throttle().Call<bool>("AddressBlocked", address)) { Refuse(); return; }
         body = CloneObject("/std/player");
         accountState = body.Call<string>("BeginLogin", name) ?? "";
         attempts = 0;
+        knownMode = false;
+        tag = Throttle().Call<string>("Tag", address) ?? "";
         switch (accountState)
         {
             case "password":
+                var verdict = Throttle().Call<string>("BeginPassword", name, address, body.Call<bool>("KnowsAddress", tag));
+                if (verdict == "refused") { Refuse(); return; }
+                knownMode = verdict == "known";
                 Write("Password: ");
                 InputTo(GotPassword, true);
                 return;
             case "new":
             case "unset":
+                if (accountState == "new" && !Throttle().Call<bool>("CanCreate", address)) { Fail("Too many new characters have been made from your address. Try again later.\n"); return; }
                 if (Users().Any(u => u != Self && u.Call<string>("QueryClaim") == name))
                 {
                     Discard();
@@ -86,18 +131,27 @@ public class Login : MudObject
     private void GotPassword(string password)
     {
         if (body is not { IsAlive: true }) { Fail("Something went wrong. Goodbye.\n"); return; }
+        // Asked again with every password: connections that were already at the prompt when a lock began (guessing in parallel) are refused too.
+        var verdict = Throttle().Call<string>("BeginPassword", name, address, body.Call<bool>("KnowsAddress", tag));
+        if (verdict == "refused") { Refuse(); return; }
+        knownMode = verdict == "known";
         if (body.Call<bool>("CheckPassword", password))
         {
+            Throttle().Call("Succeeded", name, address);
             AfterPassword();
             return;
         }
-        if (++attempts >= MaxPasswordAttempts)
+        var mayTryAgain = Throttle().Call<bool>("Failed", name, address, knownMode);
+        if (!mayTryAgain || ++attempts >= MaxPasswordAttempts)
         {
-            Fail("Wrong password. Goodbye.\n");
+            Later(() => Fail("Wrong password. Goodbye.\n"));
             return;
         }
-        Write("Wrong password. Password: ");
-        InputTo(GotPassword, true);
+        Later(() =>
+        {
+            Write("Wrong password. Password: ");
+            InputTo(GotPassword, true);
+        });
     }
 
     private void AskNewPassword()
@@ -129,12 +183,18 @@ public class Login : MudObject
             AskNewPassword();
             return;
         }
+        if (accountState == "new" && !Throttle().Call<bool>("CanCreate", address))
+        {
+            Fail("Too many new characters have been made from your address. Try again later.\n");
+            return;
+        }
         if (!body.Call<bool>("SetPassword", password))
         {
             Write("That password cannot be used.\n");
             AskNewPassword();
             return;
         }
+        if (accountState == "new") Throttle().Call("Created", address);
         Write(accountState == "new" ? "Account created.\n" : "Password set.\n");
         AfterPassword();
     }
@@ -217,6 +277,7 @@ public class Login : MudObject
         if (LoadObject("/secure/linkdead").Call<ObjectRef>("Find", name) is { } lingering)
         {
             Discard();
+            if (tag != "") lingering.Call("NoteAddress", tag);
             Exec(lingering, Self);
             lingering.Call("Reconnected");
             Destruct();
@@ -224,6 +285,7 @@ public class Login : MudObject
         }
         var player = body!;
         body = null;
+        if (tag != "") player.Call("NoteAddress", tag);
         Exec(player, Self);
         player.Call("SetupPlayer", name);
         Destruct();
