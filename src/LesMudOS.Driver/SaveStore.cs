@@ -17,6 +17,8 @@ internal sealed class SaveStore
 
     public SaveStore(string root) => _root = Path.GetFullPath(root);
 
+    public string Root => _root;
+
     private string FileFor(string mudPath) => _root + mudPath + ".json";
 
     private static IEnumerable<FieldInfo> SavedFields(MudObject instance)

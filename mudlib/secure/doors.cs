@@ -21,6 +21,13 @@ public class Doors : MudObject
 
     private readonly Dictionary<string, int> state = new();
 
+    // Doors asked about by sandbox rooms (L2 of the November 2026 review): at most this many per wizard's home, the oldest forgotten
+    // first, so that sandbox code calling State with ever new keys cannot make the register grow without end. A forgotten door is
+    // made again, in its room's declared state, the next time it is asked about.
+    private const int SandboxDoorsPerHome = 200;
+    private const int MaxKeyLength = 400;
+    private readonly Dictionary<string, Queue<string>> sandboxKeys = new();
+
     /// <summary>The key of the door between two rooms: the same from either side.</summary>
     public static string KeyOf(string roomA, string roomB) =>
         string.CompareOrdinal(roomA, roomB) <= 0 ? roomA + "|" + roomB : roomB + "|" + roomA;
@@ -30,7 +37,9 @@ public class Doors : MudObject
         var caller = PreviousObject();
         if (Self.IsClone || caller == null || caller.IsClone || !caller.IsAlive || key == null) return false;
         var parts = key.Split('|');
-        return parts.Length == 2 && (parts[0] == caller.ProgramPath || parts[1] == caller.ProgramPath) && parts[0] != parts[1];
+        // The caller is one end of the door. For sandbox code (docs/SANDBOX.md) that end is a room of a wizard's home, so a door
+        // between two of the game's rooms can never be reached from a workshop.
+        return parts.Length == 2 && parts[0] != parts[1] && (parts[0] == caller.ProgramPath || parts[1] == caller.ProgramPath);
     }
 
     /// <summary>
@@ -39,10 +48,17 @@ public class Doors : MudObject
     /// </summary>
     public int State(string key, bool startOpen, bool startLocked)
     {
-        if (!FromEnd(key)) return -1;
+        if (!FromEnd(key) || key.Length > MaxKeyLength) return -1;
         if (!state.TryGetValue(key, out var value))
         {
             value = (startOpen && !startLocked ? OpenBit : 0) | (startLocked ? LockedBit : 0);
+            var home = PreviousObject()!.Domain;
+            if (home != "")
+            {
+                if (!sandboxKeys.TryGetValue(home, out var keys)) sandboxKeys[home] = keys = new Queue<string>();
+                while (keys.Count >= SandboxDoorsPerHome) state.Remove(keys.Dequeue());
+                keys.Enqueue(key);
+            }
             state[key] = value;
         }
         return value;

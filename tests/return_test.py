@@ -111,13 +111,17 @@ def main():
     h.write(mudlib, TEST + "bruteden", a.room("RtBruteDen", "Return Brute Den", {"out": TEST + "a"}, f'        AddSpawn("{TEST}brute");\n', reset=3000))
     h.edit(mudlib, TEST + "a", 'Exits["wolf"]', 'Exits["brute"] = "/domains/rt/bruteden";\n        Exits["wolf"]')
     h.edit(mudlib, HOLLOW + "village/square", 'Exits["south"]', f'Exits["down"] = "{TEST}a";\n        Exits["south"]')
+    os.makedirs(os.path.join(mudlib, "wiz", "wren"), exist_ok=True)
+    os.makedirs(os.path.join(mudlib, "wiz", "boss"), exist_ok=True)
+    h.write(mudlib, "/wiz/wren/lab", a.room("WrenLab", "Wren's Lab", {"out": TEST + "a"}))
+    h.write(mudlib, "/wiz/boss/hall", a.room("BossHall", "Boss's Hall", {"out": TEST + "a"}))
     os.environ["LESMUDOS_IDLE_MINUTES"] = "4s"
     os.environ["LESMUDOS_TIMEOUT_MINUTES"] = "14s"
     os.environ["LESMUDOS_LINGER_SECONDS"] = str(LINGER)
     proc, log = a.start_driver(work, mudlib)
     try:
         run(work)
-        c = h.Client("wizz")   # the wizard of the link-dead tests (the secret makes only one)
+        c = h.Client("boss")  # the level 10 made in run()
         c.read_until("> ")
         c.command("shutdown")
         proc.wait(timeout=15)
@@ -186,6 +190,38 @@ def run(work):
     check("the idle timeout disconnects", str(ida.closed(30)), "True")
     time.sleep(LINGER + 3)
     check("after the idle timeout the next login is room A", where(h.Client("ida")), "Return Room A")
+
+    # A wizard's own home is a workshop (docs/SANDBOX.md): it is entered only through the master's move, which takes the checkpoint
+    # with the room the wizard came from. Quitting or dropping in it wakes them in that room, never in sandbox space.
+    boss = login("boss")
+    boss.command("promote " + h.SECRET)
+    wren = login("wren")
+    boss.command("promote wren 1")
+    wren.command("down")
+    check("a wizard enters their own home from room A", wren.command("goto /wiz/wren/lab"), "step into the workshop")
+    wren.command("quit")
+    wren.closed(3)
+    saved = open(saved_file(work, "wren")).read()
+    check("quit in the own home: the save names no room under /wiz", saved, absent=("/wiz/",))
+    check("quit in the own home: the next login is room A, the room the workshop was entered from", where(h.Client("wren")), "Return Room A")
+    wren = h.Client("wren")
+    wren.read_until("> ")
+    wren.command("goto /wiz/wren/lab")
+    wren.sock.close()
+    time.sleep(2.0)
+    check("a dropped connection in the own home: the next login is room A", where(h.Client("wren")), "Return Room A")
+    for value, label in (("/wiz/wren/lab", "the wizard's own home"), ("/wiz/boss/hall", "another wizard's home"), ("/WIZ/wren/lab", "the own home, spelled otherwise")):
+        c = h.Client("wren")
+        c.read_until("> ")
+        c.command("quit")
+        c.closed(3)
+        time.sleep(0.5)
+        check(f"{label} as the saved room: the save could be edited", str(set_room(work, "wren", value)), "True")
+        c = h.Client("wren")
+        text = c.read_until("> ")
+        check(f"{label} as the saved room: login never places a wizard in sandbox space", where(c), "Village Square", absent=("rror",))
+        check(f"{label} as the saved room: no workshop entered at login", text, absent=("step into the workshop",))
+    boss.command("quit")
 
     for name, value, label in (("fay", TEST + "gone", "a saved room that does not load"), ("gus", "/std/void", "the void"),
                                 ("hal", "/wiz/someone/room", "a room under /wiz"), ("ivy", "", "no saved room")):
@@ -306,7 +342,10 @@ def linger_tests(work):
     back.closed(3)
     # ---- a wizard's body goes at once ----
     wz = login("wizz")
-    wz.command("promote " + h.SECRET)
+    b = login("boss")  # the level 10 of the workshop checks (the secret makes only one)
+    b.command("promote wizz 1")
+    b.command("quit")
+    b.closed(3)
     wz.command("down")
     a.drain(obs2, 0.5)
     obs2.command("out")

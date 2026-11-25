@@ -253,12 +253,15 @@ public class Evil : Thing
         r.Add("takeyield=" + (corpse != null && corpse.Call<bool>("TakeYield", "skin")));
         var node = Present("bush", room);
         r.Add("trygather=" + (node != null && node.Call<bool>("TryGather", target)));
-        var made = CreateIn("/std/blood?p.kind=goblin", 3, 4, target);
+        // CHANGED (sandbox): what sandbox code makes cannot be moved to a player outside the workshop: the move throws.
+        ObjectRef? made = null;
+        try { made = CreateIn("/std/blood?p.kind=goblin", 3, 4, target); } catch (MudRuntimeException) { }
         r.Add("mintgoblin=" + (made == null ? "null" : made.Call<string>("Short")));
         var vial = CloneObject("/std/blood");
         r.Add("setkind=" + vial.Call<bool>("SetProperty", "kind", "goblin"));
         vial.Call("Vanish");
-        var herb = CreateIn("/domains/crafttest/obj/healing_herb", 2, 4, target);
+        ObjectRef? herb = null;
+        try { herb = CreateIn("/domains/crafttest/obj/healing_herb", 2, 4, target); } catch (MudRuntimeException) { }
         r.Add("mintherb=" + (herb == null ? "null" : herb.Call<string>("Short")));
         r.Add("heal=" + d.Call<bool>("StartHeal", target, 50, 10, 1, "Evil"));
         r.Add("craftsave=" + "ok");
@@ -266,9 +269,9 @@ public class Evil : Thing
         r.Add("continue=" + target.Call<bool>("CraftContinue", "x", "y", 1.0, 0.0, 0.0));
         // A corpse set up by the sandbox from a fake creature that claims goblin blood.
         var fake = CloneObject("/wiz/wizzy/fakegob");
-        MoveObject(fake, room);
+        try { MoveObject(fake, room); } catch (MudRuntimeException) { }
         var c2 = CloneObject("/std/corpse");
-        MoveObject(c2, room);
+        try { MoveObject(c2, room); } catch (MudRuntimeException) { }
         c2.Call("Setup", "a fake goblin", target, fake);
         r.Add("fakeyield=[" + c2.Call<string>("QueryYieldKind", "bleed") + "]");
         fake.Call("Vanish");
@@ -970,23 +973,24 @@ def run(work, mudlib, box):
     for name, src in (("evil", EVIL), ("fakegob", FAKEGOB), ("knife", EVIL_KNIFE), ("table", EVIL_TABLE), ("herb", EVIL_HERB), ("lab", EVIL_ROOM)):
         with open(os.path.join(wizhome, name + ".cs"), "w") as f:
             f.write(src)
-    wiz.command("tele " + T + "field")
+    # CHANGED (sandbox): a wizard's own code is cloned and run in their workshop; it reaches the player from there, or not at all.
+    wiz.command("goto ~/lab")
     check("a level-1 wizard clones its gadget at home", wiz.command("clone ~/evil"), "Cloned")
     victim = fresh("dan")
     victim.command("tele " + T + "field")
     victim.command("spawn tc_wolf")
     victim.command("slaynow wolf")
-    wiz.command("goto dan")
     text = wiz.command("evil dan")
-    check("sandbox: cannot teach", text, "teach=refused")
+    # CHANGED (sandbox): the calls below no longer reach the daemons and the player at all; they return nothing (null, False, 0).
+    check("sandbox: cannot teach", text, "teach= learn=")
     check("sandbox: cannot learn for a player", text, "learn=False")
     check("sandbox: cannot set a proficiency", text, "setprof=False")
     check("sandbox: cannot use the wizard's setter", text, "wizset=False")
     check("sandbox: cannot set the ladder position", text, "setladder=False")
     check("sandbox: cannot read the ladder position", text, "readladder=0")
-    check("sandbox: cannot use the wizard's ladder query", text, "wizladder=-1")
+    check("sandbox: cannot use the wizard's ladder query", text, "wizladder=0")
     check("sandbox: cannot fix the rolls", text, "rolls=False")
-    check("sandbox: cannot run a crafting command for a player", text, "command=[]")
+    check("sandbox: cannot run a crafting command for a player", text, "command=null")
     check("sandbox: cannot take a corpse's part", text, "takeyield=False")
     check("sandbox: cannot strip a trusted node", text, "trygather=False")
     check("sandbox: cannot mint Goblin Blood into a player's hands", text, "mintgoblin=null")
@@ -1005,10 +1009,11 @@ def run(work, mudlib, box):
     wiz.command("clone ~/herb")
     wiz.command("give herb to dan")
     victim.command("teachme minor_healing_salve")
-    victim.command("tele /wiz/wizzy/lab")
+    check("sandbox: a player cannot be teleported into a wizard's workshop", victim.command("tele /wiz/wizzy/lab"), "Only wizards can enter a wizard's workshop.")
     check("a station from a wizard's sandbox does not count", victim.command("craft salve"), "there is none here")
     text = victim.command("combine masterwork herb and wildflower")
-    check("an item from a wizard's sandbox is not a material, whatever it is called", text, "A masterwork healing herb is not something you can craft with.")
+    # CHANGED (sandbox): the wizard's herb cannot be given to a player at all, so it never reaches the crafting table.
+    check("an item from a wizard's sandbox never reaches a player", text, "You have no 'masterwork herb'.")
     check("no errors in the sandbox section", logged(), absent=("ERROR (dan)",))
 
     # ===== O. the matcher and the clash rule =====

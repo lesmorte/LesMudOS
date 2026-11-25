@@ -89,9 +89,10 @@ public class AimMeddler : Thing
     private bool Meddle(string args)
     {
         var w = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var room = Environment(ThisPlayer()!)!;
-        var who = Present(w[0], room);
-        var mob = Present("dummy", room);
+        // CHANGED (sandbox): the meddler runs in its wizard's workshop and finds the victim (and the dummy in its room) from there.
+        var who = Users().FirstOrDefault(u => (u.Call<string>("QueryName") ?? "").ToLower() == w[0].ToLower());
+        var room = who == null ? null : Environment(who);
+        var mob = room == null ? null : Present("dummy", room);
         if (who == null || mob == null) { Write("MEDDLE none\n"); return true; }
         var tries = new List<string>();
         void Try(string label, Func<object?> f)
@@ -700,15 +701,19 @@ def step_security(chief, mudlib):
     to(vic, "arena")
     to(chief, "arena")
     chief.command("aspawn dummy")
+    h.write(mudlib, "/wiz/aimchief/den", "// @inherit /std/room\npublic class AimChiefDen : Room { public override void Create() { ShortDesc = \"Den\"; LongDesc = \"A workshop.\"; } }\n")
+    chief.command("goto /wiz/aimchief/den")  # CHANGED (sandbox): a wizard's code runs in their workshop
     check("the meddler is cloned", chief.command("clone ~/meddler"), "meddler")
     out = chief.command("meddle aimvictim")
+    to(chief, "arena")
     check("the meddler ran", out, "MEDDLE ")
-    check("no object can start a fight for a player", out, "StartFight=False", absent=("StartFight=True",))
+    # CHANGED (sandbox): from sandbox code none of these calls reaches the player at all: each returns nothing (null).
+    check("no object can start a fight for a player", out, "StartFight=null", absent=("StartFight=True",))
     check("nor claim the opening or set or clear a wait: the methods are not reachable (null, not an answer)", out, "OpenFight=null", "BeginFight=null", "SetSkillWait=null", "ClearSkillWait=null", "UseSkill=null",
           absent=("OpenFight=True", "OpenFight=False", "BeginFight=True", "BeginFight=False", "UseSkill=True", "UseSkill=False"))
     check("an enemy cannot be added for a player", out, "fighting=False")
     check("the opening shot reads false to anyone", out, "QueryOpeningShot=False")
-    check("a blow cannot be forged on a player: spoiling needs the attacker's own attack", out, "SpoilPreparation=False")
+    check("a blow cannot be forged on a player: spoiling needs the attacker's own attack", out, "SpoilPreparation=null")
     check("the wait can be read (it is not secret), and is zero", out, "QuerySkillWaitLeft=0")
     s = stat(vic)
     check("the victim spent nothing", str(s["end"] == s["max_end"]), "True")

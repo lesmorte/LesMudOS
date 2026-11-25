@@ -49,13 +49,32 @@ internal sealed class Connection
     public long LastInputMs;
 
     /// <summary>Queue text for the client. Never blocks the game thread.</summary>
-    public void Send(string text) => _outbox.Writer.TryWrite(Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n").Replace("\n", "\r\n")));
+    public void Send(string text) => Enqueue(Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n").Replace("\n", "\r\n")));
+
+    /// <summary>
+    /// What is queued for a client that does not read is bounded (the second review's N1): past MaxQueuedBytes the connection is
+    /// closed, and what was queued is dropped. A client that reads keeps its queue near empty.
+    /// </summary>
+    public const long MaxQueuedBytes = 4_000_000;
+    private long _queued;
+
+    private bool Enqueue(byte[] bytes)
+    {
+        if (Interlocked.Add(ref _queued, bytes.Length) > MaxQueuedBytes)
+        {
+            Ended("closed by the game (outbox limit)");
+            _outbox.Writer.TryComplete();
+            try { _client.Close(); } catch (Exception) { }
+            return false;
+        }
+        return _outbox.Writer.TryWrite(bytes);
+    }
 
     /// <summary>
     /// Queue raw bytes (telnet commands) for the client, in order with text
     /// queued by Send. Never blocks the game thread.
     /// </summary>
-    public void SendRaw(ReadOnlySpan<byte> bytes) => _outbox.Writer.TryWrite(bytes.ToArray());
+    public void SendRaw(ReadOnlySpan<byte> bytes) => Enqueue(bytes.ToArray());
 
     /// <summary>GMCP (telnet option 201) state of this connection. Written by the network thread, read by the game thread.</summary>
     public readonly GmcpState GmcpSession = new();
@@ -67,7 +86,7 @@ internal sealed class Connection
     public bool SendGmcp(string package, byte[] json)
     {
         if (!GmcpSession.Enabled || !GmcpSession.Wants(package)) return false;
-        return _outbox.Writer.TryWrite(Net.Gmcp.Frame(package, json));
+        return Enqueue(Net.Gmcp.Frame(package, json));
     }
 
     /// <summary>The player's name as last seen, for the log line when the connection ends. Game thread only.</summary>
@@ -97,7 +116,10 @@ internal sealed class Connection
             try
             {
                 await foreach (var bytes in _outbox.Reader.ReadAllAsync())
+                {
                     await stream.WriteAsync(bytes);
+                    Interlocked.Add(ref _queued, -bytes.Length);
+                }
             }
             catch (IOException e) { Ended($"write error: {e.GetType().Name}: {e.Message}"); }
             catch (ObjectDisposedException e) { Ended($"write error: {e.GetType().Name}: {e.Message}"); }
@@ -180,7 +202,7 @@ internal sealed class Connection
     {
         if (sub.Count == 0 || sub[0] != Net.Gmcp.Option) return;
         var reply = GmcpSession.OnMessage(sub.GetRange(1, sub.Count - 1).ToArray(), overflow, message => Log.Info($"{message} ({RemoteAddress})"));
-        if (reply != null && GmcpSession.Enabled) _outbox.Writer.TryWrite(reply);
+        if (reply != null && GmcpSession.Enabled) Enqueue(reply);
     }
 
     private enum TelnetState { Data, Iac, Option, Subnegotiation, SubnegotiationIac }

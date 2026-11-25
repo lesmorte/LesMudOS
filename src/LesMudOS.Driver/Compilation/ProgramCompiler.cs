@@ -19,6 +19,8 @@ internal sealed class MudProgram
     public required MetadataReference Reference { get; init; }
     /// <summary>The MudObject subclass the file defines; null if the file only defines an abstract class.</summary>
     public required Type? ObjectType { get; init; }
+    /// <summary>The source text it was compiled from.</summary>
+    public string Source { get; init; } = "";
     /// <summary>Transitive closure of the programs this one inherits or uses.</summary>
     public required IReadOnlyList<MudProgram> Dependencies { get; init; }
 }
@@ -56,6 +58,17 @@ internal sealed partial class ProgramCompiler
     private readonly HashSet<string> _compiling = new();
     private readonly List<(string Name, WeakReference Context)> _everLoaded = new();
 
+    /// <summary>
+    /// The sandbox domain of a program path ("" for real code), from the master's ObjectDomain. Sandbox code is compiled with ticks
+    /// that check its domain (TickInjector), and may build only on real programs and on programs of its own domain.
+    /// </summary>
+    public Func<string, string> DomainOf { get; set; } = _ => "";
+
+    /// <summary>Told before and after each compile, with the program's domain: the driver's stall watchdog counts a sandbox
+    /// program's compile against its domain and pauses for real code's.</summary>
+    public Action<string>? CompileStarted { get; set; }
+    public Action? CompileEnded { get; set; }
+
     public ProgramCompiler(string mudlibRoot)
     {
         _mudlibRoot = System.IO.Path.GetFullPath(mudlibRoot);
@@ -78,7 +91,9 @@ internal sealed partial class ProgramCompiler
         path = path.Trim().Replace('\\', '/');
         if (path.EndsWith(".cs", StringComparison.Ordinal)) path = path[..^3];
         if (!path.StartsWith('/')) path = "/" + path;
-        if (!PathPattern().IsMatch(path) || path.Contains("..", StringComparison.Ordinal))
+        // One spelling per file: no "." or empty segments ("/./wiz/x" or "//wiz/x" would load /wiz/x under another program path).
+        if (!PathPattern().IsMatch(path) || path.Contains("..", StringComparison.Ordinal)
+            || path.Length < 2 || path.Substring(1).Split('/').Any(segment => segment.Length == 0 || segment == "."))
             throw new MudRuntimeException($"Illegal path '{path}'");
         return path;
     }
@@ -90,6 +105,16 @@ internal sealed partial class ProgramCompiler
     {
         path = NormalizePath(path);
         return _current.TryGetValue(path, out var program) ? program : Compile(path);
+    }
+
+    /// <summary>Is there a current program for the path, compiled from the file as it is now?</summary>
+    public bool IsCurrent(string path)
+    {
+        path = NormalizePath(path);
+        if (!_current.TryGetValue(path, out var program)) return false;
+        var file = SourceFile(path);
+        try { return File.Exists(file) && File.ReadAllText(file) == program.Source; }
+        catch (IOException) { return false; }
     }
 
     /// <summary>Drop the program for a path and every program that depends on it. Returns what was dropped.</summary>
@@ -118,6 +143,13 @@ internal sealed partial class ProgramCompiler
 
     private MudProgram Compile(string path)
     {
+        CompileStarted?.Invoke(DomainOf(path));
+        try { return CompileCore(path); }
+        finally { CompileEnded?.Invoke(); }
+    }
+
+    private MudProgram CompileCore(string path)
+    {
         var file = SourceFile(path);
         if (!File.Exists(file)) throw new MudRuntimeException($"No such file: {path}.cs");
         if (!_compiling.Add(path)) throw new CompileException(path, [$"circular @inherit/@use involving {path}"]);
@@ -134,29 +166,54 @@ internal sealed partial class ProgramCompiler
                     if (!dependencies.Contains(d)) dependencies.Add(d);
             }
 
-            // 2. Parse and inject evaluation-cost ticks.
-            var parsed = CSharpSyntaxTree.ParseText(source, ParseOptions, file, Encoding.UTF8);
-            var rewritten = new TickInjector().Visit(parsed.GetRoot());
-            var tree = CSharpSyntaxTree.Create((CSharpSyntaxNode)rewritten, ParseOptions, file, Encoding.UTF8);
+            // Sandbox code builds only on real programs and on its own domain's: another home's code, or a file directly in /wiz,
+            // would run in this program's objects and fail its own domain check at its first statement. Real code never builds on
+            // sandbox code.
+            var domain = DomainOf(path);
+            foreach (var d in dependencies)
+            {
+                var other = DomainOf(d.Path);
+                if (other.Length > 0 && other != domain)
+                    throw new CompileException(path, [$"{path}.cs: cannot inherit or use {d.Path}: " +
+                        (domain.Length == 0 ? "real code cannot build on a wizard's sandbox" : "it belongs to another wizard's sandbox")]);
+            }
 
-            // 3. Compile.
+            // 2. Parse and inject evaluation-cost ticks. 3. Compile. An expression-bodied lambda becomes a block with a return; one
+            // that turns out to be a void delegate (the compiler says so, CS8030) is rewritten without the return and compiled again.
+            var parsed = CSharpSyntaxTree.ParseText(source, ParseOptions, file, Encoding.UTF8);
             var version = _versions[path] = _versions.GetValueOrDefault(path) + 1;
             var assemblyName = $"{AssemblyPrefix}{path.Trim('/').Replace('/', '.')}.v{version}";
-            var compilation = CSharpCompilation.Create(
-                assemblyName,
-                [_globalUsingsTree, tree],
-                _platformReferences.Concat(dependencies.Select(d => d.Reference)),
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary,
-                    optimizationLevel: OptimizationLevel.Debug,
-                    allowUnsafe: false,
-                    nullableContextOptions: NullableContextOptions.Annotations));
-
-            var errors = compilation.GetDiagnostics()
-                .Where(d => d.Severity == DiagnosticSeverity.Error)
-                .Select(d => FormatDiagnostic(d, path))
-                .ToList();
-            if (errors.Count > 0) throw new CompileException(path, errors);
+            var voidLambdas = new HashSet<int>();
+            SyntaxTree tree;
+            CSharpCompilation compilation;
+            List<Diagnostic> failed;
+            var pass = 0;
+            while (true)
+            {
+                var rewritten = new TickInjector(domain, voidLambdas).Visit(parsed.GetRoot());
+                tree = CSharpSyntaxTree.Create((CSharpSyntaxNode)rewritten, ParseOptions, file, Encoding.UTF8);
+                compilation = CSharpCompilation.Create(
+                    assemblyName,
+                    [_globalUsingsTree, tree],
+                    _platformReferences.Concat(dependencies.Select(d => d.Reference)),
+                    new CSharpCompilationOptions(
+                        OutputKind.DynamicallyLinkedLibrary,
+                        optimizationLevel: OptimizationLevel.Debug,
+                        allowUnsafe: false,
+                        nullableContextOptions: NullableContextOptions.Annotations));
+                failed = compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+                if (failed.Count == 0 || ++pass > 4) break;
+                var more = false;
+                foreach (var diagnostic in failed.Where(d => d.Id == "CS8030" && d.Location.SourceTree == tree))
+                {
+                    var node = tree.GetRoot().FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
+                    var lambda = node.AncestorsAndSelf().FirstOrDefault(n => n.HasAnnotations(TickInjector.LambdaAnnotationKind));
+                    var mark = lambda?.GetAnnotations(TickInjector.LambdaAnnotationKind).First().Data;
+                    if (mark != null && voidLambdas.Add(int.Parse(mark, System.Globalization.CultureInfo.InvariantCulture))) more = true;
+                }
+                if (!more) break;
+            }
+            if (failed.Count > 0) throw new CompileException(path, failed.Select(d => FormatDiagnostic(d, path)).ToList());
 
             // 4. Sandbox allow-list.
             var violations = SandboxAnalyzer.Analyze(compilation, tree, path);
@@ -188,6 +245,7 @@ internal sealed partial class ProgramCompiler
                 Reference = MetadataReference.CreateFromImage(image.ToArray()),
                 ObjectType = objectTypes[0].IsAbstract ? null : objectTypes[0],
                 Dependencies = dependencies,
+                Source = source,
             };
             _current[path] = program;
             _everLoaded.Add((assemblyName, new WeakReference(context)));

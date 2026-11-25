@@ -7,7 +7,8 @@ public class LinkDead : MudObject
 {
     private readonly Dictionary<string, ObjectRef> bodies = new();
 
-    private static bool IsBody(ObjectRef? ob) => ob != null && ob.IsAlive && ob.IsClone && ob.ProgramPath == "/std/player";
+    // A real body only: a copy of /std/player made by a wizard's sandbox code has a domain and is never a player's body (docs/SANDBOX.md).
+    private static bool IsBody(ObjectRef? ob) => ob != null && ob.IsAlive && ob.IsClone && ob.ProgramPath == "/std/player" && ob.Domain == "";
 
     /// <summary>A player body registers itself (only it may).</summary>
     public void Register(ObjectRef body)

@@ -380,7 +380,7 @@ def main():
         ["dotnet", driver_dll, "--mudlib", mudlib, "--save", os.path.join(work, "save"), "--port", str(PORT)],
         stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "LESMUDOS_ADMIN_SECRET": SECRET})
     try:
-        for _ in range(100):
+        for _ in range(200):  # 40 s: the driver boots in about 14 s, more on a busy machine
             try:
                 socket.create_connection(("127.0.0.1", PORT), timeout=0.3).close()
                 break
@@ -544,11 +544,13 @@ public class Imposter : Item
 
         check("level 5 cannot edit /std", b.command("edit /std/room"), "need wizard level 10")
         check("level 5 cannot mkdir in /secure", b.command("mkdir /secure/x"), "need wizard level 10")
-        check("level 5 can edit elsewhere", b.ed("edit /domains/lab/notes.txt"), "New file /domains/lab/notes.txt")
-        b.command("a", marker="only .")
-        b.send("remember the milk")
-        b.ed(".")
-        check("level 5 can save", b.command("x"), "Wrote /domains/lab/notes.txt, 1 lines", absent=("update",))
+        # CHANGED (sandbox): below level 10 the real game changes only through publishing (docs/SANDBOX.md section 4).
+        check("level 5 cannot edit the real game", b.command("edit /domains/lab/notes.txt"), "You need wizard level 10 to change anything outside /wiz", absent=("editor",))
+        check("level 10 can edit elsewhere", a.ed("edit /domains/lab/notes.txt"), "New file /domains/lab/notes.txt")
+        a.command("a", marker="only .")
+        a.send("remember the milk")
+        a.ed(".")
+        check("level 10 can save", a.command("x"), "Wrote /domains/lab/notes.txt, 1 lines", absent=("update",))
         check("other objects cannot write files", b.command("scribble"), "may not write-file /domains/town/hack.cs")
 
         # ---- copy, move and rename ----
@@ -577,8 +579,9 @@ public class Imposter : Item
         check("level 5 cannot move out of /std", b.command("move /std/room /domains/lab"), "need wizard level 10", absent=("Moved",))
         check("level 5 cannot move into /secure", b.command("move /domains/lab/notes.txt /secure"), "need wizard level 10", absent=("Moved",))
         check("level 5 cannot rename in /std", b.command("rename /std/room hall"), "need wizard level 10", absent=("Renamed",))
-        check("level 5 can copy from /std elsewhere", b.command("copy /std/room /domains/lab"), "Copied /std/room.cs to /domains/lab/room.cs.")
-        check("level 5 can move elsewhere", b.command("move /domains/lab/room.cs /domains/lab/sub/hall.cs"), "Moved /domains/lab/room.cs to /domains/lab/sub/hall.cs.")
+        check("level 5 cannot copy into the real game", b.command("copy /std/room /domains/lab"), "You need wizard level 10 to change anything outside /wiz", absent=("Copied",))
+        check("level 10 can copy from /std elsewhere", a.command("copy /std/room /domains/lab"), "Copied /std/room.cs to /domains/lab/room.cs.")
+        check("level 10 can move elsewhere", a.command("move /domains/lab/room.cs /domains/lab/sub/hall.cs"), "Moved /domains/lab/room.cs to /domains/lab/sub/hall.cs.")
         check("source under /std is untouched", a.command("list /std"), "room.cs")
         check("other objects cannot copy files", b.command("duplicate"), "may not read-file /domains/town/square.cs")
         check("other objects cannot rename files", b.command("shuffle"), "may not write-file /domains/town/square.cs")
@@ -695,16 +698,20 @@ public class Beacon : Item
         check("so it is still on disk", str(os.path.exists(os.path.join(mudlib, "STD", "room.cs"))), "True")
         shutil.rmtree(os.path.join(mudlib, "STD"))
         check("/std/room.cs is still on disk", str(os.path.exists(os.path.join(mudlib, "std", "room.cs"))), "True")
-        b.command("delete /domains/lab/sub/hall", marker="(y/n) ")
-        check("level 5 can delete elsewhere", b.command("y"), "Deleted /domains/lab/sub/hall.cs.")
-        b.command("delete /domains/lab/sub/gizmo", marker="(y/n) ")
+        check("level 5 cannot delete in the real game", b.command("delete /domains/lab/sub/hall"), "You need wizard level 10 to change anything outside /wiz", absent=("(y/n)",))
+        a.command("delete /domains/lab/sub/hall", marker="(y/n) ")
+        check("level 10 can delete elsewhere", a.command("y"), "Deleted /domains/lab/sub/hall.cs.")
+        # The level is checked again when the answer comes: in another wizard's home, which level 5 may change.
+        write(mudlib, "/wiz/alice/gizmo", "// a file in alice's home")
+        b.command("delete /wiz/alice/gizmo", marker="(y/n) ")
         a.command("promote bob 4")
         b.read_until("level is now")
         check("level is checked again when the answer comes", b.command("y"), "You may no longer delete that file. Not deleted.")
-        check("so the file is still on disk", str(os.path.exists(os.path.join(lab, "sub", "gizmo.cs"))), "True")
+        check("so the file is still on disk", str(os.path.exists(os.path.join(mudlib, "wiz", "alice", "gizmo.cs"))), "True")
+        os.remove(os.path.join(mudlib, "wiz", "alice", "gizmo.cs"))
         # CHANGED (wizard homes): as above, a refusal naming the rule instead of "What?".
         check("level 4 cannot delete or rmdir outside the home", b.command("delete /domains/lab/sub/gizmo") + b.command("rmdir /domains/lab/ghost"),
-              "You need wizard level 5 to change anything outside your own home directory", absent=("(y/n)", "not empty", "What?"))
+              "You need wizard level 10 to change anything outside /wiz", absent=("(y/n)", "not empty", "What?"))
         a.command("promote bob 5")
         b.read_until("level is now")
         check("other objects cannot delete files", b.command("erase"), "may not remove-file /domains/town/square.cs")
@@ -716,7 +723,7 @@ public class Beacon : Item
         # CHANGED (wizard homes): a level-1 wizard now has the file commands (in their own home), so outside it they get
         # a refusal that names the rule instead of "What?".
         check("level 1 cannot edit or mkdir outside the home", b.command("edit /domains/lab/notes.txt") + b.command("mkdir /domains/lab/x"),
-              "You need wizard level 5 to change anything outside your own home directory, /wiz/bob.", absent=("editor", "Created", "What?"))
+              "You need wizard level 10 to change anything outside /wiz. Your own home is /wiz/bob", absent=("editor", "Created", "What?"))
         with open(os.path.join(mudlib, "domains", "lab", "widget.cs")) as f:
             check("file on disk matches", f.read(), "// @inherit /std/item\n", "edited live", absent=("\r",))
         a.command("cd /domains/town")
@@ -808,8 +815,10 @@ public class Beacon : Item
         check("wizard homes: cat with ~", b.command("cat ~/rooms/hall"), "/wiz/bob/rooms/hall.cs (11 lines)", "public class Hall")
 
         check("wizard homes: level 1 updates their own file", b.command("update ~/rooms/hall"), "Recompiled /wiz/bob/rooms/hall")
+        # CHANGED (sandbox): a wizard's own code can be cloned only in their workshop (one of their rooms), never out in the real game.
+        check("wizard homes: a level 1 wizard cannot clone their own item out in the real game", b.command("clone ~/items/gem"), "Things made in the workshop cannot leave it.", absent=("Cloned",))
+        check("wizard homes: level 1 goto their own room", b.command("goto ~/rooms/hall"), "Bob's Hall", "A hall of Bob's own making.", "Gem is here.", "You step into the workshop.")
         check("wizard homes: level 1 clones their own item", b.command("clone ~/items/gem"), "Cloned /wiz/bob/items/gem#")
-        check("wizard homes: level 1 goto their own room", b.command("goto ~/rooms/hall"), "Bob's Hall", "A hall of Bob's own making.", "Gem is here.")
         check("wizard homes: the item they wrote works", b.command("polish gem"), "The gem gleams.")
         check("wizard homes: update replaces the loaded room and keeps the wizard in it", b.command("update ~/rooms/hall"), "Replaced /wiz/bob/rooms/hall; moved 1 occupant(s) back in.")
         check("wizard homes: the room they wrote has working exits", b.command("out"), "Town Square")
@@ -854,7 +863,7 @@ public class Beacon : Item
               "You need wizard level 5 to update anything outside your own home directory, /wiz/bob.")
 
         # -- outside the home: the old levels --
-        outside = "You need wizard level 5 to change anything outside your own home directory, /wiz/bob."
+        outside = "You need wizard level 10 to change anything outside /wiz. Your own home is /wiz/bob; submit a directory of it to have it published."
         check("wizard homes: mkdir in /domains refused", b.command("mkdir /domains/x"), outside, absent=("Created",))
         check("wizard homes: edit in /domains refused", b.command("edit /domains/town/x"), outside, absent=("editor",))
         check("wizard homes: copy into /domains refused", b.command("copy ~/items/gem /domains/town"), outside, absent=("Copied",))
@@ -864,7 +873,7 @@ public class Beacon : Item
         check("wizard homes: rmdir in /domains refused", b.command("rmdir /domains/lab/sub"), outside, absent=("Removed",))
         check("wizard homes: /std still needs level 10", b.command("edit /std/room"), "You need wizard level 10 to change /secure and /std.")
         check("wizard homes: clone outside the home still needs level 3", b.command("clone /domains/town/lantern"), "You need wizard level 3 to clone anything outside your own home directory", absent=("Cloned",))
-        check("wizard homes: update outside the home still needs level 5", b.command("update /domains/town/square"), "You need wizard level 5 to update anything outside your own home directory", absent=("Recompiled",))
+        check("wizard homes: update of the real game needs level 10", b.command("update /domains/town/square"), "You need wizard level 10 to update the game's own code", absent=("Recompiled",))
         check("wizard homes: goto outside the home keeps its level 1 rule", b.command("goto /domains/town/square"), "Town Square")
 
         # -- /wiz itself and the homes themselves: level 10 --
@@ -919,7 +928,9 @@ public class Beacon : Item
         carol.command("delete /wiz/bob/c5/f", marker="(y/n) ")
         carol.command("y")
         check("wizard homes: level 5 rmdir", carol.command("rmdir /wiz/bob/c5"), "Removed /wiz/bob/c5/")
+        carol.command("goto /wiz/bob/rooms/hall")  # CHANGED (sandbox): a sandbox object is cloned in a workshop
         check("wizard homes: level 5 update and clone of bob's files", carol.command("update /wiz/bob/items/gem") + carol.command("clone /wiz/bob/items/gem"), "Recompiled /wiz/bob/items/gem", "Cloned /wiz/bob/items/gem#")
+        carol.command("goto /domains/town/square")
         check("wizard homes: level 5 still cannot touch a home itself or /wiz", carol.command("rmdir /wiz/bob") + carol.command("mkdir /wiz/zed") + carol.command("delete /wiz/README.md") + carol.command("rmdir ~"),
               "You need wizard level 10 to change /wiz itself, a home directory (/wiz/<name>) or a file directly in /wiz.", absent=("Removed", "Created", "(y/n)"))
         check("wizard homes: level 5 still cannot change /std", carol.command("mkdir /std/x"), "You need wizard level 10 to change /secure and /std.")
@@ -967,10 +978,11 @@ public class Beacon : Item
             '        Write("bootstrap=" + wiz.Call<bool>("Bootstrap", args) + "\\n");',
             '        vault.Call("Record", "bob", "1", new List<string> { "/std/item" }, 5);',
             '        vault.Call("Clear", "alice", "1");',
-            '        Write("claim=" + string.Join(",", vault.Call<List<string>>("Claim")) + "\\n");',
+            '        Write("claim=" + string.Join(",", vault.Call<List<string>>("Claim") ?? new List<string> { "0" }) + "\\n");',
             "        return true;",
             "    }",
             "}"])
+        b.command("goto ~/rooms/hall")  # CHANGED (sandbox): in the workshop
         text = b.command("clone ~/items/rogue")
         check("wizard homes: a level-1 wizard's own object compiles and clones", text, "Cloned /wiz/bob/items/rogue#")
         text = b.command("attempt " + SECRET)
@@ -983,7 +995,8 @@ public class Beacon : Item
                               ("save-vault", "may not write /secure/lost_property"), ("secret", "may not check the admin secret"),
                               ("update", "may not update /std/room"), ("shutdown", "may not shut the driver down"), ("destruct-player", "may not destruct")]:
             check("wizard homes: code in a home cannot " + label, text, label + "=BLOCKED ", reason)
-        check("wizard homes: code in a home cannot promote", text, "promote=Only a player can do that.")
+        # CHANGED (sandbox): sandbox code cannot reach the registry's Promote at all; the call returns nothing.
+        check("wizard homes: code in a home cannot promote", text, "promote=\r\n")
         check("wizard homes: code in a home cannot use the bootstrap, even with the right secret", text, "bootstrap=False")
         check("wizard homes: code in a home cannot claim from the vault", text, "claim=0\r\n")
         check("wizard homes: nothing was allowed", text, absent=("=ALLOWED",))

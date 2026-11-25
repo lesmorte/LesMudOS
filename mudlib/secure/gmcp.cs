@@ -40,13 +40,17 @@ public class GmcpDaemon : MudObject
     private bool FromBody(ObjectRef player)
     {
         var caller = PreviousObject();
-        return !Self.IsClone && caller != null && caller == player && player.IsAlive && player.IsClone && player.ProgramPath == PlayerProgram;
+        // A real body (never a sandbox copy of /std/player, docs/SANDBOX.md), and never on behalf of a wizard's sandbox code. A wizard's
+        // map in the workshop still follows them: the body polls after every prompt and heart beat, with no sandbox code running.
+        return !Self.IsClone && caller != null && caller == player && player.IsAlive && player.IsClone && player.ProgramPath == PlayerProgram
+               && player.Domain == "" && RestrictedCaller() == null;
     }
 
     private bool FromComm()
     {
         var caller = PreviousObject();
-        return !Self.IsClone && caller != null && caller.IsAlive && !caller.IsClone && (caller.ProgramPath == "/secure/comm" || caller.ProgramPath == "/secure/channels");
+        return !Self.IsClone && caller != null && caller.IsAlive && !caller.IsClone && caller.Domain == "" && RestrictedCaller() == null
+               && (caller.ProgramPath == "/secure/comm" || caller.ProgramPath == "/secure/channels");
     }
 
     // ------------------------------------------------------------------
@@ -168,7 +172,9 @@ public class GmcpDaemon : MudObject
         if (facts == null) return;
         var path = room.IsClone ? room.Name : room.ProgramPath;
         var ids = LoadObject(RoomIds);
-        var number = ids.Call<int>("Assign", path);
+        // A room of a wizard's sandbox (or a clone) gets a number that is never saved, and so do the places its exits name.
+        var sandbox = room.Domain != "";
+        var number = ids.Call<int>("Assign", path, sandbox);
         if (number <= 0) return;
 
         var area = Str(facts, "area");
@@ -191,7 +197,7 @@ public class GmcpDaemon : MudObject
             {
                 if (exits.Count >= MaxExits) break;
                 if (way.Key == null || way.Key.Length == 0 || way.Key.Length > 32 || way.Value == null) continue;
-                var target = ids.Call<int>("Assign", way.Value);
+                var target = ids.Call<int>("Assign", way.Value, sandbox);
                 if (target <= 0) continue;
                 exits[way.Key] = target;
                 if (states2 != null && states2.TryGetValue(way.Key, out var state) && state is "open" or "closed" or "locked") doors[way.Key] = state;

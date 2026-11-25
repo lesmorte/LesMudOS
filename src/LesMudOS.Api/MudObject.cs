@@ -76,6 +76,12 @@ public abstract class MudObject
     /// <summary>Called just before the object is destructed.</summary>
     public virtual void OnDestruct() { }
 
+    /// <summary>
+    /// Called on an object right after it has been moved (from is its old environment, null if it had none), before any Init is
+    /// offered in its new place. Any object may also call it by name, so act only on the object's actual state, not on the argument.
+    /// </summary>
+    public virtual void OnMoved(ObjectRef? from) { }
+
     // =====================================================================
     // Efuns (object -> driver)
     // =====================================================================
@@ -105,13 +111,16 @@ public abstract class MudObject
     /// </summary>
     protected IReadOnlyList<string> UpdateProgram(string path) => D.UpdateProgram(Self, path);
 
+    /// <summary>True if the program at this path is compiled from its file exactly as the file is now.</summary>
+    protected bool ProgramCurrent(string path) => D.ProgramCurrent(path);
+
     // ---- Containment ----
 
     /// <summary>Move this object into a destination object.</summary>
-    protected void MoveObject(ObjectRef destination) => D.Move(Self, destination);
+    protected void MoveObject(ObjectRef destination) => D.Move(Self, Self, destination);
 
     /// <summary>Move another object into a destination object.</summary>
-    protected void MoveObject(ObjectRef what, ObjectRef destination) => D.Move(what, destination);
+    protected void MoveObject(ObjectRef what, ObjectRef destination) => D.Move(Self, what, destination);
 
     /// <summary>The object that contains ob (or this object), or null.</summary>
     protected ObjectRef? Environment(ObjectRef? ob = null) => (ob ?? Self).Environment;
@@ -141,6 +150,18 @@ public abstract class MudObject
     /// command). Use it for security checks instead of trusting an argument.
     /// </summary>
     protected ObjectRef? PreviousObject() => D.PreviousObject(Self);
+
+    /// <summary>
+    /// Every object whose code is running in this execution, outermost first, this object last if its code is running. The bottom
+    /// one is what the driver entered at top level (the command's binding owner, the heartbeat or call-out owner).
+    /// </summary>
+    protected IReadOnlyList<ObjectRef> CallerChain() => D.CallerChain();
+
+    /// <summary>
+    /// The outermost restricted object (one with a domain) on the call stack, or a restricted ThisPlayer(), or null if there is none:
+    /// is this a restricted execution?
+    /// </summary>
+    protected ObjectRef? RestrictedCaller() => D.RestrictedCaller();
 
     /// <summary>The verb of the command being executed.</summary>
     protected string QueryVerb() => D.Verb;
@@ -283,6 +304,9 @@ public abstract class MudObject
     /// time. False if it does not match or the hash is malformed or empty.
     /// </summary>
     protected bool VerifyPassword(string password, string hash) => D.VerifyPassword(password, hash);
+
+    /// <summary>The SHA-256 of the text's UTF-8 bytes, as 64 lower-case hex digits.</summary>
+    protected string Sha256(string text) => D.Sha256(text ?? "");
 
     /// <summary>
     /// List a directory of the mudlib: sub-directories first, then files, each

@@ -17,7 +17,8 @@ internal sealed partial class Kernel
     /// <summary>A player's body drops its own connection (the idle timeout). The connection ends as if the client had closed it: NetDead follows.</summary>
     public bool DropConnection(ObjectRef caller, ObjectRef target)
     {
-        if (caller != target || !target.IsAlive || target.Connection is not Connection connection) return false;
+        // Only a body for itself, and never while sandbox code is acting (docs/SANDBOX.md).
+        if (Restricted || caller != target || target.Domain.Length > 0 || !target.IsAlive || target.Connection is not Connection connection) return false;
         connection.Close("closed by the game (idle timeout)");
         return true;
     }

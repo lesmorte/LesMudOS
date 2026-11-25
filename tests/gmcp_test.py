@@ -265,7 +265,14 @@ public class MinaHall : Room
     {
         ShortDesc = "Mina's Workshop"; LongDesc = "Sawdust and half-built rooms.";
         Exits["out"] = "/domains/gmcptest/hub";
+        Exits["up"] = "/wiz/mina/loft";
     }
+}
+'''
+WIZLOFT = '''// @inherit /std/room
+public class MinaLoft : Room
+{
+    public override void Create() { ShortDesc = "Mina's Loft"; LongDesc = "Plans pinned to the beams."; Exits["down"] = "/wiz/mina/hall"; }
 }
 '''
 # What a low-level wizard could write: an object that tries to send GMCP, to use the service, and to read or assign what it must not.
@@ -327,7 +334,7 @@ def start_driver(work, mudlib, log):
     driver = subprocess.Popen(
         ["dotnet", driver_dll, "--mudlib", mudlib, "--save", os.path.join(work, "save"), "--port", str(h.PORT)],
         stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "LESMUDOS_ADMIN_SECRET": h.SECRET})
-    for _ in range(150):
+    for _ in range(200):  # 40 s: the driver boots in about 14 s, more on a busy machine
         try:
             socket.create_connection(("127.0.0.1", h.PORT), timeout=0.3).close()
             return driver
@@ -739,6 +746,10 @@ def run(work, mudlib, logpath, driver_box):
     # ================= a wizard's probe =================
     h.write(mudlib, "/wiz/mina/probe", PROBE)
     h.write(mudlib, "/wiz/mina/hall", WIZROOM)
+    h.write(mudlib, "/wiz/mina/loft", WIZLOFT)
+    # CHANGED (sandbox): a wizard's code is cloned and run in their workshop (docs/SANDBOX.md); from there its calls on the services
+    # do not reach them at all (null).
+    mina.command("goto /wiz/mina/hall")
     check("Mina clones her probe", mina.command("clone /wiz/mina/probe"), "Cloned /wiz/mina/probe#")
     m_alice = alice.mark()
     m_carol = carol.mark()
@@ -748,7 +759,7 @@ def run(work, mudlib, logpath, driver_box):
     check("it may ask whether a player uses GMCP (a harmless boolean)", out, "active: True")
     check("it cannot make the service send", out, "channel: null", "poll: null", "look: null")
     check("it cannot read the facts the service builds", out, "facts: null", "roomfacts: null")
-    check("it cannot assign a room number and reading one gives 0", out, "assign: 0", "query: 0")
+    check("it cannot assign a room number and reading one gives 0", out, "assign: null", "query: 0")
     alice.pump(1.0)
     truth("Alice received nothing from the probe", all("PROBE" not in json.dumps(v) for _, v in alice.frames[m_alice:]), alice.frames[m_alice:])
     out = mina.command("gprobe bob")
@@ -756,7 +767,6 @@ def run(work, mudlib, logpath, driver_box):
     truth("Bob's stream holds no GMCP", b"\xff\xfa" not in bob.stream)
 
     # ================= wizard home rooms =================
-    mina.command("goto /wiz/mina/hall")
     wiz = mina.wait("Room.Info", lambda v: v["name"] == "Mina's Workshop")
     truth("a wizard's home room is in the Workshop area", wiz and wiz["area"] == "Workshop of Mina", wiz)
     truth("and has a number from the separate range", wiz and wiz["num"] > 1_000_000_000, wiz)
@@ -764,6 +774,14 @@ def run(work, mudlib, logpath, driver_box):
     saved = open(os.path.join(work, "save", "secure", "roomids.json")).read()
     truth("the saved table holds no wizard room and the game rooms", "/wiz/" not in saved and "gmcptest/hub" in saved, saved[:200])
     example("Room.Info (wizard home)", wiz)
+    # A wizard's map follows them through the workshop's own exits (sandbox code moves them; the body's poll after the prompt sends it).
+    m = mina.mark()
+    mina.command("up")
+    loft = mina.wait("Room.Info", lambda v: v["name"] == "Mina's Loft", m)
+    truth("walking a workshop exit updates the wizard's own map", loft is not None and loft["num"] > 1_000_000_000, loft)
+    mina.command("down")
+    saved = open(os.path.join(work, "save", "secure", "roomids.json")).read()
+    truth("and the saved table still holds no wizard room", "/wiz/" not in saved, saved[:200])
 
     # ================= restart: stable numbers =================
     numbers = {}

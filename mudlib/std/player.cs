@@ -98,6 +98,12 @@ public class Player : Adventurer
         if (ready && PreviousObject() is { ProgramPath: "/std/player" }) Save();
     }
 
+    /// <summary>Called by the driver itself (nothing else on the call stack) when memory runs low, so that a kill loses little.</summary>
+    public void SaveForLowMemory()
+    {
+        if (ready && PreviousObject() == null && RestrictedCaller() == null) Save();
+    }
+
     /// <summary>
     /// Called by another player's body right after it gave this player something (the give command), so that both save
     /// files agree. Only a player body acting for its own command may ask.
@@ -122,6 +128,7 @@ public class Player : Adventurer
 
     private void Save()
     {
+        if (inWorkshop || leavingWorkshop) return; // the save file holds the workshop checkpoint (docs/SANDBOX.md)
         PrepareSave();
         SaveObject(SaveFile);
     }
@@ -207,8 +214,11 @@ public class Player : Adventurer
         ready = true;
         loginObject = null;
 
-        logins++;
-        lastLogin = Time();
+        if (!resuming) // a body made from the workshop checkpoint is the same visit
+        {
+            logins++;
+            lastLogin = Time();
+        }
 
         EnableCommands();
         BindChannelVerbs(); // first, so that no channel name can take over a command the game already has
@@ -258,13 +268,28 @@ public class Player : Adventurer
         AddAction("clone", CmdClone);
         AddAction("mudstat", CmdMudstat);
         AddAction("shutdown", CmdShutdown);
+        AddAction("submit", CmdSubmit);
+        AddAction("submissions", CmdSubmissions);
+        AddAction("submission", CmdSubmission);
+        AddAction("approve", CmdApprove);
+        AddAction("reject", CmdReject);
+        AddAction("withdraw", CmdWithdraw);
+        AddAction("revoke", CmdRevoke);
 
+        if (resuming)
+        {
+            Write("You leave the workshop as you entered it.\n");
+            ResumeWhere();
+            Look();
+            return;
+        }
         Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type '{{cmd}}help{{/}}' for commands. If the boxes and bullets of {{cmd}}score{{/}} look wrong, type {{cmd}}charset ascii{{/}}.\n\n");
         EnsureHome(); // a wizard whose home is missing gets it back
         EnterWorld(StartRoom);
         ClaimLostProperty();
         Say($"{Name} enters the game.\n");
         Look();
+        PublishingNotice();
     }
 
     /// <summary>This player's wizard level, 0 to 10, as held by the wizard registry.</summary>
@@ -296,6 +321,8 @@ public class Player : Adventurer
 
     protected override void IdleCheck()
     {
+        if (inWorkshop && !leavingWorkshop && QueryWizLevel() < 1) ScheduleRestore(true); // no longer a wizard: out of the workshop
+        if (!inWorkshop && !leavingWorkshop) SweepSandboxThings();
         var idle = IdleSeconds(Self);
         var timeout = TimeoutSeconds();
         var warnAt = timeout - WarningLead(timeout);
@@ -340,6 +367,7 @@ public class Player : Adventurer
     /// </summary>
     private bool CmdPassword(string args)
     {
+        if (inWorkshop) { Write("Change your password outside the workshop: nothing done in the workshop is saved.\n"); return true; }
         Write("Current password: ");
         InputTo(PasswordCurrent, true);
         return true;
@@ -389,13 +417,21 @@ public class Player : Adventurer
 
     private bool CmdQuit(string args)
     {
-        // Quitting is not an escape: a fight is left by fleeing (the body of a dropped connection stays for a minute, so quit must not be cheaper).
-        if (QueryInCombat()) { Write("You cannot leave in the middle of a fight. Flee first.\n"); return true; }
-        Save();
-        Write("Goodbye.\n");
-        Say($"{Name} leaves the game.\n");
-        ReleaseInventory(); // the carried items are saved as records (path and state) and come back at the next login
-        Destruct(); // the connection closes
+        // Quitting is not an escape: a fight is left by fleeing (the body of a dropped connection stays for a minute, so quit must not be
+        // cheaper). In the workshop it is: nothing there is kept, and the save file is the checkpoint.
+        if (QueryInCombat() && !inWorkshop) { Write("You cannot leave in the middle of a fight. Flee first.\n"); return true; }
+        try
+        {
+            Save();
+            if (inWorkshop) Write("The workshop's changes were left behind.\n");
+            Write("Goodbye.\n");
+            Say($"{Name} leaves the game.\n");
+            ReleaseInventory(); // the carried items are saved as records (path and state) and come back at the next login
+        }
+        finally
+        {
+            Destruct(); // the connection closes, whatever happened above
+        }
         return true;
     }
 
@@ -457,7 +493,7 @@ public class Player : Adventurer
               "          command below, plus update and clone, at any wizard level.\n");
         if (level >= LevelMudstat) Write("          {cmd}mudstat{/}                    driver statistics\n");
         Write("          {cmd}clone{/} <path>               clone an object into your inventory or room (level 3 outside your home)\n" +
-              "          {cmd}update{/} <path>              recompile a file and replace the loaded object (level 5 outside your home)\n" +
+              "          {cmd}update{/} <path>              recompile a file and replace the loaded object (level 5 in other homes, 10 outside /wiz)\n" +
               "          {cmd}mkdir{/} <dir>                create a directory\n" +
               "          {cmd}edit{/} <file>                create or change a file in the line editor\n" +
               "          {cmd}copy{/} <from> <to>           copy a file (into a directory: same name)\n" +
@@ -465,13 +501,17 @@ public class Player : Adventurer
               "          {cmd}rename{/} <file> <newname>    rename a file within its directory\n" +
               "          {cmd}delete{/} <file>              delete a file, after you confirm (cannot be undone)\n" +
               "          {cmd}rmdir{/} <dir>                remove an empty directory\n" +
-              "                                     (those seven need level 5 outside your home, and in other wizards' homes;\n" +
-              "                                     level 10 for /secure, /std, /wiz itself and the home directories)\n");
+              "                                     (those seven need level 5 in other wizards' homes, and level 10 anywhere\n" +
+              "                                     outside /wiz, for /wiz itself and the home directories)\n" +
+              "          {cmd}submit{/} <dir> [to /domains/<name>] [: note]   ask for a directory of your home to be published\n" +
+              "          {cmd}submissions{/} [all], {cmd}submission{/} <n>, {cmd}withdraw{/} <n>   your requests (level 5: everyone's)\n");
+        if (level >= 5) Write("          {cmd}approve{/} <n> [to /domains/<name>], {cmd}reject{/} <n> <reason>   decide another wizard's request\n");
+        if (level >= 10) Write("          {cmd}revoke{/} <n> [: reason]       remove a publication from the game\n");
         if (level >= 5) Write("          {cmd}restore{/} [<target>]         restore a creature (or yourself) to full Vitality, Endurance and Focus\n");
         if (level >= 5) Write("          {cmd}speed{/} <target> <percent> [<seconds>]  haste (positive) or slow (negative) a creature's Reaction Time; 0 clears\n");
         if (level >= 10) Write("          {cmd}slay{/} <target>              kill a creature at once, with kill credit\n");
         if (level >= 10) Write("          {cmd}setlevel{/} <1-100>           set your level (experience, Vitality and resources follow)\n");
-        if (level >= LevelUpdate) Write("          {cmd}update{/} <path>              recompile a file and replace the loaded object\n");
+        if (level >= LevelSystemFiles) Write("          {cmd}update{/} <path>              recompile a file and replace the loaded object (anywhere)\n");
         if (level >= LevelShutdown) Write("          {cmd}shutdown{/}                   stop the driver\n");
         return true;
     }
@@ -680,7 +720,7 @@ public class Player : Adventurer
     ///   /wiz, /wiz/&lt;x&gt; (a home itself, or a file directly in /wiz)   level 10 (own home: mkdir only)
     ///   /wiz/&lt;me&gt;/...                      any wizard (level 1 up)
     ///   /wiz/&lt;other&gt;/...                   level 5
-    ///   anywhere else                      level 5
+    ///   anywhere else                      level 10 (below it, work reaches the game by publishing: docs/SANDBOX.md section 4)
     ///
     /// Names are compared whole-segment and without case (on a case-insensitive
     /// file system /WIZ/Bob is /wiz/bob), so bob does not reach bobby's home.
@@ -716,7 +756,23 @@ public class Player : Adventurer
             return $"/wiz/{Esc(segs[1])} is another wizard's home. Below wizard level {LevelEdit} you may read it ({{cmd}}list{{/}}, {{cmd}}cd{{/}}, {{cmd}}cat{{/}}) but not change it.";
         }
 
-        return level >= LevelEdit ? null : $"You need wizard level {LevelEdit} to change anything outside your own home directory, {Esc(HomePath)}.";
+        return level >= LevelSystemFiles ? null : $"You need wizard level {LevelSystemFiles} to change anything outside /wiz. Your own home is {Esc(HomePath)}; {{cmd}}submit{{/}} a directory of it to have it published.";
+    }
+
+    /// <summary>
+    /// Why this wizard may not update this path, or null: in the own home from level 1, in another wizard's home from level 5,
+    /// and the real game's code (everything outside /wiz) only at level 10, since an update reloads it for every player.
+    /// </summary>
+    private string? UpdateRefusal(string path)
+    {
+        if (InOwnHome(path)) return null;
+        var level = QueryWizLevel();
+        var segs = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var inWiz = segs.Length > 0 && string.Equals(segs[0], "wiz", StringComparison.OrdinalIgnoreCase);
+        var needed = inWiz && segs.Length >= 3 ? LevelUpdate : LevelSystemFiles;
+        return level >= needed ? null : inWiz
+            ? $"You need wizard level {needed} to update anything outside your own home directory, {Esc(HomePath)}."
+            : $"You need wizard level {needed} to update the game's own code (anything outside /wiz). Your own home is {Esc(HomePath)}.";
     }
 
     /// <summary>True if the path is a file or directory inside this wizard's own home (not the home directory itself).</summary>
@@ -737,8 +793,27 @@ public class Player : Adventurer
     private static string Numbered(List<string> lines, int first, int last)
     {
         var text = new StringBuilder();
-        for (var i = first; i <= last; i++) text.Append($"{i,4}  {lines[i - 1]}\n");
+        for (var i = first; i <= last; i++) text.Append($"{i,4}  {Visible(lines[i - 1])}\n");
         return text.ToString();
+    }
+
+    /// <summary>
+    /// A line of a file as a builder must see it: a character that is invisible, reorders the text or ends a line for the compiler
+    /// but not for the eye (U+2028 ends a // comment) is shown as &lt;U+XXXX&gt; (P1 of the November 2026 review).
+    /// </summary>
+    private static string Visible(string line)
+    {
+        StringBuilder? shown = null;
+        for (var i = 0; i < line.Length; i++)
+        {
+            int u = line[i];
+            var hidden = (u < 0x20 && u != 0x09) || (u >= 0x7F && u <= 0x9F) || u == 0x2028 || u == 0x2029 || u == 0x061C || u == 0xFEFF
+                         || u == 0x180E || u == 0x00AD || (u >= 0x200B && u <= 0x200F) || (u >= 0x202A && u <= 0x202E) || (u >= 0x2060 && u <= 0x2069);
+            if (!hidden) { shown?.Append(line[i]); continue; }
+            shown ??= new StringBuilder(line.Substring(0, i));
+            shown.Append($"<U+{u:X4}>");
+        }
+        return shown?.ToString() ?? line;
     }
 
     private bool CmdCat(string args)
@@ -1089,7 +1164,7 @@ public class Player : Adventurer
         if (args == "") { NotifyFail("Usage: {cmd}update{/} <path>"); return false; }
 
         args = ResolvePath(args); // relative to the current directory
-        if (!IsWizard(LevelUpdate) && !InOwnHome(args)) { Write($"You need wizard level {LevelUpdate} to update anything outside your own home directory, {Esc(HomePath)}.\n"); return true; }
+        if (UpdateRefusal(args) is { } refusal) { Write(refusal + "\n"); return true; }
         var old = FindObject(args);
         var stale = UpdateProgram(args); // throws with compiler errors; nothing has been touched yet
         Write($"Recompiled {Esc(args)}; {stale.Count} program(s) invalidated: {Esc(string.Join(", ", stale))}\n");
@@ -1113,10 +1188,18 @@ public class Player : Adventurer
         if (!IsWizard(LevelFiles)) return false;
         if (args == "") { NotifyFail("Usage: {cmd}clone{/} <path>"); return false; }
         var path = ResolvePath(args);
-        if (!IsWizard(LevelClone) && !InOwnHome(path)) { Write($"You need wizard level {LevelClone} to clone anything outside your own home directory, {Esc(HomePath)}.\n"); return true; }
+        // In the workshop anything may be cloned: what is made there is a sandbox object (docs/SANDBOX.md).
+        if (!IsWizard(LevelClone) && !InOwnHome(path) && !inWorkshop) { Write($"You need wizard level {LevelClone} to clone anything outside your own home directory, {Esc(HomePath)}. In your workshop you may clone anything.\n"); return true; }
         var ob = CloneObject(path);
         var room = Environment();
-        MoveObject(ob, ob.Call<bool>("CanGet") || room == null ? Self : room);
+        try { MoveObject(ob, ob.Call<bool>("CanGet") || room == null ? Self : room); }
+        catch (MudRuntimeException refusal)
+        {
+            // The workshop's boundary (docs/SANDBOX.md): a sandbox object made out in the real game goes at once.
+            if (ob.IsAlive) Destruct(ob);
+            Write(Esc(refusal.Message) + (ob.Domain != "" ? " Clone it in your workshop (goto ~/a room of yours).\n" : "\n"));
+            return true;
+        }
         Write($"Cloned {Esc(ob.Name)}.\n");
         return true;
     }
@@ -1145,10 +1228,16 @@ public class Player : Adventurer
     {
         if (!ready) return;
         if (QueryLingerSeconds() > 0) { StartLinger(); return; }
-        Save();
-        Say($"{Name} disconnects.\n");
-        ReleaseInventory();
-        Destruct();
+        try
+        {
+            Save();
+            Say($"{Name} disconnects.\n");
+            ReleaseInventory();
+        }
+        finally
+        {
+            Destruct();
+        }
     }
 
     // ---- A dropped connection: the body lingers (docs/specs/play-feel.md section 14) ----
@@ -1159,7 +1248,9 @@ public class Player : Adventurer
     private int lingerCall;
 
     /// <summary>How long a body of this player would linger if its connection ended now: 0 for a wizard, a body already lingering, a dead one or one not yet in the game. Read by the driver for the log.</summary>
-    public int QueryLingerSeconds() => ready && !linkDead && !Dead && QueryWizLevel() < 1 ? LingerSeconds() : 0;
+    /// A body in or leaving the workshop, or standing in sandbox space at all, never lingers: its save file is the checkpoint, and it goes
+    /// at once like any wizard's (docs/SANDBOX.md), whatever its wizard level reads now.
+    public int QueryLingerSeconds() => ready && !linkDead && !Dead && QueryWizLevel() < 1 && !inWorkshop && !leavingWorkshop && !InSandboxSpace() ? LingerSeconds() : 0;
 
     private void StartLinger()
     {
@@ -1332,5 +1423,326 @@ public class Player : Adventurer
         Save();
         Write($"You no longer ignore {Esc(Cap(name))}.\n");
         return true;
+    }
+
+    // ---- The workshop (docs/SANDBOX.md section 3) ----
+    // A wizard who steps into sandbox space is checkpointed: saved as at logout, then never saved while the mark is set. Leaving by
+    // walking or goto, or dying, replaces this body with a fresh one made from the save file; quitting, a lost connection or a
+    // restart leave the save file as it was. Every step acts on the body's real state, never on an argument, so a call from
+    // another object cannot start or skip a checkpoint.
+
+    private bool inWorkshop;          // checkpointed and in sandbox space (or just out of it, the restore pending)
+    private bool leavingWorkshop;     // the restore is under way: nothing is saved, and the fresh body may take the connection
+    private bool restoreScheduled;
+    private bool restoreToCheckpoint; // after a death (or a demotion): back to the room the workshop was entered from
+    private string checkpointRoom = "";
+    private ObjectRef? resumingFrom;  // a fresh body: the body it takes over from
+    private string resumeRoom = "";
+    private bool resuming;
+
+    /// <summary>True while this character is in the workshop: checkpointed, unsaved, and reachable by sandbox code.</summary>
+    public bool QueryInWorkshop() => inWorkshop;
+
+    /// <summary>True only while this body is handing over to the fresh body made from its checkpoint.</summary>
+    public bool QueryLeavingWorkshop() => leavingWorkshop;
+
+    /// <summary>A fresh body: the name of the body it takes over from; "" otherwise.</summary>
+    public string QueryResumingFrom() => resumingFrom?.Name ?? "";
+
+    protected override string WorkshopNote() => inWorkshop ? " [in the workshop: nothing here is saved]" : "";
+
+    private bool InSandboxSpace()
+    {
+        for (var e = Environment(); e != null; e = Environment(e)) if (e.Domain != "") return true;
+        return false;
+    }
+
+    private ObjectRef Outermost(ObjectRef room)
+    {
+        var top = room;
+        while (Environment(top) is { } up) top = up;
+        return top;
+    }
+
+    public override void OnMoved(ObjectRef? from)
+    {
+        base.OnMoved(from);
+        if (!ready || leavingWorkshop) return;
+        var inside = InSandboxSpace();
+        // The checkpoint and the mark were set by the master in the move itself (WorkshopCheckpoint); here the wizard is only told.
+        if (inside && inWorkshop && !workshopAnnounced) AnnounceWorkshop();
+        else if (!inside && inWorkshop) ScheduleRestore(false);
+    }
+
+    private bool workshopAnnounced;
+
+    private static bool FromMaster(ObjectRef? caller) => caller is { IsClone: false, ProgramPath: "/secure/master", Domain: "" };
+
+    /// <summary>
+    /// Called by the master in the move that takes this character into sandbox space, before the move happens: write the checkpoint
+    /// (the save file, with the room they came from as the place to log in again) and set the mark. False, with nothing changed, if
+    /// the checkpoint cannot be written for any reason; the master then refuses the move.
+    /// </summary>
+    public bool WorkshopCheckpoint(ObjectRef? origin)
+    {
+        if (!FromMaster(PreviousObject()) || !ready || inWorkshop || leavingWorkshop || QueryWizLevel() < 1) return false;
+        try
+        {
+            PrepareSave(origin);
+            SaveObject(SaveFile);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        checkpointRoom = origin != null && origin.Domain == "" && !origin.IsClone ? origin.Name : "";
+        inWorkshop = true;
+        workshopAnnounced = false;
+        return true;
+    }
+
+    /// <summary>Called by the master when this marked character arrives outside sandbox space (and by its heartbeat invariant).</summary>
+    public void WorkshopLeaving()
+    {
+        if (FromMaster(PreviousObject()) && inWorkshop && !leavingWorkshop) ScheduleRestore(false);
+    }
+
+    /// <summary>The master's repair of an unmarked character found in sandbox space: what the workshop made goes, and they go out.</summary>
+    public void WorkshopRepair()
+    {
+        if (!FromMaster(PreviousObject()) || inWorkshop || leavingWorkshop) return;
+        SweepSandboxThings();
+        try { MoveObject(LoadObject(StartRoom)); } catch (Exception) { }
+    }
+
+    /// <summary>The master's repair of an unmarked character carrying something made in a workshop.</summary>
+    public void WorkshopSweep()
+    {
+        if (FromMaster(PreviousObject()) && !inWorkshop && !leavingWorkshop) SweepSandboxThings();
+    }
+
+    private void AnnounceWorkshop()
+    {
+        workshopAnnounced = true;
+        Tell("You step into the workshop. Nothing that happens here will follow you out.\n");
+        var space = "";
+        for (var e = Environment(); e != null && space == ""; e = Environment(e)) space = e.Domain;
+        if (space.StartsWith("wiz:") && space.Substring(4) != Name.ToLowerInvariant())
+            Tell($"This is {Cap(space.Substring(4))}'s workshop: everything here is their code, and so is what it shows you. Text from it is marked\n" +
+                 $"[{space.Substring(4)}'s workshop]; it cannot ask for your input or answer your own commands. Review a submission from outside, with\n" +
+                 "{cmd}submission NUMBER cat FILE{/}: that is the register's copy, exactly what would be published.\n");
+    }
+
+    /// <summary>
+    /// A character outside the workshop carries nothing made in one. Every move into the real game is refused to sandbox things, so
+    /// this finds nothing; should one ever get here, it goes at the next heartbeat, without running its code, and the log says so.
+    /// </summary>
+    private void SweepSandboxThings()
+    {
+        foreach (var item in AllInventory())
+            if (item.IsAlive && item.Domain != "")
+            {
+                Destruct(item);
+                Write("Something made in a workshop crumbles away.\n");
+            }
+    }
+
+    private void ScheduleRestore(bool toCheckpoint)
+    {
+        if (toCheckpoint) restoreToCheckpoint = true;
+        if (restoreScheduled) return;
+        restoreScheduled = true;
+        CallOut(LeaveWorkshop, 0); // a call-out of this body: no sandbox code is on the stack when it runs
+    }
+
+    /// <summary>A death in the workshop leaves no corpse; the character is restored, in the room the workshop was entered from.</summary>
+    protected override bool DiesInWorkshop(ObjectRef? killer)
+    {
+        if (!inWorkshop) return false;
+        if (leavingWorkshop || restoreToCheckpoint) return true;
+        ScheduleRestore(true); // first: nothing below (sandbox enemies forgetting the fight) can keep the restore from happening
+        try
+        {
+            Tell("You die in the workshop. It leaves no corpse.\n");
+            ClearEnemies();
+            ResetCombat();
+        }
+        catch (MudRuntimeException) { }
+        return true;
+    }
+
+    private void LeaveWorkshop()
+    {
+        EnableCommands(); // this call-out acts for this body, whoever was ThisPlayer() when it was scheduled
+        restoreScheduled = false;
+        if (!inWorkshop || leavingWorkshop) return;
+        var inside = InSandboxSpace();
+        if (inside && !restoreToCheckpoint && QueryWizLevel() >= 1) return; // back inside already (an update moved them through the Void)
+        var room = Environment();
+        var outer = room == null ? null : Outermost(room);
+        var destination = restoreToCheckpoint || inside || outer == null || outer.Domain != "" || outer.IsClone ? (checkpointRoom != "" ? checkpointRoom : StartRoom) : outer.Name;
+        leavingWorkshop = true;
+        inWorkshop = false; // from here on, what is cloned for this character is real
+        // Nothing of sandbox code runs from here on (docs/SANDBOX.md, "Leaving the workshop cannot be stopped"): what is carried is
+        // destructed by this body, which for a sandbox thing runs none of its code, and whatever goes wrong, this body is destructed
+        // in the end, so it can never stay in the game as a real character with what the workshop gave it.
+        try
+        {
+            var fresh = CloneObject(PlayerProgram);
+            if (fresh.Call<bool>("ResumeFromWorkshop", Name, destination) != true)
+            {
+                Destruct(fresh);
+                throw new MudRuntimeException("the checkpoint could not be read");
+            }
+            // Everything carried goes; what a container held falls out into this body and goes next.
+            for (var pass = 0; pass < 20 && AllInventory().Count > 0; pass++)
+                foreach (var item in AllInventory())
+                    if (item.IsAlive) Destruct(item);
+            if (Interactive(Self))
+            {
+                Exec(fresh, Self);
+                fresh.Call("SetupPlayer", Name);
+            }
+            else Destruct(fresh);
+        }
+        catch (Exception problem)
+        {
+            Tell("The workshop could not restore you (" + Esc(problem is MudRuntimeException ? problem.Message : "an internal error") + "). You are disconnected; log in again to come back as you entered.\n");
+        }
+        finally
+        {
+            foreach (var item in AllInventory())
+                try { if (item.IsAlive) Destruct(item); } catch (Exception) { }
+            Destruct(); // the connection, if it is still here, closes; the save file is the checkpoint
+        }
+    }
+
+    private const string PlayerProgram = "/std/player";
+
+    /// <summary>
+    /// Called by a body leaving the workshop on the fresh body it has just cloned: read the save file of that name (the checkpoint)
+    /// and wait for the connection. Only a real player body that is leaving the workshop, for its own name, may ask, once.
+    /// </summary>
+    public bool ResumeFromWorkshop(string name, string destination)
+    {
+        var caller = PreviousObject();
+        if (ready || loginObject != null || resumingFrom != null || Self.Domain != "") return false;
+        if (caller == null || caller == Self || !caller.IsClone || caller.ProgramPath != PlayerProgram || caller.Domain != "") return false;
+        if (caller.Call<bool>("QueryLeavingWorkshop") != true || caller.Call<string>("QueryName") != name) return false;
+        Name = name;
+        if (!RestoreObject(SaveFile)) return false;
+        resumingFrom = caller;
+        resumeRoom = destination ?? "";
+        loginObject = caller; // SetupPlayer then accepts the call from that body, as it does from the login object
+        authenticated = true;
+        returning = true;
+        resuming = true;
+        return true;
+    }
+
+    /// <summary>A fresh body made from the checkpoint goes where the wizard went (or where they entered the workshop from).</summary>
+    private void ResumeWhere()
+    {
+        try
+        {
+            var room = LoadObject(resumeRoom);
+            if (room.Domain != "") room = LoadObject(StartRoom);
+            MoveObject(room);
+        }
+        catch (MudRuntimeException)
+        {
+            MoveObject(LoadObject(StartRoom));
+        }
+        resuming = false;
+        resumingFrom = null;
+    }
+
+    // ---- Publishing (docs/SANDBOX.md section 4, docs/PUBLISHING.md) ----
+    // The commands only parse what was typed; /secure/publish decides everything, for the player whose command this is.
+
+    private const string PublishDaemon = "/secure/publish";
+
+    private bool ToPublish(string function, params object?[] args)
+    {
+        Write(LoadObject(PublishDaemon).Call<string>(function, args) ?? "The publication register did not answer.\n");
+        return true;
+    }
+
+    private void PublishingNotice()
+    {
+        if (QueryWizLevel() < LevelFiles) return;
+        var waiting = LoadObject(PublishDaemon).Call<int>("QueryWaiting");
+        if (waiting > 0) Write($"{waiting} publishing request(s) are waiting: {{cmd}}submissions{{/}}.\n");
+    }
+
+    private static int RequestNumber(string word) => int.TryParse(word.TrimStart('#'), out var n) && n > 0 ? n : 0;
+
+    /// <summary>"submit DIRECTORY [to /domains/NAME] [: NOTE]"</summary>
+    private bool CmdSubmit(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        var note = "";
+        var colon = args.IndexOf(':');
+        if (colon >= 0) { note = args.Substring(colon + 1); args = args.Substring(0, colon); }
+        var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (!(words.Length == 1 || (words.Length == 3 && words[1] == "to"))) { NotifyFail("Usage: {cmd}submit{/} DIRECTORY [to /domains/NAME] [: NOTE]"); return false; }
+        return ToPublish("Submit", ResolvePath(words[0]), words.Length == 3 ? words[2] : "", note.Replace("{", "(").Replace("}", ")"));
+    }
+
+    private bool CmdSubmissions(string args) => IsWizard(LevelFiles) && ToPublish("List", args.Trim());
+
+    private bool CmdSubmission(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var n = words.Length > 0 ? RequestNumber(words[0]) : 0;
+        if (n == 0 || !(words.Length == 1 || (words.Length == 3 && words[1] == "cat")))
+        {
+            NotifyFail("Usage: {cmd}submission{/} NUMBER, or {cmd}submission{/} NUMBER cat FILE");
+            return false;
+        }
+        if (words.Length == 1) return ToPublish("Show", n);
+        // The register's own copy, printed exactly as it is: no colour markup is read in it.
+        WriteRaw(LoadObject(PublishDaemon).Call<string>("ShowFile", n, words[2]) ?? "The publication register did not answer.\n");
+        return true;
+    }
+
+    /// <summary>"approve NUMBER [to /domains/NAME]"</summary>
+    private bool CmdApprove(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        var words = args.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var n = words.Length > 0 ? RequestNumber(words[0]) : 0;
+        if (n == 0 || !(words.Length == 1 || (words.Length == 3 && words[1] == "to"))) { NotifyFail("Usage: {cmd}approve{/} NUMBER [to /domains/NAME]"); return false; }
+        return ToPublish("Approve", n, words.Length == 3 ? words[2] : "");
+    }
+
+    private bool CmdReject(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        var space = args.Trim().IndexOf(' ');
+        var n = RequestNumber(space < 0 ? args.Trim() : args.Trim().Substring(0, space));
+        if (n == 0) { NotifyFail("Usage: {cmd}reject{/} NUMBER REASON"); return false; }
+        return ToPublish("Reject", n, (space < 0 ? "" : args.Trim().Substring(space + 1)).Replace("{", "(").Replace("}", ")"));
+    }
+
+    private bool CmdWithdraw(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        var n = RequestNumber(args.Trim());
+        if (n == 0) { NotifyFail("Usage: {cmd}withdraw{/} NUMBER"); return false; }
+        return ToPublish("Withdraw", n);
+    }
+
+    /// <summary>"revoke NUMBER [: REASON]"</summary>
+    private bool CmdRevoke(string args)
+    {
+        if (!IsWizard(LevelFiles)) return false;
+        var reason = "";
+        var colon = args.IndexOf(':');
+        if (colon >= 0) { reason = args.Substring(colon + 1); args = args.Substring(0, colon); }
+        var n = RequestNumber(args.Trim());
+        if (n == 0) { NotifyFail("Usage: {cmd}revoke{/} NUMBER [: REASON]"); return false; }
+        return ToPublish("Revoke", n, reason.Replace("{", "(").Replace("}", ")"));
     }
 }

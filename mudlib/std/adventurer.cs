@@ -863,24 +863,38 @@ public abstract class Adventurer : Living
     // ---- Saving ----
 
     /// <summary>Record the carried items and the logout room just before the player is saved.</summary>
-    protected void PrepareSave()
+    protected void PrepareSave(ObjectRef? at = null)
     {
         if (!inventoryRestored) return;
         carried.Clear();
         carriedEquipped.Clear();
         foreach (var item in AllInventory())
         {
+            if (item.Domain != "") continue; // a sandbox thing is never a record of the real game (docs/SANDBOX.md)
             carried.Add(RecordOf(item));
             if (IsEquipped(item)) carriedEquipped.Add(carried.Count - 1);
         }
-        var room = Environment();
-        logoutRoom = room != null && WakeRoomOk(room.Name) ? room.Name : ""; // wherever they are (docs/specs/play-feel.md, "Where a login begins")
+        // Where the next login begins (docs/specs/play-feel.md, "Where a login begins"): the room they stand in, or for the workshop
+        // checkpoint the room they entered it from. Never sandbox space (docs/SANDBOX.md): a room with a domain, the Void, a clone.
+        var room = at ?? Environment();
+        logoutRoom = room != null && room.Domain == "" && WakeRoomOk(room.Name) ? room.Name : "";
     }
 
     /// <summary>Remove the carried items from the game, as the player leaves. They return at the next login.</summary>
     protected void ReleaseInventory()
     {
-        foreach (var item in AllInventory()) item.Call("Vanish");
+        // A sandbox thing is destructed without running any of its code (the driver runs no OnDestruct of sandbox code for real
+        // code), so it can neither stop nor delay a quit or a link death; a real thing vanishes as it always has.
+        foreach (var item in AllInventory())
+        {
+            try
+            {
+                if (!item.IsAlive) continue;
+                if (item.Domain != "") Destruct(item);
+                else item.Call("Vanish");
+            }
+            catch (MudRuntimeException) { if (item.IsAlive) Destruct(item); }
+        }
     }
 
     /// <summary>Bind the gameplay commands, start the heartbeat and bring the carried items back.</summary>
@@ -989,14 +1003,18 @@ public abstract class Adventurer : Living
         PersistNow();
     }
 
-    /// <summary>A room a character may wake in: not a wizard's sandbox (their own home excepted, for a wizard), not the void, not a clone.</summary>
-    private bool WakeRoomOk(string path) =>
-        path != "" && path != "/std/void" && !path.Contains('#') &&
-        (!path.StartsWith("/wiz/") || (QueryWizLevel() > 0 && path.StartsWith("/wiz/" + Name.ToLowerInvariant() + "/")));
+    /// <summary>
+    /// A room a character may wake in: not the Void, not a clone, and never under /wiz, a wizard's own home included: their home is
+    /// a workshop, entered only through the master's move with its checkpoint (docs/SANDBOX.md), so a wizard who quits there wakes in
+    /// the room they entered it from.
+    /// </summary>
+    private static bool WakeRoomOk(string path) =>
+        path != "" && path != "/std/void" && !path.Contains('#') && !path.ToLowerInvariant().StartsWith("/wiz/") && path.ToLowerInvariant() != "/wiz";
 
     /// <summary>Move the player into the world: the saved logout room, if there is one, else the start room.</summary>
     protected void EnterWorld(string startRoom)
     {
+        // Never into sandbox space: a body enters a workshop only through the master's move, which takes the checkpoint first.
         var destination = logoutRoom != "" && WakeRoomOk(logoutRoom) ? logoutRoom : startRoom;
         logoutRoom = "";
         try
@@ -1341,6 +1359,7 @@ public abstract class Adventurer : Living
     /// </summary>
     public override void Die(ObjectRef? killer)
     {
+        if (DiesInWorkshop(killer)) return;
         if (dying) return;
         dying = true;
         EndRest();
@@ -1383,6 +1402,12 @@ public abstract class Adventurer : Living
 
     /// <summary>Write the character to disk now. Players override this.</summary>
     protected virtual void PersistNow() { }
+
+    /// <summary>A player in a wizard's workshop dies without a corpse and is restored (docs/SANDBOX.md); true if that is what happened.</summary>
+    protected virtual bool DiesInWorkshop(ObjectRef? killer) => false;
+
+    /// <summary>What score adds after the name while the character is in a wizard's workshop. Players override it.</summary>
+    protected virtual string WorkshopNote() => "";
 
     /// <summary>Put everything carried (equipment included) and the fee into a corpse in the room.</summary>
     private void LeaveCorpse(ObjectRef? room, ObjectRef? killer, int fee)
@@ -1565,7 +1590,12 @@ public abstract class Adventurer : Living
         foreach (var (item, n) in plan)
         {
             var description = Describe(item, n);
-            if (MovePortion(item, n, room) == null) { Write($"You cannot drop {description}.\n"); continue; }
+            if (MovePortion(item, n, room) == null)
+            {
+                // The one rule of a wizard's workshop that a drop can meet (docs/SANDBOX.md).
+                Write(room.Domain != "" && item.Domain == "" ? "Real things cannot be set down in the workshop; they leave with you.\n" : $"You cannot drop {description}.\n");
+                continue;
+            }
             LeaveRest();
             Write($"You drop {description}.\n");
             Say($"{Name} drops {description}.\n");
@@ -1913,6 +1943,7 @@ public abstract class Adventurer : Living
         var text = new StringBuilder();
         var renownTitle = wizard > 0 ? "" : LoadObject("/secure/renown").Call<string>("QueryActiveTitle", QueryName()) ?? "";
         text.Append(sheet.Call<string>("Box", (Short() ?? Name).Replace("{{", "{"), renownTitle));
+        if (WorkshopNote() is { Length: > 0 } note) text.Append(note.Trim() + "\n"); // in the workshop: nothing here is saved
         var calling = archetypeName == "" ? "No calling yet" : archetypeName;
         text.Append($"\n{calling}" + (advancedClass != "" || subclass != "" || prestigeClass != "" ? $" • Class {classTitle}" : "") + $" • Level {Level}\n");
         if (wizard == 0) text.Append(sheet.Call<string>("RankLine", QueryName()));
@@ -2036,7 +2067,7 @@ public abstract class Adventurer : Living
         if (!IsWizard(LevelStat)) return args.Trim() == "" && CmdScore(args); // a player's bare stat is score
         var thing = args.Trim() == "" ? null : FindHere(args.Trim());
         if (thing == null) { NotifyFail("Stat what? (a name, me, or here)"); return false; }
-        Write(thing.Call<string>("Stat") ?? thing.Name + "\n");
+        Write((thing.Call<string>("Stat") ?? thing.Name + "\n") + (thing.Domain != "" ? $"  Sandbox object ({thing.Domain}): it cannot leave the workshop.\n" : ""));
         return true;
     }
 

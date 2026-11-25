@@ -26,6 +26,12 @@ public sealed class ObjectRef
 
     public bool IsClone { get; }
 
+    /// <summary>
+    /// The object's domain, given by the master when the object was created and never changed: "" for the unrestricted world.
+    /// An object with any other domain is restricted (see IMaster.ObjectDomain and ValidCall).
+    /// </summary>
+    public string Domain { get; internal set; } = "";
+
     /// <summary>False once the object has been destructed.</summary>
     public bool IsAlive => Target is not null;
 
@@ -43,12 +49,13 @@ public sealed class ObjectRef
         => DriverHost.Services.CallOther(this, function, args) is T value ? value : default;
 
     /// <summary>
-    /// Typed view of the object, or null if it is dead or not a T. Only safe
+    /// Typed view of the object, or null if it is dead or not a T, or if restricted code is running and the master does not allow it
+    /// a view of this object. Only safe
     /// for interfaces in LesMudOS.Api and for types the calling file inherits
     /// or uses; after the target's program is updated its type is a different
     /// .NET type and this returns null. Do not store the result in a field.
     /// </summary>
-    public T? As<T>() where T : class => Target as T;
+    public T? As<T>() where T : class => DriverHost.Services.MayView(this) ? Target as T : null;
 
     public override string ToString() => Name;
 

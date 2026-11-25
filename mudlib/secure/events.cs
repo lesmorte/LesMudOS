@@ -102,7 +102,7 @@ public class EventService : MudObject
 
     private static bool IsTrusted(ObjectRef? caller)
     {
-        if (caller == null) return false;
+        if (caller == null || caller.Domain != "") return false; // a sandbox object is never trusted (docs/SANDBOX.md)
         var path = caller.ProgramPath;
         if (path.Contains("..") || path.Contains("//")) return false;
         foreach (var tree in TrustedTrees) if (path.StartsWith(tree, StringComparison.Ordinal)) return true;

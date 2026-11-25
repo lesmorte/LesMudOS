@@ -174,7 +174,8 @@ public class FtHub : Room
         Exits["wiz"] = "/wiz/probe/room";
         Exits["example"] = "/domains/example/purse_room";
         MoveObject(CloneObject("/domains/ftest/forger"), Self);
-        MoveObject(CloneObject("/wiz/probe/minter"), Self);
+        // CHANGED (sandbox): a wizard's object cannot be put in a real room at all (docs/SANDBOX.md); the attempt is refused.
+        try { MoveObject(CloneObject("/wiz/probe/minter"), Self); } catch (MudRuntimeException) { }
     }
     public override void Init()
     {
@@ -398,7 +399,8 @@ def run(work, mudlib, box):
     # ================= the sandbox and the trusted-caller checks =================
     P[0].command("out")
     check("back in the hub", P[0].command("look"), "Find Test Hub")
-    check("a /wiz object asking the register for gold is refused (code 4)", P[0].command("mint"), "CLAIM g=0 i=0 c=4")
+    # CHANGED (sandbox): the minter never reaches a real room, so a player cannot even meet it.
+    check("a /wiz object cannot be put in a real room, so no player can use it", P[0].command("mint"), "What?", absent=("CLAIM",))
     check("a trusted object lying in the room is paid under its own path (a legitimate find)", P[0].command("forge"), "CLAIM g=1000 i=0 c=0")
     check("and the same character a second time gets nothing (code 1)", P[0].command("forge"), "CLAIM g=0 i=0 c=1")
     check("a probe in a pocket is refused: it does not lie in the character's room (code 5)", P[0].command("carryclaim"), "c=5")
@@ -407,17 +409,21 @@ def run(work, mudlib, box):
     ok("the forger's claim is recorded under the forger's own path only", rec.get(T + "forger") == ["alice"], rec.get(T + "forger"))
     ok("the forger cannot touch any other stash: the stash record is as it was", rec[T + "stash"] == low[:9])
     ok("the register holds no /wiz id", not any(k.startswith("/wiz") for k in rec))
-    P[0].command("wiz")
-    check("a /wiz room is reachable (control)", P[0].command("look"), "Wizard Probe Room")
-    mid = gold(P[0])
-    check("a find under /wiz is refused: the character is told nothing comes of it", P[0].command("get wizstash"), "Nothing comes of it.")
-    ok("a find under /wiz pays no gold", gold(P[0]) == mid)
-    check("a trusted find lying in a /wiz room is refused too", P[0].command("get hosted"), "Nothing comes of it.")
-    ok("and pays no gold", gold(P[0]) == mid)
+    # CHANGED (sandbox): an ordinary player cannot enter a wizard's workshop; the finds there are tried by a wizard instead.
+    check("a /wiz room is not reachable for a player", P[0].command("wiz"), "Only wizards can enter a wizard's workshop.")
+    check("the player is still in the hub", P[0].command("look"), "Find Test Hub")
+    wiz.command("goto /wiz/probe/room")
+    a.drain(wiz, 0.3)
+    mid = gold(wiz)
+    check("a find under /wiz gives a wizard nothing", wiz.command("get wizstash"), absent=("You take", "gold coins"))
+    ok("a find under /wiz pays no gold", gold(wiz) == mid)
+    check("a trusted find lying in a /wiz room gives nothing either", wiz.command("get hosted"), absent=("You take", "gold coins"))
+    ok("and pays no gold", gold(wiz) == mid)
     rec = record()
     ok("the register holds no /wiz id and no hosted find", not any(k.startswith("/wiz") or k.endswith("stash_wizhost") for k in rec))
-    check("look at a /wiz find: described in full (nothing was taken)", P[0].command("look at wizstash"), "full to the brim")
-    P[0].command("out")
+    check("look at a /wiz find: described in full (nothing was taken)", wiz.command("look at wizstash"), "full to the brim")
+    wiz.command("goto " + T + "hub")
+    a.drain(wiz, 0.3)
     P[0].command("vault")
 
     # ================= the copy-ready example of docs/BUILDING.md =================

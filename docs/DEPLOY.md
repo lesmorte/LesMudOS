@@ -108,8 +108,10 @@ Set any of these before running the script, for example `MUDLIB_WRITABLE=all bas
 
 ### Which should `MUDLIB_WRITABLE` be?
 
-- **`wiz` (default).** Wizards can create and edit files in their own home directories from inside the game. Nobody can change the live world from inside the game: `edit`, `copy`, `delete` and the rest fail outside `/wiz`. The world changes only when you update from the repository. This is the safer choice, and the right one until the sandbox and publishing work is finished.
-- **`all`.** Level 5 wizards and above can edit the live world from inside the game, and approving a wizard's work can publish it into the world. Changes made this way exist only on the droplet until someone copies them back into the repository, and an update replaces them with the repository's versions.
+- **`wiz` (default).** Wizards can create and edit files in their own home directories from inside the game, and test them in their workshop (docs/SANDBOX.md). Nobody can change the live world from inside the game: `edit`, `copy`, `delete` and the rest fail outside `/wiz`, and approving a publication fails cleanly (the register reports the refused write and leaves nothing behind). The world changes only when you update from the repository.
+- **`all`.** The game may write the whole mudlib, as its own rules allow: level 10 wizards may edit the live world, and approving a wizard's work (docs/PUBLISHING.md) publishes it under `/domains`. Level 5 to 9 wizards cannot write outside `/wiz` whatever this setting is. Changes made this way exist only on the droplet until someone copies them back into the repository: an update replaces the mudlib with the repository's version (`rsync --delete`), which removes published areas that are not in the repository. Copy `/opt/lesmudos/mudlib/domains/<name>` into the repository (and the publication register, `save/secure/publish.json`, is kept with the saves) before updating.
+
+The driver needs no setting for the sandbox: it is the sample mudlib's policy, always on. There is no test-only switch to turn it off.
 
 ### Idle players
 
@@ -121,6 +123,27 @@ Two server settings of the driver (not of the setup script), given as `--idle-mi
 | `--timeout-minutes` | `LESMUDOS_TIMEOUT_MINUTES` | `10` | Minutes without typed input until the player is saved and disconnected, after a warning two minutes before (half the time, if shorter). Wizards are never disconnected |
 
 A value is minutes (`0.5` is allowed), or a number with `s` or `m` (`30s`); the seconds form is for tests. Empty lines and telnet keep-alives do not count as activity. A timeout shorter than the idle time is raised to it.
+
+### Wizard accounts
+
+Give a wizard account (level 1 and up) only to someone you trust with the machine. A wizard's code runs inside the driver process; the sandbox (SANDBOX.md) keeps it out of the game's state, and the limits below keep a mistake from taking the game down for long, but no in-process sandbox can hold a determined stranger (memory, in particular, cannot be bounded per wizard). That is the owner's decision after three independent reviews.
+
+### A wizard's code that stalls the game
+
+| Setting | Environment | Default | Meaning |
+|---|---|---|---|
+| `--sandbox-stall` | `LESMUDOS_SANDBOX_STALL` | `5` | Seconds one step of the game may run with a wizard's sandbox code on the stack before the watchdog stops the driver |
+
+When it fires (SANDBOX.md section 7, "A stall"), the log says `sandbox: STALL: code of wiz:<name> ...`, the driver exits with code 3 and systemd starts it again. The wizard's home is closed: `save/sandbox_quarantine.txt` holds one line per closed home (`wiz:<name> <time> ...`), and the driver makes no object of a listed home. To reopen it, read the code that stalled, delete its line, and restart the service.
+
+### A wizard's home
+
+| Environment | Default | Meaning |
+|---|---|---|
+| `LESMUDOS_HOME_BYTES` | `3000000` | Bytes a home (`/wiz/<name>`) may hold |
+| `LESMUDOS_HOME_FILES` | `1000` | Files a home may hold |
+| `LESMUDOS_HOME_DIRS` | `64` | Directories a home may hold |
+| `LESMUDOS_HOME_DEPTH` | `8` | How deep a home's directories may go |
 
 ## 4. Make yourself the first wizard
 

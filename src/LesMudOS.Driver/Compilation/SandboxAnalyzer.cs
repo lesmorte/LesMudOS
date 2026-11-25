@@ -119,6 +119,9 @@ internal static class SandboxAnalyzer
                 case LockStatementSyntax:
                     Report(node, "lock is not allowed (mudlib code is single-threaded)");
                     continue;
+                case QueryExpressionSyntax:
+                    Report(node, "query syntax (from ... select) is not allowed: its clauses become functions with no tick; use the methods (Where, Select)");
+                    continue;
             }
 
             if (node is SimpleNameSyntax or BaseObjectCreationExpressionSyntax or AttributeSyntax

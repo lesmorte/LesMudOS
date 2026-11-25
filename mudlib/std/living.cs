@@ -334,7 +334,9 @@ public abstract class Living : Thing
     // equipment change a statistic in one place. The rule numbers are these constants.
 
     /// <summary>The six attributes, in the order they are shown.</summary>
-    public static readonly string[] AttributeNames = { "might", "grace", "vigor", "insight", "spirit", "resolve" };
+    private static readonly string[] FrozenAttributeNames = { "might", "grace", "vigor", "insight", "spirit", "resolve" };
+    /// <summary>A copy: the table itself cannot be changed from outside (docs/SANDBOX.md).</summary>
+    public static string[] AttributeNames => (string[])FrozenAttributeNames.Clone();
 
     /// <summary>The value every character starts each attribute from; the derived effects count the points above it.</summary>
     public const int AttributeNeutral = 5;

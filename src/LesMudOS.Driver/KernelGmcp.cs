@@ -7,12 +7,16 @@ namespace LesMudOS.Driver;
 internal sealed partial class Kernel
 {
     /// <summary>Only code under these directories may send GMCP. A wizard's object lives under /wiz or elsewhere and cannot.</summary>
+    /// A clone of /std or /secure code made by a wizard's sandbox code is restricted (a domain other than ""): it cannot either.
     private static bool MaySendGmcp(ObjectRef caller)
-        => caller.IsAlive && (caller.ProgramPath.StartsWith("/std/", StringComparison.Ordinal) || caller.ProgramPath.StartsWith("/secure/", StringComparison.Ordinal));
+        => caller.IsAlive && caller.Domain.Length == 0
+           && (caller.ProgramPath.StartsWith("/std/", StringComparison.Ordinal) || caller.ProgramPath.StartsWith("/secure/", StringComparison.Ordinal));
 
     public bool GmcpSend(ObjectRef caller, ObjectRef player, string package, object? value)
     {
         if (!MaySendGmcp(caller)) throw new MudRuntimeException($"{caller.Name} may not send GMCP");
+        // While restricted code runs (docs/SANDBOX.md), only to whom the master's ValidCall allows: a character in the workshop.
+        if (!Permit(player, "GmcpSend")) return false;
         if (!Gmcp.ValidPackageName(package)) throw new MudRuntimeException("GmcpSend: bad package name");
         if (!player.IsAlive || player.Connection is not Connection connection) return false;
         if (!connection.GmcpSession.Enabled || !connection.GmcpSession.Wants(package)) return false; // the client did not ask: encode nothing

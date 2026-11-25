@@ -35,7 +35,7 @@ public class RoomIds : MudObject
         if (next < 1) next = 1;
     }
 
-    private static bool Temporary(string name) => name.StartsWith("/wiz/", StringComparison.Ordinal) || name.Contains('#');
+    private static bool Temporary(string name) => name.ToLowerInvariant().StartsWith("/wiz/") || name.Contains('#');
 
     /// <summary>The number of a room, or 0 if it has none yet. Reading is harmless.</summary>
     public int QueryNumber(string path)
@@ -54,14 +54,20 @@ public class RoomIds : MudObject
     /// The number of a room (its blueprint path, or a clone's name), given now if it has none. Only /secure/gmcp may ask; anyone else
     /// is refused with 0. The number is saved before it is returned.
     /// </summary>
-    public int Assign(string path)
+    public int Assign(string path) => Assign(path, false);
+
+    /// <summary>
+    /// The same; with temporaryOnly a path that has no number yet gets one that is never saved (what a room of a wizard's sandbox
+    /// names: docs/SANDBOX.md). Sandbox code itself is always refused.
+    /// </summary>
+    public int Assign(string path, bool temporaryOnly)
     {
         var caller = PreviousObject();
-        if (Self.IsClone || caller == null || caller.IsClone || caller.ProgramPath != Service) return 0;
+        if (Self.IsClone || caller == null || caller.IsClone || caller.Domain != "" || caller.ProgramPath != Service || RestrictedCaller() != null) return 0;
         if (path == null || path.Length == 0 || path.Length > 200 || path[0] != '/') return 0;
         var known = QueryNumber(path);
         if (known != 0) return known;
-        if (Temporary(path) || !persistent)
+        if (temporaryOnly || Temporary(path) || !persistent)
         {
             // Bounded: a runaway builder cannot make this table grow without end.
             if (temporary.Count >= 100000) return 0;

@@ -456,7 +456,13 @@ public abstract class Room : MudObject
                 if (other != who && Living(other)) TellObject(other, $"{name} leaves {(Found(other, direction) ? direction : "somewhere")}.\n");
         }
         else TellRoom(Self, $"{name} leaves {direction}.\n", who);
-        MoveObject(who, destination);
+        try { MoveObject(who, destination); }
+        catch (MudRuntimeException refusal)
+        {
+            // The master's boundary (docs/SANDBOX.md): "Only wizards can enter a wizard's workshop." and the like, in one line.
+            TellObject(who, refusal.Message + "\n");
+            return false;
+        }
         if (Interactive(who)) who.Call("RecordArrival"); // so that flee can lead back the way they came
         TellRoom(destination, $"{name} arrives.\n", who);
         who.Call("Look");

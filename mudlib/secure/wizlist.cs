@@ -35,7 +35,8 @@ public class WizList : MudObject
     {
         var caller = PreviousObject();
         if (Self.IsClone || caller == null || caller != ThisPlayer()) return null;
-        if (!caller.IsClone || caller.ProgramPath != "/std/player") return null;
+        if (!caller.IsClone || caller.ProgramPath != "/std/player" || caller.Domain != "") return null;
+        if (RestrictedCaller() != null) return null; // a wizard's sandbox code acting through a body (docs/SANDBOX.md)
         return caller.Call<string>("QueryName")?.ToLower();
     }
 

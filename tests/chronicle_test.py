@@ -98,13 +98,13 @@ public class Forger : MudObject
         var bob = Users().First(u => u.Call<string>("QueryName") == "Bob");
         var ev = LoadObject("/secure/events");
         var r1 = ev.Call<string>("Report", "quest.local", bob, new List<ObjectRef> { bob }, (ObjectRef?)null, "forged", new Dictionary<string, string>());
-        var r2 = LoadObject("/secure/renown").Call<List<string>>("Award", "bob", 1000, "forged").Count;
+        var r2 = LoadObject("/secure/renown").Call<List<string>>("Award", "bob", 1000, "forged")?.Count ?? 0;
         var r3 = LoadObject("/secure/chronicle").Call<int>("AddEntry", new Dictionary<string, string> { { "headline", "fake" } });
         var r4 = LoadObject("/secure/rumors").Call<bool>("AddRumor", "Greenvale", "fake");
         var r5 = LoadObject("/secure/chronicle").Call<bool>("MarkOccurred", "forged|", new Dictionary<string, string>());
         var r6 = ev.Call<string>("Report", "wiz.fake", bob, new List<ObjectRef> { bob }, (ObjectRef?)null, "", new Dictionary<string, string>());
         var r7 = LoadObject("/secure/renown").Call<string>("ChooseTitle", "bob", "Wanderer");
-        Write("forge: " + r1 + " ## " + r2 + " ## " + r3 + " ## " + r4 + " ## " + r5 + " ## " + r6 + " ## " + r7.Trim() + "\\nhend\\n");
+        Write("forge: " + (r1 ?? "null") + " ## " + r2 + " ## " + r3 + " ## " + r4 + " ## " + r5 + " ## " + (r6 ?? "null") + " ## " + (r7 ?? "null").Trim() + "\\nhend\\n");
         return true;
     }
 }
@@ -121,7 +121,7 @@ def start(work, mudlib):
     log = open(os.path.join(work, "driver.log"), "a")
     p = subprocess.Popen(["dotnet", dll, "--mudlib", mudlib, "--save", os.path.join(work, "save"), "--port", str(h.PORT)],
                          stdout=log, stderr=subprocess.STDOUT, env={**os.environ, "LESMUDOS_ADMIN_SECRET": SECRET})
-    for _ in range(150):
+    for _ in range(200):  # 40 s: the driver boots in about 14 s, more on a busy machine
         try:
             socket.create_connection(("127.0.0.1", h.PORT), timeout=0.3).close()
             break
@@ -138,6 +138,7 @@ def main():
     h.write(mudlib, "/events/test", test_group())
     os.makedirs(os.path.join(mudlib, "wiz", "alice"), exist_ok=True)
     h.write(mudlib, "/wiz/alice/forger", FORGER)
+    h.write(mudlib, "/wiz/alice/den", "// @inherit /std/room\npublic class AliceDen : Room { public override void Create() { ShortDesc = \"Alice's Den\"; LongDesc = \"A workshop.\"; } }\n")
     start_day = (datetime.datetime.now(datetime.timezone.utc).date() - datetime.date(1970, 1, 1)).days
     driver, log = start(work, mudlib)
     try:
@@ -402,13 +403,18 @@ def run(work, mudlib, driver, start_day):
     entries_now = q(a, "chronicle", "QueryEntryCount")
     bob_renown = q(a, "renown", "QueryRenown", "bob")
     rumors_now = q(a, "rumors", "QueryCount", "Greenvale")
+    # CHANGED (sandbox): a wizard's code runs in their workshop, and cannot reach the history daemons at all: every call returns
+    # nothing (docs/SANDBOX.md), and the driver logs the refusal.
+    here = a.command("stat here").strip().split(":")[0]
+    a.command("goto ~/den")
     a.command("clone ~/forger")
     f = norm(a.command("forge", "hend"))
-    check("an object in a wizard's home cannot report an event", f, "forge: refused: /wiz/alice/forger is not in a trusted tree")
+    check("an object in a wizard's home cannot report an event", f, "forge: null ##")
     check("cannot raise Renown, write the Chronicle, a rumor or a first", f, " ## 0 ## 0 ## False ## False ## ")
-    check("cannot define an event type or choose a title", f, "refused: /wiz/alice/forger", "Only trusted code")
+    check("cannot define an event type or choose a title", f, "## null ## null")
+    a.command("goto " + here)
     ck("nothing changed: entries, Renown, rumors", (q(a, "chronicle", "QueryEntryCount"), q(a, "renown", "QueryRenown", "bob"), q(a, "rumors", "QueryCount", "Greenvale")) == (entries_now, bob_renown, rumors_now))
-    check("the refusal is logged", q(a, "events", "QueryRefusals"), "/wiz/alice/forger")
+    check("the refusal is logged", open(os.path.join(work, "driver.log")).read(), "sandbox: refused Report on /secure/events (restricted code: /wiz/alice/forger")
     check("an unknown event type from a trusted caller is refused", rep(a, "bob", "wiz.fake")["raw"], "refused: unknown event type")
 
     # ---------------- queries and the ledger object ----------------

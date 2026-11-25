@@ -249,7 +249,8 @@ public class Meddler : Thing
     public override void Init() { AddAction("meddle", Meddle); }
     private bool Meddle(string args)
     {
-        var who = Present(args.Trim(), Environment(ThisPlayer()!)!);
+        // CHANGED (sandbox): the meddler runs in its wizard's workshop and finds the victim wherever they are.
+        var who = Users().FirstOrDefault(u => (u.Call<string>("QueryName") ?? "").ToLower() == args.Trim().ToLower());
         if (who == null) { Write("MEDDLE none\n"); return true; }
         var tries = new List<string>();
         foreach (var call in new (string f, object[] a)[] {
@@ -682,10 +683,12 @@ def run(work, mudlib):
     vic.read_until("> ")
     a.drain(vic, 0.3)
     vic.command("down")
-    chief.command("goto " + T + "hall")
+    h.write(mudlib, "/wiz/chief/den", "// @inherit /std/room\npublic class ChiefDen : Room { public override void Create() { ShortDesc = \"Chief's Den\"; LongDesc = \"A workshop.\"; } }\n")
+    chief.command("goto /wiz/chief/den")  # CHANGED (sandbox): a wizard's code runs in their workshop
     out = chief.command("clone ~/meddler")
     before = vic.command("score")
     out = chief.command("meddle victim")
+    chief.command("goto " + T + "hall")
     check("the meddler ran", out, "MEDDLE ")
     check("no public method sets an attribute or grants a point", out, "SetAttribute=null", "AddAttributePoints=null", "EnsureAttributes=null", "CmdImprove=null", "might=5 points=0",
           absent=("=True", "=10"))
