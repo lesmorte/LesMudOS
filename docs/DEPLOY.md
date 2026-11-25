@@ -124,6 +124,10 @@ Two server settings of the driver (not of the setup script), given as `--idle-mi
 
 A value is minutes (`0.5` is allowed), or a number with `s` or `m` (`30s`); the seconds form is for tests. Empty lines and telnet keep-alives do not count as activity. A timeout shorter than the idle time is raised to it.
 
+### Wizard accounts
+
+Give a wizard account (level 1 and up) only to someone you trust with the machine. A wizard's code runs inside the driver process; the sandbox (SANDBOX.md) keeps it out of the game's state, and the limits below keep a mistake from taking the game down for long, but no in-process sandbox can hold a determined stranger (memory, in particular, cannot be bounded per wizard). That is the owner's decision after three independent reviews.
+
 ### A wizard's code that stalls the game
 
 | Setting | Environment | Default | Meaning |
