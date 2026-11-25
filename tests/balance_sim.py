@@ -470,7 +470,10 @@ SNEAK_ELITE = ("Goblin Elite Guard",)   # only for the options of docs/BALANCE_S
 # second notice roll (while an unnoticed Scout draws Aimed Shot) is made; "per_level": extra notice points per creature level above the Scout
 # (option C); "elite": extra notice points for SNEAK_ELITE (option C); "cap": the share of the target's maximum Vitality an Aimed Shot opener may deal;
 # "floor": the lowest base notice chance in percent (the game: 10; option F, not in the owner's list).
-OPT = dict(second=None, second_plus=0, second_scale=1.0, per_level=0, elite=0, cap=None, floor=10, g=None, g_strike=False)
+# "g": option G (docs/BALANCE_SCOUT.md section 10), (base, per level, floor) as shares, or None for no cap. G2 is the game since the owner's decision of
+# 24 November 2026 (mudlib/skills/aimed_shot.cs OpenerCapBase, OpenerCapPerLevel, OpenerCapFloor; `check` compares them): it is the DEFAULT here.
+G2 = (0.60, 0.15, 0.30)
+OPT = dict(second=None, second_plus=0, second_scale=1.0, per_level=0, elite=0, cap=None, floor=10, g=G2, g_strike=False)
 SIM_REROLL = True      # a fix to match the game: a creature that has not noticed the Scout re-rolls every 10 s at half the chance while he types his command
 SIM_BOW_STRIKE = True  # a fix to match the game: the ranged opening (2 s) goes to any Scout whose weapon is a bow, Precision Strike included (the melee Scout of the standard test holds the Hunting Bow)
 
@@ -1918,11 +1921,29 @@ def check_mudlib():
     check_classes(os.path.join(root, "..", ".."), problems, num)
     check_skills(os.path.join(root, "..", ".."), problems)
     check_corridor(problems)
+    check_opener_cap(os.path.join(root, "..", ".."), problems)
     for p in problems:
         print("MISMATCH", p)
     print("simulation numbers match the mudlib" if not problems else f"{len(problems)} mismatch(es)")
     return not problems
 
+
+
+def check_opener_cap(read_root, problems):
+    """Compare the opener cap (G2) with mudlib/skills/aimed_shot.cs, and see that the engine applies it only to the opener, once, after the damage steps."""
+    with open(os.path.join(read_root, "skills", "aimed_shot.cs"), encoding="utf-8") as f:
+        text = f.read()
+    want = {"OpenerCapBase": round(G2[0] * 100), "OpenerCapPerLevel": round(G2[1] * 100), "OpenerCapFloor": round(G2[2] * 100)}
+    for name, value in want.items():
+        m = re.search(rf"const int {name} = (\d+);", text)
+        if m is None or int(m.group(1)) != value:
+            problems.append(f"skills/aimed_shot.cs: {name} is {m.group(1) if m else None}, {value} in the simulation (G2)")
+    if OPT["g"] != G2 or OPT["g_strike"]:
+        problems.append("simulation: the default opener cap is not G2 on the Aimed Shot alone")
+    with open(os.path.join(read_root, "std", "living.cs"), encoding="utf-8") as f:
+        living = f.read()
+    if "QueryOpenerCapPercent" not in living or "action.Opener" not in living:
+        problems.append("std/living.cs: the opener cap is not applied")
 
 
 def check_corridor(problems):
@@ -3303,7 +3324,7 @@ def aim_table(opener_delta=0.0, cost=None):
 
 
 @contextmanager
-def scout_option(mode=None, opener=0.0, second=None, per_level=0, elite=0, cap=None, cost=None, floor=10, g=None, g_strike=False):
+def scout_option(mode=None, opener=0.0, second=None, per_level=0, elite=0, cap=None, cost=None, floor=10, g=G2, g_strike=False):
     """Switch on the options of docs/BALANCE_SCOUT.md for a block: opener = change to Aimed Shot's opener multiplier (A); second = None, "same",
     "plus15" or "half" (B); per_level, elite (C); cap = share of the target's maximum Vitality (D); cost = Aimed Shot's Endurance at rank I (E).
     mode: the rank mode of ranked()."""
@@ -3319,7 +3340,7 @@ def scout_option(mode=None, opener=0.0, second=None, per_level=0, elite=0, cap=N
 
 
 SCOUT_OPTIONS = [
-    ("baseline: the game now", {}),
+    ("baseline: the game now (G2 opener cap)", {}),
     ("A1 opener x2.25", dict(opener=-0.25)),
     ("A2 opener x2.0", dict(opener=-0.5)),
     ("A3 opener x1.75", dict(opener=-0.75)),
@@ -3754,7 +3775,8 @@ def spread_table(runs=1500, seeds=range(1, 9)):
 
 # ---- option G: the opener's cap depends on the level difference (docs/BALANCE_SCOUT.md section 10) ----
 G_OPTIONS = [
-    ("baseline: the game now", {}),
+    ("no cap (the game before 24 November 2026)", dict(g=None)),
+    ("baseline: the game now (G2)", {}),
     ("D2 flat cap 60%", dict(cap=0.60)),
     ("G1 60% + 20% x d, floor 40%", dict(g=(0.60, 0.20, 0.40))),
     ("G2 60% + 15% x d, floor 30%", dict(g=(0.60, 0.15, 0.30))),

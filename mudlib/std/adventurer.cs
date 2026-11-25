@@ -637,7 +637,7 @@ public abstract class Adventurer : Living
         if (kind == "enemy")
         {
             target = args == "" ? Enemies().FirstOrDefault(e => Environment(e) == room) : room == null ? null : Present(args, room);
-            if (target == null) { Write(args == "" ? "Use it on whom? You are not fighting anyone.\n" : $"You see no '{Esc(args)}' here.\n"); return true; }
+            if (target == null) { Write(args == "" ? $"You are not fighting anyone: name a target, as in '{QueryVerb()} rat'.\n" : $"You see no '{Esc(args)}' here.\n"); return true; }
             if (!target.Call<bool>("IsCreature")) { Write("You cannot fight that.\n"); return true; }
         }
         else if (kind == "friend")
@@ -1094,7 +1094,7 @@ public abstract class Adventurer : Living
     }
 
     /// <summary>Whatever the character does that is not looking or talking gets them up.</summary>
-    private void LeaveRest()
+    protected void LeaveRest()
     {
         if (resting) EndRest();
     }
@@ -1369,7 +1369,17 @@ public abstract class Adventurer : Living
         {
             dying = false;
         }
+        if (linkDead) LinkDeadDied(); // a dropped player's body that died: it is saved (above) and goes at once
     }
+
+    // ---- A dropped connection (docs/specs/play-feel.md section 14): the body lingers; /std/player holds the rest ----
+
+    /// <summary>True while this body has lost its connection and is still in the world.</summary>
+    protected bool linkDead;
+
+    public bool QueryLinkDead() => linkDead;
+
+    protected virtual void LinkDeadDied() { }
 
     /// <summary>Write the character to disk now. Players override this.</summary>
     protected virtual void PersistNow() { }
@@ -1431,7 +1441,7 @@ public abstract class Adventurer : Living
         var found = named.Where(o => o.Call<bool>("CanGet")).ToList();
         if (found.Count == 0)
         {
-            if (all && noun == "") { Write("There is nothing here to take.\n"); return true; }
+            if (all && noun == "") { Write(room != null && FindsByName(room) ? "Nothing here can be taken at a sweep; something must be taken by name.\n" : "There is nothing here to take.\n"); return true; }
             if (named.Count > 0) { Write("You can't take that.\n"); return true; }
             NotifyFail("Get what?");
             return false;
@@ -1446,8 +1456,12 @@ public abstract class Adventurer : Living
             Pick(item, n);
             left -= n;
         }
+        if (all && noun == "" && FindsByName(room)) Write("Something here must be taken by name.\n"); // a find is searched, once, by its name: never by "all"
         return true;
     }
+
+    /// <summary>Is there a find here that this character may still take from? ("get all" leaves finds alone and says so.)</summary>
+    private bool FindsByName(ObjectRef room) => AllInventory(room).Any(o => o.IsAlive && o.Call<bool>("QueryTakeByName"));
 
     /// <summary>Pick up n of an item lying in the room, with the messages.</summary>
     private void Pick(ObjectRef item, int n)
@@ -1573,6 +1587,7 @@ public abstract class Adventurer : Living
         var receiver = whom == "" ? null : Present(whom, room);
         if (receiver == Self) { Write("You already have it.\n"); return true; }
         if (receiver == null) { NotifyFail($"There is no one called '{Esc(whom)}' here."); return false; }
+        if (receiver.Call<bool>("QueryLinkDead")) { Write($"{receiver.Call<string>("QueryName")} stares at nothing and does not notice you.\n"); return true; }
         if (!receiver.Call<bool>("IsPlayerCharacter") || !Interactive(receiver))
         {
             Write($"{Cap(receiver.Call<string>("QueryLabel") ?? receiver.Call<string>("Short") ?? "It")} does not take things from you. You can give things only to other players.\n");
@@ -1697,8 +1712,9 @@ public abstract class Adventurer : Living
                 direction = exits[Random(exits.Count)];
             }
         }
-        if (Random(4) == 0) { Write("You try to flee, but cannot get away!\n"); return true; }
-        Write($"You flee {direction}!\n");
+        if (Random(4) == 0) { Tell("You try to flee, but cannot get away!\n"); return true; }
+        // Told to this character directly (not to whoever the driver thinks is typing), and always before the new room is described.
+        Tell($"You flee {direction}!\n");
         room.Call("MoveThrough", Self, direction);
         return true;
     }

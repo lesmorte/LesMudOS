@@ -357,6 +357,7 @@ Not in the proof of concept; names are provisional.
 | `Command(string)` | Force a living object to execute a command |
 | `Shadow(ObjectRef)` | LPmud shadows |
 | `QueryIpNumber`, `Snoop` | Connection inspection |
+| `TimeZoneNames()`, `LocalTime(zoneId)` | Implemented: the system's IANA zone names, and the wall clock now in one of them ("UTC", or a fixed offset "UTC+5:30") as `year\|month\|day\|hour\|minute\|second\|weekday\|offsetMinutes\|daylight\|name`; "" for any other name. The name is only matched against the driver's own list. |
 | `IdleSeconds(ObjectRef)`, `IdleLimitSeconds()`, `TimeoutSeconds()` | Implemented: seconds since the player last typed, and the two server settings (see DEPLOY.md) |
 | `virtual Prompt()`, `PromptsAfterOutput()` | Implemented: the line the driver prints for a player after each command (default `> `); a player object returns its own |
 | `SplitOrdinal(text, out name)` | Implemented: `rat 2`, `2.rat`, `second rat` to a position and a name |

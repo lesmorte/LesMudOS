@@ -213,6 +213,15 @@ public class Login : MudObject
             InputTo(GotName);
             return;
         }
+        // A dropped body of this name is still in the world: the connection goes to it, so that one name never has two bodies.
+        if (LoadObject("/secure/linkdead").Call<ObjectRef>("Find", name) is { } lingering)
+        {
+            Discard();
+            Exec(lingering, Self);
+            lingering.Call("Reconnected");
+            Destruct();
+            return;
+        }
         var player = body!;
         body = null;
         Exec(player, Self);

@@ -16,7 +16,7 @@ public class AimedShotSkill : Skill
     {
         Title = "Aimed Shot";
         Command = "aim";
-        Summary = "A shot at +3 to hit for 1.75 times the bow's damage, 2.5 times as the shot that starts the fight. A blow that lands while you aim spoils it. Needs a bow; not at one that is fighting someone else.";
+        Summary = "A shot at +3 to hit for 1.75 times the bow's damage, 2.5 times as the shot that starts the fight. The opener never takes more than part of the target's full Vitality unless you are three levels above it. A blow that lands while you aim spoils it. Needs a bow; not at one that is fighting someone else.";
         EnduranceCost = 30;
         Preparation = 1.0;
         Recovery = 1.0;
@@ -36,8 +36,21 @@ public class AimedShotSkill : Skill
         MaxRank = 5;
     }
 
+    // The opener's cap (owner's decision, 24 Nov 2026; docs/BALANCE_SCOUT.md section 10, option G2): the shot that starts the fight deals at most
+    // OpenerCapBase + OpenerCapPerLevel x d percent of the target's maximum Vitality (d = the Scout's level - the creature's level when it lands),
+    // never less than OpenerCapFloor percent, and no cap once that reaches 100.
+    const int OpenerCapBase = 60;
+    const int OpenerCapPerLevel = 15;
+    const int OpenerCapFloor = 30;
+
+    public override int QueryOpenerCapPercent(int levelDiff)
+    {
+        var share = Math.Max(OpenerCapFloor, OpenerCapBase + OpenerCapPerLevel * levelDiff);
+        return share >= 100 ? 0 : share;
+    }
+
     public override string QuerySummaryAt(int rank) =>
-        $"A shot at +{RankInt("tohit", rank)} to hit for {Fmt(RankValue("factor", rank))} times the bow's damage, {Fmt(RankValue("opener", rank))} times as the shot that starts the fight. A blow that lands while you aim spoils it. Needs a bow; not at one that is fighting someone else.";
+        $"A shot at +{RankInt("tohit", rank)} to hit for {Fmt(RankValue("factor", rank))} times the bow's damage, {Fmt(RankValue("opener", rank))} times as the shot that starts the fight. The opener never takes more than part of the target's full Vitality unless you are three levels above it. A blow that lands while you aim spoils it. Needs a bow; not at one that is fighting someone else.";
 
     private static string Fmt(double value)
     {

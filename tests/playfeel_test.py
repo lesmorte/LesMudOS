@@ -270,9 +270,43 @@ DODGER_CLASS = h.NOVICE_CLASS.replace("NoviceClass", "DodgerClass").replace('"No
 DODGER_TRAIT = h.NOVICE_FISTS.replace("NoviceFistsTrait", "DodgerFistsTrait").replace("Novice Fists", "Dodger Fists").replace('Mods["unarmed_min"] = 1;', 'Mods["dodge"] = 75; Mods["unarmed_min"] = 1;')
 
 
+# A room that reports a discovery to the Chronicle when a player walks in (so the player earns Renown on arrival).
+NEWS_ROOM = '''// @inherit /std/room
+public class PfNews : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "News Room"; LongDesc = "A room made for the arrival-order test.";
+        Exits["out"] = "/domains/test/hub";
+    }
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who)) return;
+        try { LoadObject("/secure/events").Call<string>("Report", "discover.hidden", who, new List<ObjectRef> { who }, Self, "pf-news", new Dictionary<string, string> { ["name"] = "the News Room" }); }
+        catch (MudRuntimeException) { }
+    }
+}
+'''
+
+
+# A room whose text is full of typographic characters, for the charset test.
+UNI_ROOM = '''// @inherit /std/room
+public class PfUni : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "Caf\u00e9 Room"; LongDesc = "She said \u201chello\u201d and \u2018goodbye\u2019 \u2014 then waited\u2026 \u2022 Se\u00f1or Ren\u00e9e \u2013 na\u00efve.";
+        Exits["out"] = "/domains/test/hub";
+    }
+}
+'''
+
+
 def files():
     hub_exits = {"up": HOLLOW + "village/square", "pen": TEST + "pen", "yard": TEST + "yard", "shop": TEST + "shop", "arena": TEST + "arena", "cell": TEST + "cell", "lab": TEST + "lab", "bite": TEST + "bite", "den": TEST + "den", "twoden": TEST + "twoden", "calmden": TEST + "calmden", "mild": TEST + "mild",
-                "burrow": TEST + "burrow", "burrow2": TEST + "burrow2", "warren": TEST + "warren", "trail": TEST + "trail"}
+                "burrow": TEST + "burrow", "burrow2": TEST + "burrow2", "warren": TEST + "warren", "trail": TEST + "trail", "news": TEST + "news", "uni": TEST + "uni"}
     out = {"out": TEST + "hub"}
     return {
         "hub": a.room("PfHub", "Play Hub", hub_exits, safe=True),
@@ -297,6 +331,7 @@ def files():
         "burrow2": a.room("PfBurrow2", "Second Burrow", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n', reset=3000),
         "warren": a.room("PfWarren", "Hare Warren", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}hare");\n        AddSpawn("{TEST}hare");\n', reset=3000),
         "trail": a.room("PfTrail", "Hare Trail", {"out": TEST + "hub"}, f'        AddEncounter("{TEST}hare", 100);\n', reset=3000),
+        "news": NEWS_ROOM, "uni": UNI_ROOM,
         "wolf": WOLF, "hare": HARE, "pftool": PFTOOL,
         "lab": a.room("PfLab", "Zap Lab", {"out": TEST + "hub"}, f'        AddSpawn("{TEST}zapper", 40);\n', reset=3000),
         "zapper": ZAPPER,
@@ -372,6 +407,16 @@ def run(work, mudlib, box):
     wiz = login("wiz")
     check("setup: the first wizard", wiz.command("promote " + SECRET), "level 10 wizard")
     wiz.command("goto " + TEST + "hub")
+    if os.environ.get("PF_ONLY") == "quick":  # the arrival, bare-skill and flee checks only
+        run_time()
+        run_charset()
+        run_arrival_news()
+        run_bare_skill_command()
+        run_fleeing(wiz)
+        wiz.command("save")
+        wiz.command("shutdown")
+        box[0].wait(timeout=15)
+        return
     if os.environ.get("PF_ONLY") == "logfix":  # a quick run of the last fixes only
         run_logfix(wiz)
         wiz.command("save")
@@ -388,6 +433,10 @@ def run(work, mudlib, box):
     run_verbose(wiz)
     run_prompt(wiz)
     run_logfix(wiz)
+    run_arrival_news()
+    run_bare_skill_command()
+    run_time()
+    run_charset()
     wiz.command("save")
     wiz.command("shutdown")
     box[0].wait(timeout=15)
@@ -421,7 +470,7 @@ def run_numbers(wiz):
     check("numbers: the first rat is still there", "ok" if stat_name(wiz, "rat") == first else "differs", "ok")
     wiz.command("slay rat")
     text = wiz.command("look")
-    check("numbers: two corpses are in the room", text, "corpses of")
+    check("numbers: two corpses are in the room, the creature pluralised", text, "corpses of ratlings are here")
     check("numbers: the corpses answer to numbers", wiz.command("look at corpse 2"), "The lifeless body of a ratling lies here.")
     check("numbers: get from corpse 2 takes only from the second corpse", wiz.command("get sword from corpse 2"), "You take a rusty sword from the corpse of a ratling.")
     check("numbers: corpse 2 is now without the sword", wiz.command("look in corpse 2"), "The lifeless body", absent=("rusty sword",))
@@ -514,6 +563,166 @@ def run_corpses(wiz):
 
 # ===== 3. combat restrictions and flee =====
 
+def run_bare_skill_command():
+    """A skill command with no target and no fight answers at once, in one sentence, before the next prompt."""
+    c = h.Client("aimless", archetype="scout")
+    c.read_until("> ")
+    a.drain(c, 0.4)
+    out = c.command("strike")
+    check("no target: one clear sentence, right after the command", out, "You are not fighting anyone: name a target, as in 'strike rat'.", absent=("Use it on whom",))
+    check("and the prompt follows it, with nothing after", "ok" if out.rstrip().endswith(">") or "> " in out[-40:] else out[-120:], "ok")
+    c.command("quit")
+
+
+def clock_minutes(text):
+    """Minutes since midnight from 'It is 9:40 am on Tuesday ...', or None."""
+    m = re.search(r"It is (\d+):(\d\d) (am|pm) on", text)
+    if not m:
+        return None
+    return ((int(m.group(1)) % 12) + (12 if m.group(3) == "pm" else 0)) * 60 + int(m.group(2))
+
+
+def zone_minutes(name):
+    import datetime
+    import zoneinfo
+    now = datetime.datetime.now(zoneinfo.ZoneInfo(name))
+    return now.hour * 60 + now.minute, int(now.utcoffset().total_seconds() // 60)
+
+
+def near(a_, b_, tolerance=3):
+    d = abs(a_ - b_) % 1440
+    return min(d, 1440 - d) <= tolerance
+
+
+def offset_word(minutes):
+    return "UTC" + ("-" if minutes < 0 else "+") + str(abs(minutes) // 60) + ("" if minutes % 60 == 0 else ":%02d" % (abs(minutes) % 60))
+
+
+def run_time():
+    """`time`: the player's own zone (docs/specs/play-feel.md), saved, private, with the lists, and all of it in 7-bit ASCII when asked."""
+    c = login("tzed")
+    a.drain(c, 0.4)
+    text = c.command("time")
+    check("time: unset shows UTC and the hint", text, "UTC, the server's time", "Set your own with time -timezone ZONE.", "Today is ")
+    utc_now = zone_minutes("UTC")[0]
+    check("time: the unset time is UTC's", "ok" if clock_minutes(text) is not None and near(clock_minutes(text), utc_now) else text, "ok")
+    check("time: date is the same command", c.command("date"), "It is ", "Today is ")
+    lst = c.command("time -timezone")
+    check("time -timezone lists the regions with offsets", lst, "North America", "Europe", "Asia", "Oceania", "South America", "Africa", "UTC", "America/New_York UTC-", "Asia/Tokyo UTC+9", "Europe/London UTC")
+    check("time -timezone says any zone name works and how to list a region", lst, "Any standard zone name works", "time -timezone REGION")
+    for form in ("time -tz", "time timezone", "time zones"):
+        check(f"{form}: the same list", c.command(form), "North America")
+    check("time -timezone America lists every zone of the region", c.command("time -timezone America"), "America/New_York", "America/Argentina/Buenos_Aires", "America/Indiana/Indianapolis")
+    check("time -timezone Europe", c.command("time -timezone europe"), "Europe/London", "Europe/Paris")
+    check("time -timezone Asia", c.command("time -timezone Asia"), "Asia/Tokyo", "Asia/Kolkata")
+    # Setting.
+    ny_minutes, ny_off = zone_minutes("America/New_York")
+    for how in ("America/New_York", "america/new_york", "new_york", "new york", "New York", "eastern", "EST", "edt"):
+        out = c.command("time -timezone " + how)
+        shown = clock_minutes(out)
+        check(f"time: set by '{how}'", "ok" if shown is not None and near(shown, ny_minutes) and f"America/New_York, {offset_word(ny_off)}" in out and "Eastern time" in out else out, "ok")
+    check("time: the setting shows in plain time", c.command("time"), "Eastern time (America/New_York, " + offset_word(ny_off), "Today is ")
+    out = c.command("time -timezone utc-5")
+    check("time: a plain offset", "ok" if near(clock_minutes(out) or -99, zone_minutes("UTC")[0] - 300) and "UTC-5" in out else out, "ok")
+    out = c.command("time -timezone +5:30")
+    check("time: an offset with minutes", "ok" if near(clock_minutes(out) or -99, zone_minutes("UTC")[0] + 330) and "UTC+5:30" in out else out, "ok")
+    check("time: an offset out of range", c.command("time -timezone utc+20"), "from -12 to +14")
+    out = c.command("time -timezone london")
+    lon_minutes, lon_off = zone_minutes("Europe/London")
+    check("time: the city alone", "ok" if "Europe/London" in out and near(clock_minutes(out) or -99, lon_minutes) else out, "ok")
+    check("time: an ambiguous name lists the matches", c.command("time -timezone indiana"), "could be several zones", "America/Indiana/Indianapolis")
+    check("time: an unknown name is said and the list pointed at", c.command("time -timezone narnia"), "There is no time zone called 'narnia'", "time -timezone")
+    check("time: a typed brace is shown as typed", c.command("time -timezone {red}x"), "{red}x")
+    # Two zones at one moment differ by their offsets.
+    first = clock_minutes(c.command("time -timezone Asia/Tokyo"))
+    second = clock_minutes(c.command("time -timezone America/Los_Angeles"))
+    t_off = zone_minutes("Asia/Tokyo")[1]
+    l_off = zone_minutes("America/Los_Angeles")[1]
+    check("time: Tokyo and Los Angeles differ by their offsets", "ok" if first is not None and second is not None and near(first - second, t_off - l_off, 4) else f"{first} {second}", "ok")
+    # Saved, and nobody else sees it.
+    c.command("time -timezone Asia/Tokyo")
+    c.command("save")
+    c.command("quit")
+    time.sleep(0.8)
+    c = login("tzed")
+    a.drain(c, 0.4)
+    check("time: the zone survives quit and login", c.command("time"), "Asia/Tokyo (UTC+9)")
+    other = login("tzother")
+    a.drain(other, 0.4)
+    check("time: another player's time is unaffected", other.command("time"), "UTC, the server's time", absent=("Tokyo",))
+    check("time: who does not show the zone", other.command("who"), "Tzed", absent=("Tokyo", "UTC+9"))
+    check("time: look at the player does not show it", other.command("look at tzed"), absent=("Tokyo", "UTC+9"))
+    other.command("quit")
+    c.raw_reset()
+    check("time: charset ascii", c.command("charset ascii"), "plain ASCII")
+    for cmd in ("time", "time -timezone", "time -timezone America"):
+        text = c.raw_command(cmd)
+        check(f"time: '{cmd}' is 7-bit with charset ascii", "ok" if all(ord(ch) < 128 for ch in text) else "non-ASCII", "ok")
+    c.command("charset utf8")
+    check("time: clear", c.command("time -timezone none"), "cleared", "UTC, the server's time", "Set your own with")
+    check("time: usage", c.command("time banana"), "Usage: time")
+    c.command("quit")
+
+
+def run_charset():
+    """charset ascii: every byte of what a player is sent is 7-bit, the score box lines up, the setting is saved; utf8 is unchanged."""
+    c = login("charly")
+    a.drain(c, 0.4)
+    check("charset: the default shows UTF-8", c.command("charset"), "UTF-8")
+    utf = c.command("score")
+    check("charset: utf8 score has the box characters", utf, "\u2554", "\u2557", "\u255a", "\u2551")
+    c.command("down")
+    uni = c.command("uni")
+    check("charset: utf8 room text is unchanged", uni, "\u201chello\u201d", "\u00e9", "\u2026")
+    check("charset: ascii is accepted", c.command("charset ascii"), "plain ASCII")
+    check("charset: and shown", c.command("charset"), "plain ASCII")
+    c.command("out")
+    for cmd in ("score", "look", "help", "who", "inventory", "uni", "ascii", "charset", "skills"):
+        text = c.raw_command(cmd)
+        bad = sorted({ch for ch in text if ord(ch) > 127})
+        check(f"charset: every byte of '{cmd}' is below 128", "ok" if not bad else str(bad), "ok")
+    score = c.command("score")
+    box = [l for l in score.split("\n") if l.startswith(("+", "|"))]
+    lens = {len(l.rstrip("\r")) for l in box}
+    check("charset: the score box is drawn with + - |", score, "+" + "-" * 46 + "+", "|")
+    check("charset: every box line has the same length", "ok" if len(box) >= 3 and len(lens) == 1 else str(lens), "ok")
+    check("charset: the calling and level are separated by a hyphen", score, " - Level 1")
+    check("charset: the rules under the headings are hyphens", score, "-" * 25)
+    uni = c.command("look")
+    check("charset: typographic characters are plain", uni, "\"hello\"", "'goodbye'", "- then waited...", "- Senor", "Renee - naive.", "Cafe Room")
+    check("charset: the usage line", c.command("charset klingon"), "Usage: charset [ascii|utf8]")
+    c.command("save")
+    c.command("quit")
+    time.sleep(0.8)
+    c = login("charly")
+    a.drain(c, 0.4)
+    check("charset: the setting survives quit and login", c.command("charset"), "plain ASCII")
+    check("charset: and the score is still 7-bit", "ok" if all(ord(ch) < 128 for ch in c.raw_command("score")) else "non-ASCII", "ok")
+    check("charset: ascii off is the alias for utf8", c.command("ascii off"), "UTF-8")
+    check("charset: and the box is back", c.command("score"), "\u2554")
+    check("charset: ascii on is the alias", c.command("ascii on"), "plain ASCII")
+    c.command("quit")
+    # A new character is told the command exists.
+    n = h.Client("newcomer")
+    first = n.read_until("> ")
+    check("charset: the greeting of a new character names the command", first, "charset ascii")
+    n.command("quit")
+
+
+def run_arrival_news():
+    """Renown and title lines earned by walking into a room come after the room's description, not before it."""
+    c = login("newsy")
+    a.drain(c, 0.4)
+    c.command("down")
+    text = c.command("news") + a.quiet(c, 1.5)
+    check("arrival: the room is described", text, "News Room")
+    check("arrival: the renown news is told", text, "Your renown grows", "You have earned the title:")
+    if "News Room" in text and "Your renown grows" in text:
+        check("arrival: the renown line comes after the room description", "ok" if text.index("News Room") < text.index("Your renown grows") and text.index("Obvious exits") < text.index("Your renown grows") else text[:400], "ok")
+        check("arrival: the title line comes after the room description", "ok" if text.index("Obvious exits") < text.index("You have earned the title:") else text[:400], "ok")
+    c.command("quit")
+
+
 def flee_until(c, command, tries=40):
     """Repeat a flee command until it is not the 1-in-4 failure. Returns the text of the last try."""
     text = ""
@@ -550,6 +759,7 @@ def run_fleeing(wiz):
     # With a direction.
     text = flee_until(wiz, "flee east")
     check("fleeing: with a direction you go that way", text, "You flee east!", "Second Pit")
+    check("fleeing: the flee line comes before the new room is described", "ok" if "You flee east!" in text and text.index("You flee east!") < text.index("Second Pit") else text[:200], "ok")
     check("fleeing: the fight is over for you", wiz.command("flee"), "You are not fighting anyone.")
     check("fleeing: you can walk and pick things up again", wiz.command("west"), "Fighting Pit")
     wiz.command("kill dummy")
@@ -564,6 +774,7 @@ def run_fleeing(wiz):
         wiz.command("kill dummy")
         text = flee_until(wiz, "flee")
         check(f"fleeing: with no direction you go back the way you came (round {round_})", text, "You flee east!", "Second Pit")
+        check(f"fleeing: the line comes before the room (round {round_})", "ok" if "You flee east!" in text and text.index("You flee east!") < text.index("Second Pit") else text[:200], "ok")
     # The way back cannot be used (not arrived by an exit): any usable exit, never the locked one.
     seen = set()
     for _ in range(12):
@@ -655,13 +866,13 @@ def run_aggro(wiz):
 # ===== 10. a room does not refill while the creature's corpse is there =====
 
 def look_hares(c):
-    """(hares alive, corpses of hares) in the room, from the room description ("A hare", "Two hares", "the corpse of a hare", "Two corpses of a hare")."""
+    """(hares alive, corpses of hares) in the room, from the room description ("A hare", "Two hares", "the corpse of a hare", "Two corpses of hares")."""
     text = ansi_free(c.command("look"))
     words = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3}
     corpses = 0
-    for m in re.finditer(r"(?i)\b(?:(a|one|two|three) corpses? of a hare|the corpse of a hare)", text):
+    for m in re.finditer(r"(?i)\b(?:(a|one|two|three) corpses of hares|the corpse of a hare)", text):
         corpses += words.get((m.group(1) or "a").lower(), 1)
-    rest = re.sub(r"(?i)\b(?:(a|one|two|three) corpses? of a hare|the corpse of a hare)", "", text)
+    rest = re.sub(r"(?i)\b(?:(a|one|two|three) corpses of hares|the corpse of a hare)", "", text)
     alive = 0
     for m in re.finditer(r"(?i)\b(a|one|two|three) hares?\b", rest):
         alive += words[m.group(1).lower()]
@@ -1140,7 +1351,10 @@ def run_prompt(wiz):
     wiz.command("goto " + TEST + "hub")
     # Saved with the character.
     pat.command("prompt <{vitality}> ")
-    pat.command("quit")
+    for _ in range(12):   # quit is refused in a fight: break away first
+        if "cannot leave" not in pat.command("quit"):
+            break
+        pat.command("flee")
     pat.closed(3)
     again = login("prue")
     check("prompt: saved with the character", again.command("prompt"), "Your prompt is: <{vitality}>")
