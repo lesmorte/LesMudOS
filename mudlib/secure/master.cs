@@ -6,11 +6,12 @@ public class Master : MudObject, IMaster
 {
     private const string WizList = "/secure/wizlist";
     private const string LostProperty = "/secure/lost_property";
+    private const string Throttle = "/secure/throttle";
     private const string LegacyVault = "/secure/vault";  // the old name of the lost-property save file, read once by the upgrade
 
     public ObjectRef Connect() => CloneObject("/secure/login");
 
-    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/crafting", "/secure/comm", "/secure/channels", "/secure/roomids", "/secure/gmcp", "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
+    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/crafting", "/secure/comm", "/secure/channels", "/secure/roomids", "/secure/gmcp", Throttle, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
 
     // Save files: player bodies own /players/*, the wizard registry owns its own file.
     public bool ValidRead(string path, ObjectRef caller) => OwnsSaveFile(path, caller);
@@ -52,6 +53,11 @@ public class Master : MudObject, IMaster
         {
             case "admin-secret": return IsWizList(caller);
             case "exec": return caller.ProgramPath == "/secure/login";
+            // The address of a connection reaches only the login object (a clone, about its own connection) and the login throttle (the blueprint).
+            case "connection-address": return caller.IsClone && caller.ProgramPath == "/secure/login";
+            case "address-tag":
+            case "throttle-log":
+            case "throttle-setting": return !caller.IsClone && caller.ProgramPath == Throttle;
             case "get-dir":
                 return IsPlayerBody(caller) || IsClassRegistry(caller, arg) || IsCraftingDaemon(caller, arg) || IsChannelDaemon(caller, arg);
             case "read-file":

@@ -40,6 +40,10 @@ public class Player : Adventurer
     // `charset ascii`: every message to this player is turned into 7-bit ASCII (see Asciify). Off (UTF-8) by default, also for older saves.
     [Saved] private bool asciiOnly;
 
+    // The last three addresses this character logged in from, as keyed hashes (never the addresses): a locked name still lets these addresses
+    // try a few passwords (docs/specs/login-throttle.md). Written only by NoteAddress, read only by KnowsAddress, both for the login object.
+    [Saved] private List<string> knownAddresses = new();
+
     private bool ready;
     // True only while WriteRaw is sending file text: CatchTell then passes it on exactly as stored.
     private bool rawOutput;
@@ -174,6 +178,27 @@ public class Player : Adventurer
         return false;
     }
 
+    /// <summary>True if the keyed hash of an address is one of the last three this character logged in from. Only the login object, during its login.</summary>
+    public bool KnowsAddress(string tag)
+    {
+        if (!CalledByOurLogin() || string.IsNullOrEmpty(tag)) return false;
+        return knownAddresses.Contains(tag);
+    }
+
+    /// <summary>
+    /// Remember the keyed hash of the address a login has just succeeded from (the last three are kept, the newest last). Only the login object that
+    /// holds the connection: for a new body during its login, or for a body that lingered after its connection dropped.
+    /// </summary>
+    public void NoteAddress(string tag)
+    {
+        var caller = PreviousObject();
+        if (string.IsNullOrEmpty(tag) || tag.Length > 32 || !IsLoginObject(caller) || !Interactive(caller!)) return;
+        if (!ready && !CalledByOurLogin()) return;
+        knownAddresses.Remove(tag);
+        knownAddresses.Add(tag);
+        while (knownAddresses.Count > 3) knownAddresses.RemoveAt(0);
+    }
+
     /// <summary>
     /// Step 2 for a new account or one without a password: store the password
     /// and save at once, so a new name is reserved with its password. False if
@@ -258,6 +283,7 @@ public class Player : Adventurer
         AddAction("clone", CmdClone);
         AddAction("mudstat", CmdMudstat);
         AddAction("shutdown", CmdShutdown);
+        AddAction("throttle", CmdThrottle);
 
         Write(returning ? $"\nWelcome back, {Name}. This is visit number {logins}.\n\n" : $"\nWelcome, {Name}. Type '{{cmd}}help{{/}}' for commands. If the boxes and bullets of {{cmd}}score{{/}} look wrong, type {{cmd}}charset ascii{{/}}.\n\n");
         EnsureHome(); // a wizard whose home is missing gets it back
@@ -472,6 +498,7 @@ public class Player : Adventurer
         if (level >= 10) Write("          {cmd}slay{/} <target>              kill a creature at once, with kill credit\n");
         if (level >= 10) Write("          {cmd}setlevel{/} <1-100>           set your level (experience, Vitality and resources follow)\n");
         if (level >= LevelUpdate) Write("          {cmd}update{/} <path>              recompile a file and replace the loaded object\n");
+        if (level >= LevelShutdown) Write("          {cmd}throttle{/} [clear <name>|<address>|all]  list the login locks, or lift one\n");
         if (level >= LevelShutdown) Write("          {cmd}shutdown{/}                   stop the driver\n");
         return true;
     }
@@ -1125,6 +1152,14 @@ public class Player : Adventurer
     {
         if (!IsWizard(LevelMudstat)) return false;
         Write(DriverStatus());
+        return true;
+    }
+
+    /// <summary>`throttle` lists the login locks, `throttle clear <name>|<address>|all` lifts them. Level 10 only; below it the verb does not exist.</summary>
+    private bool CmdThrottle(string args)
+    {
+        if (!IsWizard(LevelShutdown)) return false;
+        Write(LoadObject("/secure/throttle").Call<string>("Command", args) ?? "");
         return true;
     }
 
