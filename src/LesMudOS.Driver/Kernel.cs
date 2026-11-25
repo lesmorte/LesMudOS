@@ -300,7 +300,7 @@ internal sealed partial class Kernel : IDriverServices
     public void OnDisconnect(Connection connection)
     {
         Log.Info($"connection ended: {connection.RemoteAddress}, player {connection.PlayerName ?? "(none)"}, lasted {(int)connection.Lasted.TotalSeconds}s, " +
-                 $"{(TimeMs() - connection.LastInputMs) / 1000}s since last input, {connection.EndedBy}");
+                 $"{(TimeMs() - connection.LastInputMs) / 1000}s since last input, {connection.EndedBy}{LingerNote(connection)}");
         _connections.Remove(connection);
         _owing.Remove(connection);
         if (connection.Owner is not { IsAlive: true } owner) return;

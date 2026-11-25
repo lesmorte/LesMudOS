@@ -128,7 +128,7 @@ public class Player : Adventurer
 
     public override string? Short() => $"{Name} {Esc(title)}";
 
-    public override string Long() => $"{Name} {Esc(title)}, who has visited {logins} time(s).\n" + HealthLine();
+    public override string Long() => $"{Name} {Esc(title)}, who has visited {logins} time(s).\n" + HealthLine() + (linkDead ? $"{Name} stares at nothing, and does not answer.\n" : "");
 
     // ---- Login ----
     // These public methods decide who gets into an account, so each one checks
@@ -304,7 +304,7 @@ public class Player : Adventurer
         if (idle >= timeout)
         {
             Write("You have been idle for too long. Your character is saved and you are disconnected.\n");
-            CmdQuit("");
+            if (!DropConnection()) CmdQuit(""); // the connection ends like a dropped one: NetDead follows (the body lingers a minute)
             return;
         }
         if (idleWarned) return;
@@ -321,6 +321,7 @@ public class Player : Adventurer
             .Where(u => u.Call<string>("Short") != null)
             .Select(u => u.Call<string>("Short") + (u.Call<int>("QueryWizLevel") > 0 ? $" [wizard {u.Call<int>("QueryWizLevel")}]" : "") + (u.Call<bool>("QueryIdle") ? IdleSuffix(u.Call<int>("QueryIdleSeconds")) : ""))
             .ToList();
+        foreach (var dropped in LoadObject("/secure/linkdead").Call<List<ObjectRef>>("All") ?? new List<ObjectRef>()) users.Add(dropped.Call<string>("Short") + " (link-dead)");
         Write($"{users.Count} player(s) online:\n  " + string.Join("\n  ", users) + "\n");
         return true;
     }
@@ -388,6 +389,8 @@ public class Player : Adventurer
 
     private bool CmdQuit(string args)
     {
+        // Quitting is not an escape: a fight is left by fleeing (the body of a dropped connection stays for a minute, so quit must not be cheaper).
+        if (QueryInCombat()) { Write("You cannot leave in the middle of a fight. Flee first.\n"); return true; }
         Save();
         Write("Goodbye.\n");
         Say($"{Name} leaves the game.\n");
@@ -1133,6 +1136,7 @@ public class Player : Adventurer
             TellObject(user, $"{Name} shuts the game down.\n");
             user.Call("SaveForShutdown");
         }
+        foreach (var dropped in LoadObject("/secure/linkdead").Call<List<ObjectRef>>("All") ?? new List<ObjectRef>()) dropped.Call("SaveForShutdown"); // bodies of dropped connections too
         Shutdown();
         return true;
     }
@@ -1140,10 +1144,63 @@ public class Player : Adventurer
     public override void NetDead()
     {
         if (!ready) return;
+        if (QueryLingerSeconds() > 0) { StartLinger(); return; }
         Save();
         Say($"{Name} disconnects.\n");
         ReleaseInventory();
         Destruct();
+    }
+
+    // ---- A dropped connection: the body lingers (docs/specs/play-feel.md section 14) ----
+    // Without `quit`, the body stays where it stands for LingerSeconds() (a minute), link-dead: creatures fight it, it fights back with ordinary
+    // attacks only, and it can be killed. The character is saved at the drop and again when the body goes or dies. /secure/linkdead lists the
+    // bodies, so that the login object can give a returning connection back to the same one.
+
+    private int lingerCall;
+
+    /// <summary>How long a body of this player would linger if its connection ended now: 0 for a wizard, a body already lingering, a dead one or one not yet in the game. Read by the driver for the log.</summary>
+    public int QueryLingerSeconds() => ready && !linkDead && !Dead && QueryWizLevel() < 1 ? LingerSeconds() : 0;
+
+    private void StartLinger()
+    {
+        Save(); // a driver stopped in the minute loses nothing
+        linkDead = true;
+        LeaveRest();
+        EndSneakLoud();
+        AbandonActions();
+        LoadObject("/secure/linkdead").Call("Register", Self);
+        if (Environment() is { } room) TellRoom(room, $"{Name}'s eyes go blank.\n", Self);
+        lingerCall = CallOut(EndLinger, LingerSeconds());
+    }
+
+    private void EndLinger()
+    {
+        if (linkDead && Self.IsAlive) RemoveDroppedBody();
+    }
+
+    protected override void LinkDeadDied() => RemoveDroppedBody();
+
+    private void RemoveDroppedBody()
+    {
+        linkDead = false;
+        Save();
+        if (Environment() is { } room) TellRoom(room, $"{Name} fades from sight.\n", Self);
+        LoadObject("/secure/linkdead").Call("Unregister", Self);
+        ReleaseInventory();
+        Destruct();
+    }
+
+    /// <summary>The login object gives a returning player's connection to the body they left standing. Only the login object, and only to a body that lingers.</summary>
+    public void Reconnected()
+    {
+        var caller = PreviousObject();
+        if (!linkDead || caller == null || !caller.IsClone || caller.ProgramPath != "/secure/login" || !Interactive(Self)) return;
+        linkDead = false;
+        RemoveCallOut(lingerCall);
+        LoadObject("/secure/linkdead").Call("Unregister", Self);
+        Write("\nYou shake off the daze and find yourself where you stood.\n\n");
+        if (Environment() is { } room) TellRoom(room, $"{Name}'s eyes regain their focus.\n", Self);
+        Look();
     }
 
     // ---- Communication (docs/specs/communication.md) ----

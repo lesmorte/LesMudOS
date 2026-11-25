@@ -500,3 +500,6 @@ The driver speaks GMCP (telnet option 201; protocol and efuns in [DRIVER_API.md]
 
 **Security.** `GmcpSend` refuses a caller whose program is not under `/std` or `/secure`. The service's public methods, `GmcpFacts` and `GmcpRoomFacts` each check `PreviousObject()`: the service answers only the player body itself (about itself) or `/secure/comm` and `/secure/channels` (about the line they delivered), and the body and the room answer only the service. `Assign` answers only the service. A wizard's object can ask whether a player uses GMCP (one boolean) and nothing else; `tests/gmcp_test.py` has a probe that tries each of these. Player-written text (channel lines) goes to the driver as a plain string and is encoded there.
 
+
+## A dropped connection (24 November 2026)
+A player whose connection ends without `quit` (including the idle timeout) leaves a link-dead body in the room for one minute: it can be attacked, fights back with ordinary attacks, can die, and is taken over again by a login of the same name. `quit` is refused in a fight. See docs/specs/play-feel.md section 14.

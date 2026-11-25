@@ -1167,6 +1167,21 @@ public abstract class Living : Thing
 
     // ---- Combat: the clock ----
 
+    /// <summary>A link-dead body drops what it had queued and what it was preparing (nothing comes back); it goes on with ordinary attacks only.</summary>
+    protected void AbandonActions()
+    {
+        queued = null;
+        queuedTarget = null;
+        if (phase != "preparing") return;
+        phase = "recovering";
+        current = null;
+        currentTarget = null;
+        paidEndurance = 0;
+        paidFocus = 0;
+        readyAt = TimeMs();
+        Schedule(readyAt);
+    }
+
     /// <summary>Forget everything in progress: the call-out, the current and the queued action. A revived player starts clean.</summary>
     protected void ResetCombat()
     {

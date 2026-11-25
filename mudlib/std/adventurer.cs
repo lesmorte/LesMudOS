@@ -1094,7 +1094,7 @@ public abstract class Adventurer : Living
     }
 
     /// <summary>Whatever the character does that is not looking or talking gets them up.</summary>
-    private void LeaveRest()
+    protected void LeaveRest()
     {
         if (resting) EndRest();
     }
@@ -1369,7 +1369,17 @@ public abstract class Adventurer : Living
         {
             dying = false;
         }
+        if (linkDead) LinkDeadDied(); // a dropped player's body that died: it is saved (above) and goes at once
     }
+
+    // ---- A dropped connection (docs/specs/play-feel.md section 14): the body lingers; /std/player holds the rest ----
+
+    /// <summary>True while this body has lost its connection and is still in the world.</summary>
+    protected bool linkDead;
+
+    public bool QueryLinkDead() => linkDead;
+
+    protected virtual void LinkDeadDied() { }
 
     /// <summary>Write the character to disk now. Players override this.</summary>
     protected virtual void PersistNow() { }
@@ -1577,6 +1587,7 @@ public abstract class Adventurer : Living
         var receiver = whom == "" ? null : Present(whom, room);
         if (receiver == Self) { Write("You already have it.\n"); return true; }
         if (receiver == null) { NotifyFail($"There is no one called '{Esc(whom)}' here."); return false; }
+        if (receiver.Call<bool>("QueryLinkDead")) { Write($"{receiver.Call<string>("QueryName")} stares at nothing and does not notice you.\n"); return true; }
         if (!receiver.Call<bool>("IsPlayerCharacter") || !Interactive(receiver))
         {
             Write($"{Cap(receiver.Call<string>("QueryLabel") ?? receiver.Call<string>("Short") ?? "It")} does not take things from you. You can give things only to other players.\n");

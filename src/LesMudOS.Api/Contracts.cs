@@ -99,6 +99,8 @@ internal interface IDriverServices
 
     long TimeMs();
     string[] TimeZoneNames();
+    int LingerSeconds();
+    bool DropConnection(ObjectRef caller, ObjectRef target);
     string LocalTime(string zoneId);
     int IdleSeconds(ObjectRef ob);
     int IdleLimitSeconds();

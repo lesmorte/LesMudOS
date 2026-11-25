@@ -221,6 +221,12 @@ public abstract class MudObject
     /// </summary>
     protected long TimeMs() => D.TimeMs();
 
+    /// <summary>The server setting: seconds a dropped player's body stays in the world (60).</summary>
+    protected int LingerSeconds() => D.LingerSeconds();
+
+    /// <summary>A player's body drops its own connection (the idle timeout); the driver then calls NetDead as for any dropped connection. False for anyone else's.</summary>
+    protected bool DropConnection() => D.DropConnection(Self, Self);
+
     /// <summary>The IANA names of the time zones the server knows (sorted; empty if it has no zone database).</summary>
     protected string[] TimeZoneNames() => D.TimeZoneNames();
 

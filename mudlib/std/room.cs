@@ -630,6 +630,7 @@ public abstract class Room : MudObject
                 floor[key] = (g.single, g.n + Math.Max(1, ob.Call<int>("QueryQuantity")));
                 continue;
             }
+            if (Living(ob) && ob.Call<bool>("QueryLinkDead")) { sentences.Add((ob.Call<string>("QueryName") ?? Cap(desc)) + " stands here, staring at nothing."); continue; } // a dropped player's body
             if (Living(ob) && ob.Call<bool>("QueryResting")) { sitting.Add(desc); continue; } // "Keith is resting here."
             if (!counts.ContainsKey(desc)) { counts[desc] = 0; order.Add(desc); }
             counts[desc]++;

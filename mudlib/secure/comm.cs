@@ -72,6 +72,14 @@ public class Comm : MudObject
 
     private string NameFor(ObjectRef viewer, ObjectRef who) => CanSee(viewer, who) ? who.Call<string>("QueryName") ?? "Someone" : "Someone";
 
+    /// <summary>The answer to a tell or whisper aimed at a dropped player's body that is still in the world (nothing is delivered), or null.</summary>
+    private string? CannotHear(ObjectRef speaker, string name, bool sameRoom)
+    {
+        if (name == "" || LoadObject("/secure/linkdead").Call<ObjectRef>("Find", name) is not { } body || body == speaker || !CanSee(speaker, body)) return null;
+        if (sameRoom && Environment(body) != Environment(speaker)) return null;
+        return $"{NameFor(speaker, body)} cannot hear you: their eyes are blank and distant.\n";
+    }
+
     private ObjectRef? FindPlayer(string name)
     {
         foreach (var user in Users())
@@ -206,6 +214,7 @@ public class Comm : MudObject
         var text = Clean(rest);
         if (name == "" || text == "") return "Usage: {cmd}tell{/} PLAYER MESSAGE\n";
         var target = FindPlayer(name);
+        if (target == null && CannotHear(speaker, name, false) is { } deaf) return deaf;
         if (target == null || !CanSee(speaker, target)) return "No one by that name is in the world.\n";
         return TellTo(speaker, target, text);
     }
@@ -221,6 +230,7 @@ public class Comm : MudObject
         if (last == "") return "You have no one to reply to.\n";
         // Whoever told you is not asked to be visible: they spoke first.
         var target = FindPlayer(last);
+        if (target == null && CannotHear(speaker, last, false) is { } deaf) return deaf;
         if (target == null) return "No one by that name is in the world.\n";
         return TellTo(speaker, target, text);
     }
@@ -286,6 +296,7 @@ public class Comm : MudObject
             var t = PresentPlayer(speaker, first);
             if (t != null) { target = t; message = rest; }
         }
+        if (target == null && (CannotHear(speaker, named, true) ?? CannotHear(speaker, FirstWord(args, out _), true)) is { } deaf) return deaf;
         if (target == null)
         {
             // Name the one that was meant if we can tell; both ways of writing it end here for someone who is not present.
