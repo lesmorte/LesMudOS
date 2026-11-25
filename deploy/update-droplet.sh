@@ -24,8 +24,9 @@ fi
 # The settings the droplet was set up with are read back from the installed service.
 unit=/etc/systemd/system/lesmudos.service
 GAME_PORT="$(grep -oP -- '--port \K[0-9]+' "$unit")"
+BRIDGE_PORT="$(grep -oP -- '--bridge-port \K[0-9]+' "$unit" || echo 0)"   # absent in units written before the bridge existed
 if grep -q "ReadWritePaths=.*$APP_DIR/mudlib\$" "$unit"; then MUDLIB_WRITABLE=all; else MUDLIB_WRITABLE=wiz; fi
-export APP_DIR GAME_PORT MUDLIB_WRITABLE
+export APP_DIR GAME_PORT BRIDGE_PORT MUDLIB_WRITABLE
 
 if [ "$MUDLIB_WRITABLE" = all ]; then
     echo "NOTE: the mudlib is writable by the game. Files that wizards changed in the live world, outside"
@@ -40,4 +41,6 @@ BRANCH="${BRANCH:-$(git -C "$APP_DIR/src" rev-parse --abbrev-ref HEAD)}"
 export BRANCH
 git -C "$APP_DIR/src" fetch --quiet origin "$BRANCH"
 git -C "$APP_DIR/src" reset --quiet --hard "origin/$BRANCH"
+# (setup-droplet.sh adds the commented network-limit and login-throttle settings to /etc/lesmudos.env if they are not there yet; an existing
+# install runs on the defaults, with the bridge listener off, until someone edits that file.)
 exec bash "$APP_DIR/src/deploy/setup-droplet.sh"
