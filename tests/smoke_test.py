@@ -25,11 +25,12 @@ PORT = int(os.environ.get("LESMUDOS_TEST_PORT", "4777"))
 
 # The suites open many connections, all from 127.0.0.1, and the driver (rightly) does not exempt loopback: switch the connection caps
 # and the connect rate off for the test drivers. Every suite imports this module and starts its driver with a copy of this environment.
-# The input limit (20 lines/s, burst 60) is left ON: the suites run under it, so a suite that outgrows it fails. tests/net_test.py and
+# The input limit is off too: a test client sends its next command the moment the reply arrives, which is far faster than any player (the
+# measured peaks are in docs/specs/web-client.md section 4); tests/net_test.py tests the limit itself. tests/net_test.py and
 # tests/throttle_test.py set their own values. setdefault: an outer value wins.
 # The login throttle (docs/specs/login-throttle.md) is off for the same reason: the suites make dozens of characters from one address and
 # type wrong passwords on purpose. tests/throttle_test.py sets its own windows. A zero switches a limit off.
-for _name, _value in (("LESMUDOS_MAX_CONNECTIONS", "0"), ("LESMUDOS_MAX_PER_ADDRESS", "0"), ("LESMUDOS_CONNECTS_PER_MINUTE", "0"),
+for _name, _value in (("LESMUDOS_MAX_CONNECTIONS", "0"), ("LESMUDOS_MAX_PER_ADDRESS", "0"), ("LESMUDOS_CONNECTS_PER_MINUTE", "0"), ("LESMUDOS_MAX_LINES_PER_SECOND", "0"),
                       ("LESMUDOS_THROTTLE_NAME_FAILURES", "0"), ("LESMUDOS_THROTTLE_ADDRESS_FAILURES", "0"), ("LESMUDOS_THROTTLE_NEW_PER_HOUR", "0"),
                       ("LESMUDOS_THROTTLE_NEW_PER_DAY", "0"), ("LESMUDOS_THROTTLE_FAIL_DELAY_MS", "0")):
     os.environ.setdefault(_name, _value)

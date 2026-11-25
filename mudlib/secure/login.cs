@@ -131,6 +131,10 @@ public class Login : MudObject
     private void GotPassword(string password)
     {
         if (body is not { IsAlive: true }) { Fail("Something went wrong. Goodbye.\n"); return; }
+        // Asked again with every password: connections that were already at the prompt when a lock began (guessing in parallel) are refused too.
+        var verdict = Throttle().Call<string>("BeginPassword", name, address, body.Call<bool>("KnowsAddress", tag));
+        if (verdict == "refused") { Refuse(); return; }
+        knownMode = verdict == "known";
         if (body.Call<bool>("CheckPassword", password))
         {
             Throttle().Call("Succeeded", name, address);
