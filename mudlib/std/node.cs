@@ -72,14 +72,18 @@ public class Node : Thing
     }
 
     /// <summary>Is this node one its room hides (Room.HideNode) from this character, who has not found it? Then it is not listed, not looked at, not harvested.</summary>
-    private bool HiddenFrom(ObjectRef? who) => who != null && Environment() is { } room && room.Call<bool>("QueryNodeHiddenFrom", Self, who);
+    private int Hiding(ObjectRef? who) => who != null && Environment() is { } room ? room.Call<int>("QueryNodeHiding", Self, who) : 0;
+
+    private bool HiddenFrom(ObjectRef? who) => Hiding(who) == 1;
 
     public override bool Id(string id) => !HiddenFrom(ThisPlayer()) && (base.Id(id) || Kind.ToLowerInvariant() == id || Kind.ToLowerInvariant().Split(' ').Contains(id));
 
     public override string? Short()
     {
-        if (HiddenFrom(ThisPlayer())) return null;
-        return QueryCharges() > 0 || PickedShort == "" ? base.Short() : PickedShort;
+        var hiding = Hiding(ThisPlayer());
+        if (hiding == 1) return null;
+        var text = QueryCharges() > 0 || PickedShort == "" ? base.Short() : PickedShort;
+        return hiding == 2 && text != null ? text + " (hidden)" : text;
     }
 
     public override string Long()

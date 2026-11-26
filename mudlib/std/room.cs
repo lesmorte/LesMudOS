@@ -275,14 +275,15 @@ public abstract class Room : MudObject
     }
 
     /// <summary>
-    /// Is this node (one of this room's, by its program path) hidden from the viewer, who has not found it? A wizard is never hidden from. For the node's own Short, Id and TryGather.
+    /// Is this node (one of this room's, by its program path) one the room hides, and does the viewer see it? 0: it is no hidden node, or the viewer has found it
+    /// (an ordinary node); 1: hidden from this viewer, who has not found it; 2: hidden, and the viewer is a wizard, who sees it marked. For the node's own Short, Id and TryGather.
     /// </summary>
-    public bool QueryNodeHiddenFrom(ObjectRef node, ObjectRef viewer)
+    public int QueryNodeHiding(ObjectRef node, ObjectRef viewer)
     {
-        if (node == null || viewer == null || !viewer.IsAlive || !viewer.Call<bool>("IsPlayerCharacter")) return false;
+        if (node == null || viewer == null || !viewer.IsAlive || !viewer.Call<bool>("IsPlayerCharacter")) return 0;
         var thing = hiddenThings.Values.FirstOrDefault(t => t.Kind == "node" && t.Path == node.ProgramPath);
-        if (thing == null) return false;
-        return viewer.Call<int>("QueryWizLevel") < 1 && !FoundThing(viewer, thing.Id);
+        if (thing == null || FoundThing(viewer, thing.Id)) return 0;
+        return viewer.Call<int>("QueryWizLevel") >= 1 ? 2 : 1;
     }
 
     public int QueryBandLow() => bandSet ? bandLow : FindArea()?.Call<int>("QueryBandLow") ?? 0;

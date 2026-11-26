@@ -1872,8 +1872,10 @@ public abstract class Adventurer : Living
         searchRoom = null;
         if (room == null || room != started) return; // walked away while searching: nothing comes of it
         if (QueryInCombat()) { Tell("You cannot search while you are fighting.\n"); return; }
-        if (room.Call<int>("Search", Self, searchNamed) > 0) return; // the room has told the finder, and the others
-        Tell("You search carefully but find nothing of note.\n(You will need a minute before you can look this place over properly again.)\n");
+        var result = room.Call<int>("Search", Self, searchNamed);
+        if (result > 0) return; // the room has told the finder, and the others
+        if (result == 0) Tell("You search carefully but find nothing of note.\n");
+        Tell("(You will need a minute before you can look this place over properly again.)\n");
         StartSearchWait(room.Name);
     }
 
