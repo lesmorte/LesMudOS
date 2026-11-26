@@ -505,7 +505,7 @@ def sneak_room_roll(p, level, creatures, rng):
     """The notice rolls on entering a room. Returns (hidden, chances): hidden = no creature noticed the Scout; chances = each creature's entry chance (None: a Boss)."""
     grace = attrs_at(p.arch, level)[ATTR.index("grace")]
     adjust = p.skill_int("sneak", "notice")
-    chances = [None if c in SNEAK_BOSS else notice_chance(grace, level, KINDS[c].level, c in SNEAK_ALERT, adjust, c in SNEAK_ELITE) for c in creatures]
+    chances = [None if c in SNEAK_BOSS else notice_chance(grace, level, KINDS[c].level, c in SNEAK_ALERT, adjust + light_notice(c), c in SNEAK_ELITE) for c in creatures]
     for ch in chances:
         if ch is None or rng.random() * 100 < ch:
             return False, chances
@@ -792,6 +792,79 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
     return out
 
 
+# ---- light and darkness (docs/specs/light.md; docs/BALANCE_LIGHT.md). Off by default: LIGHT_NOW is None and every room is lit, as before the change.
+# The numbers are mudlib/secure/light.cs and mudlib/skills/glow.cs; `check` compares them.
+DIM_MELEE, DIM_RANGED, DARK_MELEE, DARK_RANGED = -1, -2, -3, -6
+NOTICE_DIM, NOTICE_DARK_SEEING, NOTICE_DARK_BLIND, NOTICE_OWN_LIGHT = -10, -15, -25, 20
+GLOW_FOCUS, GLOW_SECONDS, GLOW_LIGHT = (20, 23, 26), (300, 480, 720), (1, 1, 2)   # by rank
+TORCH_LIGHT, LANTERN_LIGHT = 1, 2
+LIGHT_BLIND = ("Giant Cave Toad",)    # creatures flagged DarkSight = false in the mudlib: they fight and notice by the same rules as a player
+# The cellars' light with nothing carried (mudlib/domains/hollow/cellars: Light plus any wall light): 1 lit, 0 dim, -1 dark. Rooms not named are lit.
+LIGHT_ROOMS = {"Tavern Cellar": 1, "Collapsed Passage": 1, "Storage Chamber": 1, "Smuggler Hall": 1, "Guard Post": 0, "Flooded Tunnel": -1,
+               "Mushroom Cavern": 0, "Goblin Barracks": -1, "Overseer Hall": 0, "Overseer Chamber": 1}
+LIGHT = None       # None: no light model; else dict(default=choice, by={calling: choice}) (choices: none, torch, lantern, glow, torch+glow)
+LIGHT_NOW = None   # (level, carries a lit light) for the room being fought in, or None
+
+
+def light_pen(att):
+    """The to-hit penalty of the attacker in this light (Living.Attack: ToHitPenalty). A player never sees in the dark; a creature does unless it is in LIGHT_BLIND."""
+    if LIGHT_NOW is None or LIGHT_NOW[0] >= 1:
+        return 0
+    if att.is_player:
+        ranged = getattr(att, "weapon", None) in BOWS
+    else:
+        if att.kind is None or att.kind.name not in LIGHT_BLIND:
+            return 0
+        ranged = False
+    return (DIM_RANGED if ranged else DIM_MELEE) if LIGHT_NOW[0] == 0 else (DARK_RANGED if ranged else DARK_MELEE)
+
+
+def light_notice(creature_name):
+    """What the room's light and the Scout's own light add to this creature's chance to notice him (/secure/light NoticeAdjust)."""
+    if LIGHT_NOW is None:
+        return 0
+    level, carries = LIGHT_NOW
+    a = 0 if level >= 1 else NOTICE_DIM if level == 0 else NOTICE_DARK_BLIND if creature_name in LIGHT_BLIND else NOTICE_DARK_SEEING
+    return a + (NOTICE_OWN_LIGHT if carries else 0)
+
+
+def set_light_now(v):
+    global LIGHT_NOW
+    LIGHT_NOW = v
+
+
+def glow_rank():
+    return 1 if RANK_MODE == "none" else 2
+
+
+def enter_light(room, p, now):
+    """The player's light for this room, by his choice: a source is lit only where the room is not lit already (a sensible player puts it out in a lit room).
+    Glow costs Focus (the Mage's Focus Efficiency applies) and lasts GLOW_SECONDS; with too little Focus there is no Glow. Sets LIGHT_NOW."""
+    global LIGHT_NOW
+    if LIGHT is None:
+        return
+    calling = ARCHER if p.archer else p.arch.name
+    choice = LIGHT["by"].get(calling, LIGHT["default"])
+    base = LIGHT_ROOMS.get(room, 1)
+    src = 0
+    if base < 1:
+        if "torch" in choice:
+            src += TORCH_LIGHT
+        if choice == "lantern":
+            src += LANTERN_LIGHT
+        if "glow" in choice and p.max_mana >= GLOW_FOCUS[0]:
+            rank = glow_rank()
+            if now >= getattr(p, "glow_until", -1):
+                cost = max(1, rnd(GLOW_FOCUS[rank - 1] * (100 + p.arch.spell_cost_pct) / 100.0))
+                if p.mana >= cost:
+                    p.mana -= cost
+                    p.glow_until = now + GLOW_SECONDS[rank - 1]
+                    p.glow_casts = getattr(p, "glow_casts", 0) + 1
+            if now < getattr(p, "glow_until", -1):
+                src += GLOW_LIGHT[glow_rank() - 1]
+    LIGHT_NOW = (max(-3, min(3, base + src)), src > 0)
+
+
 def do_hit(att, defn, t, to_hit_bonus=0, crit=5, factor=1.0, mult=1, bonus=0):
     """One physical attack. Returns (damage, blocked) with damage 0 on a miss or dodge. crit is the action's own chance (5 for
     a basic attack); Critical Chance from Grace is added here, as Living.QueryCritFor does."""
@@ -799,7 +872,7 @@ def do_hit(att, defn, t, to_hit_bonus=0, crit=5, factor=1.0, mult=1, bonus=0):
         return 0, False
     roll = random.randint(1, 20)
     need = 10 + defn.total_armor(t) + defn.defense()
-    if not (roll == 20 or (roll != 1 and roll + att.attack(t) + to_hit_bonus >= need)):
+    if not (roll == 20 or (roll != 1 and roll + att.attack(t) + to_hit_bonus + light_pen(att) >= need)):
         return 0, False
     dmg = max(1, rnd(max(1, random.randint(*att.dmg) + bonus) * (1 + stat(att.attrs, "physical_power") / 100.0))) * mult
     if factor != 1.0:
@@ -1285,6 +1358,7 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
         if boss:
             res["door"] = p.hp / p.max_hp
         enemies = [make_monster(c) for c in creatures]
+        enter_light(room, p, t["fight"] + t["walk"] + t["rest"])
         policy = start = None
         opens = False
         hidden = False   # sneaking, and no creature of the room has noticed: the Scout opens the fight
@@ -1333,6 +1407,8 @@ def run_approach(arch_name, level, potions, model, rng, gear="starting", aggro=T
             res.update(outcome="fled" if r.get("fled") else "died", room=room)
             break
     res["left"] = left
+    res["glow_casts"] = getattr(p, "glow_casts", 0)
+    set_light_now(None)
     return res
 
 
@@ -1922,6 +1998,7 @@ def check_mudlib():
     check_skills(os.path.join(root, "..", ".."), problems)
     check_corridor(problems)
     check_opener_cap(os.path.join(root, "..", ".."), problems)
+    check_light(os.path.join(root, "..", ".."), problems)
     for p in problems:
         print("MISMATCH", p)
     print("simulation numbers match the mudlib" if not problems else f"{len(problems)} mismatch(es)")
@@ -1944,6 +2021,53 @@ def check_opener_cap(read_root, problems):
         living = f.read()
     if "QueryOpenerCapPercent" not in living or "action.Opener" not in living:
         problems.append("std/living.cs: the opener cap is not applied")
+
+
+def check_light(read_root, problems):
+    """Compare the light numbers above with mudlib/secure/light.cs (the penalties, the notice changes), mudlib/skills/glow.cs (cost, light, seconds by rank),
+    the light items, and the cellars' rooms (LIGHT_ROOMS)."""
+    def read(*path):
+        with open(os.path.join(read_root, *path), encoding="utf-8") as f:
+            return f.read()
+
+    light = read("secure", "light.cs")
+    want = {"DimMelee": DIM_MELEE, "DimRanged": DIM_RANGED, "DarkMelee": DARK_MELEE, "DarkRanged": DARK_RANGED, "NoticeDim": NOTICE_DIM,
+            "NoticeDarkSeeing": NOTICE_DARK_SEEING, "NoticeDarkBlind": NOTICE_DARK_BLIND, "NoticeOwnLight": NOTICE_OWN_LIGHT}
+    for name, value in want.items():
+        m = re.search(rf"\b{name} = (-?\d+)\b", light)
+        if m is None or int(m.group(1)) != value:
+            problems.append(f"secure/light.cs: {name} is {m.group(1) if m else None}, {value} in the simulation")
+    glow = read("skills", "glow.cs")
+    m = re.search(r"FocusCost = (\d+);", glow)
+    rows = dict(re.findall(r'RankRow\((\d), "([^"]+)"\)', glow))
+    seconds = [int(re.search(r'Effect\("seconds", (\d+)\)', glow).group(1))] + [int(re.search(r"seconds=(\d+)", rows[r]).group(1)) for r in ("2", "3")]
+    focus = [int(m.group(1))] + [int(re.search(r"focus=(\d+)", rows[r]).group(1)) for r in ("2", "3")]
+    lights = [int(re.search(r'Effect\("light", (\d+)\)', glow).group(1)), 1, int(re.search(r"light=(\d+)", rows["3"]).group(1))]
+    if tuple(focus) != GLOW_FOCUS or tuple(seconds) != GLOW_SECONDS or tuple(lights) != GLOW_LIGHT:
+        problems.append(f"skills/glow.cs: Focus {focus}, seconds {seconds}, light {lights} in the mudlib; {GLOW_FOCUS}, {GLOW_SECONDS}, {GLOW_LIGHT} in the simulation")
+    for item, value in (("rag_torch", TORCH_LIGHT), ("pitch_torch", TORCH_LIGHT), ("storm_lantern", LANTERN_LIGHT)):
+        text = read("domains", "hollow", "obj", item + ".cs")
+        m = re.search(r"LightValue = (\d+);", text)
+        if (int(m.group(1)) if m else 1) != value:   # LightSource's default is 1
+            problems.append(f"obj/{item}.cs: LightValue is {m.group(1) if m else None}, {value} in the simulation")
+    files = {"Tavern Cellar": "../village/cellar", "Collapsed Passage": "collapsed_passage", "Storage Chamber": "storage_chamber", "Smuggler Hall": "smuggler_hall",
+             "Guard Post": "guard_post", "Flooded Tunnel": "flooded_tunnel", "Mushroom Cavern": "mushroom_cavern", "Goblin Barracks": "goblin_barracks",
+             "Overseer Hall": "overseer_hall", "Overseer Chamber": "overseer_chamber"}
+    for room, f in files.items():
+        text = read("domains", "hollow", "cellars", f + ".cs") if not f.startswith("..") else read("domains", "hollow", "village", "cellar.cs")
+        m = re.search(r"\bLight = (-?\w+);", text)
+        raw = 1 if m is None else {"LightDim": 0, "LightDark": -1, "LightBlack": -2, "LightLit": 1}.get(m.group(1), int(m.group(1)) if m.group(1).lstrip("-").isdigit() else None)
+        if raw is None:
+            problems.append(f"{room}: cannot read its Light ({m.group(1)})")
+            continue
+        has_lamp = "wall_lantern" in text or "table_lamp" in text
+        total = raw + (1 if has_lamp else 0)
+        if (1 if total >= 1 else total) != LIGHT_ROOMS[room]:
+            problems.append(f"{room}: light {total} in the mudlib, {LIGHT_ROOMS[room]} in the simulation")
+    for creature in LIGHT_BLIND:
+        text = read("domains", "hollow", "mob", creature.lower().replace(" ", "_") + ".cs")
+        if "DarkSight = false" not in text:
+            problems.append(f"{creature}: DarkSight is not false in the mudlib")
 
 
 def check_corridor(problems):
@@ -3512,6 +3636,7 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
             p.bless_until = p.cry_until = 0
             p.effects = {}
             enemies = [make_monster(c) for c in creatures]
+            enter_light(room, p, t)
             policy = HumanPolicy(model, rng)
             typed = policy.delay()
             start = start_times(p, enemies, typed, True)
@@ -3580,6 +3705,8 @@ def cellar_run(calling, model, rng, sneak=True, recurve=False, goal=5):
             rest(p, wait, model.rest_factor)
             t += wait
             st["waited"] += wait
+    st["glow_casts"] = getattr(p, "glow_casts", 0)
+    set_light_now(None)
     return st
 
 
@@ -3891,6 +4018,158 @@ def scout_report(parts=("std",), runs=1500):
         print()
 
 
+# ---------------------------------------------------------------- light and darkness (docs/specs/light.md, docs/BALANCE_LIGHT.md)
+#
+#   python3 tests/balance_sim.py light [std|cell|rooms|all] [runs]
+#
+# Nothing here is applied to the game: LIGHT is off unless a block turns it on, and then every room has its LIGHT_ROOMS state, the penalties and the notice
+# changes of /secure/light apply, and each character carries the light of his choice: none; torch (+1, lit in every room that is not lit already);
+# lantern (+2); glow (the spell: Focus 20 / 23 / 26, lasts 5 / 8 / 12 minutes, the Mage's Focus Efficiency applies, only a Mage or Priest); torch+glow.
+# A carried light adds 20 to the sneaking Scout's notice chances. Burning down (a torch burns 10 to 25 minutes, a lantern an hour) and gold are NOT modelled:
+# a character is assumed to have a fresh light, which flatters the torch; the real cost is 5 to 15 gold on a whole career (docs/specs/light.md section 9).
+
+@contextmanager
+def lights(default="none", by=None):
+    """Turn the light model on for a block: every room has its state, and each calling carries the light of its choice (by) or the default."""
+    global LIGHT, LIGHT_NOW
+    saved = LIGHT
+    LIGHT = dict(default=default, by=by or {})
+    LIGHT_NOW = None
+    try:
+        yield
+    finally:
+        LIGHT = saved
+        LIGHT_NOW = None
+
+
+CALLING_ORDER = ("warrior", "scout", "priest", "mage", "adventurer", ARCHER)
+CASTERS = ("priest", "mage")
+LIGHT_CHOICES = ("none", "torch", "lantern", "glow", "torch+glow")
+
+
+def light_std_table(runs=1500, seed=1):
+    """The standard test (level 5, starting gear, 4 potions, middle human, from the cellar entrance, Scouts sneaking) before the change and with each light
+    choice, for all six rows at rank I and rank II. A Glow choice means nothing to a calling that has no Glow: those cells are left out (-)."""
+    print(f"Standard test, kill% against the Overseer from the cellar entrance, {runs} runs a cell, seed {seed}; the Scouts sneak. Rank I = nobody has bought a rank; rank II = everyone holds rank II.")
+    print("| rank | light | warrior | scout (melee) | priest | mage | adventurer | archer | mean of five | archer - mean |")
+    print("|---|---|---|---|---|---|---|---|---|---|")
+    out = {}
+    for rname, mode in (("I", "none"), ("II", "cap")):
+        rows = [("lit world (before light)", None)] + [(c, c) for c in LIGHT_CHOICES]
+        for label, choice in rows:
+            with ranked(mode=mode), sneaking():
+                if choice is None:
+                    v = l5_kills(list(CALLING_ORDER), runs, seed)
+                else:
+                    with lights(choice):
+                        v = {}
+                        for c in CALLING_ORDER:
+                            if "glow" in choice and c not in CASTERS:
+                                v[c] = None
+                                continue
+                            v[c] = l5_kills([c], runs, seed)[c]
+            out[(rname, label)] = v
+            five = [v[c] for c in ARCHS if v[c] is not None]
+            mean = sum(five) / len(five) if len(five) == 5 else None
+            cells = " | ".join("-" if v[c] is None else f"{v[c]:.1f}" for c in CALLING_ORDER)
+            tail = f"{mean:.1f} | {v[ARCHER] - mean:+.1f}" if mean is not None else "- | -"
+            print(f"| {rname} | {label} | {cells} | {tail} |", flush=True)
+    return out
+
+
+LIGHT_CELL_ROWS = (   # (calling, sneaks, choice) for the played progression
+    ("archer", ARCHER, True, (None, "none", "torch", "lantern")),
+    ("melee Scout", "scout", True, (None, "none", "torch", "lantern")),
+    ("Warrior", "warrior", False, (None, "none", "torch", "lantern")),
+    ("Mage", "mage", False, (None, "none", "torch", "glow", "torch+glow", "lantern")),
+    ("Priest", "priest", False, (None, "none", "torch", "glow", "torch+glow", "lantern")),
+)
+
+
+def light_cell_table(runs=1500, rows=LIGHT_CELL_ROWS):
+    print(f"A played progression level 1 to 5 through the cellars, rank I, {runs} runs a row, seed 20261124; Scouts sneak; the first row of each calling is the game before light.")
+    print("| calling | light | deaths a run | potions used | creatures killed by the first action | creatures killed before they acted | fights with no damage taken | Vitality lost a fight | minutes to level 5 | reached level 5 | fights a run | fights opened from hiding |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    out = {}
+    for label, calling, sneak, choices in rows:
+        for choice in choices:
+            with ranked(mode="none"), sneaking(sneak):
+                if choice is None:
+                    c = cell_stats(calling, runs, sneak, False)
+                else:
+                    with lights(choice):
+                        c = cell_stats(calling, runs, sneak, False)
+            out[(label, choice)] = c
+            print(cell_line(f"{label} | {'lit world' if choice is None else choice}", c), flush=True)
+    return out
+
+
+def light_rooms_table():
+    print("The cellars' light with nothing carried, and what each light makes of it (level: 1 or more lit, 0 dim, -1 dark):")
+    print("| room | nothing | torch | lantern | Glow | torch + Glow | to-hit melee / bow with nothing | notice change (creature that sees / the toad) |")
+    print("|---|---|---|---|---|---|---|---|")
+    names = {1: "lit", 0: "dim", -1: "dark"}
+    for room, base in LIGHT_ROOMS.items():
+        def name(n):
+            return names[1 if n >= 1 else n]
+        pen = "0 / 0" if base >= 1 else (f"{DIM_MELEE} / {DIM_RANGED}" if base == 0 else f"{DARK_MELEE} / {DARK_RANGED}")
+        notice = "0 / 0" if base >= 1 else (f"{NOTICE_DIM} / {NOTICE_DIM}" if base == 0 else f"{NOTICE_DARK_SEEING} / {NOTICE_DARK_BLIND}")
+        print(f"| {room} | {name(base)} | {name(base + 1)} | {name(base + 2)} | {name(base + 1)} | {name(base + 2)} | {pen} | {notice} |")
+
+
+@contextmanager
+def light_option(rooms=None, **constants):
+    """An alternative to the spec's numbers for a block (docs/BALANCE_LIGHT.md): rooms = {room: base light} overrides LIGHT_ROOMS; constants override the
+    module's names (DIM_RANGED=-3 ...). Nothing here is applied to the game."""
+    saved_rooms, saved = dict(LIGHT_ROOMS), {k: globals()[k] for k in constants}
+    try:
+        LIGHT_ROOMS.update(rooms or {})
+        globals().update(constants)
+        yield
+    finally:
+        LIGHT_ROOMS.clear()
+        LIGHT_ROOMS.update(saved_rooms)
+        globals().update(saved)
+
+
+LIGHT_ALTERNATIVES = [
+    ("S: the spec as built", {}),
+    ("N1: a carried light adds 30 to the notice chances", dict(NOTICE_OWN_LIGHT=30)),
+    ("N2: a carried light adds 40", dict(NOTICE_OWN_LIGHT=40)),
+    ("R1: a bow at -3 in the dim and -9 in the dark", dict(DIM_RANGED=-3, DARK_RANGED=-9)),
+    ("D1: Guard Post, Mushroom Cavern and Overseer Hall dark", dict(rooms={"Guard Post": -1, "Mushroom Cavern": -1, "Overseer Hall": -1})),
+    ("D2: D1, and the Tunnel and the Barracks black (-2)", dict(rooms={"Guard Post": -1, "Mushroom Cavern": -1, "Overseer Hall": -1, "Flooded Tunnel": -2, "Goblin Barracks": -2})),
+    ("D3: Mushroom Cavern and Overseer Hall dark, the Chamber dim", dict(rooms={"Mushroom Cavern": -1, "Overseer Hall": -1, "Overseer Chamber": 0})),
+    ("C1: D1 + N1", dict(NOTICE_OWN_LIGHT=30, rooms={"Guard Post": -1, "Mushroom Cavern": -1, "Overseer Hall": -1})),
+    ("C2: D3 + R1", dict(DIM_RANGED=-3, DARK_RANGED=-9, rooms={"Mushroom Cavern": -1, "Overseer Hall": -1, "Overseer Chamber": 0})),
+]
+
+
+def light_alt_table(runs=1500, seed=1, options=None):
+    """The standard test, rank I and II, for each alternative: the six rows with a torch, the archer with no light and with a lantern, and the mean of the five."""
+    print(f"Alternatives to the spec's light numbers, standard test, {runs} runs a cell, seed {seed}: every calling with a torch (the archer also with no light / a lantern).")
+    print("| option | rank | warrior | scout (melee) | priest | mage | adventurer | archer, torch | mean of five | archer - mean | archer, no light | archer, lantern |")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    for label, kw in options or LIGHT_ALTERNATIVES:
+        for rname, mode in (("I", "none"), ("II", "cap")):
+            with light_option(**kw), ranked(mode=mode), sneaking():
+                with lights("torch"):
+                    v = l5_kills(list(CALLING_ORDER), runs, seed)
+                with lights("none"):
+                    nl = l5_kills([ARCHER], runs, seed)[ARCHER]
+                with lights("lantern"):
+                    la = l5_kills([ARCHER], runs, seed)[ARCHER]
+            five = [v[c] for c in ARCHS]
+            mean = sum(five) / 5
+            print(f"| {label} | {rname} | " + " | ".join(f"{x:.1f}" for x in five) + f" | {v[ARCHER]:.1f} | {mean:.1f} | {v[ARCHER] - mean:+.1f} | {nl:.1f} | {la:.1f} |", flush=True)
+
+
+def light_report(parts=("rooms", "std", "cell"), runs=1500):
+    for part in parts:
+        {"rooms": lambda: light_rooms_table(), "std": lambda: light_std_table(runs), "cell": lambda: light_cell_table(runs), "alt": lambda: light_alt_table(runs)}[part]()
+        print()
+
+
 def ranks_report(runs=3000, parts=()):
     parts = parts or ("level5", "heal", "double", "gap", "bolt", "focus", "climb")
     for part in parts:
@@ -3926,6 +4205,11 @@ def main():
         runs = int(next((a for a in sys.argv[2:] if a.isdigit()), 1500))
         parts = tuple(a for a in sys.argv[2:] if not a.isdigit()) or ("notice", "std", "cell", "pace", "hall", "spread")
         scout_report(parts, runs)
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "light":
+        runs = int(next((a for a in sys.argv[2:] if a.isdigit()), 1500))
+        parts = tuple(a for a in sys.argv[2:] if not a.isdigit()) or ("rooms", "std", "cell")
+        light_report(parts, runs)
         return
     if len(sys.argv) > 1 and sys.argv[1] == "pace":
         pace_report(int(sys.argv[2]) if len(sys.argv) > 2 else 250)
