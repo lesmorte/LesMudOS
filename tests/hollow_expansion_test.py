@@ -153,7 +153,7 @@ public class HxProbe : Thing
     public override string? Short() => "a probe";
     public override void Init()
     {
-        foreach (var v in new[] { "tele", "gold", "killed", "smite", "hurt", "mk", "dropcount", "chron", "crit", "pledge" })
+        foreach (var v in new[] { "tele", "gold", "killed", "smite", "hurt", "mk", "dropcount", "chron", "crit", "pledge", "sdice", "swait" })
             AddAction(v, Do);
     }
     private bool Do(string args)
@@ -165,6 +165,8 @@ public class HxProbe : Thing
         {
             case "tele": MoveObject(me, LoadObject(args.Trim())); me.Call("Look"); return true;
             case "gold": me.Call("AddGold", int.Parse(w[0])); Write("GOLD ok\n"); return true;
+            case "sdice": Write("SDICE " + LoadObject("/secure/search").Call<bool>("SetTestRolls", w[0]) + "\n"); return true;
+            case "swait": Write("SWAIT " + LoadObject("/secure/search").Call<bool>("SetTestWait", int.Parse(w[0])) + "\n"); return true;
             case "killed": Write("KILLED " + me.Call<bool>("QueryKilled", w[0]) + "\n"); return true;
             case "hurt": me.Call("TakeDamage", int.Parse(w[0]), null); Write("HURT ok\n"); return true;
             case "mk": MoveObject(CloneObject(w[0]), me); Write("GIVEN\n"); return true;
@@ -376,6 +378,10 @@ def run(work, mudlib, box):
     w = login("warden")
     check("the secret makes the warden a level-10 wizard", w.command("promote " + h.SECRET), "level 10 wizard")
     a.drain(w, 0.4)
+    # Searching (docs/specs/search.md): the dice are fixed at a natural 20 and the wait is off, so that every search finds what is there to find.
+    w.command("clone /domains/hxtest/probe")
+    check("the dice are fixed for the searches of the cache", w.command("sdice d20:20"), "SDICE True")
+    check("and the wait after a failed search is off", w.command("swait 0"), "SWAIT True")
 
     # ===== 0. the files =====
     new_files = []
@@ -809,6 +815,9 @@ def run(work, mudlib, box):
     # ===== 10. the finds: once, and not twice =====
     finder = newchar("fiona", gold=0)
     finder.command("tele " + CELLARS + "hidden_cache")
+    check("the Hidden Cache hides the bundle until it is searched for", finder.command("look"), "Rotted sacking", absent=("oilcloth",))
+    finder.send("search")
+    check("a search finds the bundle", a.quiet(finder, 6.5), "a long bundle wrapped in greased oilcloth")
     check("the Hidden Cache shows the bundle", finder.command("look"), "oilcloth")
     check("look at the bundle", finder.command("look at bundle"), "greased oilcloth")
     text = finder.command("get bundle")
@@ -818,11 +827,18 @@ def run(work, mudlib, box):
     check("the room lists the taken bundle as a sentence", finder.command("look"), "A long oilcloth wrapping lies folded open here.", absent=("folded open is here",))
     check("a second try finds nothing more", finder.command("get bundle"), "already")
     truth("only one recurve in the pack", count(finder, "warden's recurve") == 1, finder.command("i"))
-    # Every obvious verb and every noun of the find's line takes it (a fresh character each time: a find is taken once).
-    for who, phrase in (("ada", "open bundle"), ("beth", "unwrap bundle"), ("cora", "untie bundle"), ("dina", "take oilcloth"), ("elsa", "get oilcloth"),
-                        ("faye", "untie cord"), ("gina", "pick up bundle"), ("hana", "open oilcloth"), ("iris", "take cord"), ("jana", "get long bundle"), ("kira", "unroll bundle")):
+    # Every obvious verb and every noun of the find's line takes it once it is found (a fresh character each time: a find is taken once). They search together.
+    phrases = (("ada", "open bundle"), ("beth", "unwrap bundle"), ("cora", "untie bundle"), ("dina", "take oilcloth"), ("elsa", "get oilcloth"),
+               ("faye", "untie cord"), ("gina", "pick up bundle"), ("hana", "open oilcloth"), ("iris", "take cord"), ("jana", "get long bundle"), ("kira", "unroll bundle"))
+    crowd = []
+    for who, phrase in phrases:
         c = newchar(who, gold=0)
         c.command("tele " + CELLARS + "hidden_cache")
+        crowd.append((c, phrase))
+    for c, _ in crowd:
+        c.send("search")
+    for c, phrase in crowd:
+        a.quiet(c, 6.5)
         check(f"the bundle answers to '{phrase}'", c.command(phrase), "warden's recurve", absent=("What?",))
         c.command("quit")
     calm_bats(w)
@@ -834,6 +850,8 @@ def run(work, mudlib, box):
     truth("only one staff in the pack", count(finder, "staff of the Hollow Oak") == 1, finder.command("i"))
     second = newchar("gwen", gold=0)
     second.command("tele " + CELLARS + "hidden_cache")
+    second.send("search")
+    a.quiet(second, 6.5)
     check("a second character takes a recurve of their own", second.command("get bundle"), "warden's recurve")
     calm_bats(w)
     second.command("tele " + CELLARS + "mushroom_cavern")

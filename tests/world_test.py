@@ -94,7 +94,12 @@ public class WtProbe : Thing
         AddAction("gather", Gather);
         AddAction("gatherfar", GatherFar);
         AddAction("evil", Evil);
+        AddAction("sdice", SDice);
+        AddAction("swait", SWait);
     }
+    // The search's dice and the wait after a failed search, for the test (a level 10 wizard, from trusted code).
+    private bool SDice(string args) { Write("SDICE " + LoadObject("/secure/search").Call<bool>("SetTestRolls", args.Trim()) + "\\n"); return true; }
+    private bool SWait(string args) { Write("SWAIT " + LoadObject("/secure/search").Call<bool>("SetTestWait", int.Parse(args.Trim())) + "\\n"); return true; }
     private bool Tele(string args)
     {
         var who = ThisPlayer()!;
@@ -286,11 +291,18 @@ def pinfo(c, who):
     return (m.group(1), m.group(2), int(m.group(3)), int(m.group(4)), int(m.group(5))) if m else None
 
 
+def fix_dice(wiz, mode="d20:20"):
+    """Searching (docs/specs/search.md): every search rolls this (a natural 20 finds what is there) and no wait follows a failed one."""
+    check("search dice " + mode, wiz.command("sdice " + mode), "SDICE True")
+    check("search wait off", wiz.command("swait 0"), "SWAIT True")
+
+
 def run(work, mudlib, box):
     wiz = fresh("wiz")
     check("secret makes the first wizard", wiz.command("promote " + h.SECRET), "level 10 wizard")
     wiz.command("goto " + W + "hub")
     a.drain(wiz, 0.5)
+    fix_dice(wiz)
 
     # ===== dormant patrols: nobody on any route, nothing moves =====
     time.sleep(7)
@@ -350,7 +362,7 @@ def run(work, mudlib, box):
     check("a wizard sees the exit that only search can find too", text, "up (hidden)")
     check("a wizard who has not found one is told why it will not open", wiz.command("west"), "That way is hidden, and you have not found it yet")
     text = wiz.command("stat here")
-    check("stat here shows the hidden exits with chance and detail", text, "Hidden exit west -> /domains/wtest/vault (find chance 100%, detail 'crack,fissure')", "Hidden exit up -> /domains/wtest/vault (find chance 0%")
+    check("stat here shows the hidden exits with difficulty and detail", text, "Hidden exit west -> /domains/wtest/vault (difficulty 1, 95% for Insight 5, detail 'crack,fissure')", "Hidden exit up -> /domains/wtest/vault (difficulty 0, by detail only")
     check("a wizard who finds an exit can use it", wiz.command("look at crack") + wiz.command("west"), "You squeeze into the crack", "Test Vault")
     wiz.command("east")
     check("a hidden exit shown to a normal player is not marked", exits_of(carol.command("look")), "east, west", absent=("(hidden)",))
@@ -358,7 +370,8 @@ def run(work, mudlib, box):
     # ===== search =====
     dave = fresh("dave")
     dave.command("tele " + W + "dull")
-    text = dave.command("search")
+    dave.send("search")
+    text, _ = timed(dave, "nothing of note", 6)
     check("search in a room with nothing hidden says so in a plain line", text, "You search carefully but find nothing of note.")
     dave.command("tele " + W + "cave")
     a.drain(dave, 3.5)
@@ -378,7 +391,7 @@ def run(work, mudlib, box):
     check("a second search too soon is queued", q, "You are not ready yet. You will search as soon as you can")
     t2txt, _ = timed(dave, "nothing of note", 8)
     gap = time.time() - first
-    check("search takes about 3 seconds of action time (Reaction Time 2.5 less 1, times 2)", "ok" if 2.4 <= gap <= 3.9 else "gap %.1f" % gap, "ok")
+    check("search takes about 4 seconds of action time (Reaction Time 2.5 less 0.5, times 2)", "ok" if 3.4 <= gap <= 4.9 else "gap %.1f" % gap, "ok")
     check("the queued search happened", t2txt, "nothing of note")
     dave.send("search")
     a.quiet(dave, 0.3)
@@ -406,7 +419,8 @@ def run(work, mudlib, box):
         except Exception: pass
     check("search is refused while fighting", refused, "You cannot search while you are fighting.")
     erin.command("flee")
-    # chance: twelve characters search a 50% room once each
+    # chance: twelve characters search a 50% room once each (real dice)
+    fix_dice(wiz, "random")
     crowd = [fresh("crowd%s" % "abcdefghijkl"[i]) for i in range(12)]
     for c in crowd:
         c.command("tele " + W + "chancy")
@@ -420,6 +434,7 @@ def run(work, mudlib, box):
         if "west" in exits_of(c.command("look")):
             found += 1
     check("a 50%% exit is found by some of twelve searchers and not by all (%d found)" % found, "ok" if 1 <= found <= 11 else "found %d" % found, "ok")
+    fix_dice(wiz)
     for c in crowd:
         c.send("quit")
     # a locked hidden exit
@@ -461,6 +476,7 @@ def run(work, mudlib, box):
     wiz = h.Client("wiz")
     wiz.read_until("> ")
     wiz.command("goto " + W + "hub")
+    fix_dice(wiz)
 
     run_bands(wiz)
     run_elder(wiz, work, mudlib, box)
@@ -532,7 +548,7 @@ def run_elder(wiz, work, mudlib, box):
     check("west leads to the Overgrown Way", text, "The Overgrown Way", "Obvious exits: east, west")
     check("and back east", hank.command("east"), "Elder Lane")
     text = wiz_stat(wiz, ELDER)
-    check("Elder Lane's find chance for search is modest (20%)", text, "Hidden exit west -> " + WAY, "find chance 20%")
+    check("Elder Lane's find chance for search is modest (20% for Insight 5: difficulty 17)", text, "Hidden exit west -> " + WAY, "difficulty 17, 20% for Insight 5")
     # another character finds it by search or detail; check search runs there with one of two outcomes
     ivy = fresh("ivy")
     ivy.command("tele " + ELDER)
