@@ -174,6 +174,7 @@ Chosen at character creation, after the password, from a short in-character pres
 | Warrior | Defensive Training | trait | | | +2 armor. |
 | Warrior | Weapon Proficiency | trait | | | +2 to hit with any weapon. |
 | Scout | Evasion | trait | | | 5% dodge (8% before docs/ATTRIBUTES.md section 8). |
+| Scout | Keen Eye | trait | | | +2 to every search for hidden things (docs/specs/search.md). |
 | Scout | Tracking (`track`) | skill | 5 Endurance | 0 / 0.5 | Lists the creatures in each room the scout could walk to now (never through a closed door or an unfound hidden way). Rank II, the last, reads two rooms away and senses creatures behind a closed way. |
 | Scout | Sneak (`sneak`) | skill (toggle) | 5 Endurance a room | none | On before entering a room: the creatures there may not notice the Scout. Loud deeds end it. Rank II 4 Endurance, -10 points to be noticed; III 3, -20. Section 15. |
 | Scout | Precision Strike (`strike`) | skill | 25 Endurance | 0.5 / 1.0 | An attack at +4 to hit with a 15% critical chance (+5, +6, +7 at ranks II to IV). Works with any weapon. As the blow that starts a fight from hiding, x1.5 the weapon's damage (II 1.75, III 2.0, IV 2.25). |
