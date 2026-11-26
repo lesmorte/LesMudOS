@@ -10,6 +10,9 @@ public class CollapsedPassage : Room
         Exits["west"] = "/domains/hollow/village/cellar";
         Exits["east"] = "/domains/hollow/cellars/storage_chamber";
         Safe = false;
+        Light = LightDim;
+        AddSpawn("/domains/hollow/obj/wall_lantern");
+        LongDesc += " Someone hung a lantern on one of the props, and the beam above it is black with soot.";
 
         AddDetail("stone,loose stone,rubble,rocks", "Grey stones of every size lie where the roof gave way, and some of them shift underfoot when you step on them.");
         AddDetail("beams,beam,support beams,broken beams,timber", "Split oak props lean at crooked angles, their joints crushed. Someone propped them up once and then left them to rot.");

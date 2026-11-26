@@ -10,6 +10,9 @@ public class FloodedTunnel : Room
         Exits["west"] = "/domains/hollow/cellars/smuggler_hall";
         Exits["east"] = "/domains/hollow/cellars/mushroom_cavern";
         Safe = false;
+        Light = LightDark;
+        Wet = true;
+        DarkDesc = "Cold water laps at your ankles. Somewhere ahead drops fall into the dark, and the sound goes a long way.";
 
         AddDetail("water,ankle-deep water,pool,puddles", "Cold, brackish water covers the floor, black and still except where a drip breaks its surface.");
         AddDetail("drips,drip,ceiling,roof", "Water gathers on the roof and falls with a soft tock, and the sound travels far off into the dark.");

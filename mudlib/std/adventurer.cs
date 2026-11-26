@@ -228,6 +228,7 @@ public abstract class Adventurer : Living
         ("focus", "your current Focus"), ("maxfocus", "your maximum Focus"),
         ("rest", "\"(resting) \" while you rest, otherwise nothing"),
         ("sneak", "\"(sneaking) \" while you sneak, otherwise nothing"),
+        ("light", "\"(dim) \" in a dim room, \"(dark) \" in a dark one, otherwise nothing"),
     };
 
     /// <summary>
@@ -254,6 +255,7 @@ public abstract class Adventurer : Living
         "maxfocus" => QueryMaxFocus().ToString(),
         "rest" => QueryResting() ? "(resting) " : "",
         "sneak" => sneaking ? "(sneaking) " : "",
+        "light" => RoomLight() switch { "dim" => "(dim) ", "dark" => "(dark) ", _ => "" },
         _ => "",
     };
 
@@ -649,6 +651,13 @@ public abstract class Adventurer : Living
         var kind = skill.Call<string>("QueryTarget");
         if (kind == "enemy")
         {
+            if (InDark() && args != "")
+            {
+                if (!UnseenWord(args)) { Write($"You cannot see {WithArticle(args)}.\n"); return true; }
+                target = PickUnseen();
+                if (target == null) { Write("You can sense nothing to aim at.\n"); return true; }
+            }
+            else
             target = args == "" ? Enemies().FirstOrDefault(e => Environment(e) == room) : room == null ? null : Present(args, room);
             if (target == null) { Write(args == "" ? $"You are not fighting anyone: name a target, as in '{QueryVerb()} rat'.\n" : $"You see no '{Esc(args)}' here.\n"); return true; }
             if (!target.Call<bool>("IsCreature")) { Write("You cannot fight that.\n"); return true; }
@@ -882,6 +891,8 @@ public abstract class Adventurer : Living
         carried.Clear();
         carriedEquipped.Clear();
         foreach (var item in AllInventory())
+            if (item.Domain == "" && item.IsAlive && item.Call<bool>("IsLightSource")) item.Call("SyncLight"); // the time left goes into the record (a lit light is out at the next login)
+        foreach (var item in AllInventory())
         {
             if (item.Domain != "") continue; // a sandbox thing is never a record of the real game (docs/SANDBOX.md)
             carried.Add(RecordOf(item));
@@ -951,6 +962,14 @@ public abstract class Adventurer : Living
         AddAction("improve", CmdImprove);
         AddAction("quests", CmdQuests);
         AddAction("search", CmdSearch);
+        AddAction("light", CmdLight);
+        AddAction("ignite", CmdLight);
+        AddAction("extinguish", CmdExtinguish);
+        AddAction("douse", CmdExtinguish);
+        AddAction("snuff", CmdExtinguish);
+        AddAction("put", CmdPut);
+        AddAction("fill", CmdFill);
+        AddAction("refill", CmdFill);
         BindCraftCommands(); // crafting and gathering, below
         // Builder tools. Each handler checks the wizard level on every use and
         // declines below it, so to everyone else these verbs do not exist.
@@ -1235,7 +1254,8 @@ public abstract class Adventurer : Living
         var daemon = LoadObject(SneakDaemon);
         var skill = LoadObject("/skills/sneak");
         var adjust = skill.Call<int>("QueryNoticeAt", Math.Max(1, QuerySkillRank("sneak")));
-        var chance = daemon.Call<int>("NoticeChance", QueryAttribute("grace"), Level, creature.Call<int>("QueryLevel"), creature.Call<bool>("QueryAlert"), adjust);
+        var lightAdjust = Environment() is { } here ? LoadObject("/secure/light").Call<int>("NoticeAdjust", here, Self, creature) : 0;
+        var chance = daemon.Call<int>("NoticeChance", QueryAttribute("grace"), Level, creature.Call<int>("QueryLevel"), creature.Call<bool>("QueryAlert"), adjust, lightAdjust);
         return daemon.Call<bool>("Notices", chance, half);
     }
 
@@ -1452,6 +1472,11 @@ public abstract class Adventurer : Living
         else if (args.StartsWith("in ")) args = args.Substring(3);
         if (args == "") { Look(); return true; }
         var room = Environment();
+        if (InDark())
+        {
+            Write(Present(args) != null ? "You feel it over, but cannot see it properly.\n" : "It is too dark to see that.\n");
+            return true;
+        }
         var target = Present(args) ?? (room == null ? null : Present(args, room));
         if (target != null)
         {
@@ -1468,6 +1493,7 @@ public abstract class Adventurer : Living
     private bool CmdGet(string args)
     {
         var room = Environment();
+        if (InDark()) { Write("It is too dark to see what is here.\n"); return true; }
         if (QueryInCombat()) { Write(FightingNote.Replace("do that", "pick things up") + "\n"); return true; }
         var from = args.IndexOf(" from ", StringComparison.Ordinal);
         if (from > 0) return GetFromCorpse(args.Substring(0, from).Trim(), args.Substring(from + 6).Trim());
@@ -1581,6 +1607,7 @@ public abstract class Adventurer : Living
 
     private bool CmdLoot(string args)
     {
+        if (InDark()) { Write("It is too dark to see what is here.\n"); return true; }
         var room = Environment();
         if (room == null) return false;
         if (QueryInCombat()) { Write(FightingNote.Replace("do that", "pick things up") + "\n"); return true; }
@@ -1616,7 +1643,7 @@ public abstract class Adventurer : Living
             }
             LeaveRest();
             Write($"You drop {description}.\n");
-            Say($"{Name} drops {description}.\n");
+            Say(InDark() ? "Someone drops something.\n" : $"{Name} drops {description}.\n");
         }
         return true;
     }
@@ -1679,6 +1706,7 @@ public abstract class Adventurer : Living
     private bool CmdRead(string args)
     {
         if (args == "") { NotifyFail("Read what?"); return false; }
+        if (InDark()) { Write("It is too dark to read.\n"); return true; }
         var room = Environment();
         var thing = Present(args) ?? (room == null ? null : Present(args, room));
         var text = thing?.Call<string>("QueryReadText") ?? room?.Call<string>("QueryReadable", args);
@@ -1698,6 +1726,13 @@ public abstract class Adventurer : Living
     {
         var room = Environment();
         var target = args == "" || room == null ? null : Present(args, room);
+        if (InDark() && args != "")
+        {
+            // You cannot name what you cannot see; "something" and "it" pick the one you are fighting, or one at random.
+            if (!UnseenWord(args)) { Write($"You cannot see {WithArticle(args.Trim())}.\n"); return true; }
+            target = PickUnseen();
+            if (target == null) { Write("You can sense nothing to fight.\n"); return true; }
+        }
         if (target == null) { NotifyFail("Kill what?"); return false; }
         if (QueryFightingWith(target) && target.IsAlive)
         {
@@ -1730,6 +1765,129 @@ public abstract class Adventurer : Living
         if (from == null || from.IsClone || here == null || from == here) return;
         cameFrom = from.Name;
         arrivedIn = here.Name;
+    }
+
+    // ---- Light (docs/specs/light.md, section 3): light, extinguish, fill. They are the character's commands, so names, numbers and stacks work as everywhere. ----
+
+    /// <summary>The state of the room the character stands in, as they see it: "lit", "dim" or "dark".</summary>
+    private string RoomLight() => Environment() is { } room ? room.Call<string>("QueryLightState") ?? "lit" : "lit";
+
+    private bool InDark() => RoomLight() == "dark";
+
+    /// <summary>The lights the character carries that answer to these words (all of them for no words), unlit ones first or lit ones first.</summary>
+    private List<ObjectRef> CarriedLights(string words, bool litFirst)
+    {
+        var all = AllInventory().Where(i => i.IsAlive && i.Call<bool>("IsLightSource")).ToList();
+        if (words != "") all = all.Where(i => i.Call<bool>("Id", words.ToLowerInvariant())).ToList();
+        return all.OrderBy(i => i.Call<bool>("QueryLit") == litFirst ? 0 : 1).ToList();
+    }
+
+    private bool CmdLight(string args)
+    {
+        var words = args.Trim();
+        var lights = CarriedLights(words, false);
+        if (lights.Count == 0)
+        {
+            if (words == "") { Write("You have nothing to light.\n"); return true; }
+            NotifyFail("Light what?");
+            return false; // another object's light command (the toy lantern) may answer
+        }
+        if (words == "")
+        {
+            var unlit = lights.Where(l => !l.Call<bool>("QueryLit")).ToList();
+            if (unlit.Count == 0) { Write("It is already burning.\n"); return true; }
+            if (unlit.Count > 1 && unlit.Select(l => l.Call<string>("Short")).Distinct().Count() > 1) { Write("Light which? (" + string.Join(", ", unlit.Select(l => "{cmd}light " + l.Call<string>("QueryLightWord") + "{/}").Distinct()) + ")\n"); return true; }
+            lights = unlit;
+        }
+        var item = lights[0];
+        if (item.Call<bool>("QueryLit")) { Write("It is already burning.\n"); return true; }
+        if (!item.Call<bool>("QueryUsable")) { Write($"The {(item.Call<string>("QueryName") ?? "light").ToLowerInvariant()} has no oil left.\n"); return true; }
+        UseAsAction(item); // a quick action on the combat clock (Recovery 0.5): now if ready, else queued
+        return true;
+    }
+
+    private bool CmdPut(string args)
+    {
+        var words = args.Trim();
+        if (!words.StartsWith("out ") && words != "out") return false;
+        return Extinguish(words.Length > 3 ? words.Substring(4).Trim() : "");
+    }
+
+    private bool CmdExtinguish(string args) => Extinguish(args.Trim());
+
+    private bool Extinguish(string words)
+    {
+        var lights = CarriedLights(words, true);
+        if (lights.Count == 0)
+        {
+            Write(words == "" ? "You have nothing to put out.\n" : $"You have no '{Esc(words)}'.\n");
+            return true;
+        }
+        var item = lights[0];
+        if (!item.Call<bool>("QueryLit")) { Write("It is not lit.\n"); return true; }
+        item.Call("Douse", Self);
+        return true;
+    }
+
+    private bool CmdFill(string args)
+    {
+        var words = args.Trim();
+        var lanterns = AllInventory().Where(i => i.IsAlive && i.Call<bool>("IsLightSource") && i.Call<bool>("QueryRefillable") && (words == "" || i.Call<bool>("Id", words.ToLowerInvariant()))).ToList();
+        if (lanterns.Count == 0)
+        {
+            if (words != "" && AllInventory().Any(i => i.Call<bool>("IsLightSource") && i.Call<bool>("Id", words.ToLowerInvariant()))) { Write("That cannot be filled.\n"); return true; }
+            Write(words == "" ? "You have nothing to fill.\n" : $"You have no '{Esc(words)}' to fill.\n");
+            return true;
+        }
+        if (lanterns[0].Call<bool>("QueryFull")) { Write("The lantern is full.\n"); return true; }
+        var flask = AllInventory().FirstOrDefault(i => i.IsAlive && i.Call<bool>("IsLampOil"));
+        if (flask == null) { Write("You have no lamp oil.\n"); return true; }
+        var told = lanterns[0].Call<string>("Refill", Self, flask) ?? "";
+        if (told != "") Write(told + "\n");
+        return true;
+    }
+
+    // ---- Darkness: what the character knows of the ways out (docs/specs/light.md, section 5). Not saved. ----
+
+    private readonly Dictionary<string, List<string>> usedWays = new();
+
+    /// <summary>The room the character came from, if they came into this room by an exit (""), for the way in that a dark room tells them.</summary>
+    public string QueryArrivedFrom() => Environment() is { } here && arrivedIn == here.Name ? cameFrom : "";
+
+    /// <summary>A room tells the character they have just left it by this exit. Only that room may (it stands in the room, and it is the character's own room).</summary>
+    public void RememberWay(string roomName, string direction)
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller != Environment() || caller.Name != roomName || !TrustedCaller(caller) || direction == null || direction.Length > 32) return;
+        if (!usedWays.TryGetValue(roomName, out var list)) { if (usedWays.Count > 400) usedWays.Clear(); usedWays[roomName] = list = new List<string>(); }
+        if (!list.Contains(direction) && list.Count < 16) list.Add(direction);
+    }
+
+    /// <summary>The exits the character has used from this room since they logged in.</summary>
+    public List<string> QueryUsedWays(string roomName) => usedWays.TryGetValue(roomName ?? "", out var list) ? new List<string>(list) : new List<string>();
+
+    /// <summary>" (light torch)" if the character carries a light that is not lit, for the line a dark room gives on entering; "" if they carry none.</summary>
+    public string QueryUnlitLightHint()
+    {
+        foreach (var item in AllInventory())
+            if (item.IsAlive && item.Call<bool>("IsLightSource") && !item.Call<bool>("QueryLit") && item.Call<bool>("QueryUsable"))
+                return " ({cmd}light " + (item.Call<string>("QueryLightWord") ?? "light") + "{/})";
+        return "";
+    }
+
+    private static bool UnseenWord(string args) => args.Trim().ToLowerInvariant() is "something" or "it";
+
+    private static string WithArticle(string noun) => noun.StartsWith("a ") || noun.StartsWith("an ") || noun.StartsWith("the ") ? noun : Article(noun) + " " + noun;
+
+    /// <summary>In the dark: the enemy the character is already fighting, or else one creature of the room chosen at random (never one that is no threat).</summary>
+    private ObjectRef? PickUnseen()
+    {
+        var room = Environment();
+        if (room == null) return null;
+        var first = Enemies().FirstOrDefault(e => Environment(e) == room);
+        if (first != null) return first;
+        var choices = AllInventory(room).Where(o => o != Self && o.IsAlive && o.Call<bool>("IsCreature") && !Interactive(o) && o.Call<bool>("IsMonster") && CanFight(o) == null).ToList();
+        return choices.Count == 0 ? null : choices[Random(choices.Count)];
     }
 
     private const string FightingNote = "You are fighting! You cannot do that now. Break away with {cmd}flee{/} first.";
@@ -1895,6 +2053,7 @@ public abstract class Adventurer : Living
     private bool CmdConsider(string args)
     {
         var room = Environment();
+        if (InDark() && args != "") { Write($"You cannot see {WithArticle(args.Trim())}.\n"); return true; }
         var target = args == "" || room == null ? null : Present(args, room);
         if (target == null) { NotifyFail("Consider whom?"); return false; }
         if (!target.Call<bool>("IsCreature")) { Write("You can't fight that.\n"); return true; }
@@ -2069,6 +2228,12 @@ public abstract class Adventurer : Living
         var area = Environment()?.Call<string>("QueryAreaName") ?? "";
         var region = Environment()?.Call<string>("QueryRegionName") ?? "";
         if (area != "" || region != "") text.Append($"Area {area}   Region {region}\n");
+        // Light (docs/specs/light.md, section 15): nothing when the room is lit and nothing of yours burns.
+        var lightHere = RoomLight();
+        if (lightHere == "dim") text.Append("The light here is dim.\n");
+        else if (lightHere == "dark") text.Append("It is dark here.\n");
+        foreach (var burning in AllInventory().Where(i => i.IsAlive && i.Call<bool>("IsLightSource") && i.Call<bool>("QueryLit")))
+            text.Append(sheet.Call<string>("Wrap", $"You carry a light: {burning.Call<string>("Short")?.Replace(" (lit)", "")} ({burning.Call<string>("QueryTimeLeft")?.Replace("about ", "about ").Replace(" of burning", " left").Replace(" of oil", " of oil left")})."));
         var gear = new List<string>();
         foreach (var slot in new[] { "weapon", "shield", "body", "head", "trinket" })
             if (QueryEquipped(slot) is { } item) gear.Add($"{slot}: {item.Call<string>("Short")}");

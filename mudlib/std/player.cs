@@ -466,6 +466,18 @@ public class Player : Adventurer
     {
         // Crafting and gathering topics ("help crafting", "help skin"): answered by the crafting daemon.
         if (args.Trim() != "" && CraftHelp(args) is { } craftTopic) { Write(craftTopic); return true; }
+        if (args.Trim().ToLowerInvariant() is "light" or "lights" or "dark" or "darkness" or "torch" or "torches" or "lantern" or "glow")
+        {
+            Write("Light: every room is lit, dim or dark. {cmd}look{/} tells you when it is not ({cmd}score{/} too, and the prompt token {cmd}light{/}).\n" +
+                  "  Dim: you fight a little worse (-1 to hit, -2 with a bow), and your harvesting and crafting suffer a little.\n" +
+                  "  Dark: you cannot see the room, its exits except the ways you know, the creatures or the things on the floor. You fight at -3 (-6 with a bow)\n" +
+                  "  against what can see in the dark, you cannot get, loot, read, craft, harvest, skin or shop, and everyone is Someone. {cmd}kill something{/} still works.\n" +
+                  "  A light adds to the room: a torch (+1) turns a dark room dim, a lantern (+2) or a torch with a Glow makes it lit. {cmd}light{/} THING and\n" +
+                  "  {cmd}extinguish{/} THING (also {cmd}put out{/}) are quick actions; a light burns down, so {cmd}fill{/} a lantern from a flask of lamp oil. Water puts a torch out.\n" +
+                  "  A Mage or a Priest has {cmd}glow{/} (about 20 Focus): a light that goes where you go, for a few minutes. A lit light is a beacon: sneaking past creatures is harder while you carry one.\n" +
+                  "  Harland sells torches and oil; the Rag Torch can be made ({cmd}help crafting{/}), and there is a free one by the Tavern Cellar stair.\n");
+            return true;
+        }
         if (args.Trim().ToLowerInvariant() is "ranks" or "rank" or "train" or "training")
         {
             Write("Ranks: every skill and spell with a command word has ranks, I, II, III and on. A higher rank is stronger and costs a\n" +
@@ -515,6 +527,7 @@ public class Player : Adventurer
             "           {cmd}give{/} [N|all] THING {cmd}to{/} PLAYER, {cmd}search{/} [THING] (for hidden things; {cmd}help search{/})\n" +
             "Crafting:  {cmd}skin{/}, {cmd}bleed{/}, {cmd}harvest{/}, {cmd}craft{/}, {cmd}combine{/}, {cmd}recipes{/}, {cmd}recipe{/}, {cmd}proficiencies{/},\n" +
             "           {cmd}apply{/} THING; with a trainer: {cmd}lessons{/}, {cmd}learn{/} NAME ({cmd}help crafting{/}, or help with one of those words)\n" +
+            "Light:     {cmd}light{/} THING, {cmd}extinguish{/} THING, {cmd}fill{/} LANTERN, and the spell {cmd}glow{/} ({cmd}help light{/}); the cellars are dark: bring a light\n" +
             "Ranks:     with a trainer of your calling: {cmd}ranks{/} (what you can learn and what it asks), {cmd}train{/} SKILL (buy the next rank; {cmd}help ranks{/})\n" +
             "Town:      {cmd}browse{/}, {cmd}buy{/} THING, {cmd}sell{/} THING, {cmd}value{/} THING (in a shop), {cmd}quests{/},\n" +
             "           {cmd}accept{/} QUEST and {cmd}report{/} (in the Adventurers Guild)\n" +

@@ -49,6 +49,8 @@ public class VhShrineKeeper : Trainer
 
         AddStock(BlessingPath, 6);
         TeachCalling("priest", 2, 2);
+        AddRankOffer("glow", 2, 20);
+        AddTopic("glow,light,candle,candles,lamp,dark,darkness", "Glow is the Quiet Hand's one small gift to those who walk in the dark: it asks nothing and shows you the way. {cmd}glow{/} for yourself, {cmd}glow NAME{/} for a friend. The second working is twenty gold here, once you are of the fifth level; the rest is taught at the Hall of Legends.");
         ElsewhereLine = "The third rank and beyond are taught in Oakenfell, at the Hall of Legends.";
     }
 

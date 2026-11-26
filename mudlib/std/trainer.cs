@@ -48,6 +48,7 @@ public class Trainer : Shopkeeper
 
     private bool CmdLessons(string args)
     {
+        if (TooDark()) return true;
         var who = ThisPlayer();
         if (who == null) return false;
         var text = new StringBuilder($"{Name} can teach you:\n");
@@ -68,6 +69,7 @@ public class Trainer : Shopkeeper
 
     private bool CmdLearn(string args)
     {
+        if (TooDark()) return true;
         var who = ThisPlayer();
         if (who == null) return false;
         if (args.Trim() == "") { NotifyFail("Learn what? Type {cmd}lessons{/}."); return false; }

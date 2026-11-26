@@ -9,6 +9,8 @@ public class GuardPost : Room
         LongDesc = "Crude goblin barricades create a defensive position.";
         Exits["east"] = "/domains/hollow/cellars/smuggler_hall";
         Safe = false;
+        Light = LightDim; // dim: the goblins' fire pit is cold, and the glow of the Smuggler Hall spills in
+        LongDesc += " The fire pit is cold, and only the glow of the hall spills in.";
 
         AddDetail("barricade,barricades,crude barricades,wall", "Broken cart planks, fence stakes and fallen rubble are piled into a wall, lashed together with rope and something that looks like coarse goblin hair.");
         AddDetail("fire,fire pit,ashes,brazier", "A cold fire pit sits behind the barricade, ringed with gnawed bones and a few blackened stones.");

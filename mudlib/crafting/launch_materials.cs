@@ -14,6 +14,7 @@ public class CrLaunchMaterials : CraftData
         Material("flour", "/domains/hollow/obj/craft/flour", "grain");
         Material("clean_water", "/domains/hollow/obj/craft/clean_water", "liquid");
         Material("cloth_strip", "/domains/hollow/obj/craft/cloth_strip", "cloth");
+        Material("tallow", "/domains/hollow/obj/craft/tallow", "fat, fuel");
         Material("empty_bottle", "/domains/hollow/obj/craft/empty_bottle", "container");
         // Crafted things that are ingredients of other recipes.
         Material("berry_juice", "/domains/hollow/obj/craft/berry_juice", "juice, drink");

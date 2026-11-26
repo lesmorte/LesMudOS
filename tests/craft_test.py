@@ -1152,7 +1152,7 @@ def main():
     MUDLIB[0] = mudlib
     h.copy_mudlib(mudlib, novice=True)
     # The sample set has its own recipes and materials under the launch ids: take the real launch data out of this copy.
-    for gone in ("crafting/launch_materials.cs", "recipes/launch.cs"):
+    for gone in ("crafting/launch_materials.cs", "recipes/launch.cs", "recipes/hollow_light.cs"):
         os.remove(os.path.join(mudlib, gone))
     shutil.copytree(SAMPLES, mudlib, dirs_exist_ok=True)
     for path, source in test_files().items():

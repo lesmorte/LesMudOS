@@ -9,7 +9,7 @@ Owner's request (22 November 2026): "implement ... mudlet mapping". Mudlet canno
 - Subnegotiation framing is handled correctly inside the existing telnet state machine (IAC doubling, a message split across packets).
 
 ## 2. What is sent
-- **`Room.Info`**, on entering a room, on `look`, and when the room's exits change for that player (a hidden way found, a door opened or closed): `{ "num": 1234, "name": "Village Square", "area": "Vincent's Hollow", "environment": "outdoors|indoors|underground|road|water", "exits": { "north": 1235, "lane": 1301 }, "doors": { "east": "closed" } }`.
+- **`Room.Info`**, on entering a room, on `look`, and when the room's exits change for that player (a hidden way found, a door opened or closed), and when its light changes (a torch lit or burnt out): `{ "num": 1234, "name": "Village Square", "area": "Vincent's Hollow", "environment": "outdoors|indoors|underground|road|water", "light": "lit|dim|dark", "exits": { "north": 1235, "lane": 1301 }, "doors": { "east": "closed" } }`.
   - `num` is a stable whole number for the room, the same after every restart: assigned once by a small daemon (`/secure/roomids`) that keeps a saved table of room path to number and never reuses one.
   - `exits` lists only ways this character can see: a hidden exit is absent until this character has found it; a locked or closed door's exit is present and marked in `doors`. Named exits (`lane`, `shed`) are sent under their own names.
   - Rooms in a wizard's home are sent with area `Workshop of <name>` and numbers from a separate range that is not saved.

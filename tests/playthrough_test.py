@@ -108,6 +108,10 @@ DUNGEON = ["Tavern Cellar", "Collapsed Passage", "Storage Chamber", "Guard Post"
 WEAPONS = [("overseer axe", "overseer's axe"), ("axe", "woodcutter axe"), ("longsword", "fine iron longsword"), ("dagger", "enchanted dagger"),
            ("sword", "rusty sword"), ("spear", "training spear"), ("dagger", "iron dagger")]
 # How the creatures of each room read in combat, death and corpse messages.
+# Rooms below the village (docs/specs/light.md): the hero carries a light there. He lights a torch on arriving in a room that is dim or dark and
+# puts it out when he goes up to the village; a torch is a free Rag Torch from the bin by the stair, then Pitch Torches from Harland (5 gold).
+UNDER = set(DUNGEON) | {"Smuggler Hall", "Hidden Cache", "Tavern Cellar"}
+GLOOM = re.compile(r"\(dark\)|It is dim here\.|too dark to see|pitch black")
 SHORT = {"Tavern Cellar": "a large rat", "Collapsed Passage": "a giant rat", "Storage Chamber": "a goblin scavenger", "Guard Post": "a goblin guard",
          "Flooded Tunnel": "a giant cave toad", "Mushroom Cavern": "a spore bat", "Goblin Barracks": "a goblin warrior", "Overseer Hall": "a goblin elite guard",
          "Overseer Chamber": "the Goblin Overseer"}
@@ -169,8 +173,8 @@ def room_of(text):
     lines = clean(text).split("\n")
     found = None
     for i, line in enumerate(lines):
-        if line.startswith("Obvious exits:") and i >= 2 and lines[i - 2] in ROOMS:
-            found = lines[i - 2]
+        if line.startswith("Obvious exits:") and i >= 2 and re.sub(r" \(dark\)$", "", lines[i - 2]) in ROOMS:
+            found = re.sub(r" \(dark\)$", "", lines[i - 2])
     return found
 
 
@@ -200,6 +204,9 @@ class Hero:
         self.potion_pending = False  # a drink was queued ("You are not ready yet") and has not happened yet
         self.potion_pending_at = 0.0
         self.potion_log = ""  # the text of every potion drunk
+        self.lit = False       # a torch is burning in the pack
+        self.bin_used = False  # the free Rag Torch has been taken
+        self.bin_text = ""
         self.log_text = ""
         self.pos = room_of(self.feed(self.welcome))
 
@@ -213,7 +220,10 @@ class Hero:
             self.potion_pending = False
             self.potion_log += m.group(0) + "\n"
             self.stats["potions"] += 1
+        if "gutters and dies" in text or "hisses out" in text or "Your light fades" in text:
+            self.lit = False
         if "You have died!" in text:
+            self.lit = False
             self.died = True
             self.death_room = self.pos
             self.stats["deaths"] += 1
@@ -303,7 +313,9 @@ class Hero:
     def enemies(self):
         """The creatures a look shows here: [(count, name, kill word, worst damage per round)]."""
         found = []
-        for line in self.cmd("look").split("\n"):
+        looked = self.cmd("look")
+        looked += self.tend_light(looked)
+        for line in looked.split("\n"):
             if not (line.endswith(" are here.") or line.endswith(" is here.")) or "corpse" in line:
                 continue
             low = line.lower()
@@ -312,6 +324,45 @@ class Hero:
                     found.append((COUNTS.get(low.split()[0], 1), name, word, worst))
                     break
         return found
+
+    # ---- light ----
+
+    def get_bin_torch(self):
+        """The free Rag Torch by the Tavern Cellar stair (once a character). A player takes it the moment he is down the stair, before the rats come."""
+        if not self.bin_used and self.pos == "Tavern Cellar":
+            text = self.cmd("get torch")
+            self.bin_text += text
+            self.bin_used = "rag torch" in text or "only" in text
+            return text
+        return ""
+
+    def buy_torch(self):
+        """A Pitch Torch from Harland, if the purse allows and none is carried."""
+        if self.count("torch") >= 1 or self.gold < 5:
+            return False
+        self.go(TAVERN)
+        text = self.cmd("buy pitch torch")
+        self.stats["torches_bought"] = self.stats.get("torches_bought", 0) + ("You buy" in text)
+        return "You buy" in text
+
+    def tend_light(self, text):
+        """Called with what a move or a look showed: in a dim or dark room a player lights a torch (and looks again). Returns the extra text."""
+        if self.lit or not GLOOM.search(text):
+            return ""
+        out = self.cmd("light torch")
+        end = time.time() + 15
+        while "not ready yet" in out and "steady flame" not in out and time.time() < end:   # a fight holds the quick action: it is queued, and happens when the hero can act
+            out += self.pump(1.0)
+        if "steady flame" in out or "already burning" in out:
+            self.lit = True
+            self.stats["lights"] = self.stats.get("lights", 0) + 1
+            out += self.cmd("look")
+        return out
+
+    def douse(self):
+        if self.lit:
+            self.cmd("extinguish torch")
+            self.lit = False
 
     # ---- moving ----
 
@@ -332,12 +383,15 @@ class Hero:
                 self.stats["doors"] = self.stats.get("doors", 0) + 1
                 self.cmd("open door")
             text = self.cmd("flee " + direction)
+        text += self.tend_light(text)
         return text
 
     def go(self, dst):
         text = ""
         if self.pos == dst:
             return text
+        if dst not in UNDER:
+            self.douse()   # going up to the village: the torch is put out (it burns while it is lit)
         for direction in route(self.pos, dst):
             text = self.move(direction)
             if self.died:
@@ -447,6 +501,15 @@ class Run:
         visited = {START}
         edges = [0]
         seen_encounter = []
+        # The cellars are dark below the Smuggler Hall (docs/specs/light.md): the hero buys a Pitch Torch from Harland before he goes down. (The free Rag Torch
+        # in the bin by the stair cannot be taken while the rats are on him, and they are on him from the moment he arrives; he takes it after the first fight.)
+        # SPEC["gold"] is what the hero holds from here on, so every later gold check still reads as the starting purse.
+        if hero.gold >= 5:
+            hero.go(TAVERN)
+            check("Harland sells a Pitch Torch for 5 gold", hero.cmd("buy pitch torch"), "You buy a pitch torch")
+            SPEC["gold"] -= 5
+            hero.gold -= 5
+            hero.go(START)
 
         def visit(room):
             for direction, target in ROOMS[room]["exits"].items():
@@ -601,12 +664,12 @@ class Run:
             text += hero.pump(0.5)
         if hero.died:
             text += hero.settle(1.5)  # the wake-up lines follow the death line
-        check("two goblin elite guards kill a level 1 character", text, "You have died!", "You wake in the Guest Rooms, bruised but alive. The healer's fee costs you %d gold." % max(1, SPEC["gold"] // 10))
+        check("two goblin elite guards kill a level 1 character", text, "You have died!", "You wake in the Guest Rooms, bruised but alive. The healer's fee costs you %d gold." % (SPEC["gold"] // 10))
         hero.settle(1.0)
         hero.died = False
         check("the dead character wakes in the Guest Rooms", hero.pos, GUEST)
         check("the belongings stayed with the corpse", hero.cmd("i"), "You are empty-handed.")
-        check("score after the death", hero.score(), f"Vitality   {SPEC['hp']}/{SPEC['hp']}", "Gold %d" % (SPEC["gold"] - max(1, SPEC["gold"] // 10)), "nothing equipped", "Active quests: Clear the Cellar")
+        check("score after the death", hero.score(), f"Vitality   {SPEC['hp']}/{SPEC['hp']}", "Gold %d" % (SPEC["gold"] - SPEC["gold"] // 10), "nothing equipped", "Active quests: Clear the Cellar")
         self.stats["notes"].append("deliberate death in the Overseer Hall at level 1 (2 elite guards)")
 
     def second_player_sees_locked_corpse(self):
@@ -774,6 +837,9 @@ class Run:
                     self.stats["notes"].append("bought a padded jerkin from Oswy")
                 hero.cmd("smithy")
             hero.pos = SMITH
+        if hero.count("torch") == 0 and hero.gold >= keep + 5:
+            hero.buy_torch()   # the cellars are dark below the Smuggler Hall: a spare light, from Harland
+            hero.score()
         have = hero.count("healing potion")
         while have < potions_wanted and hero.gold >= keep + 15:
             hero.go(START)
@@ -995,6 +1061,9 @@ class Run:
         hero.died = False
         where = hero.death_room or room
         for attempt in range(3):
+            hero.score()
+            if hero.count("torch") == 0 and hero.gold >= 5:
+                hero.buy_torch()   # the corpse may lie in the dark, and a dark room cannot be looted
             hero.go(where)
             if hero.died:
                 hero.settle(1.0)
@@ -1094,6 +1163,8 @@ class Run:
         hero = self.hero
         hero.score()
         self.note(f"{room} cleared; level {hero.level}, xp {hero.xp}, gold {hero.gold}, hp {hero.hp}/{hero.max_hp}")
+        if room == "Tavern Cellar" and not hero.bin_used:
+            check("the bin by the stair gives the free Rag Torch (taken after the first fight)", hero.get_bin_torch(), "rag torch")
         if room == "Storage Chamber":
             t = hero.cmd("get potion")
             if "You take a minor healing potion." in t:

@@ -11,6 +11,7 @@ public class MushroomCavern : Room
         Exits["north"] = "/domains/hollow/cellars/hidden_cache";
         Exits["east"] = "/domains/hollow/cellars/goblin_barracks";
         Safe = false;
+        Light = LightDim; // the fungus is the light, by day and by night
         LockExit("north", "rusty key", "A stout, rust-eaten door bars the way north. It is locked.");
 
         AddDetail("mushrooms,mushroom,caps,pale caps,bioluminescent mushrooms", "Pale caps the size of dinner plates grow in clusters, each one glowing a steady cold blue that brightens faintly when something moves nearby.");

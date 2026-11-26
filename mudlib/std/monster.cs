@@ -33,6 +33,11 @@ public class Monster : Npc
 
     public bool IsMonster() => true;
 
+    /// <summary>Sees in the dark as in a lit room, for its own to-hit and for fighting, and as a dim room for noticing a sneaker (docs/specs/light.md). Set false in Create() for a creature that cannot (the Giant Cave Toad).</summary>
+    protected bool DarkSight = true;
+
+    public override bool QueryDarkSight() => DarkSight;
+
     /// <summary>An item that may fall to the floor on death, with this percent chance.</summary>
     protected void AddLoot(string path, int percent)
     {
@@ -161,7 +166,7 @@ public class Monster : Npc
         ResetCombat();
         var room = Environment();
         var label = Cap(QueryLabel());
-        if (room != null) TellRoom(room, (DeathMessage == "" ? $"{label} dies." : DeathMessage) + "\n");
+        if (room != null) TellRoomLit(room, (DeathMessage == "" ? $"{label} dies." : DeathMessage) + "\n", "Something dies.\n");
 
         var gold = GoldMax > 0 ? GoldMin + Random(Math.Max(1, GoldMax - GoldMin + 1)) : 0;
         // Experience goes by damage dealt among the players still alive, in the room and awake (see Living, "Experience").

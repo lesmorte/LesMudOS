@@ -10,6 +10,9 @@ public class StorageChamber : Room
         Exits["west"] = "/domains/hollow/cellars/collapsed_passage";
         Exits["north"] = "/domains/hollow/cellars/smuggler_hall";
         Safe = false;
+        Light = LightDim;
+        AddSpawn("/domains/hollow/obj/wall_lantern");
+        LongDesc += " A lantern burns on the nearest crate. Whoever hung it meant people to find their way.";
 
         AddDetail("crates,rotting crates,crate,splintered crates", "Splintered crates are stacked three high, their lids pried off and their contents long since rotted or carried away.");
         AddDetail("goods,trade goods,bales,sacks,sack,grain sacks", "Bales of cloth have gone grey with mould, and the sacks beside them hold a dark, crumbling mass that was once grain. One of them, at the bottom of the heap, is the wrong shape for grain. You could {cmd}search{/} the sacks.");

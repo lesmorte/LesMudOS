@@ -9,6 +9,8 @@ public class HiddenCache : Room
         LongDesc = "A concealed smuggler stash untouched for decades. Rotted sacking has been thrown over the top of the stacked chests, and it lies in a long, stiff hump.";
         Exits["south"] = "/domains/hollow/cellars/mushroom_cavern";
         Safe = false;
+        Light = LightDark;
+        DarkDesc = "The air is dry and still, and smells of rust and old canvas. Your steps ring a little off close stone.";
 
         AddDetail("sacking,rotted sacking,hump,stack", "Grey sacking, stiff as bark with damp. It has been spread over the stack with some care, and the hump in it is too long and too straight to be a chest lid: whatever lies under it is as long as a spear, and was put there to be missed. A thing hidden this well is not found at a glance. You could {cmd}search{/} the sacking, and {cmd}search sacking{/} has you go through it fold by fold, which helps; if your eyes tire, rest them a minute and try again.");
         AddDetail("chests,chest,stash,smuggler stash", "Sealed wooden chests are stacked against the back wall, their iron bindings furred with rust, but their locks are still whole.");

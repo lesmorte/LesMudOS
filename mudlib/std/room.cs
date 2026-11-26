@@ -24,6 +24,14 @@ public abstract class Room : MudObject
     protected bool NoShout;
     /// <summary>What this room is like, for clients that draw a map (GMCP): outdoors, indoors, underground, road or water. If it is left empty the room takes its area's, and outdoors if the area says nothing.</summary>
     protected string Terrain = "";
+    /// <summary>The named values of Light (docs/specs/light.md): lit (1 or more), dim (0), dark (-1), black (-2).</summary>
+    protected const int LightLit = 1, LightDim = 0, LightDark = -1, LightBlack = -2;
+    /// <summary>This room's own light, before any lit thing in it is added (default 1: lit). 0 is dim, -1 or less is dark. A dark room should have a DarkDesc.</summary>
+    protected int Light = 1;
+    /// <summary>Water on the floor: a lit light dropped here hisses out (it is put out, not destroyed).</summary>
+    protected bool Wet;
+    /// <summary>What the senses give in the dark: sound, smell, cold. Shown by look when the room is dark; "" gives "Nothing can be made out."</summary>
+    protected string DarkDesc = "";
 
     private sealed class Spawn
     {
@@ -216,7 +224,7 @@ public abstract class Room : MudObject
     /// for a thing that is found by touch or smell (HideItem and HideNode's byFeel, a find's ByFeel), which the dark does not hide. Called once per thing per search
     /// by the room itself, never by anything else; must not change anything. docs/specs/search.md section 2.
     /// </summary>
-    protected virtual int SearchModifier(ObjectRef searcher, bool byFeel) => 0;
+    protected virtual int SearchModifier(ObjectRef searcher, bool byFeel) => LightSearchModifier(searcher, byFeel); // darkness: dim -2, dark -5; nothing for a thing found by feel
 
     /// <summary>
     /// Called once for each character and hidden exit, at the moment the character first finds the exit (by search or by looking at
@@ -245,6 +253,30 @@ public abstract class Room : MudObject
     // ---- Queries ----
 
     public bool QuerySafe() => Safe;
+
+    public bool IsRoom() => true;
+
+    /// <summary>This room's own light before any lit source is added (the Light field).</summary>
+    public int QueryBaseLight() => Light;
+
+    public bool QueryWet() => Wet;
+
+    public string QueryDarkDesc() => DarkDesc;
+
+    private const string LightPath = "/secure/light";
+
+    /// <summary>The light of this room now: -3 to 3. 1 or more is lit.</summary>
+    public int QueryLight() => LoadObject(LightPath).Call<int>("QueryLevel", Self);
+
+    /// <summary>"lit", "dim" or "dark" for this room now.</summary>
+    public string QueryLightState() => LoadObject(LightPath).Call<string>("QueryState", Self) ?? "lit";
+
+    /// <summary>
+    /// The modifier of this room's light to a search check, in points (0 lit, -2 dim, -5 dark; byFeel: a thing found by touch or smell is not hindered).
+    /// A self-contained rule for the search command to ask: TODO(search) the hook is not wired (docs/specs/search.md expects an overridable
+    /// SearchModifier(searcher) on the room; at the merge, its default should return LightSearchModifier(searcher, false)).
+    /// </summary>
+    public int LightSearchModifier(ObjectRef searcher, bool byFeel) => LoadObject(LightPath).Call<int>("SearchModifier", QueryLight(), byFeel);
 
     public bool QueryNoTell() => NoTell;
 
@@ -309,12 +341,16 @@ public abstract class Room : MudObject
         if (caller == null || caller.IsClone || caller.ProgramPath != "/secure/gmcp" || viewer == null || !viewer.IsAlive) return null;
         var ways = new Dictionary<string, string>();
         var states = new Dictionary<string, string>();
+        var light = QueryLightState();
+        // In the dark the map learns only what the text told the character: the way in and the ways they have used (docs/specs/light.md).
+        var known = light == "dark" ? KnownWays(viewer) : null;
         foreach (var direction in Exits.Keys.Concat(hidden.Keys.Where(d => !Exits.ContainsKey(d) && Found(viewer, d))))
         {
+            if (known != null && !known.Contains(direction)) continue;
             ways[direction] = Exits.TryGetValue(direction, out var path) ? path : hidden[direction].Path;
             if (doors.ContainsKey(direction)) states[direction] = QueryDoorState(direction);
         }
-        return new Dictionary<string, object?> { ["name"] = ShortDesc, ["area"] = QueryAreaName(), ["environment"] = QueryTerrain(), ["exits"] = ways, ["doors"] = states };
+        return new Dictionary<string, object?> { ["name"] = ShortDesc, ["area"] = QueryAreaName(), ["environment"] = QueryTerrain(), ["exits"] = ways, ["doors"] = states, ["light"] = light };
     }
 
     /// <summary>The path of the room an exit leads to, or null.</summary>
@@ -455,7 +491,7 @@ public abstract class Room : MudObject
 
     public string Stat()
     {
-        var text = new StringBuilder($"{Self.Name}: {ShortDesc}\n  Safe {Safe}, logout room {LogoutRoom}, reset every {ResetSeconds}s\n");
+        var text = new StringBuilder($"{Self.Name}: {ShortDesc}\n  Safe {Safe}, logout room {LogoutRoom}, reset every {ResetSeconds}s\n  Light base {Light}, now {QueryLight()} ({QueryLightState()}){(Wet ? ", wet" : "")}\n");
         foreach (var spawn in spawns) text.Append($"  Spawn {spawn.Path} x{spawn.Count}: {spawn.Handles.Count(h => h.IsAlive)} alive\n");
         foreach (var encounter in encounters) text.Append($"  Encounter {encounter.Path} {encounter.Percent}%\n");
         foreach (var exit in Exits) text.Append($"  Exit {exit.Key} -> {exit.Value}{(locks.ContainsKey(exit.Key) ? " (locked)" : "")}\n");
@@ -474,10 +510,18 @@ public abstract class Room : MudObject
         ArmReset();
         var who = ThisPlayer();
         if (who == null || !Interactive(who)) return;
+        var bound = new HashSet<string>();
         foreach (var direction in Exits.Keys.Concat(locks.Keys).Concat(hidden.Keys).Distinct().ToList())
         {
             AddAction(direction, GoExit);
             AddAction(direction.Substring(0, 1), GoExit); // "n" for "north", "u" for "up", "d" for "down"
+            bound.Add(direction);
+            bound.Add(direction.Substring(0, 1));
+        }
+        foreach (var word in Compass)
+        {
+            if (bound.Add(word)) AddAction(word, Grope);
+            if (word.Length <= 5 && bound.Add(word.Substring(0, 1))) AddAction(word.Substring(0, 1), Grope);
         }
         if (doors.Count > 0)
         {
@@ -543,13 +587,20 @@ public abstract class Room : MudObject
         if (Interactive(who) && !who.Call<bool>("SneakDeparts", destination)) return false;
 
         var name = who.Call<string>("QueryName") ?? "Someone";
+        // In the dark nobody is named: a character is "Someone", a creature "Something" (docs/specs/light.md, section 5).
+        var leaving = QueryLightState() == "dark";
+        if (leaving) name = Interactive(who) ? "Someone" : "Something";
+        var light = LoadObject(LightPath);
+        light.Call("Touch", Self);
+        light.Call("Touch", destination);
+        if (Interactive(who)) who.Call("RememberWay", Self.Name, direction);
         if (secret)
         {
             // Only those who have found the way know which way it was.
             foreach (var other in AllInventory())
                 if (other != who && Living(other)) TellObject(other, $"{name} leaves {(Found(other, direction) ? direction : "somewhere")}.\n");
         }
-        else TellRoom(Self, $"{name} leaves {direction}.\n", who);
+        else TellRoom(Self, leaving ? $"{name} leaves.\n" : $"{name} leaves {direction}.\n", who);
         try { MoveObject(who, destination); }
         catch (MudRuntimeException refusal)
         {
@@ -558,8 +609,12 @@ public abstract class Room : MudObject
             return false;
         }
         if (Interactive(who)) who.Call("RecordArrival"); // so that flee can lead back the way they came
-        TellRoom(destination, $"{name} arrives.\n", who);
+        light.Call("RoomChanged", Self);
+        light.Call("RoomChanged", destination);
+        var arriving = destination.Call<string>("QueryLightState") == "dark";
+        TellRoom(destination, arriving ? $"{(Interactive(who) ? "Someone" : "Something")} arrives.\n" : $"{who.Call<string>("QueryName") ?? "Someone"} arrives.\n", who);
         who.Call("Look");
+        if (arriving && Interactive(who)) TellObject(who, "{yellow}It is pitch black here. You will want a light.{/}" + (who.Call<string>("QueryUnlitLightHint") ?? "") + "\n");
         WarnIfDangerous(who, destination);
         return true;
     }
@@ -776,6 +831,8 @@ public abstract class Room : MudObject
     public string LongFor(ObjectRef? viewer)
     {
         var text = new StringBuilder();
+        var lightState = QueryLightState();
+        if (lightState == "dark") return DarkLook(viewer);
         // The room name is a title; every exit is a command the player can type.
         text.Append("{title}").Append(ShortDesc).Append("{/}\n").Append(LongDesc).Append('\n');
         var detailed = viewer != null && viewer.Call<double>("QueryMod", "exit_detail") > 0;
@@ -827,8 +884,53 @@ public abstract class Room : MudObject
         }
         foreach (var desc in sitting) text.Append(Cap(desc)).Append(" is resting here.\n");
         foreach (var line in sentences) text.Append(line).Append('\n');
+        if (lightState == "dim") text.Append("It is dim here.\n");
         return text.ToString();
     }
+
+    // ---- Darkness (docs/specs/light.md, section 5) ----
+
+    /// <summary>The ways a character knows in the dark: the way they came in, then every exit they have used from this room since they logged in.</summary>
+    private List<string> KnownWays(ObjectRef? viewer)
+    {
+        var known = new List<string>();
+        if (viewer == null || !viewer.IsAlive) return known;
+        var from = viewer.Call<string>("QueryArrivedFrom") ?? "";
+        if (from != "")
+            foreach (var (direction, path) in Exits)
+                if (path == from) { known.Add(direction); break; }
+        foreach (var direction in viewer.Call<List<string>>("QueryUsedWays", Self.Name) ?? new List<string>())
+            if ((Exits.ContainsKey(direction) || hidden.ContainsKey(direction)) && !known.Contains(direction)) known.Add(direction);
+        return known;
+    }
+
+    /// <summary>The room as seen in the dark: its name, what the senses give, the exits the character knows. No creature and no thing is listed.</summary>
+    private string DarkLook(ObjectRef? viewer)
+    {
+        var text = new StringBuilder();
+        text.Append("{title}").Append(ShortDesc).Append(" (dark){/}\n");
+        text.Append("It is too dark to see. ").Append(DarkDesc != "" ? DarkDesc : "Nothing can be made out.").Append('\n');
+        var known = KnownWays(viewer);
+        var from = viewer?.Call<string>("QueryArrivedFrom") ?? "";
+        if (known.Count == 0) text.Append("You cannot tell the way out. Try a direction.\n");
+        else if (known.Count == 1 && from != "" && Exits.GetValueOrDefault(known[0]) == from)
+            text.Append($"You feel your way: the way you came in is {{cmd}}{known[0]}{{/}}. There may be others; try a direction.\n");
+        else text.Append("You feel your way: you know of " + string.Join(", ", known.Select(d => "{cmd}" + d + "{/}")) + ". There may be others; try a direction.\n");
+        if (viewer != null)
+            for (var i = viewer.Call<int>("QueryEnemiesHere"); i > 0; i--) text.Append("Something is fighting you.\n");
+        return text.ToString();
+    }
+
+    /// <summary>The compass words that are not exits of this room answer in the dark, so that no "What?" tells a character whether they mistyped. Lit or dim: they do nothing.</summary>
+    private bool Grope(string args)
+    {
+        var player = ThisPlayer();
+        if (player == null || Environment(player) != Self || QueryLightState() != "dark") return false;
+        TellObject(player, "You grope along the wall and find only stone.\n");
+        return true;
+    }
+
+    private static readonly string[] Compass = { "north", "south", "east", "west", "up", "down", "northeast", "northwest", "southeast", "southwest" };
 
     /// <summary>Where an exit leads, and whether it is locked against the viewer (Traveler's Instinct): " (to Village Square)".</summary>
     private string ExitNote(string direction, ObjectRef viewer)

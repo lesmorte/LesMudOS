@@ -550,6 +550,12 @@ public class CraftingDaemon : Thing
     /// <summary>A character's Crafting Aptitude (added to the crafted quality shift), the one place the daemon asks for it.</summary>
     private static double Aptitude(ObjectRef who) => who.Call<double>("QueryStat", "crafting");
 
+    /// <summary>Dim light: -5 to a harvest quality score (docs/specs/light.md, section 5).</summary>
+    private double LightHarvest(ObjectRef who) => Environment(who) is { } room ? LoadObject("/secure/light").Call<int>("QueryHarvestModifier", LoadObject("/secure/light").Call<int>("QueryLevel", room)) : 0;
+
+    /// <summary>Dim light: -0.25 of a tier to a crafted quality.</summary>
+    private double LightCraft(ObjectRef who) => Environment(who) is { } room ? LoadObject("/secure/light").Call<double>("QueryCraftShift", LoadObject("/secure/light").Call<int>("QueryLevel", room)) : 0;
+
     private int HarvestTier(double score)
     {
         var tier = 0;
@@ -1065,6 +1071,9 @@ public class CraftingDaemon : Thing
         if (Self.IsClone || PreviousObject() != who || ThisPlayer() != who || !IsPlayerBody(who)) return Say1("");
         EnsureLoaded();
         args = (args ?? "").Trim();
+        // Darkness (docs/specs/light.md, section 5): no gathering and no crafting where you cannot see what you are doing.
+        if (verb is "skin" or "bleed" or "harvest" or "craft" or "combine" && Environment(who) is { } here && LoadObject("/secure/light").Call<int>("QueryLevel", here) < 0)
+            return Say1("It is too dark to see what you are doing.");
         switch (verb)
         {
             case "proficiencies": return Say1(Proficiencies(who));
@@ -1303,7 +1312,7 @@ public class CraftingDaemon : Thing
         }
         var v = (int)Num1("harvest.variation", 15);
         var (a, b) = RollPair(v);
-        var quality = HarvestTier(HarvestScore(prof, toolQ, work, a + b - v, Efficiency(who)));
+        var quality = HarvestTier(HarvestScore(prof, toolQ, work, a + b - v, Efficiency(who)) + LightHarvest(who));
         var bonus = RollPercent(BonusChance(prof, toolQ), false) ? 1 : 0;
         var made = CreateIn(mat.Record, units + bonus, quality, who);
         if (made == null) { TellObject(who, "Something went wrong; nothing was gathered.\n"); return; }
@@ -1532,7 +1541,7 @@ public class CraftingDaemon : Thing
         var prof = Tenths(who, r.Proficiency) / 10.0;
         var steps = (int)Num1("craft.noise_steps", 20);
         var (a, b) = RollPair(steps);
-        var quality = CraftTier(average, prof, r.Work, a, b, Aptitude(who));
+        var quality = CraftTier(average + LightCraft(who), prof, r.Work, a, b, Aptitude(who));
         var bonus = RollPercent(CraftBonusChance(prof, r.Work), false);
         var giveBack = RollPercent(CraftReturnChance(prof, r.Work), false);
         var count = r.Count + (bonus ? 1 : 0);

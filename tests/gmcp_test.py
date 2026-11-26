@@ -238,6 +238,40 @@ public class GmcpVault : Room
     }
 }
 '''
+PIT = '''// @inherit /std/room
+public class GmcpPit : Room
+{
+    public override void Create()
+    {
+        ShortDesc = "The Test Pit"; LongDesc = "A pit with a Gmcpbeast and a Gmcpgem in it.";
+        Light = LightDark;
+        DarkDesc = "It is pitch dark. Water drips somewhere.";
+        Exits["up"] = "/domains/gmcptest/hub";
+        Exits["down"] = "/domains/gmcptest/hall";
+        AddSpawn("/domains/gmcptest/beast", 1);
+        AddSpawn("/domains/gmcptest/gem", 1);
+    }
+}
+'''
+BEAST = '''// @inherit /std/monster
+public class GmcpBeast : Monster
+{
+    public override void Create()
+    {
+        Name = "Gmcpbeast"; Ids.Add("gmcpbeast"); ShortDesc = "a Gmcpbeast"; LongDesc = "A beast for the GMCP test.";
+        Level = 1; MaxVitality = 5; DamageMin = 1; DamageMax = 1; BaseReaction = 9.0; Aggressive = false;
+    }
+}
+'''
+GEM = '''// @inherit /std/item
+public class GmcpGem : Item
+{
+    public override void Create()
+    {
+        Name = "Gmcpgem"; Ids.Add("gmcpgem"); ShortDesc = "a Gmcpgem"; LongDesc = "A gem for the GMCP test."; Value = 1;
+    }
+}
+'''
 SECRET = '''// @inherit /std/room
 public class GmcpSecret : Room
 {
@@ -481,7 +515,7 @@ def run(work, mudlib, logpath, driver_box):
     truth("Char.Vitals has the specified fields and the aliases", vitals and set(vitals) == {"vitality", "maxvitality", "endurance", "maxendurance", "focus", "maxfocus", "resting", "sneaking", "fighting", "hp", "maxhp", "mp", "maxmp"}, vitals)
     truth("Char.Vitals: hp is vitality, mp is focus", vitals and vitals["hp"] == vitals["vitality"] and vitals["mp"] == vitals["focus"] and vitals["maxhp"] == vitals["maxvitality"], vitals)
     truth("Room.Info on login is the start room", info and info["name"] and info["num"] > 0 and info["environment"] in ("outdoors", "indoors", "underground", "road", "water"), info)
-    truth("Room.Info has exactly the specified fields", info and set(info) == {"num", "name", "area", "environment", "exits", "doors"}, info)
+    truth("Room.Info has exactly the specified fields", info and set(info) == {"num", "name", "area", "environment", "light", "exits", "doors"}, info)
     example("Char.Status", status)
     example("Char.Vitals", vitals)
     example("Room.Info (start room)", info)
@@ -503,6 +537,7 @@ def run(work, mudlib, logpath, driver_box):
     hub = alice.room(name="The Test Hub")
     truth("hub: exits are north, lane, east (named exits under their own names), no hidden exit yet", hub and set(hub["exits"]) == {"north", "lane", "east"}, hub)
     truth("hub: environment defaults to outdoors", hub and hub["environment"] == "outdoors", hub)
+    truth("hub: light is lit", hub and hub["light"] == "lit", hub)
     truth("hub: a door's exit is present and marked in doors", hub and hub["doors"] == {"east": "closed"}, hub)
     m = alice.mark()
     alice.command("north")
@@ -822,6 +857,22 @@ def run(work, mudlib, logpath, driver_box):
     status = alice.wait("Char.Status")
     truth("after a restart Char.Status is sent again at login", status and status["name"] == "Alice" and status["level"] >= 2, status)
 
+    # ================= light: Room.Info says so, and a dark room tells only what is known =================
+    m = alice.mark()
+    alice.command("tp /domains/gmcptest/pit")
+    pit = alice.room(m, name="The Test Pit")
+    truth("a dark room: Room.Info says light is dark", pit and pit["light"] == "dark", pit)
+    truth("a dark room sends no exit the character does not know (they were placed here, they know none)", pit and pit["exits"] == {} and pit["doors"] == {}, pit)
+    alice.command("look")
+    alice.pump(0.6)
+    seen = b"".join(json.dumps(v).encode() for p, v in alice.frames[m:])
+    truth("no package names the creature or the item of a dark room", b"Gmcpbeast" not in seen and b"gmcpbeast" not in seen and b"Gmcpgem" not in seen, seen[:300])
+    truth("and the text of the room does not either", b"Gmcpbeast" not in alice.clean[-600:] and b"Gmcpgem" not in alice.clean[-600:], alice.clean[-300:])
+    m = alice.mark()
+    alice.command("up")
+    hub2 = alice.room(m, name="The Test Hub")
+    truth("leaving by an exit works in the dark (a way, felt for)", hub2 is not None and hub2["light"] == "lit", hub2)
+
     # ================= the room numbers: the daemon itself =================
     alice.send("quit")
 
@@ -831,7 +882,7 @@ def main():
     mudlib = os.path.join(work, "mudlib")
     h.copy_mudlib(mudlib)
     patch_player(mudlib)
-    for name, source in (("hub", HUB), ("hall", HALL), ("lane_end", LANE), ("vault", VAULT), ("secret_room", SECRET)):
+    for name, source in (("hub", HUB), ("hall", HALL), ("lane_end", LANE), ("vault", VAULT), ("secret_room", SECRET), ("pit", PIT), ("beast", BEAST), ("gem", GEM)):
         os.makedirs(os.path.join(mudlib, "domains", "gmcptest"), exist_ok=True)
         h.write(mudlib, f"/domains/gmcptest/{name}", source)
     os.makedirs(os.path.join(mudlib, "wiz"), exist_ok=True)

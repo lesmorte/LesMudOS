@@ -89,7 +89,7 @@ public class SnProbe : Thing
             case "schance":
             {
                 var n = w.Select(int.Parse).ToArray();
-                Write("CHANCE " + LoadObject("/secure/sneak").Call<int>("NoticeChance", n[0], n[1], n[2], n[3] == 1, n[4]) + "\n"); return true;
+                Write("CHANCE " + LoadObject("/secure/sneak").Call<int>("NoticeChance", n[0], n[1], n[2], n[3] == 1, n[4], n.Length > 5 ? n[5] : 0) + "\n"); return true;
             }
             case "sskill": { var k = LoadObject("/skills/" + w[0]); Write("SKILL " + string.Join(" ", Enumerable.Range(1, int.Parse(w[2])).Select(r => k.Call<double>("RankValue", w[1], r))) + "\n"); return true; }
             case "sclone": { var r = CloneObject(w[0]); MoveObject(r, room); Write("CLONED " + r.Name + "\n"); return true; }
@@ -618,6 +618,10 @@ def step_sneak(chief):
                        ("1 1 10 1 0", 100), ("9 5 1 0 0", 10), ("9 1 6 0 0", 55), ("9 1 1 0 -10", 20), ("9 1 1 0 -20", 10),
                        ("15 1 1 0 -20", 5), ("9 1 1 1 -20", 40), ("9 10 1 0 0", 10), ("0 1 1 0 0", 75)):
         check(f"notice chance for grace/scout/creature/alert/rank {args}", chief.command("schance " + args), f"CHANCE {want}")
+    # The light's term (docs/specs/light.md section 8): dim -10, dark -15 (-25 for a creature that cannot see), a carried light +20; the sixth argument, clamped 5..100.
+    for args, want in (("9 1 1 0 0 0", 30), ("9 1 1 0 0 -10", 20), ("9 1 1 0 0 -15", 15), ("9 1 1 0 0 -25", 5), ("9 1 1 0 0 20", 50), ("9 1 1 1 0 20", 80),
+                       ("9 1 1 0 -20 20", 30), ("15 1 1 0 0 -15", 5), ("1 1 10 1 0 20", 100), ("9 1 1 0 0 -10", 20)):
+        check(f"notice chance with the light's term {args}", chief.command("schance " + args), f"CHANCE {want}")
     check("Precision Strike's ambush factors by rank", chief.command("sskill precision_strike ambush 4"), "SKILL 1.5 1.75 2 2.25")
     check("Sneak's Endurance a room by rank", chief.command("sskill sneak room 3"), "SKILL 5 4 3")
     check("Sneak's notice change by rank", chief.command("sskill sneak notice 3"), "SKILL 0 -10 -20")

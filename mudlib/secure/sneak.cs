@@ -26,14 +26,14 @@ public class SneakRules : MudObject
 
     /// <summary>
     /// The chance, in percent, that a creature notices a Scout who sneaks. grace and levels as they are; alert: the creature is flagged Alert;
-    /// rankAdjust: the Scout's rank in Sneak adds this (0, -10, -20).
+    /// rankAdjust: the Scout's rank in Sneak adds this (0, -10, -20); lightAdjust: the light's term (/secure/light NoticeAdjust), 0 in a lit room with no light carried.
     /// </summary>
-    public int NoticeChance(int grace, int scoutLevel, int creatureLevel, bool alert, int rankAdjust)
+    public int NoticeChance(int grace, int scoutLevel, int creatureLevel, bool alert, int rankAdjust, int lightAdjust = 0)
     {
         var chance = 50 - 5 * (grace - 5) + 5 * (creatureLevel - scoutLevel);
         chance = Math.Clamp(chance, BaseMin, BaseMax);
         if (alert) chance += AlertBonus;
-        chance += rankAdjust;
+        chance += rankAdjust + lightAdjust; // the room's light and the sneaker's own (docs/specs/light.md, section 8; /secure/light)
         return Math.Clamp(chance, FinalMin, FinalMax);
     }
 

@@ -10,6 +10,8 @@ public class GoblinBarracks : Room
         Exits["west"] = "/domains/hollow/cellars/mushroom_cavern";
         Exits["east"] = "/domains/hollow/cellars/overseer_hall";
         Safe = false;
+        Light = LightDark;
+        DarkDesc = "The dark is thick with old straw, smoke and sour meat. The air feels crowded.";
 
         AddDetail("bedding,straw,beds,bedrolls,nests", "Heaps of filthy straw and stolen blankets are piled in the corners, and each nest has a notched knife tucked beside it.");
         AddDetail("goods,stolen goods,loot,plunder", "Stolen goods of every kind lie heaped together: a cracked lantern, a bolt of mildewed cloth, and a child's wooden horse with one wheel missing.");
