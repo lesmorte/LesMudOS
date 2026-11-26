@@ -126,7 +126,7 @@ def entries(text):
     return text.split("Conversation:")[-1] if "Conversation:" in text else ""
 
 
-def run(work, mudlib, logpath, driver_box):
+def run(work, mudlib, log, box):
     # ===== 1. a newcomer =====
     alice = g.login("Alice", answer="dont")
     bob = g.login("Bob", answer="dont")
@@ -241,9 +241,8 @@ def run(work, mudlib, logpath, driver_box):
     check("the log says the early conversation is not kept", story, "(earlier conversation not kept)")
     truth("it holds at most 80 entries", len(re.findall(r"^\s*(?:\*|You:|Envoy:)", entries(story), re.M)) <= 80, len(shown))
     truth("and the newest entry is the last", re.findall(r"^\s*(?:You:|Envoy:)(.*)$", entries(story), re.M)[-1].strip() == "\"Blah.\"", entries(story)[-120:])
-    log = carol.of("Char.Quests.Log")
-    last = [m for m in log if m["id"] == "test-errand"][-1]
-    truth("the appended entries carry sequence numbers", all("seq" in e for m in log for e in m["entries"]), log[-1])
+    sent = carol.of("Char.Quests.Log")
+    truth("the appended entries carry sequence numbers", bool(sent) and all("seq" in e for m in sent for e in m["entries"]), sent[-1:])
     carol.command("quest errand")
     carol.pump(0.5)
     mark = carol.mark()
@@ -274,6 +273,42 @@ def run(work, mudlib, logpath, driver_box):
     for c in commands:
         truth("after a login `" + c + "` says the same", body(alice.command(c)) == before[c], (before[c][-200:], body(alice.command(c))[-200:]))
     truth("the active quest's conversation survived", "Quest taken on: Recover the Overseer's Orders." in before["quest orders"] and "Rowan: \"The goblins take their orders" in before["quest orders"])
+
+    # ===== 7. a character saved before the journal existed, and a restart of the driver =====
+    dora = g.login("Dora", answer="dont")
+    dora.command("quests")
+    dora.send("quit")
+    dora.closed(5)
+    alice.send("quit")
+    alice.closed(5)
+    carol.send("quit")
+    time.sleep(2)
+    g.stop_driver(box[0])
+    path = os.path.join(work, "save", "players", "dora.json")
+    data = json.load(open(path))
+    data["quests"] = {"clear-the-cellar": 2, "overseers-orders": 1, "the-quiet-offering": 2}
+    data["questTitles"] = {"clear-the-cellar": "Clear the Cellar", "overseers-orders": "Recover the Overseer's Orders", "the-quiet-offering": "The Quiet Offering"}
+    data.pop("journal", None)
+    data.pop("journalLog", None)
+    json.dump(data, open(path, "w"), indent=2)
+    box[0] = g.start_driver(work, mudlib, log)
+    dora = g.login("Dora", answer="dont")
+    old_save = body(dora.command("quests"))
+    check("an older save: the quest log reads as before", dora.command("quests"), "Active quests: Recover the Overseer's Orders", "Completed quests: Clear the Cellar, The Quiet Offering", "2 completed, 0 abandoned.")
+    done = dora.command("quests completed")
+    check("its completed quests have their authored summaries, no date", done, "Clear the Cellar", "You went down into the smugglers' tunnels", "The Quiet Offering", "You laid a wildflower and clean water",
+          "Given by Rowan in Vincent's Hollow.", "Given by Sister Merewyn in Vincent's Hollow.", absent=("Clear the Cellar - the", "Reward:"))
+    check("its active quest has its giver, objective and an empty conversation", dora.command("quest orders"), "Recover the Overseer's Orders (active)", "Given by Rowan in Vincent's Hollow.",
+          "[ ] Find the Overseer's Orders", "Nothing has been said yet.")
+    dora.command("tp " + GUILD)
+    dora.command("mk " + ORDERS)
+    ask(dora, "abandon orders")
+    check("such a quest can be abandoned like any other", dora.command("y"), "You give up \"Recover the Overseer's Orders\".", "You put Rowan's second contract aside.")
+    check("and its items are taken back", dora.command("i"), absent=("Overseer's Orders",))
+    # Alice, after the restart: her journal is what it was
+    alice = g.login("Alice", answer="dont")
+    for c in commands:
+        truth("after a restart of the driver `" + c + "` says the same", body(alice.command(c)) == before[c], (before[c][-200:], body(alice.command(c))[-200:]))
     return alice
 
 
@@ -287,7 +322,7 @@ def main():
     driver = g.start_driver(work, mudlib, log)
     box = [driver]
     try:
-        run(work, mudlib, logpath, box)
+        run(work, mudlib, log, box)
     finally:
         g.stop_driver(box[0])
         log.close()
