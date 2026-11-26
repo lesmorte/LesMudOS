@@ -417,6 +417,12 @@ def run(work, mudlib, box):
         wiz.command("shutdown")
         box[0].wait(timeout=15)
         return
+    if os.environ.get("PF_ONLY") == "guild":  # the guild nudge only
+        run_guild(wiz)
+        wiz.command("save")
+        wiz.command("shutdown")
+        box[0].wait(timeout=15)
+        return
     if os.environ.get("PF_ONLY") == "logfix":  # a quick run of the last fixes only
         run_logfix(wiz)
         wiz.command("save")
@@ -434,6 +440,7 @@ def run(work, mudlib, box):
     run_prompt(wiz)
     run_logfix(wiz)
     run_arrival_news()
+    run_guild(wiz)
     run_bare_skill_command()
     run_time()
     run_charset()
@@ -721,6 +728,60 @@ def run_arrival_news():
         check("arrival: the renown line comes after the room description", "ok" if text.index("News Room") < text.index("Your renown grows") and text.index("Obvious exits") < text.index("Your renown grows") else text[:400], "ok")
         check("arrival: the title line comes after the room description", "ok" if text.index("Obvious exits") < text.index("You have earned the title:") else text[:400], "ok")
     c.command("quit")
+
+
+# ===== 15. the nudge to the Adventurers Guild =====
+
+def run_guild(wiz):
+    """A new character is told where the guild is, a quest-less one is reminded under 'quests' and at the top of the cellar stair
+    (once), and none of it is shown to a wizard, to a returning character, or to anyone who has taken a quest."""
+    c = h.Client("guildy")
+    first = c.pending + a.quiet(c, 1.5)
+    check("guild: a new character is told the way to the guild", first, "Your first stop is the Adventurers Guild", "west", "Rowan", "help start")
+    check("guild: the way told is the real way", c.command("west"), "Adventurers Guild")
+    c.command("east")
+    text = c.command("quests")
+    check("guild: 'quests' says there are none and where to go", text, "You have no quests.", "Contracts are given out at the Adventurers Guild", "Rowan")
+    check("guild: 'score' carries the same hint", c.command("score"), "You have no quests.", "Contracts are given out")
+    check("guild: 'help start' says where to begin", c.command("help start"), "go to the Adventurers Guild", "accept cellar", "report")
+    check("guild: 'help' points at it", c.command("help"), "help start")
+
+    # The stair: told once, below the room, never again.
+    c.command("south")
+    down = c.command("down") + a.quiet(c, 1.0)
+    check("guild: at the cellar stair a contract-less character is told once", down, "Tavern Cellar", "you have no contract")
+    check("guild: the line comes after the room", "ok" if down.index("Obvious exits") < down.index("you have no contract") else down[:300], "ok")
+    flee_until(c, "flee up")  # the rats there are aggressive
+    a.drain(c, 0.5)
+    again = c.command("down") + a.quiet(c, 1.0)
+    check("guild: the stair line is not told twice", again, "Tavern Cellar", absent=("you have no contract",))
+    flee_until(c, "flee up")
+    a.drain(c, 0.5)
+    check("guild: and out of the cellar", c.command("quit"), "Goodbye")
+
+    # A character who has been back gets no welcome; the tip it saw stays seen.
+    back = h.Client("guildy")
+    text = back.pending + a.quiet(back, 1.5)
+    check("guild: a returning character gets no welcome", text, "Welcome back", absent=("Your first stop",))
+    back.command("save")
+    back.command("quit")
+
+    # Taking a contract ends it all.
+    d = h.Client("guildz")
+    a.drain(d, 0.8)
+    d.command("west")
+    check("guild: a contract is accepted", d.command("accept cellar"), "Quest accepted")
+    check("guild: with a quest there is no hint under 'quests'", d.command("quests"), "Clear the Cellar", absent=("Contracts are given out",))
+    d.command("east")
+    d.command("south")
+    down = d.command("down") + a.quiet(d, 1.0)
+    check("guild: with a quest the stair says nothing", down, "Tavern Cellar", absent=("you have no contract",))
+    flee_until(d, "flee up")
+    a.drain(d, 0.5)
+    d.command("quit")
+
+    # A wizard sees none of it.
+    check("guild: a wizard's 'quests' has no hint", wiz.command("quests"), "You have no quests.", absent=("Contracts are given out",))
 
 
 def flee_until(c, command, tries=40):

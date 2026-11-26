@@ -137,7 +137,7 @@ public class ExampleHall : Room
 }
 ```
 
-Treasure in a hidden place is a find, not coins (see "A find" under Items). Room fields and methods: `Safe`, `LogoutRoom` (no longer needed: every player who leaves a room logs in there), `ResetSeconds`, `Exits`, `AddDetail`, `AddReadable`, `AddSpawn`, `AddEncounter`, `LockExit`, `BlockExit`, `HiddenExit`, `DangerBand`, `AddNode`. Override `Reset()` (and call `base.Reset()`) for anything special.
+Treasure in a hidden place is a find, not coins (see "A find" under Items). Room fields and methods: `Safe`, `LogoutRoom` (no longer needed: every player who leaves a room logs in there), `ResetSeconds`, `Exits`, `AddDetail`, `AddReadable`, `AddSpawn`, `AddEncounter`, `LockExit`, `BlockExit`, `HiddenExit`, `HideExit`, `HideItem`, `HideNode`, `HideClue`, `DangerBand`, `AddNode`. Override `Reset()` (and call `base.Reset()`) for anything special.
 
 ### A room with a locked exit
 
@@ -277,12 +277,14 @@ public class ExampleTrail : Room
 
 ### A room with a hidden exit
 
-`HiddenExit(direction, destination, hintDetail, findChance, foundLine = "")` declares an exit that is **not listed** and cannot be walked (typing it answers "What?", as if it did not exist) until the character has found it. There are two ways to find it, and you choose them:
+`HideExit(direction, destination, hintDetail, difficulty, foundLine = "", landmark = false)` declares an exit that is **not listed** and cannot be walked (typing it answers "What?", as if it did not exist) until the character has found it. There are two ways to find it, and you choose them:
 
-- **`search`** in the room: each attempt finds the exit with `findChance` percent (0 to 100; 100 always finds it, 0 never does). Searching is an action on the combat clock and takes about 3 seconds; it cannot be used while fighting. A room with nothing to find gives the same plain line as a room where the attempt failed.
-- **Looking at a detail**: `hintDetail` is a comma-separated list of the names of a detail you added with `AddDetail`; `look at` any of them finds the exit for certain. Use `""` if only searching should find it, and `findChance` 0 if only looking should.
+- **`search`** in the room: each attempt is a d20 roll plus the character's bonus (one point of Insight above 5, a Scout's Keen Eye +2, +3 for naming the spot) against `difficulty`: `SearchEasy` (7), `SearchModerate` (12), `SearchHard` (17), `SearchVeryHard` (22), or a number from 6 to 25. A natural 20 always finds it and a natural 1 never does, so the chance is between 5% and 95%; one point of bonus is 5%. A failed search starts a 60-second wait for that character in that room. Searching is an action on the combat clock and takes 3 seconds; it cannot be used while fighting, ends sneaking and resting, and an attack breaks it off. A room with nothing to find gives the same plain line as a room where the attempt failed. See "A hidden thing" below for the other kinds of hidden thing and the full rules.
+- **Looking at a detail**: `hintDetail` is a comma-separated list of the names of a detail you added with `AddDetail`; `look at` any of them finds the exit for certain. Use `""` if only searching should find it (a hidden exit that should need the search leaves the hint empty), and `difficulty` 0 if only looking should.
 
-When a character finds the exit they read `foundLine` (a standard line if you give none) and from then on it is listed among their exits and usable; the record is saved with the character at once, so it survives logout and restart. Other characters see nothing: until they find it themselves the exit is not listed for them, and when someone leaves by it they read "Name leaves somewhere." (a character who has found it reads the direction). Wizards (level 1 and up) see every hidden exit in the list marked `(hidden)`, and `stat here` lists them with their chance and detail; a wizard still has to find an exit before walking it. The room on the far side needs nothing special: give it an ordinary return exit. A hidden exit can be locked like any other (`LockExit`), and `flee` never uses one.
+The older `HiddenExit(direction, destination, hintDetail, findChance, foundLine = "")` still works: its percent becomes a difficulty (21 less a twentieth of the percent: 10% is 19, 20% is 17; 0 is found only by the detail), which is the same chance for an Insight 5 character who is not a Scout. New exits use `HideExit`. A secret door is `HideExit` and then `AddDoor` on the same direction (and the far room's `AddDoor` as usual): finding the exit shows the way, and the door still has to be opened.
+
+When a character finds the exit they read `foundLine` (a standard line if you give none) and from then on it is listed among their exits and usable; the record is saved with the character at once, so it survives logout and restart. Other characters see nothing: until they find it themselves the exit is not listed for them, and when someone leaves by it they read "Name leaves somewhere." (a character who has found it reads the direction). Wizards (level 1 and up) see every hidden exit in the list marked `(hidden)`, and `stat here` lists them with their difficulty and detail; a wizard still has to find an exit before walking it. The room on the far side needs nothing special: give it an ordinary return exit. A hidden exit can be locked like any other (`LockExit`), and `flee` never uses one. `landmark: true` makes the first time a character finds it a Chronicle event (`discover.hidden_find`, Renown 2 and 10 for the first on the server); use it only for a secret way to a new place.
 
 To be told when a character first finds an exit, override `ExitFound(ObjectRef who, string direction)` in the room. It runs once for each character and exit, at the moment of discovery, and does nothing by default (the Chronicle's discovery events will use it). It is `protected`: only the room runs it.
 
@@ -321,6 +323,28 @@ public class ExampleHiddenCellar : Room
     }
 }
 ```
+
+### A hidden thing
+
+Searching finds more than exits. Every kind is declared in the room's `Create()` in one or two lines, with a difficulty from `SearchEasy` (7), `SearchModerate` (12), `SearchHard` (17) and `SearchVeryHard` (22) (or a number from 6 to 25), the words `search NAME` takes (each also an `AddDetail` key of the room, so `look at NAME` works), the line the finder reads, and, for things found by touch or smell, `byFeel: true`:
+
+```csharp
+HideItem("honey", "/domains/hollow/obj/craft/honey", SearchEasy, "sacks,sack", "Under the sacks you find a jar of honey.");  // once per reset
+HideNode("herbs", "/domains/hollow/obj/cave_herbs", SearchModerate, "crack,draught", "In the crack you find pale herbs.", byFeel: true);
+HideClue("tally", SearchModerate, "hooks,hook", "Behind the last hook is a slip of paper.", "slip,paper", "The text of the clue.");
+```
+
+- **`HideItem`** is for a small, cheap thing that may come back: the first character to find it takes a copy of the item, and until the room's own timed reset nobody else finds anything there ("Someone has been before you"). Nothing is recorded on the character. Use it for a material or a consumable worth a few gold at most.
+- **A hidden find** is for treasure and anything that must not be farmed: an ordinary find file (see "A find") with `SearchDifficulty`, `SearchNames`, `FoundLine` and, if it is found by feel, `ByFeel = true` set in `Create()`. Until a character finds it, it is not in the room's list, and `look at` and `get` say they see no such thing; afterwards it is an ordinary find (taken once, for less each time). A character the register lists as having taken it counts as having found it.
+- **`HideNode`** puts a node nobody can see, `harvest`, or gather from until they have found it; the charges and regrowth are shared. **`HideClue`** hides a scrap of writing; after finding it `read` with one of `readNames` shows the text to that character and to nobody else.
+- **Hints.** Every room that hides something says so in a detail, and the detail's words are what `search NAME` takes. The room's `LongDesc` mentions the first of those words, so a player can read their way to it. The first things a new player meets say "You could {cmd}search{/} it" outright; a Hard thing says that more than one try may be needed. Looking never finds an item, node or clue; only an exit's hint detail finds it by looking.
+- **Words.** `search` alone searches the room; `search THING` rolls only the hidden things whose names include THING, with +3. If THING names a find that the character can already see in the room, the find takes the word instead (`search bundle` takes a found bundle, as `get bundle` does).
+- **The dark.** A room may override `protected virtual int SearchModifier(ObjectRef searcher, bool byFeel)` to make searching there harder (a negative number) or easier; it does nothing by default. docs/specs/light.md uses it.
+- **Chronicle.** Only a secret way to a new place may be a Chronicle first (`landmark: true` on `HideExit`); items, clues and nodes never are. Override `ThingFound(ObjectRef who, string id)` to do something when a character finds a thing (it runs once per character and thing).
+- **Lint.** `tests/lint_area.py` Check 15 reports a duplicate id, a difficulty that is not a constant or 6 to 25, a clue with no `readNames`, a far room with no way back, and names that are no `AddDetail` key of the room (errors); and a first name missing from the `LongDesc`, a hidden find over 20 gold, a once-per-reset item worth over 5 gold, and a shop in the room (warnings).
+- **Where it works.** The rules of finds apply: a hidden find, node or item must be a file in a trusted tree and in a room of a trusted tree; one under `/wiz` hides and finds as a test would, is capped as found exits are, and pays nothing from the register.
+
+The numbers and the full design are in docs/specs/search.md.
 
 ### A room with a level band
 

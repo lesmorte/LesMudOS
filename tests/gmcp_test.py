@@ -318,7 +318,9 @@ TEST_ACTIONS = ('        AddAction("lv", a => { Level = int.Parse(a); return tru
                 '        AddAction("xp", a => { AddXp(int.Parse(a)); return true; });\n'
                 '        AddAction("gold", a => { Gold += int.Parse(a); return true; });\n'
                 '        AddAction("mk", a => { MoveObject(CloneObject(a), Self); return true; });\n'
-                '        AddAction("spawn", a => { MoveObject(CloneObject(a), Environment()!); return true; });\n')
+                '        AddAction("spawn", a => { MoveObject(CloneObject(a), Environment()!); return true; });\n'
+                '        AddAction("sdice", a => { Write("SDICE " + LoadObject("/secure/search").Call<bool>("SetTestRolls", a.Trim()) + "\\n"); return true; });\n'
+                '        AddAction("swait", a => { Write("SWAIT " + LoadObject("/secure/search").Call<bool>("SetTestWait", int.Parse(a.Trim())) + "\\n"); return true; });\n')
 
 
 def patch_player(mudlib):
@@ -423,6 +425,8 @@ def run(work, mudlib, logpath, driver_box):
     # ================= the offer, and a client without GMCP =================
     warden = login("Warden", answer="dont")
     check("the secret makes the first wizard", warden.command("promote " + h.SECRET), "level 10 wizard")
+    check("the search dice are fixed at a natural 20 (a search finds what is hidden)", warden.command("sdice d20:20"), "SDICE True")
+    check("and a failed search starts no wait", warden.command("swait 0"), "SWAIT True")
     truth("the offer is sent once, first, to a client that has not answered", warden.offers == 1 and warden.stream.startswith(bytes([IAC, WILL, GMCP])), warden.stream[:20])
     truth("a client that answered DONT is sent no GMCP message at all", b"\xff\xfa\xc9" not in warden.stream)
     warden.command("look")
@@ -528,9 +532,10 @@ def run(work, mudlib, logpath, driver_box):
     carol_hub = carol.room(name="The Test Hub")
     truth("Carol sees the hub without the secret exit", carol_hub and "secret" not in carol_hub["exits"], carol_hub)
     m = alice.mark()
-    found = alice.command("search")
+    alice.send("search")
+    after = alice.wait("Room.Info", lambda v: "secret" in v["exits"], m, timeout=9.0)
+    found = alice.clean.decode(errors="replace")[-1500:]
     truth("Alice's search finds the secret exit (text)", "hidden way" in found, found)
-    after = alice.wait("Room.Info", lambda v: "secret" in v["exits"], m)
     truth("Room.Info arrives with the found exit, with no look needed", after is not None, alice.of("Room.Info", m))
     m = alice.mark()
     carol.command("look")
@@ -544,8 +549,8 @@ def run(work, mudlib, logpath, driver_box):
     truth("Alice can walk the exit and the number matches", secret and after["exits"]["secret"] == secret["num"], (after, secret))
     alice.command("out")
     m = carol.mark()
-    carol.command("search")
-    carol.wait("Room.Info", lambda v: "secret" in v["exits"], m)
+    carol.send("search")
+    carol.wait("Room.Info", lambda v: "secret" in v["exits"], m, timeout=9.0)
     truth("when Carol finds it herself she gets it too", any("secret" in v["exits"] for v in carol.of("Room.Info", m)))
 
     # ================= doors =================

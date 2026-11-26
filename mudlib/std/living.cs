@@ -1490,6 +1490,15 @@ public abstract class Living : Thing
         if (phase != "preparing" || current == null || !current.Spoilable) return false;
         var name = current.Name;
         var halfRecovery = Math.Max(0, readyAt - resolveAt) / 2;
+        if (current.Kind == "search")
+        {
+            // A search is not a shot: the blow just breaks it off (the half Recovery is still paid; the search wait is not started).
+            phase = "recovering"; current = null; currentTarget = null;
+            readyAt = TimeMs() + halfRecovery;
+            Tell("The blow breaks off your search.\n");
+            Schedule(readyAt);
+            return true;
+        }
         paidEndurance = 0;
         paidFocus = 0;
         phase = "recovering";
@@ -1498,6 +1507,22 @@ public abstract class Living : Thing
         readyAt = TimeMs() + halfRecovery;
         Tell($"The blow throws off your aim: your {name.ToLowerInvariant()} is spoiled.\n");
         if (Environment() is { } room) TellRoom(room, $"{Cap(QueryLabel())}'s aim is spoiled by the blow.\n", Self);
+        Schedule(readyAt);
+        return true;
+    }
+
+    /// <summary>
+    /// Give up an action of this kind that is still in its Preparation, with no refund and no penalty: nothing is paid back, the creature may act
+    /// again when its Ready Time comes (a fight that has just begun has already put that off by the Reaction Time). Only a creature's own code can call it (protected);
+    /// the search uses it when an attack breaks it off. True if there was such an action.
+    /// </summary>
+    protected bool AbandonPreparation(string kind)
+    {
+        if (phase != "preparing" || current == null || current.Kind != kind) return false;
+        phase = "recovering";
+        current = null;
+        currentTarget = null;
+        if (readyAt < TimeMs()) readyAt = TimeMs();
         Schedule(readyAt);
         return true;
     }

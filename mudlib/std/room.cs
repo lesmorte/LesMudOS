@@ -45,13 +45,27 @@ public abstract class Room : MudObject
         public string Refusal = "";
     }
 
+    /// <summary>The difficulties of a search (docs/specs/search.md section 2; the numbers are in /secure/search): the d20 roll plus the searcher's bonus must reach this.</summary>
+    public const int SearchEasy = 7, SearchModerate = 12, SearchHard = 17, SearchVeryHard = 22;
+
+    /// <summary>One hidden thing of this room: an exit (kind "exit", id the direction), or an item, node or clue (id is the builder's name for it).</summary>
     private sealed class Hidden
     {
+        public string Kind = "exit";
+        public string Id = "";
         public string Path = "";
         public List<string> Hints = new();
-        public int Chance;
+        public int Difficulty;          // 0: found only by looking at a hint detail (an exit)
         public string FoundLine = "";
+        public List<string> Names = new(); // what `search NAME` can name
+        public bool ByFeel;
+        public bool Landmark;
+        public List<string> ReadNames = new();
+        public string Text = "";
+        public bool Taken;             // a once-per-reset item: taken since the last reset
     }
+
+    private const string SearchDaemon = "/secure/search";
 
     private sealed class DoorInfo
     {
@@ -73,7 +87,8 @@ public abstract class Room : MudObject
     private readonly Dictionary<string, Lock> locks = new();
     private readonly List<Spawn> spawns = new();
     private readonly List<Encounter> encounters = new();
-    private readonly Dictionary<string, Hidden> hidden = new();
+    private readonly Dictionary<string, Hidden> hidden = new();       // hidden exits, by direction
+    private readonly Dictionary<string, Hidden> hiddenThings = new(); // hidden items, nodes and clues, by id
     private int bandLow;
     private int bandHigh;
     private bool bandSet;
@@ -135,7 +150,8 @@ public abstract class Room : MudObject
     /// </summary>
     protected void AddDoor(string direction, string name = "door", bool closed = true, string keyId = "", bool closesOnReset = true, string description = "")
     {
-        if (!Exits.TryGetValue(direction, out var partner)) return; // a door needs an ordinary exit
+        // A door needs an exit: an ordinary one, or a hidden one (a secret door), which takes its far room from the hidden exit.
+        if (!Exits.TryGetValue(direction, out var partner) && !(hidden.TryGetValue(direction, out var secret) && (partner = secret.Path) != "")) return;
         doors[direction] = new DoorInfo
         {
             Name = string.IsNullOrWhiteSpace(name) ? "door" : name.Trim().ToLowerInvariant(), StartClosed = closed, KeyId = keyId ?? "", ClosesOnReset = closesOnReset,
@@ -146,18 +162,61 @@ public abstract class Room : MudObject
 
     /// <summary>
     /// An exit that is not listed and cannot be walked until a character has found it. It is found by `search` (findChance
-    /// percent per attempt, 0 to 100) or, for certain, by looking at the detail named by hintDetail (comma-separated names, as in
-    /// AddDetail; "" for none: only searching finds it). What a character has found is saved with the character. foundLine is
-    /// the line the character reads when they find it; "" for a standard one. Other characters see nothing until they find it.
+    /// percent per attempt for an Insight 5 character who is not a Scout, 0 to 100) or, for certain, by looking at the detail named by hintDetail
+    /// (comma-separated names, as in AddDetail; "" for none: only searching finds it). What a character has found is saved with the character.
+    /// foundLine is the line the character reads when they find it; "" for a standard one. Other characters see nothing until they find it.
+    /// The old percent is turned into a difficulty (21 less a twentieth of the percent, so 10% is 19, 20% is 17); a percent of 0 is found by the
+    /// detail only. New exits use HideExit.
     /// </summary>
     protected void HiddenExit(string direction, string destination, string hintDetail, int findChance, string foundLine = "")
     {
+        var percent = Math.Max(0, Math.Min(100, findChance));
+        HideExit(direction, destination, hintDetail, percent == 0 ? 0 : 21 - percent / 5, foundLine);
+    }
+
+    /// <summary>
+    /// An exit that is not listed and cannot be walked until a character has found it, found by `search` against a difficulty (SearchEasy, SearchModerate,
+    /// SearchHard, SearchVeryHard, or a number from 6 to 25; 0 for found only by the detail) or, for certain, by looking at a detail named in hintDetail
+    /// (leave it "" for an exit that should need the search). landmark: the first time a character finds it is a Chronicle event (discover.hidden_find). A secret
+    /// door is this and AddDoor on the same direction. docs/specs/search.md section 5.4.
+    /// </summary>
+    protected void HideExit(string direction, string destination, string hintDetail, int difficulty, string foundLine = "", bool landmark = false)
+    {
+        var hints = Names(hintDetail);
         hidden[direction] = new Hidden
         {
-            Path = destination, Hints = Names(hintDetail), Chance = Math.Max(0, Math.Min(100, findChance)),
+            Kind = "exit", Id = direction, Path = destination, Hints = hints, Names = hints, Difficulty = Math.Max(0, difficulty), Landmark = landmark,
             FoundLine = foundLine != "" ? foundLine : $"You find a hidden way {{cmd}}{direction}{{/}}!",
         };
     }
+
+    /// <summary>
+    /// A small thing kept in a hidden place, for a cheap material or a consumable: the first character to find it takes a copy of the item (put in their hands), and
+    /// until this room's own timed reset nobody else finds anything there ("Someone has been before you"). Nothing is recorded on the character; they may find it
+    /// again each reset. Treasure in gold, and anything that must not be farmed, is a hidden find instead (docs/BUILDING.md, "A find"). names are the words `search NAME` takes
+    /// (also AddDetail keys of this room); byFeel: found in the dark as well as in the light.
+    /// </summary>
+    protected void HideItem(string id, string path, int difficulty, string names, string foundLine, bool byFeel = false)
+        => hiddenThings[id] = new Hidden { Kind = "item", Id = id, Path = path, Difficulty = Math.Max(0, difficulty), Names = Names(names), FoundLine = foundLine, ByFeel = byFeel };
+
+    /// <summary>A resource node (a /std/node file) that nobody can see or gather from until they have found it. The charges and the regrowth are shared, as for any node.</summary>
+    protected void HideNode(string id, string path, int difficulty, string names, string foundLine, bool byFeel = false)
+    {
+        hiddenThings[id] = new Hidden { Kind = "node", Id = id, Path = path, Difficulty = Math.Max(0, difficulty), Names = Names(names), FoundLine = foundLine, ByFeel = byFeel };
+        AddSpawn(path, 1);
+    }
+
+    /// <summary>A written clue: a scrap of writing found per character, after which `read` with one of readNames shows the text to that character and to nobody else. It cannot hide an item.</summary>
+    protected void HideClue(string id, int difficulty, string names, string foundLine, string readNames, string text)
+        => hiddenThings[id] = new Hidden { Kind = "clue", Id = id, Difficulty = Math.Max(0, difficulty), Names = Names(names), FoundLine = foundLine, ReadNames = Names(readNames), Text = text };
+
+    /// <summary>
+    /// THE SITUATIONAL MODIFIER OF A SEARCH. Added to the searcher's bonus for every hidden thing of this room that a search rolls for (+1 is 5 percentage
+    /// points). Does nothing here: a room, or a rule such as the dark, overrides it to make searching here harder (a negative number) or easier. byFeel is true
+    /// for a thing that is found by touch or smell (HideItem and HideNode's byFeel, a find's ByFeel), which the dark does not hide. Called once per thing per search
+    /// by the room itself, never by anything else; must not change anything. docs/specs/search.md section 2.
+    /// </summary>
+    protected virtual int SearchModifier(ObjectRef searcher, bool byFeel) => 0;
 
     /// <summary>
     /// Called once for each character and hidden exit, at the moment the character first finds the exit (by search or by looking at
@@ -165,6 +224,9 @@ public abstract class Room : MudObject
     /// It is protected on purpose: only the room itself can run it.
     /// </summary>
     protected virtual void ExitFound(ObjectRef who, string direction) { }
+
+    /// <summary>Called once for each character and hidden thing of any kind (an exit's id is its direction), after the finding is recorded and told; a fault in it does not undo the finding. Does nothing here.</summary>
+    protected virtual void ThingFound(ObjectRef who, string id) { }
 
     /// <summary>This room's level band: ground meant for characters of level low to high. Entering a room whose low end is two or more above the character's level warns them once. A room that does not call this takes the band of its area.cs, if that has one.</summary>
     protected void DangerBand(int low, int high)
@@ -200,6 +262,29 @@ public abstract class Room : MudObject
     public bool QueryExitFoundBy(ObjectRef who, string direction) => hidden.ContainsKey(direction) && Found(who, direction);
 
     private bool Found(ObjectRef who, string direction) => who.IsAlive && who.Call<bool>("QueryFoundExit", Self.Name, direction);
+
+    private bool FoundThing(ObjectRef who, string id) => who.IsAlive && who.Call<bool>("QueryFound", Self.Name, "#" + id);
+
+    /// <summary>The keys of everything this room hides besides its exits: "#id" for each item, node and clue, and "#" and the program path for each hidden find in it now. The character's record accepts only these.</summary>
+    public List<string> QueryHiddenKeys()
+    {
+        var keys = hiddenThings.Keys.Select(k => "#" + k).ToList();
+        foreach (var ob in AllInventory())
+            if (ob.IsAlive && ob.Call<int>("QuerySearchDifficulty") > 0 && ob.Call<string>("QuerySearchKey") is { Length: > 0 } key) keys.Add(key);
+        return keys;
+    }
+
+    /// <summary>
+    /// Is this node (one of this room's, by its program path) one the room hides, and does the viewer see it? 0: it is no hidden node, or the viewer has found it
+    /// (an ordinary node); 1: hidden from this viewer, who has not found it; 2: hidden, and the viewer is a wizard, who sees it marked. For the node's own Short, Id and TryGather.
+    /// </summary>
+    public int QueryNodeHiding(ObjectRef node, ObjectRef viewer)
+    {
+        if (node == null || viewer == null || !viewer.IsAlive || !viewer.Call<bool>("IsPlayerCharacter")) return 0;
+        var thing = hiddenThings.Values.FirstOrDefault(t => t.Kind == "node" && t.Path == node.ProgramPath);
+        if (thing == null || FoundThing(viewer, thing.Id)) return 0;
+        return viewer.Call<int>("QueryWizLevel") >= 1 ? 2 : 1;
+    }
 
     public int QueryBandLow() => bandSet ? bandLow : FindArea()?.Call<int>("QueryBandLow") ?? 0;
 
@@ -267,7 +352,14 @@ public abstract class Room : MudObject
         return (door.Description != "" ? door.Description + " " : "") + $"The {door.Name} {DoorWhere(direction)} is {state}." + (state == "locked" ? " It has a lock." : state == "closed" && door.KeyId != "" ? " It has a lock, and it is not locked." : "");
     }
 
-    public virtual string? QueryReadable(string name) => readables.GetValueOrDefault(Names(name).FirstOrDefault() ?? "");
+    public virtual string? QueryReadable(string name)
+    {
+        var key = Names(name).FirstOrDefault() ?? "";
+        // A found clue reads only for the character who found it.
+        if (hiddenThings.Count > 0 && ThisPlayer() is { } reader && hiddenThings.Values.FirstOrDefault(t => t.Kind == "clue" && t.ReadNames.Contains(key)) is { } clue)
+            return FoundThing(reader, clue.Id) ? clue.Text : null;
+        return readables.GetValueOrDefault(key);
+    }
 
     /// <summary>May this creature use the exit right now (is it not locked against them)?</summary>
     public bool CanUseExit(ObjectRef who, string direction)
@@ -368,7 +460,9 @@ public abstract class Room : MudObject
         foreach (var encounter in encounters) text.Append($"  Encounter {encounter.Path} {encounter.Percent}%\n");
         foreach (var exit in Exits) text.Append($"  Exit {exit.Key} -> {exit.Value}{(locks.ContainsKey(exit.Key) ? " (locked)" : "")}\n");
         foreach (var door in doors) text.Append($"  Door {door.Key}: {door.Value.Name}, {QueryDoorState(door.Key)}, key '{door.Value.KeyId}', closes on reset {door.Value.ClosesOnReset}\n");
-        foreach (var exit in hidden) text.Append($"  Hidden exit {exit.Key} -> {exit.Value.Path} (find chance {exit.Value.Chance}%, detail '{string.Join(",", exit.Value.Hints)}'{(locks.ContainsKey(exit.Key) ? ", locked" : "")})\n");
+        foreach (var exit in hidden) text.Append($"  Hidden exit {exit.Key} -> {exit.Value.Path} (difficulty {exit.Value.Difficulty}{(exit.Value.Difficulty > 0 ? $", {5 * (21 - Math.Clamp(exit.Value.Difficulty, 2, 20))}% for Insight 5" : ", by detail only")}{(exit.Value.Landmark ? ", landmark" : "")}, detail '{string.Join(",", exit.Value.Hints)}'{(locks.ContainsKey(exit.Key) ? ", locked" : "")})\n");
+        foreach (var thing in hiddenThings.Values)
+            text.Append($"  Hidden {thing.Kind} {thing.Id}{(thing.Path != "" ? " " + thing.Path : "")} (difficulty {thing.Difficulty}, names '{string.Join(",", thing.Names)}'{(thing.ByFeel ? ", by feel" : "")}{(thing.Kind == "item" ? (thing.Taken ? ", taken this period" : ", in place") : "")})\n");
         text.Append(QueryBandHigh() > 0 ? $"  Danger band {QueryBandLow()}-{QueryBandHigh()}{(bandSet ? "" : " (from the area)")}\n" : "  Danger band none\n");
         return text.ToString();
     }
@@ -563,16 +657,73 @@ public abstract class Room : MudObject
     // ---- Hidden exits: finding them ----
 
     /// <summary>
-    /// Search the room once, for this character, who must be the caller (the search command). Each hidden exit they have not found
-    /// is found with its own chance. True if anything was found.
+    /// Search the room once, for this character, who must be the caller (the search command, when its 3 seconds are over). named is what they named
+    /// ("sacking"), or "" for the whole room: a named search rolls only the hidden things whose names include it, with +3. Each hidden thing they have not found gets
+    /// its own roll against its difficulty (docs/specs/search.md section 2). The finder is told for each; the others in the room are told only that they found something.
+    /// Answers how many things were found; 0 for nothing; -1 when the character was told something already ("the place is empty") but it still counts as a try that
+    /// found nothing, so the wait begins.
     /// </summary>
-    public bool Search(ObjectRef who)
+    public int Search(ObjectRef who, string named)
     {
-        if (PreviousObject() != who || Environment(who) != Self) return false;
-        var any = false;
+        if (PreviousObject() != who || Environment(who) != Self || !who.IsAlive) return 0;
+        named = (named ?? "").Trim().ToLowerInvariant();
+        var rules = LoadObject(SearchDaemon);
+        var count = 0;
+        var empty = false;
+        int Bonus(bool byFeel) => who.Call<int>("QuerySearchBonus") + (named != "" ? 3 : 0) + SearchModifier(who, byFeel);
+
         foreach (var exit in hidden.ToList())
-            if (!Found(who, exit.Key) && Random(100) < exit.Value.Chance && Reveal(who, exit.Key)) any = true;
-        return any;
+            if (exit.Value.Difficulty > 0 && !Found(who, exit.Key) && (named == "" || exit.Value.Names.Contains(named)) && rules.Call<bool>("Succeeds", exit.Value.Difficulty, Bonus(false)) && Reveal(who, exit.Key)) count++;
+        foreach (var thing in hiddenThings.Values.ToList())
+        {
+            if (thing.Kind != "item" && FoundThing(who, thing.Id)) continue; // an item is not recorded on the character: it may be found again each reset
+            if (thing.Difficulty <= 0 || (named != "" && !thing.Names.Contains(named))) continue;
+            if (!rules.Call<bool>("Succeeds", thing.Difficulty, Bonus(thing.ByFeel))) continue;
+            if (thing.Kind == "item")
+            {
+                if (thing.Taken) { TellObject(who, "You find where something was kept, but the place is empty. Someone has been before you.\n"); empty = true; continue; }
+                if (GiveHiddenItem(who, thing)) count++;
+            }
+            else if (Reveal(who, "#" + thing.Id)) count++;
+        }
+        foreach (var ob in AllInventory().ToList())
+        {
+            if (!ob.IsAlive) continue;
+            var difficulty = ob.Call<int>("QuerySearchDifficulty");
+            if (difficulty <= 0 || !ob.Call<bool>("QueryHiddenFrom", who)) continue;
+            if (named != "" && !Names(ob.Call<string>("QuerySearchNames") ?? "").Contains(named)) continue;
+            if (!rules.Call<bool>("Succeeds", difficulty, Bonus(ob.Call<bool>("QueryByFeel")))) continue;
+            var key = ob.Call<string>("QuerySearchKey") ?? "";
+            if (key == "" || !who.Call<bool>("RecordFound", key)) continue;
+            TellObject(who, (ob.Call<string>("QueryFoundLine") is { Length: > 0 } line ? line : "You find something hidden here.") + "\n");
+            count++;
+        }
+        if (count > 0) TellRoom(Self, $"{who.Call<string>("QueryName") ?? "Someone"} finds something.\n", who);
+        return count > 0 ? count : empty ? -1 : 0;
+    }
+
+    /// <summary>The finder takes the once-per-reset item: a copy goes into their hands (at their feet if they cannot carry it) and nobody else finds it until the next timed reset.</summary>
+    private bool GiveHiddenItem(ObjectRef who, Hidden thing)
+    {
+        ObjectRef? item = null;
+        try
+        {
+            item = CloneObject(thing.Path);
+            MoveObject(item, who);
+            item = item.Call<ObjectRef>("Settle") ?? item;
+        }
+        catch (MudRuntimeException) { }
+        if (item == null || !item.IsAlive) return false;
+        thing.Taken = true;
+        TellObject(who, thing.FoundLine + "\n");
+        if (Environment(item) != who)
+        {
+            try { MoveObject(item, Self); TellObject(who, $"You cannot carry {item.Call<string>("Short") ?? "it"}; it falls at your feet.\n"); }
+            catch (MudRuntimeException) { item.Call("Vanish"); }
+        }
+        try { ThingFound(who, thing.Id); }
+        catch (MudRuntimeException) { }
+        return true;
     }
 
     /// <summary>The character (the caller) has just looked at a detail of this room. A hidden exit that names it is found, for certain.</summary>
@@ -585,16 +736,36 @@ public abstract class Room : MudObject
             if (exit.Value.Hints.Contains(key) && !Found(who, exit.Key)) Reveal(who, exit.Key);
     }
 
-    private bool Reveal(ObjectRef who, string direction)
+    /// <summary>Record that this character has found a hidden thing (an exit by its direction, anything else as "#id") and tell them.</summary>
+    private bool Reveal(ObjectRef who, string key)
     {
-        if (!who.Call<bool>("RecordFoundExit", direction)) return false; // the character keeps the record; false if already there or refused
-        TellObject(who, hidden[direction].FoundLine + "\n");
-        try { ExitFound(who, direction); }
-        catch (MudRuntimeException)
+        if (!who.Call<bool>("RecordFound", key)) return false; // the character keeps the record; false if already there or refused
+        var isExit = !key.StartsWith('#');
+        var thing = isExit ? hidden[key] : hiddenThings[key.Substring(1)];
+        TellObject(who, thing.FoundLine + "\n");
+        if (isExit)
         {
-            // A fault in a room's discovery hook must not undo the discovery.
+            try { ExitFound(who, key); }
+            catch (MudRuntimeException)
+            {
+                // A fault in a room's discovery hook must not undo the discovery.
+            }
+            if (thing.Landmark) ReportHiddenFind(who, thing);
         }
+        try { ThingFound(who, thing.Id); }
+        catch (MudRuntimeException) { }
         return true;
+    }
+
+    /// <summary>A secret way marked as a landmark: the first time a character finds it is a Chronicle event (wizards are left out by the event service).</summary>
+    private void ReportHiddenFind(ObjectRef who, Hidden exit)
+    {
+        try
+        {
+            LoadObject("/secure/events").Call<string>("Report", "discover.hidden_find", who, new List<ObjectRef> { who }, Self, "way-" + Self.Name.Replace('/', '-').Trim('-') + "-" + exit.Id,
+                new Dictionary<string, string> { ["name"] = "a secret way from " + ShortDesc });
+        }
+        catch (MudRuntimeException) { }
     }
 
     // ---- Description ----
@@ -717,7 +888,11 @@ public abstract class Room : MudObject
     /// <summary>Called every ResetSeconds. Tops up the spawns. Override it, and call base.Reset(), for more.</summary>
     public virtual void Reset()
     {
-        if (timedReset) ResetDoors(); // only the room's own timed reset shuts its doors: a call from another object cannot
+        if (timedReset) // only the room's own timed reset shuts its doors and puts its hidden items back: a call from another object cannot
+        {
+            ResetDoors();
+            foreach (var thing in hiddenThings.Values) thing.Taken = false;
+        }
         foreach (var spawn in spawns) Fill(spawn, false);
         foreach (var encounter in encounters)
         {
