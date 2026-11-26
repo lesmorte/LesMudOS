@@ -824,7 +824,8 @@ def step_loud(chief):
 
     # kill and strike start a fight with one lurker: the second, which had not noticed, wakes and attacks too.
     for label, room, line, n in (("say", "lurk", "say hello", 1), ("shout", "lurk", "shout hello", 1), ("kill", "lurk", "kill lurker", 2),
-                                 ("a skill that is not Tracking (strike)", "lurk", "strike lurker", 2), ("opening a door", "ndoor", "open door", 1)):
+                                 ("a skill that is not Tracking (strike)", "lurk", "strike lurker", 2), ("opening a door", "ndoor", "open door", 1),
+                                 ("searching (docs/specs/search.md)", "lurk", "search", 1)):
         fresh(room, n)
         check(f"{label}: sneaking was on", str(stat(s)["sneaking"]), "True")
         out = say(s, line, 4.0)
