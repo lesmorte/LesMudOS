@@ -2,6 +2,16 @@
 
 public class TavernCellar : Room
 {
+    /// <summary>A character with no contract who comes down the stair for the first time is told, once, where the work is given out.</summary>
+    public override void Init()
+    {
+        base.Init();
+        var who = ThisPlayer();
+        if (who == null || !Interactive(who) || !who.Call<bool>("TakeTip", "stair")) return;
+        var line = LoadObject("/secure/guidepost").Call<string>("Stair");
+        CallOut(() => TellObject(who, line), 0);
+    }
+
     public override void Create()
     {
         ShortDesc = "Tavern Cellar";

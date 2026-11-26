@@ -413,6 +413,19 @@ public abstract class Adventurer : Living
         }
     }
 
+    // Signposts to the Adventurers Guild (docs/specs/play-feel.md, section 15): for a mortal who has never taken a quest, up to level 10.
+    [Saved] private List<string> tipsShown = new();
+
+    public bool QueryNeedsGuild() => quests.Count == 0 && Level <= 10 && QueryWizLevel() < 1;
+
+    /// <summary>True the first time it is asked for a known tip, for a character who still needs the guild; false after, and for any other id.</summary>
+    public bool TakeTip(string id)
+    {
+        if (id != "stair" || tipsShown.Contains(id) || !QueryNeedsGuild()) return false;
+        tipsShown.Add(id);
+        return true;
+    }
+
     public int QueryQuest(string id) => quests.TryGetValue(id, out var state) ? state : 0;
 
     public void SetQuest(string id, int state) => quests[id] = state;
@@ -2104,7 +2117,7 @@ public abstract class Adventurer : Living
     {
         var active = quests.Where(q => q.Value == 1).Select(q => QuestTitle(q.Key)).ToList();
         var done = quests.Where(q => q.Value == 2).Select(q => QuestTitle(q.Key)).ToList();
-        if (active.Count == 0 && done.Count == 0) return "You have no quests.\n";
+        if (active.Count == 0 && done.Count == 0) return "You have no quests.\n" + (QueryNeedsGuild() ? LoadObject("/secure/guidepost").Call<string>("Hint") : "");
         return (active.Count > 0 ? "Active quests: " + string.Join(", ", active) + "\n" : "") +
                (done.Count > 0 ? "Completed quests: " + string.Join(", ", done) + "\n" : "");
     }

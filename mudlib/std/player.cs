@@ -315,6 +315,7 @@ public class Player : Adventurer
         ClaimLostProperty();
         Say($"{Name} enters the game.\n");
         Look();
+        if (!returning && QueryNeedsGuild()) Write(LoadObject("/secure/guidepost").Call<string>("Welcome"));
         PublishingNotice();
     }
 
@@ -475,6 +476,11 @@ public class Player : Adventurer
                   "{cmd}train{/} SKILL buys the next rank. Ranks cannot be skipped. {cmd}skills{/} shows your rank in each and the next rank's level.\n");
             return true;
         }
+        if (args.Trim().ToLowerInvariant() is "start" or "begin" or "beginning" or "guild" or "new" or "newbie")
+        {
+            Write(LoadObject("/secure/guidepost").Call<string>("Help"));
+            return true;
+        }
         if (args.Trim().ToLowerInvariant() == "search")
         {
             Write("Search: {cmd}search{/} looks the whole place over for hidden things (a way, a stash, a scrap of writing); {cmd}search{/} THING looks at one spot that a\n" +
@@ -485,6 +491,7 @@ public class Player : Adventurer
             return true;
         }
         Write(
+            "New here? {cmd}help start{/} says where to begin.\n" +
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
             "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}time{/} [-timezone [ZONE|REGION|none]] (your own time zone), {cmd}charset{/} [ascii|utf8] (or {cmd}ascii{/} [on|off]: plain 7-bit characters if the boxes of {cmd}score{/} look wrong), {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
