@@ -15,6 +15,9 @@ public class Npc : Living
     private readonly List<string> emoteLines = new();
     private readonly List<int> emotePercents = new();
     private readonly Dictionary<string, int> chatIndex = new();
+    private readonly List<string> topicQuests = new(); // parallel to topicKeys: the quests (comma-separated ids) a topic's answer is part of, or ""
+    private readonly List<string> chatQuests = new();  // parallel to chat
+    private readonly Dictionary<string, Dictionary<string, string>> questDefs = new();
     private string questChatId = "";
     private string questChatLine = "";
 
@@ -26,13 +29,55 @@ public class Npc : Living
     public override bool QueryPeaceful() => Peaceful;
 
     /// <summary>A line for "talk". Lines come in the order added and wrap round; the first is the main dialogue.</summary>
-    protected void AddChat(string line) => chat.Add(line);
+    /// <summary>quests (comma-separated quest ids) says the line is part of those quests: a character who has been spoken to keeps it in their quest journal.</summary>
+    protected void AddChat(string line, string quests = "")
+    {
+        chat.Add(line);
+        chatQuests.Add(quests);
+    }
 
     /// <summary>The reply to "ask <npc> about <keyword>". keywords is comma-separated.</summary>
-    protected void AddTopic(string keywords, string line)
+    /// <summary>quests (comma-separated quest ids) says the answer is part of those quests: it, and what was asked, go in the asker's quest journal.</summary>
+    protected void AddTopic(string keywords, string line, string quests = "")
     {
         topicKeys.Add(keywords.ToLowerInvariant());
         topicLines.Add(line);
+        topicQuests.Add(quests);
+    }
+
+    // ---- Quests (docs/specs/quest-journal.md) ----
+
+    /// <summary>
+    /// Describe a quest this NPC gives, for the quest journal. title is what the quest log shows; area where it is given; completed and abandoned
+    /// are one or two sentences in the game's voice for the journal's summary of a quest the character finished or gave up (without them a plain
+    /// sentence is made); items are the program paths (comma-separated) of what the quest has the character carry, taken back when it is abandoned;
+    /// objectives are lines "kill|PATH|text" (that creature kind has been killed) or "have|PATH|text|COUNT" (that many of that item carried),
+    /// one per line; a quest that must not be given up sets abandonable false.
+    /// </summary>
+    protected void DefineQuest(string id, string title, string area, string completed, string abandoned, string items = "", string objectives = "", bool abandonable = true)
+    {
+        questDefs[id] = new Dictionary<string, string>
+        {
+            ["title"] = title, ["area"] = area, ["completed"] = completed, ["abandoned"] = abandoned, ["items"] = items, ["objectives"] = objectives,
+            ["abandonable"] = abandonable ? "yes" : "no", ["giver"] = Name,
+        };
+    }
+
+    /// <summary>What this NPC says of one of its quests (title, area, completed, abandoned, items, objectives, abandonable, giver), or null. The journal reads it.</summary>
+    public Dictionary<string, string>? QueryQuestDefinition(string id) => questDefs.TryGetValue(id, out var d) ? new Dictionary<string, string>(d) : null;
+
+    /// <summary>Say a line to the room as this NPC, as part of quests (comma-separated ids) for one character: it is also written in that character's quest journal.</summary>
+    protected void QuestSay(ObjectRef? who, string quests, string line)
+    {
+        if (Environment() is { } room) TellRoom(room, Speech(line) + "\n");
+        if (who != null) RecordQuest(who, quests, "", line);
+    }
+
+    /// <summary>The one place quest speech is written down: the quest journal of the character it was said to (never of anyone else who heard it).</summary>
+    private void RecordQuest(ObjectRef who, string quests, string asked, string line)
+    {
+        if (quests == "" || who == null || !who.IsAlive || !Interactive(who)) return;
+        who.Call("QuestHeard", quests, asked, Name, line);
     }
 
     /// <summary>An idle action shown to the room, with this percent chance per heartbeat while a player is present.</summary>
@@ -77,6 +122,7 @@ public class Npc : Living
             var index = chatIndex.GetValueOrDefault(key);
             line = chat[index % chat.Count];
             if (index % chat.Count == 0 && questChatId != "" && who.Call<int>("QueryQuest", questChatId) == 2) line = questChatLine;
+            else RecordQuest(who, chatQuests[index % chat.Count], "", line);
             chatIndex[key] = index + 1;
         }
         return line == null ? $"{Name} has nothing to say to you." : Speech(line);
@@ -96,14 +142,21 @@ public class Npc : Living
             {
                 var key = raw.Trim();
                 if (key == "") continue;
-                if (key == topic) return Speech(topicLines[i]);
+                if (key == topic) return Answer(who, topic, i);
                 if (topic.Contains(key) && key.Length > bestLength) { best = i; bestLength = key.Length; }
                 else if (loose < 0 && topic.Length >= 3 && key.Contains(topic)) loose = i;
             }
         }
-        if (best >= 0) return Speech(topicLines[best]);
-        if (loose >= 0) return Speech(topicLines[loose]);
+        if (best >= 0) return Answer(who, topic, best);
+        if (loose >= 0) return Answer(who, topic, loose);
         return $"{Name} shrugs. \"I can't tell you anything about that.\"";
+    }
+
+    /// <summary>The reply to a topic. A topic that belongs to quests is also written, with the question, in the asker's quest journal.</summary>
+    private string Answer(ObjectRef who, string topic, int i)
+    {
+        RecordQuest(who, topicQuests[i], $"ask {Name} about {topic.Replace("{", "{{")}", topicLines[i]);
+        return Speech(topicLines[i]);
     }
 
     private bool PlayerPresent()

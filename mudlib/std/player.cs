@@ -530,7 +530,7 @@ public class Player : Adventurer
             "Light:     {cmd}light{/} THING, {cmd}extinguish{/} THING, {cmd}fill{/} LANTERN, and the spell {cmd}glow{/} ({cmd}help light{/}); the cellars are dark: bring a light\n" +
             "Ranks:     with a trainer of your calling: {cmd}ranks{/} (what you can learn and what it asks), {cmd}train{/} SKILL (buy the next rank; {cmd}help ranks{/})\n" +
             "Town:      {cmd}browse{/}, {cmd}buy{/} THING, {cmd}sell{/} THING, {cmd}value{/} THING (in a shop), {cmd}quests{/},\n" +
-            "           {cmd}accept{/} QUEST and {cmd}report{/} (in the Adventurers Guild)\n" +
+            "           {cmd}accept{/} QUEST and {cmd}report{/} (in the Adventurers Guild); {cmd}quest{/} NAME, {cmd}quests completed{/}, {cmd}abandon{/} QUEST\n" +
             "Colour:    command names like these are highlighted; {cmd}ansi off{/} turns colour off, {cmd}ansi on{/} turns it on.\n");
 
         var level = QueryWizLevel();

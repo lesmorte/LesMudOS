@@ -26,17 +26,27 @@ public class Rowan : Npc
         MaxVitality = 50;
 
         AddChat("Every village has its legends. Ours is Vincent himself. Some believe he found something beneath these lands before he vanished.");
-        AddChat("The board has work for anyone brave enough. Read it, then tell me which contract you want: {cmd}accept cellar{/}, or {cmd}accept orders{/}.");
-        AddChat("When your work is done, come back and {cmd}report{/}. The guild pays its debts.");
+        AddChat("The board has work for anyone brave enough. Read it, then tell me which contract you want: {cmd}accept cellar{/}, or {cmd}accept orders{/}.", Cellar + "," + Orders);
+        AddChat("When your work is done, come back and {cmd}report{/}. The guild pays its debts.", Cellar + "," + Orders);
         AddChat("Before you go down there, mind your kit. There is a bowyer, a shrine and a scholar in Fletcher's Lane off the square, an armourer's shed beside the Iron Oak, and a practice yard by the north gate where you can try a weapon on a dummy before a goblin tries it on you.");
-        AddTopic("quest,quests,work,job,contract,board", "Read the board. The cellar quest is the one the village needs. When you've done it, say {cmd}report{/}.");
-        AddTopic("cellar,goblins,goblin,overseer", "Goblins have taken the old smugglers' tunnels beneath the Hollowman's Rest. Lately they've grown organized. There's an Overseer down there, and he's the one you want. Bring a light.");
+        AddTopic("quest,quests,work,job,contract,board", "Read the board. The cellar quest is the one the village needs. When you've done it, say {cmd}report{/}.", Cellar + "," + Orders);
+        AddTopic("cellar,goblins,goblin,overseer", "Goblins have taken the old smugglers' tunnels beneath the Hollowman's Rest. Lately they've grown organized. There's an Overseer down there, and he's the one you want. Bring a light.", Cellar);
         AddTopic("vincent,holloway,founder", "Vincent Holloway built this village. He vanished decades ago, looking for something under the earth. Nobody believed him then.");
         AddTopic("crow", "The Crow? I have never heard the name. If you find it written down somewhere, bring it to me.");
         AddTopic("attributes,attribute,improve,points,point,placing,placed,spend,spending,six", "Every level the guild gives you two points to place among six attributes: Might, Grace, Vigor, Insight, Spirit and Resolve. Say {cmd}improve{/} to see them, and {cmd}improve might{/} to place one. A person who never spends their points is a poor risk, and I have buried one or two of those.");
         AddTopic("callings,calling,warrior,scout,priest,mage,adventurer,class,classes,lean,leans", "A Warrior leans on Might and Vigor, and holds on by Resolve. A Scout is Grace first, with Insight to read the ground. A Priest is Spirit, steadied by Vigor; a Mage is Insight, then Spirit. An Adventurer begins even in all six, and chooses along the road.");
         AddTopic("remembered,remember,fame,renown,stories,songs,legend,legends", "Folk remember a person for one thing. Vincent is remembered for his Resolve, because he went on digging when the others quit. Do something worth one word, and the guild will find it.");
         AddEmote("Rowan studies a map pinned to the wall and frowns.", 5);
+
+        // The journal's text for each contract (docs/specs/quest-journal.md): what the quest log keeps once it is finished or given up.
+        DefineQuest(Cellar, "Clear the Cellar", "Vincent's Hollow",
+            "You went down into the smugglers' tunnels, put the Goblin Overseer in the ground and came back up to Rowan, who paid you and trusted you with the road north.",
+            "You took Rowan's cellar work and set it down again. The goblins still hold the tunnels beneath the Hollowman's Rest, and the Overseer with them.",
+            "", "kill|" + OverseerPath + "|Kill the Goblin Overseer at the end of the Forgotten Cellars, then report to Rowan");
+        DefineQuest(Orders, "Recover the Overseer's Orders", "Vincent's Hollow",
+            "You carried the Overseer's Orders back to Rowan, and between you the Guild learned that the goblins answered to a voice called the Crow.",
+            "You put Rowan's second contract aside. Whatever the Overseer carried is still down in the cellars, and Rowan still wants to read it.",
+            OrdersPath, "have|" + OrdersPath + "|Find the Overseer's Orders in the Forgotten Cellars, then bring them to Rowan");
     }
 
     /// <summary>
@@ -70,8 +80,10 @@ public class Rowan : Npc
         AddAction("report", CmdReport);
     }
 
-    private void Speak(string line)
+    /// <summary>quest, if given, says the line is part of that quest: it is also written in the quest journal of the character being spoken to.</summary>
+    private void Speak(string line, string quest = "")
     {
+        if (quest != "") { QuestSay(ThisPlayer(), quest, line); return; }
         if (Environment() is { } room) TellRoom(room, $"{Name} says: \"{line}\"\n");
     }
 
@@ -93,14 +105,14 @@ public class Rowan : Npc
 
         var state = player.Call<int>("QueryQuest", quest);
         if (state == 2) { Speak($"You have already finished \"{Title(quest)}\". Thank you again."); return true; }
-        if (state == 1) { Speak($"You have already taken \"{Title(quest)}\". " + Reminder(quest)); return true; }
+        if (state == 1) { Speak($"You have already taken \"{Title(quest)}\". " + Reminder(quest), quest); return true; }
 
         player.Call("SetQuest", quest, 1, Title(quest));
         Write($"Quest accepted: {Title(quest)}.\n");
         if (quest == Cellar)
-            Speak("Good. Go down through the Hollowman's Rest, past the cellar and into the old smugglers' tunnels. The goblins answer to an Overseer. Kill him, and come back and {cmd}report{/}. Whatever you kill leaves a corpse, so {cmd}loot{/} it for gold and spoils.");
+            Speak("Good. Go down through the Hollowman's Rest, past the cellar and into the old smugglers' tunnels. The goblins answer to an Overseer. Kill him, and come back and {cmd}report{/}. Whatever you kill leaves a corpse, so {cmd}loot{/} it for gold and spoils.", Cellar);
         else
-            Speak("The goblins take their orders from somewhere. The Overseer will carry them. Bring me what he carries on him, and we will learn who is behind this.");
+            Speak("The goblins take their orders from somewhere. The Overseer will carry them. Bring me what he carries on him, and we will learn who is behind this.", Orders);
         return true;
     }
 
@@ -130,8 +142,8 @@ public class Rowan : Npc
         {
             var cellar = player.Call<int>("QueryQuest", Cellar);
             var ordersState = player.Call<int>("QueryQuest", Orders);
-            if (cellar == 1) Speak("The Overseer still lives. " + Reminder(Cellar));
-            else if (ordersState == 1) Speak(Reminder(Orders));
+            if (cellar == 1) Speak("The Overseer still lives. " + Reminder(Cellar), Cellar);
+            else if (ordersState == 1) Speak(Reminder(Orders), Orders);
             else if (cellar == 2 && ordersState == 2) Speak("You have done everything I asked. Rest, and come back when you are stronger.");
             else Speak("You have nothing to report yet. Take a contract from the board first.");
         }
@@ -142,7 +154,7 @@ public class Rowan : Npc
 
     private void Reward(ObjectRef player, string quest, int xp, int gold, string extra)
     {
-        player.Call("SetQuest", quest, 2, Title(quest));
+        player.Call("SetQuest", quest, 2, Title(quest), $"{xp} experience, {gold} gold" + (quest == Cellar ? ", a Guild Initiate's Helm and a travel pass" : ""));
         Write($"Quest complete: {Title(quest)}!\n");
         player.Call("AddXp", xp);
         player.Call("AddGold", gold);
@@ -157,7 +169,7 @@ public class Rowan : Npc
 
     private void FinishCellar(ObjectRef player)
     {
-        Speak("The Overseer is dead? Then the cellar is ours again. Well done. The Hollow owes you.");
+        Speak("The Overseer is dead? Then the cellar is ours again. Well done. The Hollow owes you.");  // hand-in talk: the log is dropped by Reward
         var helm = CloneObject(HelmPath);
         MoveObject(helm, player);
         Reward(player, Cellar, 150, 50, " and gives you a Guild Initiate's Helm");
@@ -168,7 +180,7 @@ public class Rowan : Npc
         if (player.Call<int>("QueryQuest", Orders) == 0)
         {
             player.Call("SetQuest", Orders, 1, Title(Orders));
-            Speak("There is more. Whatever drove those goblins left its orders somewhere down there. Find the Overseer's Orders, if the goblins have not burned them, and bring them to me.");
+            Speak("There is more. Whatever drove those goblins left its orders somewhere down there. Find the Overseer's Orders, if the goblins have not burned them, and bring them to me.", Orders);
             Write("New quest: Recover the Overseer's Orders.\n");
         }
     }

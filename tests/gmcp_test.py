@@ -400,6 +400,10 @@ def example(label, value):
 
 
 def lua_value(value):
+    if value is None:
+        return "nil"
+    if isinstance(value, list):
+        return "{" + ", ".join(lua_value(v) for v in value) + "}"
     if isinstance(value, dict):
         return "{" + ", ".join(f"[{json.dumps(k)}] = {lua_value(v)}" for k, v in value.items()) + "}"
     if isinstance(value, bool):
@@ -454,6 +458,134 @@ def capture_village(path, moves=45):
     walker.send("quit")
     print(f"captured {len(frames)} Room.Info messages, {len(visited)} rooms, to {path}")
 
+def quests_section(warden):
+    """Char.Quests.List and Char.Quests.Log (docs/specs/gmcp.md, docs/specs/quest-journal.md)."""
+    guild, shrine = "/domains/hollow/village/guild", "/domains/hollow/village/shrine"
+    orders_item = "/domains/hollow/obj/overseers_orders"
+    dana = login("Dana")
+    erin = login("Erin", supports=("Room 1", "Char.Status 1"))   # a client that did not announce Char.Quests
+    walt = login("Walt", answer="dont")
+    first = dana.wait("Char.Quests.List")
+    truth("the login burst has Char.Quests.List, with no quests yet", first == {"quests": [], "truncated": False}, first)
+    example("Char.Quests.List (a newcomer)", first)
+    dana.command("tp " + guild)
+    erin.command("tp " + guild)
+    walt.command("tp " + guild)
+    m = dana.mark()
+    dana.command("ask rowan about quests")
+    dana.command("ask rowan about cellar")
+    dana.pump(0.8)
+    truth("a quest only spoken of is sent nothing: not in a list, not as a log", not [v for p, v in dana.frames[m:] if p.startswith("Char.Quests")], dana.frames[m:])
+    m = dana.mark()
+    dana.command("accept orders")
+    listed = dana.wait("Char.Quests.List", lambda v: any(q["id"] == "overseers-orders" for q in v["quests"]), m)
+    truth("accepting sends the list with the quest active", listed is not None, dana.of("Char.Quests.List", m))
+    q = listed["quests"][0] if listed else {}
+    example("Char.Quests.List (one active quest)", listed)
+    truth("an active quest has exactly the specified fields", set(q) == {"id", "name", "state", "giver", "area", "started", "started_date", "objective", "progress", "objectives", "entries", "seq"}, q)
+    truth("its values", q.get("name") == "Recover the Overseer's Orders" and q.get("state") == "active" and q.get("giver") == "Rowan" and q.get("area") == "Vincent's Hollow"
+          and q.get("progress") == "0 of 1" and q.get("objectives") == [{"text": "Find the Overseer's Orders in the Forgotten Cellars, then bring them to Rowan", "have": 0, "need": 1}]
+          and q.get("started", 0) > 1700000000 and q.get("started_date", "").startswith("the ") and q.get("entries", 0) >= 3 and q.get("seq") == q.get("entries"), q)
+    truth("the quest the character only heard of is not in the list", all(x["id"] != "clear-the-cellar" for x in listed["quests"]), listed)
+    log = dana.wait("Char.Quests.Log", lambda v: v["id"] == "overseers-orders" and v["reset"] is True, m)
+    example("Char.Quests.Log (a log, from the start)", log)
+    truth("the log is sent whole with reset true", log is not None and log["reset"] is True and len(log["entries"]) >= 3, log)
+    e = log["entries"] if log else []
+    truth("every entry has exactly the specified fields", all(set(x) == {"seq", "ts", "date", "kind", "speaker", "text"} for x in e), e[:1])
+    truth("its sequence numbers run from 1 without a gap", [x["seq"] for x in e] == list(range(1, len(e) + 1)), [x["seq"] for x in e])
+    truth("it holds the question, Rowan's offer and the acceptance", [x["kind"] for x in e][:1] == ["you"] and e[0]["text"] == "ask Rowan about quests" and e[0]["speaker"] == "You"
+          and any(x["kind"] == "npc" and x["speaker"] == "Rowan" and "Read the board" in x["text"] for x in e) and any(x["kind"] == "note" and "Quest taken on" in x["text"] for x in e), e)
+    truth("the text is plain (no colour tags)", all("{" not in x["text"] for x in e), e)
+    truth("a date as the game shows dates elsewhere", all(x["date"].startswith("the ") and "Day of" in x["date"] for x in e), e[:1])
+    dana.pump(0.4)
+    seen = max(x["seq"] for v in dana.of("Char.Quests.Log") if v["id"] == "overseers-orders" for x in v["entries"])
+    truth("Rowan's acceptance speech came after the log as a single entry", seen > e[-1]["seq"], (seen, e[-1]))
+    m = dana.mark()
+    dana.command("ask rowan about quest")
+    one = dana.wait("Char.Quests.Log", lambda v: v["id"] == "overseers-orders", m)
+    truth("afterwards one entry is sent at a time, reset false, the next number", one is not None and one["reset"] is False and len(one["entries"]) == 1 and one["entries"][0]["seq"] == seen + 1, one)
+    two = dana.wait("Char.Quests.Log", lambda v: v["id"] == "overseers-orders" and v["entries"][0]["kind"] == "npc", m)
+    truth("the question first, then Rowan's answer, each with the next number", one is not None and two is not None and two["entries"][0]["seq"] == one["entries"][0]["seq"] + 1, (one, two))
+    truth("and a line about the quest she has not been given is never sent", not any("clear-the-cellar" in json.dumps(v) for p, v in dana.frames if p.startswith("Char.Quests")), "leak")
+    m = dana.mark()
+    dana.command("mk " + orders_item)
+    moved = dana.wait("Char.Quests.List", lambda v: v["quests"] and v["quests"][0].get("progress") == "1 of 1", m, timeout=8.0)
+    truth("an objective that moves sends the list again", moved is not None, dana.of("Char.Quests.List", m))
+    note = dana.wait("Char.Quests.Log", lambda v: any(x["kind"] == "note" and "(1 of 1)" in x["text"] for x in v["entries"]), m)
+    truth("and a note in the log", note is not None, note)
+    # hand-in
+    m = dana.mark()
+    dana.command("report")
+    done = dana.wait("Char.Quests.List", lambda v: v["quests"] and v["quests"][0]["state"] == "completed", m)
+    truth("handing in sends the list with the quest completed", done is not None, dana.of("Char.Quests.List", m))
+    q = done["quests"][0] if done else {}
+    example("Char.Quests.List (a completed quest)", done)
+    truth("a completed quest has exactly the specified fields", set(q) == {"id", "name", "state", "giver", "area", "started", "started_date", "ended", "ended_date", "summary", "reward"}, q)
+    truth("with its authored summary and its reward", q.get("summary", "").startswith("You carried the Overseer's Orders back to Rowan") and q.get("reward") == "200 experience, 75 gold" and q.get("ended", 0) > 1700000000, q)
+    dropped = dana.wait("Char.Quests.Log", lambda v: v["id"] == "overseers-orders" and v["reset"] is True and v["entries"] == [], m)
+    example("Char.Quests.Log (the log dropped)", dropped)
+    truth("the log is dropped with a reset marker and no entries", dropped is not None, dana.of("Char.Quests.Log", m))
+    # abandon, retake
+    dana.command("tp " + shrine)
+    dana.command("accept offering")
+    dana.pump(0.6)
+    m = dana.mark()
+    dana.command("abandon offering", marker="(y/n) ")
+    dana.command("y")
+    gone = dana.wait("Char.Quests.List", lambda v: any(x["state"] == "abandoned" for x in v["quests"]), m)
+    truth("abandoning sends the list with the quest abandoned", gone is not None, dana.of("Char.Quests.List", m))
+    ab = next((x for x in gone["quests"] if x["state"] == "abandoned"), {}) if gone else {}
+    example("Char.Quests.List (an abandoned quest)", ab)
+    truth("an abandoned quest has exactly the specified fields", set(ab) == {"id", "name", "state", "giver", "area", "started", "started_date", "ended", "ended_date", "summary"}, ab)
+    truth("with its authored summary", ab.get("id") == "the-quiet-offering" and ab.get("summary", "").startswith("You left the shrine's offering undone"), ab)
+    truth("the list orders active, then completed, then abandoned", [x["state"] for x in gone["quests"]] == ["completed", "abandoned"], gone)
+    truth("and its log is reset to nothing", dana.wait("Char.Quests.Log", lambda v: v["id"] == "the-quiet-offering" and v["reset"] and v["entries"] == [], m) is not None)
+    m = dana.mark()
+    dana.command("accept offering")
+    again = dana.wait("Char.Quests.List", lambda v: any(x["id"] == "the-quiet-offering" and x["state"] == "active" for x in v["quests"]), m)
+    truth("a retaken quest is active again and no longer abandoned", again is not None and all(x["state"] != "abandoned" for x in again["quests"]), again)
+    fresh = dana.wait("Char.Quests.Log", lambda v: v["id"] == "the-quiet-offering" and v["reset"] is True and v["entries"], m)
+    truth("with a fresh log, numbered from 1", fresh is not None and [x["seq"] for x in fresh["entries"]] == list(range(1, len(fresh["entries"]) + 1)), fresh)
+    # a client without the package, and one without GMCP
+    m = erin.mark()
+    erin.command("accept orders")
+    erin.command("ask rowan about quests")
+    erin.pump(0.8)
+    truth("a client that did not announce Char.Quests is sent nothing of it", not [v for p, v in erin.frames if p.startswith("Char.Quests")], [p for p, v in erin.frames])
+    truth("though it sent and got other packages", erin.of("Char.Status") != [] or erin.of("Room.Info") != [], len(erin.frames))
+    walt.command("accept orders")
+    walt.command("quests")
+    truth("a client without GMCP is sent no GMCP bytes, quests or not", walt.frames == [] and b"\xff\xfa" not in walt.stream)
+    check("and still reads the journal as text", walt.command("quest orders"), "Recover the Overseer's Orders (active)", "Quest taken on")
+    # Erin adds the package later and gets the whole thing again when she types `quests`
+    erin.raw_send(message("Core.Supports.Add", ["Char.Quests 1"]))
+    time.sleep(0.3)
+    m = erin.mark()
+    erin.command("quests")
+    late = erin.wait("Char.Quests.List", since=m)
+    truth("a client that adds the package later gets the list again with `quests`", late is not None and late["quests"] and late["quests"][0]["id"] == "overseers-orders", late)
+    # reconnect: the game resends the lot
+    active_before = [x["id"] for x in again["quests"] if x["state"] == "active"] if again else []
+    earlier = [(p, v) for p, v in dana.frames if p.startswith("Char.Quests")]
+    dana.send("quit")
+    dana.closed(5)
+    time.sleep(1)
+    dana = login("Dana")
+    burst = dana.wait("Char.Quests.List")
+    truth("at the next login the list is sent again: the completed quest and the active one", burst is not None and [x["state"] for x in burst["quests"]] == ["active", "completed"] and [x["id"] for x in burst["quests"] if x["state"] == "active"] == active_before, burst)
+    logs = [v for p, v in dana.frames if p == "Char.Quests.Log"]
+    truth("and the log of each active quest, whole, with reset true", [v["id"] for v in logs if v["reset"]] == active_before and all(v["entries"] for v in logs), logs)
+    truth("and nothing for the completed one", all(v["id"] != "overseers-orders" for v in logs), logs)
+    truth("no message of the package is over the driver's limit", all(len(json.dumps(v)) < 16000 for p, v in dana.frames if p.startswith("Char.Quests")))
+    if os.environ.get("GMCP_CAPTURE_QUESTS"):
+        # Not part of the checks: the Char.Quests messages Dana was sent, in order, as a Lua fixture for clients/mudlet/test/quests_test.lua.
+        with open(os.environ["GMCP_CAPTURE_QUESTS"], "w") as f:
+            f.write("-- Char.Quests messages as the game sent them to a character who took, finished, gave up and retook quests (tests/gmcp_test.py with GMCP_CAPTURE_QUESTS).\n")
+            f.write("-- Each entry is one message in the order it arrived: package, then the data. The last block is the login burst after a reconnect.\n")
+            f.write("return {\n" + "".join(f"  {{ package = {json.dumps(p)}, data = {lua_value(v)} }},\n" for p, v in earlier + [("reconnect", None)] + [(p, v) for p, v in dana.frames if p.startswith("Char.Quests")]) + "}\n")
+    for c in (dana, erin, walt):
+        c.send("quit")
+
 
 def run(work, mudlib, logpath, driver_box):
     # ================= the offer, and a client without GMCP =================
@@ -497,6 +629,10 @@ def run(work, mudlib, logpath, driver_box):
 
     if os.environ.get("GMCP_CAPTURE"):
         capture_village(os.environ["GMCP_CAPTURE"])
+        return
+
+    if os.environ.get("GMCP_ONLY") == "quests":  # for working on the Char.Quests checks alone
+        quests_section(warden)
         return
 
     # ================= a GMCP client: login =================
@@ -822,6 +958,9 @@ def run(work, mudlib, logpath, driver_box):
     mina.command("down")
     saved = open(os.path.join(work, "save", "secure", "roomids.json")).read()
     truth("and the saved table still holds no wizard room", "/wiz/" not in saved, saved[:200])
+
+    # ================= Char.Quests =================
+    quests_section(warden)
 
     # ================= restart: stable numbers =================
     numbers = {}

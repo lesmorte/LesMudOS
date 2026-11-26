@@ -15,13 +15,13 @@ from xml.sax.saxutils import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PACKAGE = "Hollowmere"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 # In the order they load: the map needs the layout.
-SCRIPTS = [("layout", "layout.lua"), ("map", "map.lua"), ("gauges", "gauges.lua")]
+SCRIPTS = [("layout", "layout.lua"), ("map", "map.lua"), ("gauges", "gauges.lua"), ("quests", "quests.lua")]
 CONFIG = f'''mpackage = "{PACKAGE}"
 author = "LesMudOS"
-title = "Hollowmere map and gauges"
-description = [[Builds the Mudlet map of Legends of Hollowmere from the game's GMCP Room.Info and draws Vitality, Endurance and Focus gauges from Char.Vitals. Open the mapper (Toggle Map) to see it.]]
+title = "Hollowmere map, gauges and quests"
+description = [[Builds the Mudlet map of Legends of Hollowmere from the game's GMCP Room.Info and draws Vitality, Endurance and Focus gauges from Char.Vitals, and adds a Quests panel (Active, Completed, Abandoned) from Char.Quests. Open the mapper (Toggle Map) to see it.]]
 version = "{VERSION}"
 created = "2026-11-22T00:00:00Z"
 '''
