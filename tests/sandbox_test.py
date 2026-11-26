@@ -131,7 +131,7 @@ public class SbInspector : Item
     private string Player(ObjectRef p)
     {
         var name = p.Call<string>("QueryName") ?? "";
-        return $"gold={p.Call<int>("QueryGold")} xp={p.Call<int>("QueryXp")} level={p.Call<int>("QueryLevel")} quest={p.Call<int>("QueryQuest", "sb_quest")} " +
+        return $"gold={p.Call<int>("QueryGold")} xp={p.Call<int>("QueryXp")} level={p.Call<int>("QueryLevel")} quest={p.Call<int>("QueryQuest", "sb_quest")} journal={p.Call<string>("QueryJournal", "sb_journal")}/{p.Call<string>("QueryJournal", "sb_quest")}/{p.Call<string>("QueryJournal", "sb_workshop")} " +
                $"killed={p.Call<bool>("QueryKilled", "/domains/x")} kinds={D(p.Call<Dictionary<string, int>>("QueryKillCounts"))} with={D(p.Call<Dictionary<string, int>>("QueryKillsWithCounts"))} " +
                $"ranks={D(p.Call<Dictionary<string, int>>("QuerySkillRanks"))} unlocks={L(p.Call<List<string>>("QueryRankUnlocks"))} prof={D(p.Call<Dictionary<string, int>>("QueryProficiencies"))} " +
                $"recipes={D2(p.Call<Dictionary<string, string>>("QueryKnownRecipes"))} vit={p.Call<int>("QueryVitality")}/{p.Call<int>("QueryMaxVitality")} end={p.Call<int>("QueryEndurance")} " +
@@ -227,6 +227,9 @@ public static class Attacks
             T("p.AddXp", () => pat.Call("AddXp", 5000));
             T("p.SetQuest", () => pat.Call("SetQuest", "sb_quest", 3));
             T("p.SetQuest3", () => pat.Call("SetQuest", "sb_quest", 3, "Hacked"));
+            T("p.SetQuest4", () => pat.Call("SetQuest", "sb_journal", 2, "Hacked", "all the gold in the world"));
+            T("p.SetQuestActive", () => pat.Call("SetQuest", "sb_journal", 1, "Hacked"));
+            T("p.QuestHeard", () => pat.Call("QuestHeard", "sb_journal,sb_quest", "ask Rowan about gold", "Rowan", "FORGED quest line"));
             T("p.NotifyKill", () => pat.Call("NotifyKill", "/domains/x"));
             T("p.RankCountKill", () => pat.Call("RankCountKill", "goblin"));
             T("p.RankCountKillWith", () => pat.Call("RankCountKillWith", "arcane_bolt"));
@@ -484,6 +487,8 @@ public class WrenWand : Item
             me.Call("AddGold", 100000);
             me.Call("AddXp", 60000);
             me.Call("SetQuest", "sb_quest", 3);
+            me.Call("SetQuest", "sb_workshop", 1, "Workshop Quest");   // the journal of the wizard in their own workshop takes it, and loses it with the rest
+            me.Call("QuestHeard", "sb_workshop", "ask Imp about quests", "Imp", "A line from the workshop.");
             me.Call("AddEffect", "sbbuff", "Might", 600, "tohit=50", 1.0, 0);
             me.Call("CraftSetProficiency", "skinning", 900);
             me.Call("RankCountKill", "goblin");
@@ -626,6 +631,35 @@ public class WrenGreeter : Item
 ''' + efun_method() + '''}
 '''
 
+# A sandbox quest giver (it inherits /std/npc): its quest speech and its quest state go only to characters in the workshop.
+QUESTER = '''// @inherit /std/npc
+public class WrenQuester : Npc
+{
+    public override void Create()
+    {
+        Name = "quester"; Ids.Add("quester"); ShortDesc = "a sandbox quester"; LongDesc = "It hands out quests nobody can keep.";
+        DefineQuest("sb_journal", "Hacked", "Nowhere", "stolen summary", "stolen summary");
+        AddTopic("quest", "A quest line from the workshop.", "sb_journal");
+    }
+    protected override void Noticed(ObjectRef other)
+    {
+        base.Noticed(other);
+        AddAction("qsay", a =>
+        {
+            var pat = Users().FirstOrDefault(u => (u.Call<string>("QueryName") ?? "") == "Pat");
+            if (pat != null)
+            {
+                QuestSay(pat, "sb_journal", "FORGED by the quester");
+                pat.Call("SetQuest", "sb_journal", 1, "Hacked", "x");
+                pat.Call("QuestHeard", "sb_journal", "ask", "Rowan", "FORGED again");
+            }
+            Write("QSAY done\\n");
+            return true;
+        });
+    }
+}
+'''
+
 GOB = '''// @inherit /std/monster
 public class WrenGob : Monster
 {
@@ -727,7 +761,7 @@ def main():
     os.makedirs(os.path.join(mudlib, "wiz", "wren", "area"), exist_ok=True)
     os.makedirs(os.path.join(mudlib, "wiz", "rev", "nook"), exist_ok=True)
     h.write(mudlib, "/wiz/rev/nook/nook", "// @inherit /std/room\npublic class RevNook : Room { public override void Create() { ShortDesc = \"Rev's Nook\"; LongDesc = \"Small.\"; } }\n")
-    for name, src in (("lib", LIB), ("lab", LAB), ("gem", GEM), ("wand", WAND), ("imp", IMP), ("ticker", TICKER), ("greeter", GREETER), ("gob", GOB),
+    for name, src in (("lib", LIB), ("lab", LAB), ("gem", GEM), ("wand", WAND), ("imp", IMP), ("ticker", TICKER), ("greeter", GREETER), ("gob", GOB), ("quester", QUESTER),
                       ("area/glade", AREA_ROOM), ("area/inner", AREA_INNER), ("area/beast", AREA_BEAST), ("area/shiny", AREA_SHINY)):
         h.write(mudlib, W + name, src)
     proc, log = start(work, mudlib)
@@ -848,6 +882,17 @@ def main():
         run_origin("room", "roomhack")
         run_origin("item", "wandhack")
         run_origin("creature", "imphack")
+        # a sandbox quest giver (a subclass of /std/npc) cannot write to a real character's journal either
+        wren.command("clone " + W + "quester")
+        wren.command("drop quester")
+        check("quest giver: a sandbox NPC's quest speech to a real character does nothing", wren.command("qsay"), "QSAY done")
+        time.sleep(0.3)
+        seen = pat.read_any(("FORGED",), timeout=0.5) + pat.pending
+        pat.pending = ""
+        check("quest giver: nothing reached the player's screen", seen, absent=("FORGED",))
+        same("quest giver: the real character's journal and quests are unchanged", base_pat, chief.command("dump pat"))
+        check("quest giver: the real character has no such quest", pat.command("quests"), "You have no quests.")
+        check("quest giver: a sandbox NPC's answer is recorded only in the wizard's own journal, which the workshop throws away", wren.command("ask quester about quest"), "A quest line from the workshop.")
         found = run_origin("delayed", "wandlater")
         run_origin("inherited", "impinherit", wait="INHERIT DONE")
         wren.command("clone " + W + "ticker")
@@ -894,6 +939,8 @@ def main():
         mine = attempts(text)
         check("workshop: sandbox code can give a wizard in the workshop gold", mine.get("p.AddGold", ""), "True")
         check("workshop: and set a quest on them", chief.command("dump wren"), "quest=3")
+        wren.command("wandgive")
+        check("workshop: the wizard's own journal takes a quest written in the workshop", wren.command("quest workshop"), "Workshop Quest (active)", "A line from the workshop.")
 
         # ================================================================ leaving: walking out
         wren.command("wandgive")
@@ -902,6 +949,8 @@ def main():
         check("restore: walking out, the wizard is told", got, "You leave the workshop as you entered it.")
         time.sleep(0.5)
         same("restore: walking out leaves the character as it was", base_wren, chief.command("dump wren"))
+        check("restore: the workshop's quest is not in the journal (nor the quest list) any more", wren.command("quests"), "You have no quests.", absent=("Workshop Quest",))
+        check("restore: nor is its conversation", wren.command("quest workshop"), "You have no quest called")
         check("restore: the save file is the checkpoint", "same" if save_bytes("wren") == checkpoint else "changed", "same")
         same("restore: no history from the workshop (levels, kills)", base_hist, chief.command("dump history"))
 

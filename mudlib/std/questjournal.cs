@@ -112,6 +112,9 @@ public abstract class QuestJournal : Living
         return false;
     }
 
+    /// <summary>The state and the number of log entries of one quest in the journal ("active:12"), or "none". Tests and tools read it.</summary>
+    public string QueryJournal(string id) => journal.TryGetValue(id, out var r) ? r.GetValueOrDefault("state") + ":" + (journalLog.TryGetValue(id, out var l) ? l.Count : 0) : "none";
+
     private bool InWorkshop() => Self.Call<bool>("QueryInWorkshop");
 
     /// <summary>The caller may write this journal: trusted real code, or (only for the wizard in their own workshop, which is never saved) sandbox code.</summary>
@@ -250,7 +253,7 @@ public abstract class QuestJournal : Living
         if (Fld(id, "giver") == "" && caller != null && caller.IsAlive)
             SetFld(id, "giver", Clean(Of(def, "giver") != "" ? Of(def, "giver") : giverObject?.Call<string>("QueryName") ?? "", 60));
         var area = Of(def, "area");
-        if (area == "" && Fld(id, "area") == "" && caller != null && caller.IsAlive) area = Environment(caller)?.Call<string>("QueryAreaName") ?? "";
+        if (area == "" && Fld(id, "area") == "" && giverObject != null) area = Environment(giverObject)?.Call<string>("QueryAreaName") ?? "";
         if (area != "") SetFld(id, "area", Clean(area, 80));
 
         var now = Time().ToString();
