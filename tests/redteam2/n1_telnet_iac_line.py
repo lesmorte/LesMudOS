@@ -6,9 +6,14 @@ in, sends IAC IAC pairs with no newline and the driver's memory grows by one byt
 Measured: the driver's resident memory before and after 200 MB of IAC IAC (100 MB of line), with no newline sent.
 
 Expected after a fix: memory does not grow by the amount sent."""
+import os
 import socket
 import time
 import rt2
+
+# This proof is about the line cap alone: the byte rate limit (which delays what it reads, and would hold a flood back before the line grew) is
+# switched off for this driver, so the cap is what is tested.
+os.environ["LESMUDOS_INPUT_BYTES_PER_SECOND"] = "0"
 
 
 def rss_mb(pid):
