@@ -34,6 +34,12 @@ public class Harland : Trainer
         AddStock("/domains/hollow/obj/craft/honey", 3);
         AddStock("/domains/hollow/obj/craft/clean_water", 1);
         AddLesson("berry_juice", 3);
+        // Light (docs/specs/light.md, section 11): torches, tallow for a rag torch, and the lesson, free.
+        AddStock("/domains/hollow/obj/pitch_torch", 5);
+        AddStock("/domains/hollow/obj/lamp_oil", 4);
+        AddStock("/domains/hollow/obj/craft/tallow", 1);
+        AddLesson("rag_torch", 0);
+        AddTopic("torch,torches,light,lantern,dark,darkness,lamp,lamps", "I hung every lamp on that wall myself, down to the Smuggler Hall, and I'll not go past it with less than a torch. There's a bin by the stair, free, the first one; take it. After that it's five gold at my bar, or tallow and cloth if you'd rather make your own: {cmd}learn rag torch{/}, and I'll show you. A lantern is Tobin's trade, and a good one, but you'll not want it yet.");
     }
 
     protected override bool OnBuy(ObjectRef buyer, string path)

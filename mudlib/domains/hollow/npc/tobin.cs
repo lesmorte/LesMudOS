@@ -29,6 +29,9 @@ public class VhCraftsman : Trainer
         AddLesson("travelers_leather_wrap", 10);
 
         AddStock("/domains/hollow/obj/craft/cloth_strip", 2);
+        AddStock("/domains/hollow/obj/storm_lantern", 30);
+        AddStock("/domains/hollow/obj/lamp_oil", 4);
+        AddTopic("lantern,lanterns,storm lantern,oil,lamp oil,light,lamp,dark,darkness", "A storm lantern: thirty gold, and oil is four a flask. It will see you through the dark and not go out when you wave it about, which is more than I can say for a torch.");
         AddStock("/domains/hollow/obj/craft/harvest_sickle", 5);
         AddStock("/domains/hollow/obj/craft/bandage_primer", 5);
         AddEmote("Tobin squints along the edge of a plank, grunts and reaches for a plane.", 8);

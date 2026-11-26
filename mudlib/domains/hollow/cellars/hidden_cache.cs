@@ -9,6 +9,8 @@ public class HiddenCache : Room
         LongDesc = "A concealed smuggler stash untouched for decades.";
         Exits["south"] = "/domains/hollow/cellars/mushroom_cavern";
         Safe = false;
+        Light = LightDark;
+        DarkDesc = "The air is dry and still, and smells of rust and old canvas. Your steps ring a little off close stone.";
 
         AddDetail("chests,chest,stash,smuggler stash", "Sealed wooden chests are stacked against the back wall, their iron bindings furred with rust, but their locks are still whole.");
         AddDetail("dust,cobwebs,floor", "Decades of dust lie undisturbed across the floor, and the only tracks in it are the ones you have just made.");

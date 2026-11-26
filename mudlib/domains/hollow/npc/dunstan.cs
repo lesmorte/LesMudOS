@@ -31,6 +31,7 @@ public class VhTanner : Trainer
         AddStock("/std/blood?p.kind=rabbit", 2);
         AddStock("/std/blood?p.kind=wolf", 4);
         AddStock("/domains/hollow/obj/craft/skinning_knife", 6);
+        AddStock("/domains/hollow/obj/craft/tallow", 1);
         AddStock("/domains/hollow/obj/craft/bleeding_kit", 8);
         AddEmote("Dunstan drags a scraper down a stretched hide with a long, wet rasp.", 8);
         AddEmote("Dunstan prods a vat with a pole, nods, and wipes his hands on his apron.", 5);

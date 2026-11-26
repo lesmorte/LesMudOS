@@ -10,6 +10,8 @@ public class OverseerHall : Room
         Exits["west"] = "/domains/hollow/cellars/goblin_barracks";
         Exits["east"] = "/domains/hollow/cellars/overseer_chamber";
         Safe = false;
+        Light = LightDim;
+        LongDesc += " A rush-light gutters in the eye of a nailed skull.";
         // The door to the Overseer's chamber: closed and not locked, shut again at every reset. Opening it is loud (docs/BUILDING.md, sneaking):
         // whoever comes through it has to deal with the Elite Guards first. The chamber declares the other half; the two share one state.
         AddDoor("east", "door", description: "A heavy door of black-stained planks bound in iron, a crow scratched across it in ash. It has no lock, only an iron ring to pull.");

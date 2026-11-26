@@ -30,7 +30,7 @@ public class Rowan : Npc
         AddChat("When your work is done, come back and {cmd}report{/}. The guild pays its debts.");
         AddChat("Before you go down there, mind your kit. There is a bowyer, a shrine and a scholar in Fletcher's Lane off the square, an armourer's shed beside the Iron Oak, and a practice yard by the north gate where you can try a weapon on a dummy before a goblin tries it on you.");
         AddTopic("quest,quests,work,job,contract,board", "Read the board. The cellar quest is the one the village needs. When you've done it, say {cmd}report{/}.");
-        AddTopic("cellar,goblins,goblin,overseer", "Goblins have taken the old smugglers' tunnels beneath the Hollowman's Rest. Lately they've grown organized. There's an Overseer down there, and he's the one you want.");
+        AddTopic("cellar,goblins,goblin,overseer", "Goblins have taken the old smugglers' tunnels beneath the Hollowman's Rest. Lately they've grown organized. There's an Overseer down there, and he's the one you want. Bring a light.");
         AddTopic("vincent,holloway,founder", "Vincent Holloway built this village. He vanished decades ago, looking for something under the earth. Nobody believed him then.");
         AddTopic("crow", "The Crow? I have never heard the name. If you find it written down somewhere, bring it to me.");
         AddTopic("attributes,attribute,improve,points,point,placing,placed,spend,spending,six", "Every level the guild gives you two points to place among six attributes: Might, Grace, Vigor, Insight, Spirit and Resolve. Say {cmd}improve{/} to see them, and {cmd}improve might{/} to place one. A person who never spends their points is a poor risk, and I have buried one or two of those.");

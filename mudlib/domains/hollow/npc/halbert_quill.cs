@@ -35,6 +35,8 @@ public class VhHedgeScholar : Trainer
         // Rank II for Mages (docs/specs/skill-ranks.md). Arcane Bolt II asks for deeds as well as gold.
         TeachCalling("mage", 2, 2);
         AddRankOffer("arcane_bolt", 2, 40, "kills goblin 10");
+        AddRankOffer("glow", 2, 20);
+        AddTopic("glow,light,candle,lamp,dark,darkness", "Glow is a candle you carry in your head. Any mage can call it from the first day: {cmd}glow{/} for yourself, {cmd}glow NAME{/} for a friend. It costs Focus, so spend it where the dark is worth the bolts you will not cast. The second working is twenty gold here, once you are of the fifth level; the rest is taught at the Hall of Legends.");
         AddRankLine("kills goblin 10", "Ten goblins, and then we will talk about the second working. The first one wants practice, and the cellars are full of practice.");
         ElsewhereLine = "The third rank and beyond are taught in Oakenfell, at the Hall of Legends.";
 
