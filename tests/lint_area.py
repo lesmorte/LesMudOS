@@ -277,6 +277,7 @@ class Source:
         self.path = mudpath
         with open(abspath, encoding="utf-8-sig", errors="replace") as fh:
             text = fh.read()
+        self.text = text
         self.first_line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
         m = INHERIT_RE.fullmatch(self.first_line)
         self.inherit = m.group(1) if m else None
@@ -444,6 +445,26 @@ def run(root, flt):
                     keys = [k.strip().lower() for k in raw_keys.split(",") if k.strip()]
                     if keys and not any(k in long_text for k in keys):
                         report(p, 12, WARN, f'AddDetail "{raw_keys}" matches no word in LongDesc')
+
+            # Check 16: light (docs/specs/light.md, section 16): Light is an integer from -3 to 1; a dark room (below 0) has a DarkDesc; a wet room
+            # is not lit by a wall light in reach (a warning); a room with a shopkeeper is not below 1 (a warning).
+            m = re.search(r"\bLight\s*=\s*(-?\d+|LightLit|LightDim|LightDark|LightBlack)\s*;", src.text)
+            if m:
+                word = m.group(1)
+                light = {"LightLit": 1, "LightDim": 0, "LightDark": -1, "LightBlack": -2}.get(word)
+                if light is None:
+                    light = int(word)
+                if light < -3 or light > 1:
+                    report(p, 16, ERROR, f"Light {light} is not an integer from -3 to 1")
+                if light < 0 and not re.search(r"\bDarkDesc\s*=", src.text):
+                    report(p, 16, ERROR, "a dark room (Light below 0) has no DarkDesc")
+                spawned = re.findall(r'AddSpawn\(\s*"([^"]+)"', src.text)
+                if light < 1 and any(lib.is_file(sp) and "AddStock(" in lib.source(sp).text for sp in spawned):
+                    report(p, 16, WARN, "a room with a shopkeeper is below Light 1")
+                if re.search(r"\bWet\s*=\s*true", src.text) and any(lib.is_file(sp) and lib.source(sp).inherit in ("/std/wall_light",) for sp in spawned):
+                    report(p, 16, WARN, "a wet room has an unquenchable lamp in reach")
+            elif re.search(r"\bLight\s*=", src.text):
+                report(p, 16, ERROR, "Light is not an integer from -3 to 1 (use a number or LightLit, LightDim, LightDark, LightBlack)")
 
         if is_npc:
             # Check 11: people have the basics.
