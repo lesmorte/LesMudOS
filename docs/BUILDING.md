@@ -828,6 +828,20 @@ var fine = CountIn(player, "/domains/test/wolf_skin").GetValueOrDefault(Item.Fin
 
 A file that uses `Item.Fine` and the other names needs `// @use /std/item` (an item file already has it through `@inherit`). A shopkeeper can sell a quality with `AddStock(path, price, quality)`; the price shown is the listed price times the multiplier.
 
+## Light
+
+Every room has a light number: its `Light` (default 1, "lit") plus the light of every lit source in it (a torch carried in, a wall lantern, a Glow on someone there), clamped to -3..3. **1 or more is lit, 0 is dim, -1 or less is dark.** A lit room is as it ever was. Design and numbers: [specs/light.md](specs/light.md); measured balance: [BALANCE_LIGHT.md](BALANCE_LIGHT.md).
+
+- **A dim room**: `Light = LightDim;` (0). Players fight at -1 to hit (-2 with a bow), notice you 10 points less, and harvest and craft a little worse. The room says "It is dim here."
+- **A dark room**: `Light = LightDark;` (-1), and **give it `DarkDesc`** (what a player who cannot see feels or hears: a sentence about water, cold stone, the smell; no exits, no creatures, no items). In the dark a player sees no exits except the ways they know (the way they came in, and any they have used from the room), no creatures (they are "Someone" and "Something"), no items, cannot get, loot, read, craft, harvest, skin or shop, fights at -3 (-6 with a bow) against a creature that sees in the dark, and can still `kill something`. `LightBlack` (-2) exists but is for content that does not exist yet; `tests/lint_area.py` check 16 allows `Light` from -3 to 1 and an ERROR for a dark room with no `DarkDesc`, and warns about a shop in a room below 1 and a wall light in a `Wet` room.
+- **Lighting a dark room for good**: spawn a wall light: `AddSpawn("/domains/hollow/obj/wall_lantern")` (+1; a table lamp is the same). A wall light is furniture (`/std/wall_light`, cannot be taken) and lights its room as long as it stands. A base 0 room with a wall lantern is lit; a base -1 room with one is dim.
+- **`Wet = true;`** puts out any light carried in ("The torch hisses out in the water."), a lantern too. Use it for water you can wade in.
+- **A creature that cannot see in the dark**: `DarkSight = false;` in its `Create` (every `/std/monster` has `DarkSight = true`, so only the rare cave toad suffers the penalties). It fights, and notices a sneaking Scout, as a player does.
+- **A light item**: inherit `/std/light_source` and set `LightValue` (1 torch, 2 lantern), `Capacity` (seconds of burning), `WarnAt` (seconds left when it says so), `Noun`, and `Lantern = true` if it can be refilled from a flask of lamp oil (`/domains/hollow/obj/lamp_oil`, 30 minutes). A light is never saved lit: it is out when the player returns. `light THING` is a quick action; `extinguish` and `put out` too; water puts torches out.
+- **Never call** `/secure/light` from a wizard's object: `AddSource`, `NoteGlow` and `SetTestBurnScale` check their caller. A wizard's own lamp lights only its own workshop, never a real room, and a source's value is clamped to +3.
+- **Search** will use `Room.LightSearchModifier(searcher, byFeel)` (dim -2, dark -5; searching by feel costs nothing): see the NOTES in the search spec; the hook is not connected yet.
+- Prompt token `{light}` and `score` show the room's light to the player; GMCP `Room.Info` carries `light`.
+
 ## Crafting
 
 The full reference, with every number and the launch recipes as data, is [CRAFTING.md](CRAFTING.md). The builder's part in brief:

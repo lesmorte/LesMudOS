@@ -936,7 +936,7 @@ def existing_exits(room_file):
 def main():
     work = tempfile.mkdtemp(prefix="lesmudos-hollowexp-")
     mudlib = os.path.join(work, "mudlib")
-    h.copy_mudlib(mudlib, novice=True)
+    h.copy_mudlib(mudlib, novice=True, lit=True)  # about the expansion's content, not the cellars' dark: every room lit (tests/smoke_test.py all_lit)
     os.makedirs(os.path.join(mudlib, "domains", "hxtest"))
     h.write(mudlib, T + "probe", PROBE)
     h.write(mudlib, T + "lab", LAB)

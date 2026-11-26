@@ -1,4 +1,6 @@
-# Light and darkness (proposed 24 November 2026; not built)
+# Light and darkness (built 26 November 2026)
+
+> **Built.** Everything below is in the game as written, with the deviations listed in "As built" at the end of this file. The measured balance, and what to change if the owner wants the archer Scout lower, is in [BALANCE_LIGHT.md](../BALANCE_LIGHT.md).
 
 Owner's ideas (24 November 2026): "a light level for rooms (default to 1) to have visibility. Items could also have + or - light and affect the current light level of a room. This makes things like lanterns and light spells have value." And: "Should also have a craftable starter torch." Every number here is a starting value for play-testing and for `tests/balance_sim.py`; nothing has been run, and section 12 lists what to measure. Where this document says "today" it means the files in the repository on 24 November 2026.
 
@@ -335,3 +337,15 @@ Each stage can be merged and played, and the dark is the last thing switched on.
 - Party light, group commands, and a lit room that attracts wanderers.
 - Light affecting archery against creatures in the next room (true sniping, docs/specs/hollow-expansion.md section 1).
 - Dark sight as a calling trait or an item (a Ranger's, a goggle), and light-shy creatures.
+
+## As built (26 November 2026)
+Built in the order of section 18 on the branch `work/light`; the numbers are the spec's (balance in [BALANCE_LIGHT.md](../BALANCE_LIGHT.md)). Where the build differs or adds:
+- **The register** (`/secure/light`) keeps a short cache (0.4 s) of each room's level, cleared whenever a source is lit, put out or moved, or a creature passes an exit; a sweep every 10 s settles anything missed and announces a change of state to the room.
+- **A wizard's lamp** cannot call the register (the sandbox refuses `AddSource`), but a lit source of a workshop is found by the register's own scan of the workshop room, so it lights that workshop and nothing else; the clamp of +3 holds. Real sources count only in a room of their own domain, and in a real room only from a trusted tree.
+- **Saving.** A light is never saved lit and a mid-session autosave does not put a torch out: the item keeps its own remaining time (synced on save, douse and refill), and a lit light is put out when its holder leaves the game. (The spec's "put out in `PrepareSave`" was dropped for that reason.)
+- **Lint.** Check 16 asks for a `DarkDesc` only where `Light` is below 0 (a dim room needs none), warns about a shop in a room below 1 and a wall light in a `Wet` room.
+- **Glow for a Mage costs 16 / 18 / 21 Focus** (Focus Efficiency, -20%), not 20 / 23 / 26.
+- **Search.** The light penalty for search is **not hooked**: `Room.LightSearchModifier(searcher, byFeel)` returns `LightDaemon.SearchModifier` (dim -2, dark -5, 0 by feel). When `docs/specs/search.md` lands, `Room.SearchModifier(searcher)` should return `LightSearchModifier(searcher, false)`, and the by-feel search `LightSearchModifier(searcher, true)`.
+- **GMCP.** `light` (`lit`, `dim`, `dark`) is in `Room.Info` and is resent on a change; a dark room's exits are only the ways the character knows; no package carries a creature or an item (`tests/gmcp_test.py`). The Mudlet script reads none of the fields that changed.
+- **Help and score.** `help light`; a line in `score`; the prompt token `{light}`.
+- **Tests.** `tests/light_test.py` (engine, items, burn, water, saving, messages, darkness, to-hit by real fights, sneak, Glow, crafting, bin, content, security); additions to `gmcp_test.py`, `sneak_test.py`; `tests/lint_area.py` check 16; `tests/balance_sim.py light` and `check`. Suites about something other than the cellars' dark may use `tests/smoke_test.py`'s `copy_mudlib(..., lit=True)`, which makes every room lit: only `hollow_expansion_test.py` does (its subject is the expansion's content, including the dark Hidden Cache).

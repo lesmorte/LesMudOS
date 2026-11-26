@@ -27,7 +27,7 @@ The package asks the game for `Room`, `Char` and `Comm.Channel` with `Core.Suppo
 
 ## What the game sends
 
-See `docs/DRIVER_API.md` (the protocol) and `docs/GAME_SYSTEMS.md`, section 16 (the packages). In short, `Room.Info` is `{num, name, area, environment, exits = {direction = number}, doors = {direction = "open"|"closed"|"locked"}}`.
+See `docs/DRIVER_API.md` (the protocol) and `docs/GAME_SYSTEMS.md`, section 16 (the packages). In short, `Room.Info` is `{num, name, area, environment, light = "lit"|"dim"|"dark", exits = {direction = number}, doors = {direction = "open"|"closed"|"locked"}}`. The script does not read `light` (it is there for other clients). In a dark room only the ways the character already knows are sent (the way they came in, and any they have used from it), and nothing about creatures or items is sent in any package, so the map fills in more slowly in the dark cellars; carry a light.
 
 ## Known limits
 

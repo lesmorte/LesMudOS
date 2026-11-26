@@ -363,7 +363,7 @@ def edit(mudlib, path, old, new):
         f.write(source.replace(old, new))
 
 
-def copy_mudlib(destination, novice=False):
+def copy_mudlib(destination, novice=False, lit=False):
     """Copy the mudlib for a test run, leaving out the build output beside Mudlib.csproj
     (only at the top: domains may have an obj/ directory of their own)."""
     source = os.path.join(ROOT, "mudlib")
@@ -373,11 +373,19 @@ def copy_mudlib(destination, novice=False):
         return [n for n in names if (top and n in ("bin", "obj")) or n.endswith(".csproj")]
 
     shutil.copytree(source, destination, ignore=skip)
+    if lit:
+        all_lit(destination)
     if novice:
         global DEFAULT_ARCHETYPE
         DEFAULT_ARCHETYPE = "novice"
         write(destination, "/classes/novice", NOVICE_CLASS)
         write(destination, "/skills/novice_fists", NOVICE_FISTS)
+
+
+def all_lit(destination):
+    """Test-only: every room is lit, whatever its Light or its sources, for suites that are about something other than the cellars' darkness.
+    (The light daemon's level query returns daylight; the item and room code is untouched.)"""
+    edit(destination, "/secure/light", "public int QueryLevel(ObjectRef room)\n    {", "public int QueryLevel(ObjectRef room)\n    {\n        if (true) return 1;")
 
 
 def main():

@@ -36,7 +36,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(ROOT, "tests", "fixtures", "crafting")
 # The real launch data (the owner's ten recipes and their materials), which the sample fixtures stand in for in their own runs.
-LAUNCH_FILES = ("/crafting/launch_materials", "/recipes/launch")
+LAUNCH_FILES = ("/crafting/launch_materials", "/recipes/launch", "/recipes/hollow_light")
 QUALITY = ["poor", "common", "fine", "excellent", "masterwork", "legendary"]
 PROF_LEVELS = [0, 25, 50, 75, 100]
 

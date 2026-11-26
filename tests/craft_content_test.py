@@ -236,7 +236,7 @@ def run(work, mudlib, box):
     check("secret makes the warden a level-10 wizard", w.command("promote " + h.SECRET), "level 10 wizard")
     a.drain(w, 0.4)
     w.command("goto " + T + "lab")  # the lab hands the warden the probe
-    check("the driver loaded all ten recipes and every material", logged(), "crafting: loaded 10 recipes, 33 materials")
+    check("the driver loaded all eleven recipes and every material", logged(), "crafting: loaded 11 recipes, 34 materials")
     check("with no problems and no clashes", ct.dq(w, "problems") + ct.dq(w, "clashes"), absent=("not loaded", "unknown", "CLASH"))
     ids = "," + ct.dq(w, "ids") + ","
     for r in ("berry_juice", "sweet_berry_juice", "simple_bandage", "herbal_bandage", "minor_healing_salve", "minor_stamina_tonic",
@@ -370,7 +370,7 @@ def run(work, mudlib, box):
     for rid in ("berry_juice", "simple_bandage", "herbal_bandage", "minor_healing_salve", "minor_stamina_tonic", "treated_leather",
                 "travelers_leather_wrap", "hunters_poultice"):
         truth(f"{rid} is known, taught", known.get(rid) == "taught", known)
-    truth("exactly the eight teachable recipes are known", len(known) == 8 and "blood_ink" not in known and "sweet_berry_juice" not in known, known)
+    truth("exactly the nine teachable recipes are known (the eight and the Rag Torch)", len(known) == 9 and "blood_ink" not in known and "sweet_berry_juice" not in known, known)
     truth("the lessons cost 57 gold in all", sum(taught.values()) == 57, taught)
     check("recipes lists them by station", ann.command("recipes"), "Anywhere", "Simple Bandage", "At a cooking fire", "Berry Juice", "At a herbalist table",
           "At a tanning rack", "Treated Leather", "At a workbench", "Traveler's Leather Wrap")

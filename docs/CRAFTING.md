@@ -26,6 +26,8 @@ Contents: 1 For players. 2 How it is built. 3 The numbers and the odds. 4 Data f
 
 Help: `help crafting`, and `help skin` (or any of the command words).
 
+**Light.** One launch recipe makes light: the Rag Torch (`rag_torch`, Simple Tinkering, no station): one cloth strip and one lump of tallow (a material, 1 gold, sold by Harland and Dunstan) make **two** torches, each worth 0 gold in a shop and lit for ten minutes. Harland teaches it free. It is the only recipe whose output is not for sale; the pricing rule holds because the torches have no sale value (`Value = 0`) and the ingredients cost 3 gold, so the recipe is never a source of gold. Crafting, harvesting, skinning and bleeding are refused in the dark ("It is too dark to see what you are doing."), and in a dim room a harvest scores 5 points lower in quality and a craft is 0.25 of a tier lower (`LightHarvest`, `LightCraft` in `/secure/crafting`). `docs/specs/light.md` has the whole design.
+
 ## 2. How it is built
 
 | File | What it is |
@@ -381,7 +383,7 @@ The Hollow's creatures and the corridor's have them. A new beast is one `Beast` 
 
 These are the game's real files now: `/crafting/launch_materials.cs`, `/recipes/launch.cs` and `/domains/hollow/obj/craft/` (classes prefixed `Cr`), with the stations, tools, a recipe book and the vendors and teachers on top. `craft_sim.py` checks them on every run; the closest recipe to a loop is still 0.14 gold short. The listing below is the data as first written; two discovery levels differ in the files (Sweet Berry Juice `.Discovery("discovered")`, Blood Ink `.Discovery("rare")`) and the Herbal Bandage restores 12.
 
-**The sixteen materials.** Six come from `/crafting/beasts.cs` as shipped: Rabbit Skin (`rabbit_skin`, 3), Wolf Skin (`wolf_skin`, 6), Deer Skin (`deer_skin`, 6), Rabbit Blood (`rabbit_blood`, 2), Wolf Blood (`wolf_blood`, 4), Goblin Blood (`goblin_blood`, 8, scarce). The other ten, and three crafted intermediates, in `/crafting/launch_materials.cs`:
+**The seventeenth material, tallow** (`tallow`, 1, categories `fat, fuel`, `/crafting/launch_materials.cs`), and the one light recipe, `rag_torch` (`/recipes/hollow_light.cs`), were added with light: see section 1. **The sixteen materials.** Six come from `/crafting/beasts.cs` as shipped: Rabbit Skin (`rabbit_skin`, 3), Wolf Skin (`wolf_skin`, 6), Deer Skin (`deer_skin`, 6), Rabbit Blood (`rabbit_blood`, 2), Wolf Blood (`wolf_blood`, 4), Goblin Blood (`goblin_blood`, 8, scarce). The other ten, and three crafted intermediates, in `/crafting/launch_materials.cs`:
 
 ```csharp
 // @inherit /std/craft_data
