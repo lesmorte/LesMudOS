@@ -882,7 +882,7 @@ def main():
     work = tempfile.mkdtemp(prefix="lesmudos-search-")
     mudlib = os.path.join(work, "mudlib")
     SAVE_DIR = os.path.join(work, "save")
-    h.copy_mudlib(mudlib)
+    h.copy_mudlib(mudlib, lit=True)  # about the search rules and content, not the dark: every room lit (the light modifier itself is checked in tests/light_test.py)
     os.makedirs(os.path.join(mudlib, "domains", "searchtest"), exist_ok=True)
     for path, source in test_files().items():
         h.write(mudlib, path, source)
