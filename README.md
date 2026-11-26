@@ -229,6 +229,8 @@ public class Lantern : Item
 | `tests/balance_sim.py` | Standalone combat balance simulation (event clock); `check` compares it with the mudlib numbers |
 | `deploy/lesmudos.service` | Sample systemd unit (a starting point; not yet tested on a server) |
 | `tests/gmcp_test.py` | GMCP (telnet option 201): the offer and the stream of a client without it, Room.Info with room numbers that survive a driver restart, hidden exits and doors per character, Char.Vitals and Char.Status, Comm.Channel.Text, Core.Supports and Core.Ping, malformed and oversized incoming messages, and a wizard's probe (port 4841, about 2 minutes) |
+| `tests/net_test.py` | The network limits: the loopback bridge listener and its strict PROXY line (good, bad, late, oversize, split, the public port ignoring one), connection caps (total, per address, IPv6 /64, rate, release), the input bucket and the log lines (ports N and N+1, about 2 minutes) |
+| `tests/throttle_test.py` | The login throttle: locks by name and by address, the known-address exception, the same refusal and pause for every "no", resets, the new-character limit and the level 10 `throttle` command (ports N and N+1, about 6 minutes) |
 | `clients/mudlet` | A Mudlet package that draws the map from GMCP and shows the vitals gauges; see [docs/MUDLET.md](docs/MUDLET.md) (not tested in a real Mudlet) |
 | `docs` | Design and API reference |
 
@@ -252,6 +254,8 @@ LESMUDOS_TEST_PORT=4841 python3 tests/gmcp_test.py
 LESMUDOS_TEST_PORT=4840 python3 tests/sandbox_test.py
 LESMUDOS_TEST_PORT=4852 python3 tests/redteam/run_all.py
 LESMUDOS_TEST_PORT=4853 python3 tests/redteam2/run_all.py
+LESMUDOS_TEST_PORT=5100 python3 tests/net_test.py
+LESMUDOS_TEST_PORT=5104 python3 tests/throttle_test.py
 python3 tests/balance_sim.py
 python3 tests/balance_sim.py ranks [runs] [level5 heal double gap bolt focus climb aim wait aimfix healcost selfheal]
 ```

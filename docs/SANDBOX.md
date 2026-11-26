@@ -275,3 +275,7 @@ A second independent review attacked commit 422e00d and found that the first fix
 
 What remains: a home can still make the game wait up to the stall limit once (then it is closed); one statement can still allocate memory without limit inside sandbox code; the real code of an approved publication runs with the base game's power, as the reviewer decided.
 
+
+## 10. The network efuns and the login throttle
+
+`ConnectionAddress`, `AddressTag`, `ThrottleSetting` and `ThrottleLog` (the login throttle, [specs/login-throttle.md](specs/login-throttle.md)) are refused to every restricted execution and to everything but the real `/secure/login` clone (the first) and the real `/secure/throttle` blueprint (the others), by program path and domain. The throttle's functions cannot be reached to record, lift or read anything, the `throttle` command is level 10 only, a character's saved known addresses are untouched by the workshop checkpoint and unreadable to sandbox code, and the salt file is outside every path a file efun can name. Proof: `tests/redteam/n2_net_efuns.py`. Input is rate-limited by delaying, never by dropping, so a wizard's paste into the editor arrives whole (`tests/net_test.py`).

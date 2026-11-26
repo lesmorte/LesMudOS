@@ -15,6 +15,7 @@ set -euo pipefail
 REPO_URL="${REPO_URL:-https://github.com/lesmorte/LesMudOS.git}"
 BRANCH="${BRANCH:-main}"
 GAME_PORT="${GAME_PORT:-4000}"            # the telnet port players connect to
+BRIDGE_PORT="${BRIDGE_PORT:-0}"          # the loopback port of the website's browser client: 0 = off (default); 4001 once the website side is deployed. Never opened in the firewall.
 APP_DIR="${APP_DIR:-/opt/lesmudos}"
 APP_USER="${APP_USER:-lesmudos}"
 # Which parts of the mudlib the running game may write to:
@@ -137,6 +138,26 @@ if [ ! -f "$ENV_FILE" ]; then
     NEW_SECRET="$(head -c 256 /dev/urandom | od -An -tx1 | tr -d ' \n' | cut -c1-32)"
     printf 'LESMUDOS_ADMIN_SECRET=%s\n' "$NEW_SECRET" > "$ENV_FILE"
 fi
+# The network limits and the login throttle (docs/DEPLOY.md, docs/specs/login-throttle.md). Added once, to a new or an existing file, with every
+# line commented out: the defaults shown are the ones in force. The bridge listener stays OFF (no LESMUDOS_BRIDGE_PORT) until the website's
+# browser client is deployed; when it is, run  BRIDGE_PORT=4001 bash setup-droplet.sh  (writes --bridge-port 4001 into the unit; loopback only, never open it in the firewall). LESMUDOS_BRIDGE_PORT in this file would override it.
+if ! grep -q '^# ---- network limits' "$ENV_FILE"; then
+    cat >> "$ENV_FILE" <<'LIMITS'
+
+# ---- network limits and login throttle: defaults shown, uncomment to change; 0 = no limit for a count or a rate ----
+# LESMUDOS_BRIDGE_PORT=0                      # overrides --bridge-port in the unit. 0 = no bridge listener; 4001 = the browser client may connect (127.0.0.1 only)
+# LESMUDOS_MAX_CONNECTIONS=200                # all connections together
+# LESMUDOS_MAX_PER_ADDRESS=10                 # per address (IPv6 by /64); a web player counts under his real address
+# LESMUDOS_CONNECTS_PER_MINUTE=20             # new connections per address per minute
+# LESMUDOS_MAX_LINES_PER_SECOND=20            # typed lines per second per connection (burst LESMUDOS_INPUT_BURST=60); lines over it are delayed, never dropped
+# LESMUDOS_THROTTLE_NAME_FAILURES=5           # wrong passwords on one name within 15 minutes lock the name ...
+# LESMUDOS_THROTTLE_NAME_LOCK_SECONDS=300     # ... for 5 minutes, doubling each time up to LESMUDOS_THROTTLE_NAME_LOCK_MAX_SECONDS=3600
+# LESMUDOS_THROTTLE_ADDRESS_FAILURES=40       # wrong passwords from one address (any names) within 15 minutes lock the address ...
+# LESMUDOS_THROTTLE_ADDRESS_LOCK_SECONDS=900  # ... for 15 minutes, doubling up to LESMUDOS_THROTTLE_ADDRESS_LOCK_MAX_SECONDS=14400
+# LESMUDOS_THROTTLE_NEW_PER_HOUR=3            # new characters per address per hour
+# LESMUDOS_THROTTLE_NEW_PER_DAY=10            # and per day
+LIMITS
+fi
 chown root:root "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
@@ -154,7 +175,7 @@ Group=$APP_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=-$ENV_FILE
 Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
-ExecStart=$BIN_DIR/LesMudOS.Driver --mudlib $MUDLIB_DIR --save $SAVE_DIR --port $GAME_PORT
+ExecStart=$BIN_DIR/LesMudOS.Driver --mudlib $MUDLIB_DIR --save $SAVE_DIR --port $GAME_PORT --bridge-port $BRIDGE_PORT
 # The in-game "shutdown" command exits cleanly (status 0), and the game then stays down until it is
 # started again. A crash is restarted automatically.
 Restart=on-failure

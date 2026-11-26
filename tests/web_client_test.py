@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
 """End-to-end test of the browser client's bridge (docs/specs/web-client.md sections 2 and 12.1).
 
-Starts the driver on a temporary copy of the mudlib and the website (the built LesMudOS.Web.dll) with the browser client switched on in
-PLAIN mode (the bridge connects to the game's ordinary telnet port and sends no PROXY line: use Site:Play:PlainMode only for tests like this
-one; the PROXY line itself is covered by the website's own tests against a fake listener). Then a headless WebSocket client (the Python
+Two passes, each on its own driver and website:
+
+  1. PLAIN mode (the bridge connects to the game's ordinary telnet port and sends no PROXY line: Site:Play:PlainMode, for tests only), with
+     every limit of the game switched off (the shared test defaults);
+  2. PROXY-LINE mode (the real thing, the first time the two halves meet): the game runs with --bridge-port on the next port and the
+     production-style limits (a per-address cap, the login throttle), the website with PlainMode off, so every web player's telnet connection
+     opens with a PROXY line giving the address the website was told by its proxy (here a forged X-Hollowmere-Client-Ip, as Caddy would
+     set it). It checks what the game logs and counts, what the public port does with a PROXY line, what the bridge port does without one,
+     GMCP, a dropped page and the link-dead resume, and that the login throttle sees the visitor's real address.
+
+Pass 1: a headless WebSocket client (the Python
 `websockets` package) does what a browser would: refused from a wrong origin, a new account through a masked password, a few commands, a
 second login of the same name, a tell from a telnet player, hostile text, pings that must not count as player input, the idle timeout,
 a flood of connections, and quit.
 
 Usage (from the repository root, after `dotnet build` of src/LesMudOS.Driver and web/LesMudOS.Web, and `pip install websockets`):
-    LESMUDOS_TEST_PORT=5120 LESMUDOS_WEB_TEST_PORT=5140 python3 tests/web_client_test.py
+    LESMUDOS_TEST_PORT=5112 LESMUDOS_WEB_TEST_PORT=5140 python3 tests/web_client_test.py      (the game uses the next port too, for the bridge)
+    ... --plain-only / --proxy-only to run one pass
     python3 tests/web_client_test.py --load 20      # open N logged-out web sessions and print the processes' memory (spec section 11)
 """
 import asyncio
@@ -100,10 +109,20 @@ class Web:
             return self.ws.close_code
 
 
-def start_processes(work, mudlib):
+BRIDGE_PORT = GAME_PORT + 1
+
+
+def start_processes(work, mudlib, proxy=False):
     env = {**os.environ, "LESMUDOS_ADMIN_SECRET": h.SECRET, "LESMUDOS_IDLE_MINUTES": "5s", "LESMUDOS_TIMEOUT_MINUTES": "12s"}
+    if proxy:
+        env = {k: v for k, v in os.environ.items() if not k.startswith("LESMUDOS_") or k == "LESMUDOS_TEST_PORT"}
+        env.update({"LESMUDOS_ADMIN_SECRET": h.SECRET, "LESMUDOS_BRIDGE_PORT": str(BRIDGE_PORT), "LESMUDOS_BRIDGE_HANDSHAKE_SECONDS": "2",
+                    "LESMUDOS_MAX_PER_ADDRESS": "3", "LESMUDOS_CONNECTS_PER_MINUTE": "0", "LESMUDOS_THROTTLE_FAIL_DELAY_MS": "0",
+                    "LESMUDOS_THROTTLE_ADDRESS_FAILURES": "8", "LESMUDOS_THROTTLE_NEW_PER_HOUR": "20", "LESMUDOS_THROTTLE_NEW_PER_DAY": "50"})
     driver_dll = os.path.join(h.ROOT, "src", "LesMudOS.Driver", "bin", "Debug", "net10.0", "LesMudOS.Driver.dll")
     dlog = open(os.path.join(work, "driver.log"), "w")
+    if proxy:
+        env["LESMUDOS_TEST_PORT"] = str(GAME_PORT)
     driver = subprocess.Popen(["dotnet", driver_dll, "--mudlib", mudlib, "--save", os.path.join(work, "save"), "--port", str(GAME_PORT)], stdout=dlog, stderr=subprocess.STDOUT, env=env)
     for _ in range(150):
         try:
@@ -117,8 +136,8 @@ def start_processes(work, mudlib):
     web_dll = os.path.join(web_dir, "bin", "Debug", "net10.0", "LesMudOS.Web.dll")
     wlog = open(os.path.join(work, "web.log"), "w")
     wenv = {**os.environ, "ASPNETCORE_URLS": f"http://127.0.0.1:{WEB_PORT}", "ASPNETCORE_ENVIRONMENT": "Production",
-            "Site__BaseUrl": ORIGIN, "Site__SaveDirectory": "", "Site__Play__Enabled": "true", "Site__Play__PlainMode": "true",
-            "Site__Play__GameBridgePort": str(GAME_PORT), "Site__Play__MaxConnections": os.environ.get("WEB_TEST_MAX_CONNECTIONS", "10"),
+            "Site__BaseUrl": ORIGIN, "Site__SaveDirectory": "", "Site__Play__Enabled": "true", "Site__Play__PlainMode": "false" if proxy else "true",
+            "Site__Play__GameBridgePort": str(BRIDGE_PORT if proxy else GAME_PORT), "Site__Play__MaxConnections": os.environ.get("WEB_TEST_MAX_CONNECTIONS", "10"),
             "Site__Play__KillSwitchFile": os.path.join(work, "play.off")}
     web = subprocess.Popen(["dotnet", web_dll], cwd=web_dir, stdout=wlog, stderr=subprocess.STDOUT, env=wenv)
     for _ in range(150):
@@ -341,6 +360,208 @@ async def main(work, mudlib, driver, web):
     check("the website logged them with the true address and no typed text", "play: open 203.0.113.9" in wlog and "hello there" not in wlog and PASSWORD not in wlog, wlog[-500:])
 
 
+def game_log(work):
+    return open(os.path.join(work, "driver.log")).read()
+
+
+def raw_connect(port):
+    s = socket.create_connection(("127.0.0.1", port), timeout=5)
+    s.settimeout(0.3)
+    return s
+
+
+def raw_read(s, until=None, timeout=3.0):
+    end = time.time() + timeout
+    data = b""
+    while time.time() < end:
+        try:
+            chunk = s.recv(65536)
+        except socket.timeout:
+            continue
+        except OSError:
+            return data, True
+        if chunk == b"":
+            return data, True
+        data += chunk
+        if until and until in data:
+            return data, False
+    return data, False
+
+
+async def wrong_passwords(name, ip, count):
+    """Open a page from `ip`, give the name and `count` wrong passwords (the game ends the connection at three). Returns the text seen."""
+    w = await Web.open(ip)
+    await w.until("known? ")
+    await w.say(name)
+    text = ""
+    for _ in range(count):
+        text += await w.until("Password: ", 8)
+        await w.say("not the password 1")
+        try:
+            text += await w.until("Wrong password.", 8)
+        except (asyncio.TimeoutError, websockets.ConnectionClosed):
+            break
+    try:
+        while True:
+            await w.frame(2)
+    except (asyncio.TimeoutError, websockets.ConnectionClosed):
+        pass
+    text += w.buf
+    try:
+        await w.ws.close()
+    except Exception:
+        pass
+    return text
+
+
+async def main_proxy(work, mudlib, driver, web):
+    A = "203.0.113.9"
+    # ---- the first real character, through the website and the bridge listener ----
+    a = await Web.open(A)
+    await login_new(a, "Proxie")
+    check("PROXY mode: a character is made through the masked password", any(f["t"] == "mask" and f["on"] for f in a.frames))
+    check("PROXY mode: GMCP frames arrive (Char.Status, Room.Info, Char.Vitals)", a.gmcp("Char.Status") and a.gmcp("Room.Info") and a.gmcp("Char.Vitals"), [f["p"] for f in a.frames if f["t"] == "gmcp"])
+    room = a.gmcp("Room.Info")[-1]["d"]
+    text = await a.command("look")
+    check("PROXY mode: look shows the room", room["name"] in text, text[-200:])
+    text = await a.command(sorted(room["exits"])[0])
+    check("PROXY mode: a move works", len(a.gmcp("Room.Info")) >= 3, text[-200:])
+    text = await a.command("say hello through the bridge")
+    check("PROXY mode: say is answered", "hello through the bridge" in text, text)
+    log = game_log(work)
+    check("the game's 'connection from' line has the address the website gave, with (web)", f"connection from {A} (web)" in log, log[-400:])
+    check("... and never the bridge's own 127.0.0.1 as a web player's address", "127.0.0.1 (web)" not in log and ":" not in "".join(l.split("connection from ")[1].split(" (web)")[0] for l in log.splitlines() if "(web)" in l and "connection from" in l), log[-400:])
+    wlog = open(os.path.join(work, "web.log")).read()
+    check("the website logged the same address", f"play: open {A}" in wlog, wlog[-300:])
+
+    # ---- the per-address cap counts the claimed address (the cap is 3 here), not the bridge's 127.0.0.1 ----
+    C = "198.51.100.5"
+    held = [await Web.open(C) for _ in range(3)]
+    for w in held:
+        await w.until("known? ")
+    fourth = await Web.open(C)
+    got = ""
+    try:
+        got = await fourth.until("Too many connections from your address.", 5)
+    except Exception as e:
+        got = repr(e)
+    check("the fourth page from one address is refused by the game's per-address cap", "Too many connections from your address." in got, got)
+    time.sleep(0.5)
+    check("... and the game logged it under that address with (web)", f"connection refused: too many from address: {C} (web)" in game_log(work))
+    other = await Web.open("198.51.100.6")
+    await other.until("known? ")
+    check("another address is not affected", True)
+    await other.ws.close()
+    pub = h.Client("publicguy")
+    pub.read_until("> ")
+    check("the public port's own 127.0.0.1 count is separate (a telnet login still works)", True)
+    pub.sock.close()
+    for w in held + [fourth]:
+        await w.ws.close()
+    await asyncio.sleep(1)
+
+    # ---- a PROXY line typed at the PUBLIC port is just a (bad) name, and changes nothing ----
+    E = "198.51.100.77"
+    s = raw_connect(GAME_PORT)
+    raw_read(s, b"known?", 5)
+    s.sendall(f"PROXY TCP4 {E} 127.0.0.1 0 4000\r\n".encode())
+    data, _ = raw_read(s, b"Try again", 4)
+    check("a PROXY line at the public port is refused as a name", b"Names are 2 to 16 letters" in data, data)
+    s.sendall(f"PROXY TCP4 {E} 127.0.0.1 0 4000\r\n".encode() * 3)
+    time.sleep(0.5)
+    held = [await Web.open(E) for _ in range(3)]
+    for w in held:
+        await w.until("known? ")
+    check("... and did not count against the address it named (three pages from it still get in)", True)
+    s.close()
+    for w in held:
+        await w.ws.close()
+    await asyncio.sleep(1.0)
+    log = game_log(work)
+    check("... the log never shows the claimed address for the public connection", f"connection from {E}:" not in log and "connection from 127.0.0.1:" in log)
+
+    # ---- the bridge port refuses a connection with no PROXY line ----
+    s = raw_connect(BRIDGE_PORT)
+    data, closed = raw_read(s, None, 4)
+    check("the bridge port: silence is closed after the handshake time with nothing sent", closed and data == b"", (closed, data))
+    s.close()
+    s = raw_connect(BRIDGE_PORT)
+    s.sendall(b"proxie\r\n")
+    data, closed = raw_read(s, None, 4)
+    check("the bridge port: a plain name instead of a PROXY line is closed at once with nothing sent", closed and data == b"", (closed, data))
+    s.close()
+    check("... and it is logged as a bad PROXY line", "bridge connection refused: bad PROXY line" in game_log(work))
+
+    # ---- a dropped page leaves the body link-dead; a reconnect inside the window resumes it ----
+    await a.ws.close()
+    await asyncio.sleep(1.5)
+    log = game_log(work)
+    check("the dropped page's connection ended is logged with the web address and the player", f"connection ended: {A} (web), player Proxie" in log, log[-300:])
+    r = await Web.open(A)
+    await r.until("known? ")
+    await r.say("proxie")
+    await r.until("Password: ")
+    await r.say(PASSWORD)
+    text = await r.until("> ", 15)
+    check("a reconnect from the web inside the window resumes the lingering body", "shake off the daze" in text, text[-300:])
+    check("... with GMCP again", len(r.gmcp("Room.Info")) >= 1)
+    await r.say("quit")
+    await r.closed()
+
+    # ---- the login throttle sees the visitor's real address ----
+    for nm, ip in (("Victim", "203.0.113.30"), ("Yara", "203.0.113.30"), ("Zed", "203.0.113.30")):
+        w = await Web.open(ip)
+        await login_new(w, nm)
+        await w.say("quit")
+        await w.closed()
+    X, Y = "203.0.113.31", "203.0.113.33"
+    t1 = await wrong_passwords("Victim", X, 3)
+    check("three wrong passwords through the web end the connection as before", "Goodbye" in t1, t1[-200:])
+    t2 = await wrong_passwords("Victim", X, 2)
+    check("the fifth locks the name and the player is told what to do", "wait a few minutes and try again" in t2, t2[-300:])
+    time.sleep(0.5)
+    log = game_log(work)
+    check("the throttle logged the lock with the real web address", f"name locked: Victim (from {X})" in log, [l for l in log.splitlines() if "throttle" in l][-4:])
+    w = await Web.open("203.0.113.34")
+    await w.until("known? ")
+    await w.say("victim")
+    t3 = await w.until("Try again later.", 8)
+    check("a name locked by five wrong passwords through the web refuses everyone else too, with the plain words", "Too many attempts. Try again later." in t3, t3[-200:])
+    await w.ws.close()
+    # separate counts: Y has 3 wrong passwords on another name; X has 5 so far
+    ty = await wrong_passwords("Yara", Y, 3)
+    check("another address's failures are counted separately", "Goodbye" in ty, ty[-200:])
+    tz = await wrong_passwords("Zed", X, 3)
+    time.sleep(0.5)
+    log = game_log(work)
+    check("the first address reaches its own count (5 + 3 = 8) and is locked", f"address locked: {X} for" in log, [l for l in log.splitlines() if "throttle" in l][-4:])
+    check("... while the second address (3) is not locked", f"address locked: {Y}" not in log)
+    w = await Web.open(Y)
+    await login_existing(w, "Yara")
+    check("the second address can still log in", True)
+    await w.say("quit")
+    await w.closed()
+    w = await Web.open(X)
+    await w.until("known? ")
+    await w.say("nobodyatall")
+    t4 = await w.until("Try again later.", 8)
+    check("the locked address is refused whatever name it gives (an unknown name too)", "Too many attempts. Try again later." in t4, t4[-200:])
+    await w.ws.close()
+    log = game_log(work)
+    check("no password is in the game's log", "not the password 1" not in log and PASSWORD not in log)
+    check("the game logged web connections only with (web) addresses of the forged set",
+          all(l.split("connection from ")[1].split(" (web)")[0] in {A, "198.51.100.5", "198.51.100.6", "198.51.100.77", "203.0.113.30", "203.0.113.31", "203.0.113.33", "203.0.113.34"}
+              for l in log.splitlines() if "(web)" in l and "connection from" in l), [l for l in log.splitlines() if "(web)" in l and "connection from" in l][-6:])
+
+
+async def login_existing(w, name):
+    await w.until("known? ")
+    await w.say(name)
+    await w.until("Password: ")
+    await w.say(PASSWORD)
+    await w.until("> ", 15)
+
+
 async def load(n, work, driver, web):
     print(f"memory with 0 sessions: game {rss_mb(driver.pid):.0f} MB, website {rss_mb(web.pid):.0f} MB")
     ws = []
@@ -355,22 +576,40 @@ async def load(n, work, driver, web):
 
 
 def run():
-    work = tempfile.mkdtemp(prefix="lesmudos-webtest-")
-    mudlib = os.path.join(work, "mudlib")
-    h.copy_mudlib(mudlib)
-    driver, web = start_processes(work, mudlib)
-    try:
-        if "--load" in sys.argv:
+    plain = "--proxy-only" not in sys.argv
+    proxy = "--plain-only" not in sys.argv
+    if "--load" in sys.argv:
+        work = tempfile.mkdtemp(prefix="lesmudos-webtest-")
+        mudlib = os.path.join(work, "mudlib")
+        h.copy_mudlib(mudlib)
+        driver, web = start_processes(work, mudlib)
+        try:
             asyncio.run(load(int(sys.argv[sys.argv.index("--load") + 1]), work, driver, web))
-        else:
-            asyncio.run(main(work, mudlib, driver, web))
-    finally:
-        stop(web)
-        stop(driver)
-        if failures:
-            print(f"logs kept in {work}")
-        else:
+        finally:
+            stop(web)
+            stop(driver)
             shutil.rmtree(work, ignore_errors=True)
+        return
+    for mode, body, on in (("plain", main, plain), ("proxy", main_proxy, proxy)):
+        if not on:
+            continue
+        print(f"--- pass: {mode} mode")
+        work = tempfile.mkdtemp(prefix=f"lesmudos-webtest-{mode}-")
+        mudlib = os.path.join(work, "mudlib")
+        h.copy_mudlib(mudlib)
+        driver, web = start_processes(work, mudlib, proxy=(mode == "proxy"))
+        before = len(failures)
+        try:
+            asyncio.run(body(work, mudlib, driver, web))
+        except BaseException as e:  # noqa: BLE001
+            check(f"the {mode} pass ran to its end", False, repr(e))
+        finally:
+            stop(web)
+            stop(driver)
+            if len(failures) > before:
+                print(f"logs kept in {work}")
+            else:
+                shutil.rmtree(work, ignore_errors=True)
     print(f"\n{checks[0]} checks, {len(failures)} failures")
     sys.exit(1 if failures else 0)
 
