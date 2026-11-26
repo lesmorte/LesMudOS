@@ -16,7 +16,7 @@ public class CellarPurse : Find
         ShortDesc = "a rat-chewed purse";
         LongDesc = "A small leather purse, chewed at one corner and furred with dust. It has the weight of a few coins.";
         SearchDifficulty = 7; // Easy (Room.SearchEasy)
-        SearchNames = "flagstone,flat stone,stone";
+        SearchNames = "flat stone,flagstone,stone";
         FoundLine = "You work your fingers under the edge of the stone and lever it up. In a hollow scraped out of the dirt lies a small leather purse, chewed at one corner.";
         Gold = 8;
         FallOff = 50;

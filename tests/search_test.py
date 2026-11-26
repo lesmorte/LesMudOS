@@ -794,6 +794,66 @@ def step_content(chief):
         c.command("quit")
 
 
+# ---------------------------------------------------------------- 9. the lint rule (no driver needed)
+
+LINT_FILES = {
+    "std/room": "public abstract class Room : MudObject { }\n",
+    "std/find": "public class Find : Thing { }\n",
+    "std/thing": "public class Thing : MudObject { }\n",
+    "std/item": "public class Item : Thing { }\n",
+    "std/node": "public class Node : Thing { }\n",
+    "std/monster": "public class Monster : Thing { }\n",
+    "domains/lint/item": "// @inherit /std/item\npublic class LItem : Item { public override void Create() { Name = \"Gem\"; Value = 9; } }\n",
+    "domains/lint/cheap": "// @inherit /std/item\npublic class LCheap : Item { public override void Create() { Name = \"Jar\"; Value = 3; } }\n",
+    "domains/lint/node": "// @inherit /std/node\npublic class LNode : Node { public override void Create() { Name = \"Herbs\"; } }\n",
+    "domains/lint/richfind": "// @inherit /std/find\npublic class LRich : Find { public override void Create() { Name = \"Chest\"; Gold = 50; SearchDifficulty = 12; SearchNames = \"lid\"; } }\n",
+    "domains/lint/badfind": "// @inherit /std/find\npublic class LBad : Find { public override void Create() { Name = \"Chest\"; Gold = 5; SearchDifficulty = 3; SearchNames = \"crack\"; } }\n",
+    "domains/lint/keeper": "// @inherit /std/monster\npublic class LKeeper : Monster { public override void Create() { Name = \"Keeper\"; AddStock(\"/domains/lint/cheap\", 5); } }\n",
+    "domains/lint/far": "// @inherit /std/room\npublic class LFar : Room { public override void Create() { ShortDesc = \"Far\"; LongDesc = \"Far.\"; Exits[\"east\"] = \"/domains/lint/good\"; AddDetail(\"x\", \"x\"); } }\n",
+    "domains/lint/lost": "// @inherit /std/room\npublic class LLost : Room { public override void Create() { ShortDesc = \"Lost\"; LongDesc = \"Lost.\"; Exits[\"north\"] = \"/domains/lint/nowhere_back\"; AddDetail(\"x\", \"x\"); } }\n",
+    "domains/lint/nowhere_back": "// @inherit /std/room\npublic class LNB : Room { public override void Create() { ShortDesc = \"NB\"; LongDesc = \"NB.\"; Exits[\"south\"] = \"/domains/lint/lost\"; AddDetail(\"x\", \"x\"); } }\n",
+    "domains/lint/good": "// @inherit /std/room\npublic class LGood : Room { public override void Create() { ShortDesc = \"Good\"; LongDesc = \"A room with a crack in the wall.\"; Exits[\"north\"] = \"/domains/lint/lost\"; AddDetail(\"crack\", \"A crack.\"); "
+                        "HideExit(\"west\", \"/domains/lint/far\", \"crack\", SearchModerate, \"You find it.\"); } }\n",
+    "domains/lint/bad": "// @inherit /std/room\npublic class LBadRoom : Room { public override void Create() { ShortDesc = \"Bad\"; LongDesc = \"A bare room.\"; Exits[\"east\"] = \"/domains/lint/far\"; "
+                        "AddDetail(\"sacks\", \"Sacks.\"); AddDetail(\"hooks\", \"Hooks.\"); "
+                        "HideItem(\"twice\", \"/domains/lint/cheap\", SearchEasy, \"sacks\", \"Found.\"); "
+                        "HideItem(\"twice\", \"/domains/lint/cheap\", SearchEasy, \"sacks\", \"Found.\"); "
+                        "HideItem(\"easy\", \"/domains/lint/cheap\", 3, \"sacks\", \"Found.\"); "
+                        "HideItem(\"nameless\", \"/domains/lint/cheap\", SearchEasy, \"nothing here\", \"Found.\"); "
+                        "HideItem(\"gem\", \"/domains/lint/item\", SearchEasy, \"hooks\", \"Found.\"); "
+                        "HideExit(\"south\", \"/domains/lint/lost\", \"\", SearchEasy, \"Found.\"); "
+                        "HideClue(\"slip\", SearchModerate, \"hooks\", \"Found.\", \"\", \"Text.\"); "
+                        "AddSpawn(\"/domains/lint/richfind\"); AddSpawn(\"/domains/lint/badfind\"); AddSpawn(\"/domains/lint/keeper\"); } }\n",
+}
+
+
+def step_lint():
+    import subprocess
+    work = tempfile.mkdtemp(prefix="lesmudos-lint-")
+    try:
+        for path, source in LINT_FILES.items():
+            full = os.path.join(work, path + ".cs")
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            with open(full, "w") as f:
+                f.write(("// @inherit /std/thing\n" if path == "std/item" else "") + source if not source.startswith("//") else source)
+        out = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "lint_area.py"), "--mudlib", work, "/domains/lint/"], capture_output=True, text=True).stdout
+        good = [l for l in out.splitlines() if "/domains/lint/good" in l and "HideExit" in l]
+        check("lint: a well-made hidden exit draws no check 15 problem", "ok" if not good else repr(good), "ok")
+        for label, want in (("an id used twice", "id 'twice' is used twice"), ("a difficulty that is not a constant or 6 to 25", "HideItem easy: the difficulty is not a constant"),
+                            ("no name is a detail", "HideItem nameless: none of its names (nothing here) is an AddDetail key"),
+                            ("a far room with no way back", "HideExit south: the far room /domains/lint/lost has no exit back"),
+                            ("a clue with no readNames", "HideClue slip: a clue needs readNames"),
+                            ("a hidden find with a difficulty out of range", "SearchDifficulty 3 is not a number from 6 to 25"),
+                            ("a first name that is not in the description", "its first name 'sacks' does not appear"),
+                            ("a hidden find with more than 20 gold", "Gold 50 is more than 20"),
+                            ("an item worth more than 5 gold", "the item is worth 9 gold"),
+                            ("a shopkeeper in the room", "hidden things in a room that has a shopkeeper")):
+            check(f"lint: {label}", out, want)
+        check("lint: the errors fail the run and the warnings alone do not", "ok" if "ERROR /domains/lint/bad" in out else out[-300:], "ok")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 # ---------------------------------------------------------------- main
 
 SAVE_DIR = ""
@@ -806,7 +866,7 @@ def run(work, mudlib):
     a.drain(chief, 0.4)
     chief.command("down")
     only = [x for x in os.environ.get("SEARCH_STEPS", "").split(",") if x]
-    steps = (("check", lambda: step_check(chief)), ("time", lambda: step_time(chief)), ("exits", lambda: step_exits(chief)), ("named", lambda: step_named(chief)),
+    steps = (("lint", lambda: step_lint()), ("check", lambda: step_check(chief)), ("time", lambda: step_time(chief)), ("exits", lambda: step_exits(chief)), ("named", lambda: step_named(chief)),
              ("mod", lambda: step_mod(chief)), ("conv", lambda: step_conv(chief)), ("interrupt", lambda: step_interrupt(chief)), ("finds", lambda: step_finds(chief)),
              ("items", lambda: step_items(chief)), ("nodes", lambda: step_nodes(chief)), ("clues", lambda: step_clues(chief)), ("door", lambda: step_door(chief)),
              ("landmark", lambda: step_landmark(chief)), ("probe", lambda: step_probe(chief, mudlib)), ("content", lambda: step_content(chief)))

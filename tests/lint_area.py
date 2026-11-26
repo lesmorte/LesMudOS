@@ -316,6 +316,89 @@ class Mudlib:
         return sorted(out)
 
 
+HIDE_CALLS = ("HideExit", "HiddenExit", "HideItem", "HideNode", "HideClue")
+DIFFICULTY_NAMES = {"SearchEasy": 7, "SearchModerate": 12, "SearchHard": 17, "SearchVeryHard": 22}
+
+
+def call_args(toks, k):
+    """The arguments of the call whose name is at toks[k]: a list of token lists, split at top-level commas (named-argument labels are dropped)."""
+    if not is_op(at(toks, k + 1), "("):
+        return None
+    args, cur, depth, j = [], [], 0, k + 2
+    while j < len(toks):
+        t = toks[j]
+        if is_op(t, "(") or is_op(t, "[") or is_op(t, "{"):
+            depth += 1
+        elif is_op(t, ")") or is_op(t, "]") or is_op(t, "}"):
+            if depth == 0:
+                break
+            depth -= 1
+        if depth == 0 and is_op(t, ","):
+            args.append(cur)
+            cur = []
+        else:
+            cur.append(t)
+        j += 1
+    if cur:
+        args.append(cur)
+    out = []
+    for arg in args:
+        if len(arg) >= 3 and arg[0][0] == "id" and is_op(arg[1], ":") and not is_op(at(arg, 2), ":"):
+            arg = arg[2:]  # a named argument: byFeel: true
+        out.append(arg)
+    return out
+
+
+def literal(arg):
+    """The text of a plain string literal argument, or None."""
+    return arg[0][1].raw if len(arg) == 1 and arg[0][0] == "str" and not arg[0][1].interp else None
+
+
+def hidden_calls(toks):
+    """Every hide call of a room, as (call name, [args])."""
+    out = []
+    for k in range(len(toks)):
+        if toks[k][0] == "id" and toks[k][1] in HIDE_CALLS and not is_op(at(toks, k - 1), "."):
+            args = call_args(toks, k)
+            if args is not None:
+                out.append((toks[k][1], args))
+    return out
+
+
+def difficulty_of(arg):
+    """The difficulty an argument spells: a constant of /std/room or a number; None if it is neither."""
+    if len(arg) == 1 and arg[0][0] == "id" and arg[0][1] in DIFFICULTY_NAMES:
+        return DIFFICULTY_NAMES[arg[0][1]]
+    if len(arg) == 1 and arg[0][0] == "num" and arg[0][1].isdigit():
+        return int(arg[0][1])
+    return None
+
+
+def number_assign(toks, name):
+    """`name = 12;` as 12, or None."""
+    for k in range(len(toks)):
+        if is_id(toks[k], name) and is_op(at(toks, k + 1), "=") and not is_op(at(toks, k + 2), "=") and at(toks, k + 2)[0] == "num" and is_op(at(toks, k + 3), ";"):
+            text = toks[k + 2][1]
+            if text.isdigit():
+                return int(text)
+    return None
+
+
+def spawn_paths(toks):
+    """The path of every AddSpawn("path"...) with a plain literal."""
+    return [at(toks, k + 2)[1].raw for k in range(len(toks))
+            if is_id(toks[k], "AddSpawn") and is_op(at(toks, k + 1), "(") and is_str(at(toks, k + 2)) and not at(toks, k + 2)[1].interp]
+
+
+def hidden_exits_in(toks):
+    """(direction, destination) of every HideExit or HiddenExit with plain literals."""
+    out = []
+    for name, args in hidden_calls(toks):
+        if name in ("HideExit", "HiddenExit") and len(args) >= 2 and literal(args[0]) and literal(args[1]):
+            out.append((literal(args[0]), literal(args[1])))
+    return out
+
+
 def in_scope(mudpath):
     parts = mudpath.split("/")
     if len(parts) < 3 or parts[1] != "domains":
@@ -323,6 +406,92 @@ def in_scope(mudpath):
     if parts[2] == "town" or parts[-1] == "area":
         return False
     return True
+
+
+def lint_hidden(lib, p, src, exits, report):
+    calls = hidden_calls(src.toks)
+    spawned = spawn_paths(src.toks)
+    finds = []
+    for path in spawned:
+        if lib.is_file(path) and (number_assign(lib.source(path).toks, "SearchDifficulty") or 0) > 0:
+            finds.append(path)
+    if not calls and not finds:
+        return
+    details = [{k.strip().lower() for k in raw.split(",") if k.strip()} for raw in detail_keys(src.toks)]
+    detail_set = set().union(*details) if details else set()
+    long_found = assignments(src.toks, "LongDesc")
+    long_text = "".join(lit.raw for lits, _ in long_found for lit in lits).lower() if long_found and all(ok for _, ok in long_found) else None
+    seen = {}
+
+    def names_check(label, names):
+        names = [n.strip().lower() for n in names.split(",") if n.strip()]
+        if not names:
+            return
+        if not any(n in detail_set for n in names):
+            report(p, 15, ERROR, f"{label}: none of its names ({', '.join(names)}) is an AddDetail key of the room")
+        elif long_text is not None and names[0] not in long_text:
+            report(p, 15, WARN, f"{label}: its first name '{names[0]}' does not appear in the room's LongDesc (a player cannot read their way to it)")
+
+    for name, args in calls:
+        if not args or literal(args[0]) is None:
+            continue
+        ident = literal(args[0])
+        label = f"{name} {ident}"
+        if ident in seen:
+            report(p, 15, ERROR, f"{label}: id '{ident}' is used twice in the room")
+        seen[ident] = name
+        if name == "HiddenExit":
+            if len(args) >= 3 and literal(args[2]):
+                names_check(label, literal(args[2]))
+            continue
+        index = {"HideExit": 3, "HideItem": 2, "HideNode": 2, "HideClue": 1}[name]
+        if len(args) <= index:
+            report(p, 15, ERROR, f"{label}: no difficulty given")
+            continue
+        difficulty = difficulty_of(args[index])
+        if difficulty is None or not (6 <= difficulty <= 25 or (name == "HideExit" and difficulty == 0)):
+            report(p, 15, ERROR, f"{label}: the difficulty is not a constant (SearchEasy, SearchModerate, SearchHard, SearchVeryHard) or a number from 6 to 25")
+        if name == "HideExit":
+            far = literal(args[1]) if len(args) > 1 else None
+            if far and lib.is_file(far):
+                other = lib.source(far)
+                back = [d for _, d in exits_in(other.toks)] + [d for _, d in hidden_exits_in(other.toks)]
+                if p not in back:
+                    report(p, 15, ERROR, f"{label}: the far room {far} has no exit back to {p}")
+            elif far is None:
+                report(p, 15, ERROR, f"{label}: the far room is not a plain path")
+            if len(args) > 2 and literal(args[2]):
+                names_check(label, literal(args[2]))
+        elif name in ("HideItem", "HideNode"):
+            if len(args) > 3 and literal(args[3]) is not None:
+                names_check(label, literal(args[3]))
+            path = literal(args[1]) if len(args) > 1 else None
+            if name == "HideItem" and path and lib.is_file(path):
+                value = number_assign(lib.source(path).toks, "Value")
+                if value is not None and value > 5:
+                    report(p, 15, WARN, f"{label}: the item is worth {value} gold; a once-per-reset item should be worth 5 or less (a hidden find is once per character)")
+        else:  # HideClue
+            if len(args) > 2 and literal(args[2]) is not None:
+                names_check(label, literal(args[2]))
+            if len(args) < 5 or not (literal(args[4]) or "").strip():
+                report(p, 15, ERROR, f"{label}: a clue needs readNames (what `read` takes)")
+    for path in finds:
+        fsrc = lib.source(path)
+        difficulty = number_assign(fsrc.toks, "SearchDifficulty")
+        label = f"hidden find {path}"
+        if difficulty is None or not 6 <= difficulty <= 25:
+            report(p, 15, ERROR, f"{label}: SearchDifficulty {difficulty} is not a number from 6 to 25")
+        for lits, ok in assignments(fsrc.toks, "SearchNames"):
+            if ok:
+                names_check(label, "".join(lit.raw for lit in lits))
+        gold = number_assign(fsrc.toks, "Gold")
+        if gold is not None and gold > 20:
+            report(p, 15, WARN, f"{label}: Gold {gold} is more than 20 for a hidden find")
+    # a shop is not a search puzzle
+    for path in spawned:
+        if lib.is_file(path) and stock_calls(lib.source(path).toks):
+            report(p, 15, WARN, f"hidden things in a room that has a shopkeeper ({path})")
+            break
 
 
 def run(root, flt):
@@ -373,16 +542,23 @@ def run(root, flt):
                     report(p, 2, WARN, f'exit "{direction}" to {dest} has no exit back to {p}')
 
         # Check 14: a door is declared on both sides (docs/BUILDING.md, "A room with a door"): the room it leads to must declare a door on an exit that leads back.
-        exit_map = dict(exits)
+        exit_map = dict(hidden_exits_in(src.toks))
+        exit_map.update(exits)  # a door may be on a hidden exit (a secret door, docs/specs/search.md section 5.4)
         for direction in doors_in(src.toks):
             dest = exit_map.get(direction)
             if dest is None:
                 report(p, 14, ERROR, f'AddDoor("{direction}") but the room has no exit "{direction}" (set Exits first)')
             elif lib.is_file(dest):
                 other = lib.source(dest)
-                back = dict(exits_in(other.toks))
+                back = dict(hidden_exits_in(other.toks))
+                back.update(exits_in(other.toks))
                 if not any(back.get(d) == p for d in doors_in(other.toks)):
                     report(p, 14, ERROR, f'door "{direction}" to {dest}: that room declares no door on an exit back to {p}')
+
+
+        # Check 15: hidden things (docs/specs/search.md section 11), for a room's own HideExit, HideItem, HideNode and HideClue and for the hidden finds it spawns.
+        if is_room:
+            lint_hidden(lib, p, src, exits, report)
 
         # Checks 3, 7 and 8 and 9 look at every string literal in the file.
         strings = [t[1] for t in src.toks if t[0] == "str"]

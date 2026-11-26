@@ -384,6 +384,7 @@ public class UnitTests
     [Theory]
     [InlineData("discover.hidden", false)]
     [InlineData("discover.hidden_anything", false)]
+    [InlineData("discover.hidden_find", false)]
     [InlineData("discover.secret_dungeon", false)]
     [InlineData("discover.great_stump", false)]
     [InlineData("craft.discover_blood_ink", false)]
