@@ -1714,6 +1714,34 @@ public abstract class Adventurer : Living
         arrivedIn = here.Name;
     }
 
+    // ---- Darkness: what the character knows of the ways out (docs/specs/light.md, section 5). Not saved. ----
+
+    private readonly Dictionary<string, List<string>> usedWays = new();
+
+    /// <summary>The room the character came from, if they came into this room by an exit (""), for the way in that a dark room tells them.</summary>
+    public string QueryArrivedFrom() => Environment() is { } here && arrivedIn == here.Name ? cameFrom : "";
+
+    /// <summary>A room tells the character they have just left it by this exit. Only that room may (it stands in the room, and it is the character's own room).</summary>
+    public void RememberWay(string roomName, string direction)
+    {
+        var caller = PreviousObject();
+        if (caller == null || caller != Environment() || caller.Name != roomName || !TrustedCaller(caller) || direction == null || direction.Length > 32) return;
+        if (!usedWays.TryGetValue(roomName, out var list)) { if (usedWays.Count > 400) usedWays.Clear(); usedWays[roomName] = list = new List<string>(); }
+        if (!list.Contains(direction) && list.Count < 16) list.Add(direction);
+    }
+
+    /// <summary>The exits the character has used from this room since they logged in.</summary>
+    public List<string> QueryUsedWays(string roomName) => usedWays.TryGetValue(roomName ?? "", out var list) ? new List<string>(list) : new List<string>();
+
+    /// <summary>" (light torch)" if the character carries a light that is not lit, for the line a dark room gives on entering; "" if they carry none.</summary>
+    public string QueryUnlitLightHint()
+    {
+        foreach (var item in AllInventory())
+            if (item.IsAlive && item.Call<bool>("IsLightSource") && item.Call<bool>("QueryCarriable") && !item.Call<bool>("QueryLit") && item.Call<bool>("QueryUsable"))
+                return " ({cmd}light " + (item.Call<string>("QueryLightWord") ?? "light") + "{/})";
+        return "";
+    }
+
     private const string FightingNote = "You are fighting! You cannot do that now. Break away with {cmd}flee{/} first.";
 
     /// <summary>

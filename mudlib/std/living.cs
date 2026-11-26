@@ -1094,6 +1094,12 @@ public abstract class Living : Thing
         CheckFightOver();
     }
 
+    /// <summary>How many of this creature's enemies are in the room with it (the dark look says "Something is fighting you" for each).</summary>
+    public int QueryEnemiesHere() { var room = Environment(); return enemies.Count(e => e.IsAlive && Environment(e) == room); }
+
+    /// <summary>Does this creature see in the dark as in a lit room? Players do not; a monster does unless its file says otherwise (docs/specs/light.md).</summary>
+    public virtual bool QueryDarkSight() => false;
+
     /// <summary>Is there an enemy in the room right now?</summary>
     public bool QueryInCombat()
     {

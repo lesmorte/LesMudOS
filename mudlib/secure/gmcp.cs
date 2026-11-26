@@ -209,7 +209,11 @@ public class GmcpDaemon : MudObject
             ["num"] = number, ["name"] = Cut(Str(facts, "name"), 120), ["area"] = Cut(area, 80), ["environment"] = environment,
             ["exits"] = exits, ["doors"] = doors,
         };
-        var key = number + "|" + info["name"] + "|" + area + "|" + environment + "|" + string.Join(",", exits.Select(x => x.Key + "=" + x.Value)) + "|" + string.Join(",", doors.Select(x => x.Key + "=" + x.Value));
+        // What the character sees the light as (their own light counts): "lit", "dim" or "dark". A dark room still gives its real name, with only the ways the
+        // character knows (the room does that); nothing about creatures or things is ever sent.
+        var light = Str(facts, "light");
+        if (light is "lit" or "dim" or "dark") info["light"] = light; else light = "";
+        var key = number + "|" + info["name"] + "|" + area + "|" + environment + "|" + string.Join(",", exits.Select(x => x.Key + "=" + x.Value)) + "|" + string.Join(",", doors.Select(x => x.Key + "=" + x.Value)) + "|" + light;
         if (!look && key == st.Room) return;
         st.Room = key;
         GmcpSend(player, "Room.Info", info);
