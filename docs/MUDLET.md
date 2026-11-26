@@ -1,8 +1,8 @@
-# Mudlet map and gauges for Legends of Hollowmere
+# Mudlet map, gauges and quests for Legends of Hollowmere
 
 > **UNTESTED in a real Mudlet.** There is no Mudlet in the build environment, so this package has never been loaded into one. It is written against Mudlet's documented Lua API, its Lua logic is tested with a stand-in for that API (see "How it was tested"), and the game side (GMCP) is fully tested over TCP. Expect to find things to fix the first time you try it, and please report them. Exactly what is and is not verified is listed at the end.
 
-Mudlet cannot draw a map by itself: it needs the game to say which room the player is in. The game now says so with GMCP (telnet option 201); this package turns those messages into a Mudlet map, follows you around it, and shows your Vitality, Endurance and Focus as bars.
+Mudlet cannot draw a map by itself: it needs the game to say which room the player is in. The game now says so with GMCP (telnet option 201); this package turns those messages into a Mudlet map, follows you around it, shows your Vitality, Endurance and Focus as bars, and (package 1.1.0) adds a Quests panel.
 
 ## Install
 
@@ -25,9 +25,25 @@ To rebuild the package from the Lua source (`clients/mudlet/src`): `python3 clie
 
 The package asks the game for `Room`, `Char` and `Comm.Channel` with `Core.Supports.Add`. The game also sends `Char.Status` (name, calling, level, experience, gold) and `Comm.Channel.Text` (tells, shouts and channel lines); this package does not use them, but Mudlet puts them in the `gmcp` table (`gmcp.Char.Status`, `gmcp.Comm.Channel.Text`) for your own scripts.
 
+## The Quests panel (package 1.1.0)
+
+A panel docked on the right of the main window (380 pixels; the map and the text window shrink to make room), headed "Quests", with three tabs: **Active**, **Completed**, **Abandoned**, each showing its count.
+
+- **Active** lists your active quests, six at a time (Prev / Next below the list), with their progress. Click one: the top of the detail area shows who gave it, where and when, the objectives (`[ ]` and `[x]`) and the progress; below it is the whole conversation about the quest, oldest first and newest at the bottom, with the speakers' names coloured (you in yellow, others in cyan) and progress notes marked with a green `*`. Long lines wrap.
+- **Completed** and **Abandoned** show, for each quest, its name, the date, who gave it, a small summary and (completed) the reward. They keep no conversation.
+- It is filled only from `Char.Quests.List` and `Char.Quests.Log`; no trigger reads the game's text. The game keeps the journal with your character and sends it again at every login, so nothing is saved by the package and a reconnect shows the same journal (after a disconnection the panel says "Disconnected: this is the journal as it was." until the game sends it again).
+- Before anything arrives it says "Waiting for the game's quest journal."; with no quests it says "No quests yet."; if the game sends nothing within 5 seconds of `Char.Status` it says the game is an older version without a quest journal.
+- Abandoning is done in the game (`abandon QUEST`), not from the panel.
+
+**To update an installed package:** uninstall "Hollowmere map and gauges" in Package Manager and install the new `Hollowmere.mpackage` (version 1.1.0, now named "Hollowmere map, gauges and quests"). Your map is not affected.
+
+**Mudlet functions added in `src/quests.lua`:** `Geyser.Container:new`; `Geyser.Label:new` with `:setStyleSheet`, `:echo`, `:setClickCallback`, `:show`, `:hide`; `Geyser.MiniConsole:new` with `:clear`, `:cecho`, `:setFontSize`, `:enableAutoWrap`, `:show`, `:hide`; `setBorderRight`; and the already used `getMainWindowSize`, `registerAnonymousEventHandler`, `killAnonymousEventHandler`, `tempTimer`, `cecho`. Events: `gmcp.Char.Quests.List`, `gmcp.Char.Quests.Log`, `gmcp.Char.Status`, `sysDisconnectionEvent`.
+
+**Still never tried in a real Mudlet,** the Quests panel included. In particular unverified: the placement and look of the panel, `setBorderRight` with the map open, `enableAutoWrap` wrapping in a MiniConsole, how `<` in game text shows in `cecho` (it is replaced by an angle quote), and the order Mudlet raises `gmcp.Char.Quests.Log` when several messages arrive at once (the panel copes with a `Log` before its `List`, a hole in the numbers, and a repeat).
+
 ## What the game sends
 
-See `docs/DRIVER_API.md` (the protocol) and `docs/GAME_SYSTEMS.md`, section 16 (the packages). In short, `Room.Info` is `{num, name, area, environment, exits = {direction = number}, doors = {direction = "open"|"closed"|"locked"}}`.
+See `docs/DRIVER_API.md` (the protocol) and `docs/GAME_SYSTEMS.md`, section 16 (the packages). The quest journal is in `docs/specs/gmcp.md` and `docs/specs/quest-journal.md`. In short, `Room.Info` is `{num, name, area, environment, exits = {direction = number}, doors = {direction = "open"|"closed"|"locked"}}`.
 
 ## Known limits
 
@@ -43,6 +59,7 @@ See `docs/DRIVER_API.md` (the protocol) and `docs/GAME_SYSTEMS.md`, section 16 (
 ## How it was tested
 
 - `lua clients/mudlet/test/map_test.lua` (Lua 5.1, LuaJIT and 5.4 all pass) runs the layout and map logic against `test/stub.lua`, an in-memory stand-in for the Mudlet functions used, with small invented worlds (compass and named exits, doors, jumps, other areas, malformed messages) and with `test/village_fixture.lua`, 23 real `Room.Info` messages captured from the running game as a character walked 13 rooms of Vincent's Hollow. The stand-in follows Mudlet's documentation; it is not Mudlet.
+- `lua clients/mudlet/test/quests_test.lua` (Lua 5.1, LuaJIT, 5.4) replays `test/quests_fixture.lua`, the `Char.Quests` messages of a real game session (a quest taken, its conversation, completed, another taken, abandoned, retaken, then a reconnect), plus gaps, repeats, malformed messages, paging, the empty state and the older-game note, against the same stand-in.
 - `luacheck clients/mudlet/src clients/mudlet/test` (settings in `clients/mudlet/.luacheckrc`) is clean; every file also passes `luac5.1 -p`.
 - `tests/gmcp_test.py` tests the game's side over TCP: the offer, the framing, every package, the room numbers across a driver restart, hidden exits and doors per character, and malformed incoming messages.
 - The package builds reproducibly (`build.py --check`); the generated XML parses and each script in it is byte-for-byte the source and passes `luac5.1 -p`.
