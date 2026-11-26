@@ -1019,8 +1019,9 @@ public abstract class Living : Thing
         if (!fresh) return true;
 
         var room = Environment()!;
-        var label = QueryLabel();
-        var theirs = enemy.Call<string>("QueryLabel") ?? "it";
+        var unseen = room.Call<string>("QueryLightState") == "dark";
+        var label = unseen ? "something" : QueryLabel();
+        var theirs = unseen ? "something" : enemy.Call<string>("QueryLabel") ?? "it";
         Tell($"You attack {theirs}.\n");
         TellObject(enemy, $"{Cap(label)} attacks you!\n");
         TellRoom(room, $"{Cap(label)} attacks {theirs}!\n", Self, enemy);
@@ -1093,6 +1094,10 @@ public abstract class Living : Thing
         absentSince.Clear();
         CheckFightOver();
     }
+
+    /// <summary>Tell a room two versions of a line: the full one where there is light to see by, the other in the dark (docs/specs/light.md, section 5).</summary>
+    protected void TellRoomLit(ObjectRef room, string fullText, string darkText, params ObjectRef[] exclude) =>
+        TellRoom(room, room.Call<string>("QueryLightState") == "dark" ? darkText : fullText, exclude);
 
     /// <summary>How many of this creature's enemies are in the room with it (the dark look says "Something is fighting you" for each).</summary>
     public int QueryEnemiesHere() { var room = Environment(); return enemies.Count(e => e.IsAlive && Environment(e) == room); }
@@ -1379,15 +1384,20 @@ public abstract class Living : Thing
     {
         var room = Environment();
         if (room == null) return;
-        var label = Cap(QueryLabel());
-        var theirs = target.Call<string>("QueryLabel") ?? "it";
+        // The light of the room (docs/specs/light.md): in the dark nobody is named, and a creature that cannot see fights worse.
+        var light = LoadObject("/secure/light");
+        var lightLevel = light.Call<int>("QueryLevel", room);
+        var dark = lightLevel < 0;
+        var label = dark ? "Something" : Cap(QueryLabel());
+        var self_ = dark ? "something" : QueryLabel();
+        var theirs = dark ? "something" : target.Call<string>("QueryLabel") ?? "it";
 
         // 1. The defender's dodge, before the hit roll.
         if (target.Call<bool>("RollDodge"))
         {
             Tell($"{Cap(theirs)} dodges your attack.\n");
-            TellObject(target, $"You dodge {QueryLabel()}'s attack.\n");
-            TellRoom(room, $"{Cap(theirs)} dodges {QueryLabel()}'s attack.\n", Self, target);
+            TellObject(target, $"You dodge {self_}'s attack.\n");
+            TellRoom(room, $"{Cap(theirs)} dodges {self_}'s attack.\n", Self, target);
             action.Skill?.Call("OnMiss", Self, target);
             return;
         }
@@ -1395,7 +1405,8 @@ public abstract class Living : Thing
         // 2. d20 + Attack against 10 + Armor + Defense. A natural 20 always hits, a natural 1 always misses.
         var roll = Random(20) + 1;
         var need = 10 + target.Call<int>("QueryArmor") + target.Call<int>("QueryDefense");
-        var hit = roll == 20 || (roll != 1 && roll + QueryAttack() + action.ToHitBonus >= need);
+        var lightPenalty = lightLevel >= 1 ? 0 : light.Call<int>("ToHitPenalty", lightLevel, QueryWeaponCategory() == "bow", QueryDarkSight());
+        var hit = roll == 20 || (roll != 1 && roll + QueryAttack() + action.ToHitBonus + lightPenalty >= need);
         if (!hit)
         {
             Tell($"You miss {theirs}.\n");

@@ -25,7 +25,10 @@ public class WallLight : Thing
     public override void OnMoved(ObjectRef? from)
     {
         if (Environment() == null) return;
-        // After the room has finished making itself: the register looks at the room, which may be in the middle of its own Create().
+        // At once if it can be, so that the first look at a room that has only just loaded is already lit; and again a moment later, after the
+        // room has finished making itself (the register looks at the room, which may be in the middle of its own Create()).
+        try { LoadObject("/secure/light").Call("AddSource", Self); }
+        catch (MudRuntimeException) { }
         CallOut(() =>
         {
             try { if (Environment() != null) LoadObject("/secure/light").Call("AddSource", Self); }

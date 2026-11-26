@@ -101,6 +101,15 @@ public class Shopkeeper : Npc
         AddAction("price", CmdValue);   // the same question in the word players reach for first
     }
 
+    /// <summary>In the dark you cannot see the goods (docs/specs/light.md, section 5): says so and returns true.</summary>
+    protected bool TooDark()
+    {
+        var player = ThisPlayer();
+        if (player == null || Environment(player) is not { } room || room.Call<string>("QueryLightState") != "dark") return false;
+        TellObject(player, "It is too dark to see the goods.\n");
+        return true;
+    }
+
     private Stock? Find(string name)
     {
         var id = name.ToLowerInvariant();
@@ -115,6 +124,7 @@ public class Shopkeeper : Npc
 
     private bool CmdBrowse(string args)
     {
+        if (TooDark()) return true;
         var text = new StringBuilder($"{Name} has these for sale:\n");
         foreach (var entry in stock)
             if (entry.Sample is { IsAlive: true } sample)
@@ -130,6 +140,7 @@ public class Shopkeeper : Npc
 
     private bool CmdBuy(string args)
     {
+        if (TooDark()) return true;
         if (args == "" || !ParseAmount(args, out var count, out var all, out var noun) || all) { NotifyFail("Buy what?"); return false; }
         var entry = Find(noun);
         var buyer = ThisPlayer();
@@ -182,6 +193,7 @@ public class Shopkeeper : Npc
 
     private bool CmdSell(string args)
     {
+        if (TooDark()) return true;
         var seller = ThisPlayer();
         if (args == "" || seller == null || !ParseAmount(args, out var count, out var all, out var noun)) { NotifyFail("Sell what?"); return false; }
         List<ObjectRef> found;
@@ -222,6 +234,7 @@ public class Shopkeeper : Npc
 
     private bool CmdValue(string args)
     {
+        if (TooDark()) return true;
         var asker = ThisPlayer();
         var item = args == "" || asker == null ? null : Present(args, asker);
         if (item != null)

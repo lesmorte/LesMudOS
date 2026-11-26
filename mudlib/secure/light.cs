@@ -43,6 +43,9 @@ public class LightDaemon : MudObject
     private readonly List<ObjectRef> sources = new();
     private readonly Dictionary<ObjectRef, long> glowers = new();
     private readonly Dictionary<ObjectRef, int> known = new();
+    /// <summary>A computed level is reused for this long unless the register is told of a change (a source lit or put out, a move through an exit).</summary>
+    public const int CacheMs = 400;
+    private readonly Dictionary<ObjectRef, (int level, long at)> cache = new();
     private bool sweeping;
     private int burnScale = 1;
 
@@ -58,7 +61,7 @@ public class LightDaemon : MudObject
     /// <summary>The to-hit modifier for an attack in a room of this light. ranged: a bow is wielded. sees: the attacker sees in the dark (or the room is lit).</summary>
     public int ToHitPenalty(int level, bool ranged, bool sees)
     {
-        if (level >= 1 || sees && level < 0) return 0;
+        if (level >= 1 || sees) return 0;
         if (level == 0) return ranged ? DimRanged : DimMelee;
         return ranged ? DarkRanged : DarkMelee;
     }
@@ -79,6 +82,12 @@ public class LightDaemon : MudObject
     /// TODO(search): not yet hooked into the search check (docs/specs/search.md); the hook is Room.SearchModifier(searcher), see Room.LightSearchModifier.
     /// </summary>
     public int SearchModifier(int level, bool byFeel) => byFeel || level >= 1 ? 0 : level == 0 ? SearchDim : SearchDark;
+
+    /// <summary>The change to a harvest quality score in a room of this light: dim -5; lit 0 (dark is refused before it is asked).</summary>
+    public int QueryHarvestModifier(int level) => level == 0 ? -HarvestDimPenalty : 0;
+
+    /// <summary>The change to a crafted quality in tiers: dim -0.25; lit 0 (dark is refused before it is asked).</summary>
+    public double QueryCraftShift(int level) => level == 0 ? -CraftDimTierShift : 0.0;
 
     // ------------------------------------------------------------------
     // Asking
@@ -107,30 +116,42 @@ public class LightDaemon : MudObject
     private int Compute(ObjectRef room)
     {
         var total = BaseOf(room);
-        for (var i = sources.Count - 1; i >= 0; i--)
+        foreach (var ob in AllInventory(room).ToList())
         {
-            var src = sources[i];
-            if (!src.IsAlive) { sources.RemoveAt(i); continue; }
-            if (!src.Call<bool>("QueryLit") || RoomOf(src) != room || !MayLight(src, room)) continue;
-            total += Math.Clamp(src.Call<int>("QueryLightValue"), SourceMin, SourceMax);
-        }
-        foreach (var who in glowers.Keys.ToList())
-        {
-            if (!who.IsAlive) { glowers.Remove(who); continue; }
-            if (RoomOf(who) != room || !MayLight(who, room)) continue;
-            total += Math.Clamp((int)Math.Round(who.Call<double>("QueryMod", "light")), 0, GlowMax);
+            if (!ob.IsAlive) continue;
+            if (Living(ob))
+            {
+                foreach (var held in AllInventory(ob)) total += LightOf(held, room);
+                if (glowers.ContainsKey(ob) && MayLight(ob, room)) total += Math.Clamp((int)Math.Round(ob.Call<double>("QueryMod", "light")), 0, GlowMax);
+            }
+            else total += LightOf(ob, room);
         }
         return Math.Clamp(total, TotalMin, TotalMax);
     }
 
-    /// <summary>The domain wall: a source lights only the room of its own domain, and in the real game only if it is trusted code.</summary>
-    private static bool MayLight(ObjectRef source, ObjectRef room) => source.Domain == room.Domain && (room.Domain != "" || Trusted(source));
+    /// <summary>What one thing in or carried into a room adds: its light if it is a lit source (clamped), else 0. The domain wall is here.</summary>
+    private int LightOf(ObjectRef ob, ObjectRef room)
+    {
+        if (!ob.IsAlive || !ob.Call<bool>("IsLightSource") || !ob.Call<bool>("QueryLit") || !MayLight(ob, room)) return 0;
+        return Math.Clamp(ob.Call<int>("QueryLightValue"), SourceMin, SourceMax);
+    }
+
+    /// <summary>
+    /// The domain wall. A trusted thing of the real game lights any room it is in (a wizard's own torch in their workshop included); a
+    /// thing of a wizard's workshop lights only the rooms of that same workshop, and never a real room.
+    /// </summary>
+    private static bool MayLight(ObjectRef source, ObjectRef room) => source.Domain == room.Domain ? (room.Domain != "" || Trusted(source)) : source.Domain == "" && Trusted(source);
 
     /// <summary>The light of a room now, -3 to +3. Never throws: a thing that is not a room has the default light of 1.</summary>
     public int QueryLevel(ObjectRef room)
     {
         if (room == null || !room.IsAlive || !room.Call<bool>("IsRoom")) return StateLit;
-        return Compute(room);
+        var now = TimeMs();
+        if (cache.TryGetValue(room, out var hit) && now - hit.at < CacheMs) return hit.level;
+        var level = Compute(room);
+        if (cache.Count > 256) cache.Clear();
+        cache[room] = (level, now);
+        return level;
     }
 
     /// <summary>The state of a room as a character in it sees it: "lit", "dim" or "dark".</summary>
@@ -139,13 +160,15 @@ public class LightDaemon : MudObject
     /// <summary>The state as a number: 1, 0 or -1.</summary>
     public int QueryStateNumber(ObjectRef room) => StateOf(QueryLevel(room));
 
-    /// <summary>Is any lit light carried by this creature, or Glow on it? (A sneaker with a light is a beacon.)</summary>
+    /// <summary>Does this creature carry a lit light, or have a Glow on it? (A sneaker with a light is a beacon.)</summary>
     public bool QueryCarriesLight(ObjectRef who)
     {
         if (who == null || !who.IsAlive) return false;
-        if (glowers.ContainsKey(who) && who.Call<double>("QueryMod", "light") > 0) return true;
-        foreach (var src in sources)
-            if (src.IsAlive && Environment(src) == who && src.Call<bool>("QueryLit") && src.Call<int>("QueryLightValue") > 0 && MayLight(src, Environment(who) ?? who)) return true;
+        var room = Environment(who);
+        if (room == null) return false;
+        if (glowers.ContainsKey(who) && MayLight(who, room) && who.Call<double>("QueryMod", "light") > 0) return true;
+        foreach (var held in AllInventory(who))
+            if (LightOf(held, room) > 0) return true;
         return false;
     }
 
@@ -201,8 +224,10 @@ public class LightDaemon : MudObject
         if (!who.IsAlive) { glowers.Remove(who); return; }
         if (glowers.TryGetValue(who, out var until) && until > TimeMs()) return; // recast: a later end is already waiting
         var room = RoomOf(who);
+        if (room != null) Touch(room);
         glowers.Remove(who);
-        if (room != null) { Touch(room); Settle(room); }
+        if (!who.Call<bool>("QueryHasEffect", "light")) TellObject(who, "Your light fades.\n");
+        if (room != null) Settle(room);
     }
 
     /// <summary>Remember the state of a room before something changes it, so that the change can be told.</summary>
@@ -211,6 +236,7 @@ public class LightDaemon : MudObject
         if (room == null || !room.IsAlive || known.Count > 512 && !known.ContainsKey(room)) return;
         if (!room.Call<bool>("IsRoom")) return;
         if (!known.ContainsKey(room)) known[room] = Compute(room);
+        cache.Remove(room);
     }
 
     /// <summary>Something that may have changed the light of these rooms has moved (a creature through an exit, a pick-up or a drop, a death). Recomputes and tells a change of state.</summary>
@@ -223,7 +249,9 @@ public class LightDaemon : MudObject
     private void Settle(ObjectRef room)
     {
         if (!room.Call<bool>("IsRoom")) return;
+        cache.Remove(room);
         var now = Compute(room);
+        cache[room] = (now, TimeMs());
         if (!known.TryGetValue(room, out var before)) { known[room] = now; return; }
         known[room] = now;
         var was = StateOf(before);
