@@ -364,6 +364,10 @@ def example(label, value):
 
 
 def lua_value(value):
+    if value is None:
+        return "nil"
+    if isinstance(value, list):
+        return "{" + ", ".join(lua_value(v) for v in value) + "}"
     if isinstance(value, dict):
         return "{" + ", ".join(f"[{json.dumps(k)}] = {lua_value(v)}" for k, v in value.items()) + "}"
     if isinstance(value, bool):
@@ -526,6 +530,7 @@ def quests_section(warden):
     truth("a client that adds the package later gets the list again with `quests`", late is not None and late["quests"] and late["quests"][0]["id"] == "overseers-orders", late)
     # reconnect: the game resends the lot
     active_before = [x["id"] for x in again["quests"] if x["state"] == "active"] if again else []
+    earlier = [(p, v) for p, v in dana.frames if p.startswith("Char.Quests")]
     dana.send("quit")
     dana.closed(5)
     time.sleep(1)
@@ -536,6 +541,12 @@ def quests_section(warden):
     truth("and the log of each active quest, whole, with reset true", [v["id"] for v in logs if v["reset"]] == active_before and all(v["entries"] for v in logs), logs)
     truth("and nothing for the completed one", all(v["id"] != "overseers-orders" for v in logs), logs)
     truth("no message of the package is over the driver's limit", all(len(json.dumps(v)) < 16000 for p, v in dana.frames if p.startswith("Char.Quests")))
+    if os.environ.get("GMCP_CAPTURE_QUESTS"):
+        # Not part of the checks: the Char.Quests messages Dana was sent, in order, as a Lua fixture for clients/mudlet/test/quests_test.lua.
+        with open(os.environ["GMCP_CAPTURE_QUESTS"], "w") as f:
+            f.write("-- Char.Quests messages as the game sent them to a character who took, finished, gave up and retook quests (tests/gmcp_test.py with GMCP_CAPTURE_QUESTS).\n")
+            f.write("-- Each entry is one message in the order it arrived: package, then the data. The last block is the login burst after a reconnect.\n")
+            f.write("return {\n" + "".join(f"  {{ package = {json.dumps(p)}, data = {lua_value(v)} }},\n" for p, v in earlier + [("reconnect", None)] + [(p, v) for p, v in dana.frames if p.startswith("Char.Quests")]) + "}\n")
     for c in (dana, erin, walt):
         c.send("quit")
 

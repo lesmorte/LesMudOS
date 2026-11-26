@@ -48,6 +48,7 @@ end
 function killAnonymousEventHandler(id) S.handlers[id] = nil return true end
 function getMainWindowSize() return 800, 600 end
 function setBorderBottom(n) S.border = n end
+function setBorderRight(n) S.borderRight = n end
 
 -- Geyser: containers and gauges that remember what they were told
 Geyser = { Container = {}, Gauge = {} }
@@ -61,6 +62,37 @@ function Geyser.Gauge:new(cons, parent)
 end
 function Geyser.Gauge:setColor(r, g, b) self.color = { r, g, b } end
 function Geyser.Gauge:setValue(now, max, text) self.now, self.max, self.text = now, max, text end
+
+-- Geyser labels and mini consoles remember what they were told (the quests panel)
+Geyser.Label = {}
+function Geyser.Label:new(cons, parent)
+  local o = { cons = cons, parent = parent, text = "", style = "", visible = true }
+  setmetatable(o, { __index = self })
+  S.labels = S.labels or {}
+  S.labels[cons.name] = o
+  return o
+end
+function Geyser.Label:echo(text) self.text = text end
+function Geyser.Label:setStyleSheet(css) self.style = css end
+function Geyser.Label:setClickCallback(fn) self.click = fn end
+function Geyser.Label:show() self.visible = true end
+function Geyser.Label:hide() self.visible = false end
+function Geyser.Label:press() if self.click then self.click() end end
+
+Geyser.MiniConsole = {}
+function Geyser.MiniConsole:new(cons, parent)
+  local o = { cons = cons, parent = parent, text = "", visible = true, wrap = false }
+  setmetatable(o, { __index = self })
+  S.consoles = S.consoles or {}
+  S.consoles[cons.name] = o
+  return o
+end
+function Geyser.MiniConsole:clear() self.text = "" end
+function Geyser.MiniConsole:cecho(text) self.text = self.text .. text end
+function Geyser.MiniConsole:setFontSize(n) self.fontSize = n end
+function Geyser.MiniConsole:enableAutoWrap() self.wrap = true end
+function Geyser.MiniConsole:show() self.visible = true end
+function Geyser.MiniConsole:hide() self.visible = false end
 
 -- Fire the handlers registered for an event, with `gmcp` set as Mudlet sets it.
 function S.fire(event, ...)

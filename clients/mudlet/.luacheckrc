@@ -8,10 +8,11 @@ read_globals = {
   "addRoom", "roomExists", "setRoomName", "setRoomArea", "addAreaName", "getAreaTable", "getAreaRooms", "getRoomArea",
   "setRoomCoordinates", "getRoomCoordinates", "getRoomsByPosition", "setRoomEnv",
   "setExit", "setExitStub", "addSpecialExit", "getSpecialExitsSwap", "setDoor", "centerview", "updateMap",
-  "getMainWindowSize", "setBorderBottom",
+  "getMainWindowSize", "setBorderBottom", "setBorderRight",
 }
 
 -- The stand-in for Mudlet defines Mudlet's functions as globals on purpose.
 files["test/stub.lua"] = { ignore = { "1" } }
 files["test/map_test.lua"] = { ignore = { "1" } }
-exclude_files = { "test/village_fixture.lua" }
+files["test/quests_test.lua"] = { ignore = { "1", "631" } }
+exclude_files = { "test/village_fixture.lua", "test/quests_fixture.lua" }

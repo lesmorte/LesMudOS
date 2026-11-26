@@ -841,7 +841,7 @@ public abstract class QuestJournal : Living
             if (state == "active")
             {
                 var objectives = Objectives(id);
-                d["objective"] = string.Join(" ", objectives.Select(o => o.text));
+                d["objective"] = string.Join("; ", objectives.Select(o => o.text));
                 d["progress"] = ProgressText(objectives);
                 d["objectives"] = objectives.Select(o => (object?)new Dictionary<string, object?> { ["text"] = o.text, ["have"] = o.have, ["need"] = o.need }).ToList();
                 d["entries"] = LogOf(id).Count;
