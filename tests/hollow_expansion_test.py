@@ -91,11 +91,11 @@ def stock_of(npc):
 
 
 def topics_of(npc):
-    return [(m.group(1).split(","), m.group(2)) for m in re.finditer(r'AddTopic\(\s*' + STR + r'\s*,\s*' + STR + r'\s*\)', source(npc))]
+    return [(m.group(1).split(","), m.group(2)) for m in re.finditer(r'AddTopic\(\s*' + STR + r'\s*,\s*' + STR + r'\s*(?:,\s*[A-Za-z]+\s*)?\)', source(npc))]
 
 
 def chats_of(npc):
-    return [m.group(1) for m in re.finditer(r'AddChat\(\s*' + STR + r'\s*\)', source(npc))]
+    return [m.group(1) for m in re.finditer(r'AddChat\(\s*' + STR + r'\s*(?:,\s*[A-Za-z]+\s*)?\)', source(npc))]
 
 
 readables = {}
