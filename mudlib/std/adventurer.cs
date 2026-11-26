@@ -1,4 +1,4 @@
-// @inherit /std/living
+// @inherit /std/questjournal
 // @use /std/skill
 
 /// <summary>
@@ -6,7 +6,7 @@
 /// death and respawn, quests and the saved character. /std/player inherits this
 /// and adds accounts, wizard tools and files.
 /// </summary>
-public abstract class Adventurer : Living
+public abstract class Adventurer : QuestJournal
 {
     private const string RespawnRoom = "/domains/hollow/village/guest_rooms";
     private const string Registry = "/secure/classes";
@@ -30,8 +30,6 @@ public abstract class Adventurer : Living
     [Saved] private string advancedClass = "";
     [Saved] private string subclass = "";
     [Saved] private string prestigeClass = "";
-    [Saved] private Dictionary<string, int> quests = new();
-    [Saved] private Dictionary<string, string> questTitles = new();
     [Saved] private List<string> killed = new();
     // One save record per carried object: its program path, then "?" and its state (quality, quantity, properties) unless
     // that is the default. Saves made before item state existed hold bare paths, which load as items in the default state.
@@ -413,16 +411,7 @@ public abstract class Adventurer : Living
         }
     }
 
-    public int QueryQuest(string id) => quests.TryGetValue(id, out var state) ? state : 0;
-
-    public void SetQuest(string id, int state) => quests[id] = state;
-
-    /// <summary>Set a quest's state and the title the quest log shows for it ("Clear the Cellar").</summary>
-    public void SetQuest(string id, int state, string title)
-    {
-        quests[id] = state;
-        questTitles[id] = title;
-    }
+    // QueryQuest and SetQuest are the quest journal's (/std/questjournal).
 
     public void NotifyKill(string programPath)
     {
@@ -937,6 +926,7 @@ public abstract class Adventurer : Living
         AddAction("skills", CmdSkills);
         AddAction("improve", CmdImprove);
         AddAction("quests", CmdQuests);
+        BindJournalCommands(); // quest NAME, abandon NAME
         AddAction("search", CmdSearch);
         BindCraftCommands(); // crafting and gathering, below
         // Builder tools. Each handler checks the wizard level on every use and
@@ -1040,6 +1030,7 @@ public abstract class Adventurer : Living
 
     private void GmcpPoll()
     {
+        JournalPoll(adventureBegun); // the quest journal's GMCP (Char.Quests.*) and its objective notes
         if (adventureBegun && GmcpActive(Self)) LoadObject("/secure/gmcp").Call("Poll", Self);
     }
 
@@ -2013,7 +2004,8 @@ public abstract class Adventurer : Living
 
     private bool CmdQuests(string args)
     {
-        Write(QuestLog());
+        if (JournalQuestsCommand(args)) return true; // quests completed | abandoned | NAME
+        Write(QuestLog() + JournalFooter());
         return true;
     }
 
