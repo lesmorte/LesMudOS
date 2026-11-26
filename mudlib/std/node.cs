@@ -57,7 +57,7 @@ public class Node : Thing
         if (Self.Domain == "" && InTrusted(Self.ProgramPath) && !(caller != null && caller.Domain == "" && InTrusted(caller.ProgramPath))) return false;
         var room = Environment();
         if (room == null || !who.IsAlive || Environment(who) != room || !who.Call<bool>("IsCreature")) return false;
-        if (QueryCharges() <= 0) return false;
+        if (QueryCharges() <= 0 || HiddenFrom(who)) return false;
         regrowAt.Add(TimeMs() + RegrowSeconds * 1000L);
         return true;
     }
@@ -71,9 +71,16 @@ public class Node : Thing
         return false;
     }
 
-    public override bool Id(string id) => base.Id(id) || Kind.ToLowerInvariant() == id || Kind.ToLowerInvariant().Split(' ').Contains(id);
+    /// <summary>Is this node one its room hides (Room.HideNode) from this character, who has not found it? Then it is not listed, not looked at, not harvested.</summary>
+    private bool HiddenFrom(ObjectRef? who) => who != null && Environment() is { } room && room.Call<bool>("QueryNodeHiddenFrom", Self, who);
 
-    public override string? Short() => QueryCharges() > 0 || PickedShort == "" ? base.Short() : PickedShort;
+    public override bool Id(string id) => !HiddenFrom(ThisPlayer()) && (base.Id(id) || Kind.ToLowerInvariant() == id || Kind.ToLowerInvariant().Split(' ').Contains(id));
+
+    public override string? Short()
+    {
+        if (HiddenFrom(ThisPlayer())) return null;
+        return QueryCharges() > 0 || PickedShort == "" ? base.Short() : PickedShort;
+    }
 
     public override string Long()
     {

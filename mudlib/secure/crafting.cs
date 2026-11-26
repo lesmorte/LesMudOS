@@ -1235,7 +1235,7 @@ public class CraftingDaemon : Thing
         var room = Environment(who);
         if (room == null) return Say1("There is nothing here to harvest.");
         ObjectRef? node;
-        if (args == "") node = AllInventory(room).FirstOrDefault(o => o.IsAlive && o.Call<bool>("IsNode"));
+        if (args == "") node = AllInventory(room).FirstOrDefault(o => o.IsAlive && o.Call<bool>("IsNode") && o.Call<string>("Short") != null); // a node the character has not found is not in the list
         else
         {
             node = Present(args.ToLowerInvariant(), room);

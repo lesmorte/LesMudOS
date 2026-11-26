@@ -55,12 +55,53 @@ public class Find : Thing
     /// <summary>What a later finder is told when nothing is left. Default: someone has been here before them.</summary>
     protected string? EmptyLine;
 
+    /// <summary>
+    /// 0 (the default): the find is in plain view, as every find is. A number from 6 to 25 (Room.SearchEasy, SearchModerate, SearchHard, SearchVeryHard) hides it from every
+    /// character until they have found it by a search in its room that beats this difficulty (docs/specs/search.md section 5.2): until then it is not listed, and "look at" and
+    /// "get" say they see no such thing. A character the register already lists as having taken it counts as having found it. Wizards see it, marked "(hidden)".
+    /// </summary>
+    protected int SearchDifficulty;
+    /// <summary>The words `search NAME` takes for this find (comma-separated, as in AddDetail; each is also a detail of its room).</summary>
+    protected string SearchNames = "";
+    /// <summary>What the finder reads when the search finds it.</summary>
+    protected string? FoundLine;
+    /// <summary>Found by touch or smell: the dark does not hide it (see Room.SearchModifier).</summary>
+    protected bool ByFeel;
+
     private const string Register = "/secure/finds";
 
     // The answers of the register that matter for a description (see /secure/finds).
     private const int Open = 0, WasTaken = 1, WasEmpty = 2;
 
     public override bool CanGet() => false;
+
+    // ---- Hidden finds ----
+
+    public int QuerySearchDifficulty() => SearchDifficulty;
+
+    public string QuerySearchNames() => SearchNames;
+
+    /// <summary>The key of this find in a character's record of what they have found: "#" and the program path (the register's key). Empty for a find in plain view.</summary>
+    public string QuerySearchKey() => SearchDifficulty > 0 ? "#" + Self.ProgramPath : "";
+
+    public string QueryFoundLine() => FoundLine ?? "";
+
+    public bool QueryByFeel() => ByFeel;
+
+    /// <summary>Is this find still hidden from this character? Only for a hidden find, a player character who is not a wizard, who has not found it and whom the register does not list as having taken it.</summary>
+    public bool QueryHiddenFrom(ObjectRef? who)
+    {
+        if (SearchDifficulty <= 0 || who == null || !who.IsAlive || !who.Call<bool>("IsPlayerCharacter") || who.Call<int>("QueryWizLevel") >= 1) return false;
+        var room = Environment();
+        if (room == null || who.Call<bool>("QueryFound", room.Name, QuerySearchKey())) return false;
+        return StatusFor(who) != WasTaken;
+    }
+
+    private bool WizardSeesHidden(ObjectRef? who)
+        => SearchDifficulty > 0 && who != null && who.IsAlive && who.Call<bool>("IsPlayerCharacter") && who.Call<int>("QueryWizLevel") >= 1
+           && Environment() is { } room && !who.Call<bool>("QueryFound", room.Name, QuerySearchKey());
+
+    public override bool Id(string id) => base.Id(id) && !QueryHiddenFrom(ThisPlayer());
 
     // ---- What the register says ----
 
@@ -97,6 +138,8 @@ public class Find : Thing
     public override string? Short()
     {
         var full = ShortDesc ?? Name;
+        if (QueryHiddenFrom(ThisPlayer())) return null;
+        if (WizardSeesHidden(ThisPlayer())) full += " (hidden)";
         return StatusFor(ThisPlayer()) switch
         {
             WasTaken => TakenShort ?? full + " (taken by you)",
@@ -111,6 +154,7 @@ public class Find : Thing
     /// </summary>
     public string QueryHereLine()
     {
+        if (QueryHiddenFrom(ThisPlayer())) return "";
         var full = ShortDesc ?? Name;
         var cap = full.Length == 0 ? full : char.ToUpper(full[0]) + full.Substring(1);
         return StatusFor(ThisPlayer()) switch
@@ -122,10 +166,11 @@ public class Find : Thing
     }
 
     /// <summary>True while the looker may still take from this find: "get all" skips finds (each is searched once, by name) and says so when this is true.</summary>
-    public bool QueryTakeByName() => StatusFor(ThisPlayer()) == Open;
+    public bool QueryTakeByName() => !QueryHiddenFrom(ThisPlayer()) && StatusFor(ThisPlayer()) == Open;
 
     public override string Long()
     {
+        if (QueryHiddenFrom(ThisPlayer())) return "You see nothing like that.\n"; // never reached by a look (Id says no), but never a description either
         return StatusFor(ThisPlayer()) switch
         {
             WasTaken => (TakenLong ?? "You have already taken what it held. There is nothing more in it for you.") + "\n",
@@ -143,7 +188,8 @@ public class Find : Thing
         catch (MudRuntimeException) { }
         return base.Stat() + $"  Find id {Self.ProgramPath}: first {Gold} gold, {FallOff}% kept by each next finder, empty below {MinimumGold}" +
                (ItemPath != null ? $", item {ItemPath} for {(ItemFinders > 0 ? "the first " + ItemFinders : "every")} finder{(ItemFinders == 1 ? "" : "s")}" : "") +
-               $"; {finders} finder(s) so far\n";
+               $"; {finders} finder(s) so far\n" +
+               (SearchDifficulty > 0 ? $"  Hidden: difficulty {SearchDifficulty}, names '{SearchNames}'{(ByFeel ? ", by feel" : "")}\n" : "");
     }
 
     // ---- The words ----
@@ -168,7 +214,7 @@ public class Find : Thing
         var room = Environment();
         var word = args.Trim().ToLowerInvariant();
         if (QueryVerb() == "pick" && word.StartsWith("up ")) word = word.Substring(3).Trim(); // "pick up bundle"
-        if (who == null || room == null || word == "" || Environment(who) != room || !Id(word) || Present(word, room) != Self) return false;
+        if (who == null || room == null || word == "" || Environment(who) != room || QueryHiddenFrom(who) || !Id(word) || Present(word, room) != Self) return false;
 
         List<int>? answer;
         try { answer = LoadObject(Register).Call<List<int>>("Claim", who, Gold, FallOff, MinimumGold, ItemPath != null, ItemFinders); }

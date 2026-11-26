@@ -475,6 +475,15 @@ public class Player : Adventurer
                   "{cmd}train{/} SKILL buys the next rank. Ranks cannot be skipped. {cmd}skills{/} shows your rank in each and the next rank's level.\n");
             return true;
         }
+        if (args.Trim().ToLowerInvariant() == "search")
+        {
+            Write("Search: {cmd}search{/} looks the whole place over for hidden things (a way, a stash, a scrap of writing); {cmd}search{/} THING looks at one spot that a\n" +
+                  "room's description points at ({cmd}search sacking{/}), which helps a little. It takes about three seconds, and an attack breaks it off. Your chance is\n" +
+                  "higher with Insight (each point above 5 is 5 in a hundred) and a Scout's Keen Eye adds two points more. A search that finds nothing needs a minute's rest\n" +
+                  "before you may search the same room again (leave and come back and the minute is still running). Searching is not quiet: it ends sneaking and gets you\n" +
+                  "up from resting. A thing you find is found for you alone. Looking at what a room mentions may show you a hidden way at once.\n");
+            return true;
+        }
         Write(
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
             "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}time{/} [-timezone [ZONE|REGION|none]] (your own time zone), {cmd}charset{/} [ascii|utf8] (or {cmd}ascii{/} [on|off]: plain 7-bit characters if the boxes of {cmd}score{/} look wrong), {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
@@ -484,7 +493,7 @@ public class Player : Adventurer
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "           A bow in your hands gives you a head start when you choose the fight: the target's first action waits two seconds more (never when a creature attacks you first).\n" +
             "           A Scout's {cmd}aim{/} (Aimed Shot, bow only) hits hardest as the shot that starts a fight (never more than a share of the target's full Vitality, unless you are three levels above it), and is spoiled if a blow lands while you aim. A Priest cannot cast {cmd}heal{/} again for 15 seconds after one, and what it heals in the Priest who casts it is a third of what it gives another.\n" +
-            "Sneaking:  a Scout's {cmd}sneak{/} [on|off] (turn it on before you enter a room): each room costs Endurance, and the creatures there may not notice you. Attacking, any skill but Tracking, picking things up, opening a door or chest, {cmd}say{/} and {cmd}shout{/} end it and wake the room;\n" +
+            "Sneaking:  a Scout's {cmd}sneak{/} [on|off] (turn it on before you enter a room): each room costs Endurance, and the creatures there may not notice you. Attacking, any skill but Tracking, picking things up, opening a door or chest, {cmd}search{/}, {cmd}say{/} and {cmd}shout{/} end it and wake the room;\n" +
             "           {cmd}look{/}, {cmd}rest{/}, {cmd}tell{/} and {cmd}track{/} do not. A creature that has seen you keeps you from sneaking until it dies or you leave. The {cmd}prompt{/} token for it is sneak.\n" +
             "Resting:   {cmd}rest{/} (or {cmd}sit{/}) sits you down: Vitality, Endurance and Focus return five times as fast, until you {cmd}stand{/}, move, fight, pick up, drop, wear, buy, sell or craft;\n" +
             "           a creature that finds you resting gets the first blow in (you lose two seconds more). Not while fighting. The {cmd}prompt{/} token for it is rest.\n" +
@@ -496,7 +505,7 @@ public class Player : Adventurer
             "           {cmd}shout off{/} / {cmd}shout on{/} (stop or hear shouts), {cmd}ignore{/} [PLAYER], {cmd}unignore{/} PLAYER,\n" +
             "           {cmd}channels{/} (your channels), {cmd}channel{/} NAME {cmd}on{/}|{cmd}off{/}, {cmd}shout{/} NAME TEXT or NAME TEXT to speak on one\n" +
             "People:    {cmd}talk{/} (or {cmd}greet{/}) NPC, {cmd}ask{/} NPC {cmd}about{/} TOPIC, {cmd}read{/} THING,\n" +
-            "           {cmd}give{/} [N|all] THING {cmd}to{/} PLAYER, {cmd}search{/} (for hidden ways)\n" +
+            "           {cmd}give{/} [N|all] THING {cmd}to{/} PLAYER, {cmd}search{/} [THING] (for hidden things; {cmd}help search{/})\n" +
             "Crafting:  {cmd}skin{/}, {cmd}bleed{/}, {cmd}harvest{/}, {cmd}craft{/}, {cmd}combine{/}, {cmd}recipes{/}, {cmd}recipe{/}, {cmd}proficiencies{/},\n" +
             "           {cmd}apply{/} THING; with a trainer: {cmd}lessons{/}, {cmd}learn{/} NAME ({cmd}help crafting{/}, or help with one of those words)\n" +
             "Ranks:     with a trainer of your calling: {cmd}ranks{/} (what you can learn and what it asks), {cmd}train{/} SKILL (buy the next rank; {cmd}help ranks{/})\n" +

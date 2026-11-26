@@ -1157,6 +1157,11 @@ public abstract class Adventurer : Living
     protected override void Ambushed(ObjectRef enemy)
     {
         if (sneaking) { sneaking = false; Tell("You are no longer sneaking.\n"); }
+        if (AbandonPreparation("search"))
+        {
+            searchRoom = null;
+            Tell($"You break off your search as {enemy.Call<string>("QueryLabel") ?? "something"} attacks!\n");
+        }
         if (!resting) return;
         var attacker = PreviousObject();
         if (RestEnded() || attacker != enemy || !enemy.Call<bool>("IsCreature") || Environment(enemy) != Environment()) { if (RestEnded()) EndRest(); return; }
@@ -1754,10 +1759,16 @@ public abstract class Adventurer : Living
     private const int MaxFoundExits = 1000;
     private const int MaxFoundExitsInWiz = 50; // records for rooms under /wiz are capped, so a sandbox cannot fill the save file
 
-    /// <summary>The hidden exits this character has found, as "room path|direction". Kept on the character; a room asks for its own.</summary>
+    /// <summary>
+    /// Everything this character has found in a room, as "room path|direction" for a hidden exit and "room path|#id" for any other hidden thing
+    /// (docs/specs/search.md section 5.1). Kept on the character; a room asks for its own. The saved field keeps its old name so old saves load unchanged.
+    /// </summary>
     [Saved] private List<string> foundExits = new();
 
     public bool QueryFoundExit(string roomPath, string direction) => foundExits.Contains(roomPath + "|" + direction);
+
+    /// <summary>Has this character found the thing with this key ("#id", or "#" and the program path of a hidden find) in this room?</summary>
+    public bool QueryFound(string roomPath, string key) => foundExits.Contains(roomPath + "|" + key);
 
     /// <summary>
     /// A room tells the character they have found one of its hidden exits. The room is the caller and can only record itself, for a
@@ -1767,9 +1778,27 @@ public abstract class Adventurer : Living
     public bool RecordFoundExit(string direction)
     {
         var room = PreviousObject();
-        if (room == null || room.IsClone || Environment() != room || direction == "" || direction.Contains('|')) return false;
-        if (!room.Call<List<string>>("QueryHiddenExits")?.Contains(direction) ?? true) return false;
-        var key = room.Name + "|" + direction;
+        if (direction == "" || direction.StartsWith('#') || !(room?.Call<List<string>>("QueryHiddenExits")?.Contains(direction) ?? false)) return false;
+        return AddFound(room, direction);
+    }
+
+    /// <summary>
+    /// A room tells the character they have found a hidden thing of its own: key is a direction (an exit) or "#id" for an item, node, clue or hidden
+    /// find the room declares. The same rules as RecordFoundExit: the room is the caller, can record only itself, for a character who is in it, and only a key
+    /// it really declares (QueryHiddenKeys). True if newly recorded; saved at once.
+    /// </summary>
+    public bool RecordFound(string key)
+    {
+        var room = PreviousObject();
+        if (room == null || key == "" || !key.StartsWith('#')) return RecordFoundExit(key);
+        if (!(room.Call<List<string>>("QueryHiddenKeys")?.Contains(key) ?? false)) return false;
+        return AddFound(room, key);
+    }
+
+    private bool AddFound(ObjectRef? room, string tail)
+    {
+        if (room == null || room.IsClone || Environment() != room || tail.Contains('|')) return false;
+        var key = room.Name + "|" + tail;
         if (foundExits.Contains(key) || foundExits.Count >= MaxFoundExits) return false;
         if (room.Name.StartsWith("/wiz/", StringComparison.OrdinalIgnoreCase) && foundExits.Count(k => k.StartsWith("/wiz/", StringComparison.OrdinalIgnoreCase)) >= MaxFoundExitsInWiz) return false;
         foundExits.Add(key);
@@ -1777,12 +1806,61 @@ public abstract class Adventurer : Living
         return true;
     }
 
+    // ---- Search (docs/specs/search.md) ----
+    // The numbers and the dice are in /secure/search. The wait after a failed search is kept here, on the character, and never saved; only the
+    // character's own search action (below) starts one. What a search finds is the room's business (Room.Search).
+
+    private const string SearchDaemon = "/secure/search";
+    private const int MaxSearchWaits = 32;
+    private readonly Dictionary<string, long> searchWaits = new();
+    private string searchNamed = "";
+    private ObjectRef? searchRoom;
+
+    /// <summary>The bonus this character brings to a search: Insight above 5 (one point of Insight is one point of the d20, 5%), plus the "search" modifier (the Scout's Keen Eye +2, a lens, a charm).</summary>
+    public int QuerySearchBonus() => QueryAttribute("insight") - 5 + (int)Math.Round(QueryMod("search"));
+
+    /// <summary>Whole seconds until this character may search this room again (0 if they may now).</summary>
+    public int QuerySearchWaitLeft(string roomPath)
+    {
+        if (!searchWaits.TryGetValue(roomPath ?? "", out var until)) return 0;
+        var left = until - TimeMs();
+        if (left <= 0) { searchWaits.Remove(roomPath ?? ""); return 0; }
+        return (int)((left + 999) / 1000);
+    }
+
+    private void StartSearchWait(string roomPath)
+    {
+        var now = TimeMs();
+        foreach (var old in searchWaits.Where(w => w.Value <= now).Select(w => w.Key).ToList()) searchWaits.Remove(old);
+        while (searchWaits.Count >= MaxSearchWaits) searchWaits.Remove(searchWaits.OrderBy(w => w.Value).First().Key);
+        searchWaits[roomPath] = now + LoadObject(SearchDaemon).Call<int>("QueryWaitSeconds") * 1000L;
+    }
+
     private bool CmdSearch(string args)
     {
-        if (Environment() == null) return false;
+        var room = Environment();
+        if (room == null) return false;
         if (QueryInCombat()) { Write("You cannot search while you are fighting.\n"); return true; }
-        // A short action on the combat clock: its delay is your Reaction Time less 1 (not below 0), about 3 seconds.
-        ActAsAction(new CombatAction { Id = "search", Name = "Search", Kind = "search", Preparation = 0, Recovery = 0, ReactionMod = -1.0 }, "search");
+        var named = args.Trim().ToLowerInvariant();
+        foreach (var article in new[] { "the ", "a ", "an " }) if (named.StartsWith(article)) { named = named.Substring(article.Length).Trim(); break; }
+        if (named.Length > 40) named = named.Substring(0, 40);
+        var left = QuerySearchWaitLeft(room.Name);
+        if (left > 0)
+        {
+            Write($"You have only just searched here; your eyes need a rest. Try again in about {(left + 9) / 10 * 10} seconds.\n");
+            return true;
+        }
+        // Searching is loud, like opening a chest: it ends sneaking (and wakes whatever had not noticed), and it gets a seated character up.
+        LeaveRest();
+        EndSneakLoud();
+        searchNamed = named;
+        searchRoom = room;
+        // 3 seconds to the result (Preparation 1.5 units); the character may act again after Reaction Time less 0.5, doubled. A blow spoils it, and so does an attack.
+        ActAsAction(new CombatAction
+        {
+            Id = "search", Name = "Search", Kind = "search", Preparation = 1.5, Recovery = 0, ReactionMod = -0.5, Spoilable = true,
+            WindUp = named == "" ? "searches the area carefully" : $"searches the {named} carefully",
+        }, named == "" ? "search" : $"search the {named}");
         return true;
     }
 
@@ -1790,10 +1868,13 @@ public abstract class Adventurer : Living
     {
         if (action.Kind != "search") { base.Special(action, target); return; }
         var room = Environment();
-        if (room == null) return;
+        var started = searchRoom;
+        searchRoom = null;
+        if (room == null || room != started) return; // walked away while searching: nothing comes of it
         if (QueryInCombat()) { Tell("You cannot search while you are fighting.\n"); return; }
-        TellRoom(room, $"{Name} searches the area carefully.\n", Self);
-        if (!room.Call<bool>("Search", Self)) Tell("You search carefully but find nothing of note.\n");
+        if (room.Call<int>("Search", Self, searchNamed) > 0) return; // the room has told the finder, and the others
+        Tell("You search carefully but find nothing of note.\n(You will need a minute before you can look this place over properly again.)\n");
+        StartSearchWait(room.Name);
     }
 
     private bool CmdConsider(string args)

@@ -299,7 +299,7 @@ public class Master : MudObject, IMaster
 
     // What a workshop's rooms may do to a visitor besides reading: walk them through an exit as /std/room does (the visitor's body
     // is checkpointed like the owner's, so nothing done to it lasts; what matters is that the workshop cannot speak as the game).
-    private static readonly HashSet<string> VisitorMoves = new() { "SneakDeparts", "RecordArrival", "RecordFoundExit", "Look" };
+    private static readonly HashSet<string> VisitorMoves = new() { "SneakDeparts", "RecordArrival", "RecordFoundExit", "RecordFound", "Look" };
 
     // Functions that only read, by the naming rule every public function of the game keeps (docs/SANDBOX.md section 3).
     private static readonly string[] ReadOnlyPrefixes = { "Query", "Is", "Has", "Can" };
@@ -311,6 +311,7 @@ public class Master : MudObject, IMaster
         ["/secure/classes"] = new() { "ClassIds", "SkillIds", "Class", "Skill", "EnabledOfTier", "EnabledChildren" },
         ["/secure/doors"] = new() { "State", "Open", "Close", "Lock", "Unlock", "Reset" },
         ["/secure/sneak"] = new() { "NoticeChance", "Roll", "Notices" },
+        ["/secure/search"] = new() { "Chance", "Check", "Roll", "Succeeds" },
         ["/secure/renown"] = new() { "TierIndex", "TierFor", "TierLine", "RenownText", "RecognitionLine" },
         ["/secure/chronicle"] = new() { "YearLength", "DateFor", "DateText", "DateOfTimestamp", "DateCommand" },
         ["/secure/events"] = new() { "PreviewEss", "ClassName", "Describe" },
