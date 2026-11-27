@@ -415,7 +415,9 @@ def main():
         b = Client("bob")
         b.read_until("> ")
         check("arrival is announced to the room", a.read_until("enters the game"), "Bob enters the game.")
-        check("duplicate name refused", Client("alice").read_until("Another name?"), "already here")
+        dup = Client("alice", login=False)  # an online name is asked for its password like any other: it does not say who is online (tests/takeover_test.py does the rest)
+        check("an online name gets the password prompt", dup.read_until("Password: "), "Password: ", absent=("already here",))
+        dup.sock.close()
 
         check("say reaches other players", (a.command("say hello"), b.read_until("hello"))[1], "Alice says: hello")
         check("unknown verb", a.command("dance"), "What?")

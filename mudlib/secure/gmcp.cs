@@ -64,6 +64,13 @@ public class GmcpDaemon : MudObject
         Refresh(player, false);
     }
 
+    /// <summary>The player's connection is a new one (a takeover): forget what was sent, so that the next poll sends everything again.</summary>
+    public void Forget(ObjectRef player)
+    {
+        if (!FromBody(player)) return;
+        states.Remove(player);
+    }
+
     /// <summary>The player has looked at the room (or has just entered it): Room.Info is sent whether or not it changed.</summary>
     public void Look(ObjectRef player)
     {

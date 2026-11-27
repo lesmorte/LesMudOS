@@ -179,6 +179,7 @@ public abstract class MudObject
 
     /// <summary>Move the network connection from one object to another (login object to player body).</summary>
     protected void Exec(ObjectRef to, ObjectRef from) => D.Exec(Self, to, from);
+    protected bool TakeOver(ObjectRef to, ObjectRef from) => D.TakeOver(Self, to, from);
 
     /// <summary>Offer a command to ThisPlayer(). The binding disappears when this object and the player part ways.</summary>
     protected void AddAction(string verb, ActionHandler handler) => D.AddAction(Self, verb, handler);

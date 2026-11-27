@@ -90,7 +90,7 @@ def login(name, passwords, addr):
             return "refused", text, 0.0
         s.sendall(name.encode() + b"\r\n")
         t0 = time.time()
-        text = wait_for(s, ["Password: ", "Creating a new account", REFUSED, "already here"])
+        text = wait_for(s, ["Password: ", "Creating a new account", REFUSED])
         took = time.time() - t0
         if REFUSED in text:
             return "refused", text, took
@@ -356,6 +356,45 @@ def main():
         h.check("clear all", c.command("throttle clear all"), "Cleared everything")
         h.check("the list is then empty", c.command("throttle"), "no locks")
         c.command("quit")
+
+        # ---- an online character: asked for the password like any other; a takeover goes through the throttle like any login
+        ok_addr = owners["Ian"]
+        held = open_as(ok_addr)
+        wait_for(held, ["known?"])
+        held.sendall(b"Ian\r\n")
+        wait_for(held, ["Password: "])
+        held.sendall(GOOD.encode() + b"\r\n")
+        wait_for(held, ["Welcome back"])                     # Ian is in the game, from his own address
+        r = login("Ian", [], fresh())
+        h.check("an online name: the prompt after the name is the password prompt, as for an offline one", r[0], "prompt")
+        x2 = fresh()
+        h.check("wrong passwords against an online name are counted like any other: the fifth locks it", str(wrong("Ian", 5, x2)), "['goodbye', 'goodbye']")
+        h.check("... and the refusal for the online name is the plain one", login("Ian", [], fresh())[1].replace("\r", "").strip().splitlines()[-1], REFUSED)
+        held.settimeout(1.5)
+        h.check("the connected player was told nothing of it", wait_for(held, ["taken over", "failed", "Someone"], 1.5), absent=("taken over", "failed", "Someone", "log in"))
+        # the owner's known address still gets the prompt of a locked name, with the right password takes the body over, and the success is noted
+        s2 = open_as(ok_addr)
+        wait_for(s2, ["known?"])
+        s2.sendall(b"Ian\r\n")
+        h.check("a locked online name: a known address gets the password prompt", wait_for(s2, ["Password: ", REFUSED]), "Password: ")
+        s2.sendall(GOOD.encode() + b"\r\n")
+        h.check("... and the right password takes the body over", wait_for(s2, ["You take over your character where it stands."]), "You take over your character where it stands.")
+        h.check("... the old connection is told", wait_for(held, ["taken over from another connection"], 3.0), "Your character has been taken over from another connection.")
+        s2.sendall(b"quit\r\n")
+        wait_for(s2, ["Goodbye", "closed"], 1.5)
+        s2.close()
+        held.close()
+        # from an address that is not known the right password on a locked online name is refused, whether or not the name is online
+        online_other = open_as(owners["Jo"])
+        wait_for(online_other, ["known?"])
+        online_other.sendall(b"Jo\r\n")
+        wait_for(online_other, ["Password: "])
+        online_other.sendall(GOOD.encode() + b"\r\n")
+        wait_for(online_other, ["Welcome back"])
+        wrong("Jo", 5, fresh())
+        h.check("a locked online name is refused to an address it does not know, even with the right password",
+                login("Jo", [GOOD], fresh())[0], "refused")
+        online_other.close()
 
         # ---- what is and is not on disk and in the log
         save = open(os.path.join(work, "save", "players", "vera.json")).read()

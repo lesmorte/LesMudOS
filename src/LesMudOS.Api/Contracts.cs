@@ -183,6 +183,8 @@ internal interface IDriverServices
     void EnableCommands(ObjectRef ob);
     IReadOnlyList<ObjectRef> Users();
     void Exec(ObjectRef caller, ObjectRef to, ObjectRef from);
+    /// <summary>Give the connection of <c>from</c> (a login object) to <c>to</c>, a body that has one already; the old connection is closed. Needs ValidOperation("takeover"). True if the body had an input handler, which is dropped.</summary>
+    bool TakeOver(ObjectRef caller, ObjectRef to, ObjectRef from);
     void AddAction(ObjectRef owner, string verb, ActionHandler handler);
     void NotifyFail(string message);
     void InputTo(ObjectRef caller, Action<string> handler, bool noEcho);

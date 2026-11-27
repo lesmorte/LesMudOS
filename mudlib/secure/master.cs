@@ -73,6 +73,8 @@ public class Master : MudObject, IMaster
         {
             case "admin-secret": return IsWizList(caller);
             case "exec": return (caller.ProgramPath == "/secure/login" && caller.Domain == "") || WorkshopHandover(caller, arg);
+            // A connection taken over from an old one: only the login object, for a real body (docs/specs/login-throttle.md, "Taking over").
+            case "takeover": return caller.IsClone && caller.Domain == "" && caller.ProgramPath == "/secure/login" && arg != null && FindObject(arg) is { } body && IsPlayerBody(body);
             // The address of a connection reaches only the login object (a clone, about its own connection) and the login throttle (the blueprint).
             case "connection-address": return caller.IsClone && caller.Domain == "" && caller.ProgramPath == "/secure/login";
             case "address-tag":

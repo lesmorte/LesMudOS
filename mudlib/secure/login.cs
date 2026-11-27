@@ -69,7 +69,9 @@ public class Login : MudObject
     /// </summary>
     public string? QueryClaim() => claiming ? name : null;
 
-    private bool IsOnline(string who) => Users().Any(u => u.Call<string>("QueryName") == who);
+    /// <summary>The real player body of this name that has a connection, or null. (A dropped one, without a connection, is /secure/linkdead's.)</summary>
+    private ObjectRef? FindOnline(string who)
+        => Users().FirstOrDefault(u => u != Self && u.IsClone && u.ProgramPath == "/std/player" && u.Domain == "" && u.Call<string>("QueryName") == who);
 
     private void GotName(string input)
     {
@@ -86,13 +88,8 @@ public class Login : MudObject
         // character (below, "known" mode). Everyone else, whatever the name, hears the same refusal, and learns nothing about the name.
         address = ConnectionAddress();
         var addressLocked = Throttle().Call<bool>("AddressBlocked", address);
-        if (addressLocked && IsOnline(name)) { Refuse(); return; }
-        if (IsOnline(name))
-        {
-            Write($"{name} is already here. Another name? ");
-            InputTo(GotName);
-            return;
-        }
+        // A name that is online is asked for its password like any other: nothing here depends on who is in the game (docs/specs/login-throttle.md,
+        // "Taking over"). If the password is right, the connection takes the body over in EnterGame.
 
         body = CloneObject("/std/player");
         accountState = body.Call<string>("BeginLogin", name) ?? "";
@@ -216,7 +213,9 @@ public class Login : MudObject
     private void AfterPassword()
     {
         if (body is not { IsAlive: true }) { Fail("Something went wrong. Goodbye.\n"); return; }
-        if (!body.Call<bool>("NeedsArchetype"))
+        // A name that is already in the game (online, or dropped and lingering) has its calling in that body, whatever its save file says (a new
+        // character who has not saved yet): the choice would be made for a body that is thrown away.
+        if (!body.Call<bool>("NeedsArchetype") || FindOnline(name) != null || LoadObject("/secure/linkdead").Call<ObjectRef>("Find", name) != null)
         {
             EnterGame();
             return;
@@ -275,12 +274,21 @@ public class Login : MudObject
     private void EnterGame()
     {
         claiming = false;
-        // Checked again: the same player may have logged in from elsewhere meanwhile.
-        if (IsOnline(name))
+        // Looked for now, not when the name was typed: the same player may have logged in from elsewhere meanwhile, or this connection may have
+        // waited at the password prompt while another one got in. The password has been proved (and counted by the throttle) either way.
+        // One name never has two bodies: this connection takes over the one that is in the game.
+        if (FindOnline(name) is { } online)
         {
-            Discard();
-            Write($"{name} is already here. Another name? ");
-            InputTo(GotName);
+            if (online.Call<bool>("BeginTakeover"))
+            {
+                Discard();
+                if (tag != "") online.Call("NoteAddress", tag);
+                var hadHandler = TakeOver(online, Self);
+                online.Call("TakenOver", hadHandler);
+                Destruct();
+                return;
+            }
+            Fail("Something went wrong. Goodbye.\n");
             return;
         }
         // A dropped body of this name is still in the world: the connection goes to it, so that one name never has two bodies.

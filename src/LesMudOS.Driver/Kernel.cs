@@ -1280,6 +1280,36 @@ internal sealed partial class Kernel : IDriverServices
         if (_thisPlayer == from) _thisPlayer = to;
     }
 
+    /// <summary>
+    /// The connection of a login object goes to a player body that already has one (a character logging in again while an old connection is
+    /// still open: docs/specs/login-throttle.md, "Taking over"). The old connection is detached first (its owner is null from then on, so nothing it
+    /// sends reaches the body and its closing does not end the body), then closed with a log reason and, if it does not close by itself (a
+    /// half-open connection), cut after a few seconds so that its slot in the connection limits is given back. Whatever input handler the body had
+    /// (InputTo, whoever set it, sandbox code included) is dropped, so the new connection's first line is a command. True if there was one.
+    /// </summary>
+    public bool TakeOver(ObjectRef caller, ObjectRef to, ObjectRef from)
+    {
+        if (!AskMaster(m => m.ValidOperation("takeover", caller, to.Name)))
+            throw new MudRuntimeException($"{caller.Name} may not take over");
+        if (!to.IsAlive || from.Connection is not Connection fresh) throw new MudRuntimeException("takeover: source is not interactive or target is dead");
+        if (to.Connection is not Connection old || old == fresh) throw new MudRuntimeException("takeover: target is not interactive");
+        var pending = to.InputTo is not null;
+        old.Owner = null;
+        to.Connection = null;
+        to.InputTo = null;
+        to.InputToOwner = null;
+        _owing.Remove(old);
+        old.Abort("closed by the game (taken over)");
+        from.Connection = null;
+        from.InputTo = null;
+        from.InputToOwner = null;
+        to.Connection = fresh;
+        fresh.Owner = to;
+        if (_thisPlayer == from) _thisPlayer = to;
+        Log.Info($"takeover: {old.PlayerName ?? "(unknown)"}'s connection from {old.RemoteAddress} replaced by the one from {fresh.RemoteAddress}");
+        return pending;
+    }
+
     public void AddAction(ObjectRef owner, string verb, ActionHandler handler)
     {
         if (_thisPlayer is not { IsAlive: true, Living: true } player) return;
