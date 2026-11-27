@@ -115,7 +115,7 @@ GLOOM = re.compile(r"\(dark\)|It is dim here\.|too dark to see|pitch black")
 SHORT = {"Tavern Cellar": "a large rat", "Collapsed Passage": "a giant rat", "Storage Chamber": "a goblin scavenger", "Guard Post": "a goblin guard",
          "Flooded Tunnel": "a giant cave toad", "Mushroom Cavern": "a spore bat", "Goblin Barracks": "a goblin warrior", "Overseer Hall": "a goblin elite guard",
          "Overseer Chamber": "the Goblin Overseer"}
-COMBAT_LINE = re.compile(r"(You (hit|miss|scratch|smash)|(hits|misses|scratches|smashes) you)")
+COMBAT_LINE = re.compile(r"(You (hit|miss|scratch|smash|nick|cut|slash|cleave|bruise|thump|crack|prick|stab|pierce|run|graze|shoot)|(hits|misses|scratches|smashes|nicks|cuts|slashes|cleaves|bruises|thumps|cracks|pricks|stabs|pierces|runs|grazes|shoots) you)")
 
 
 # ---------------------------------------------------------------- the brief
@@ -1046,8 +1046,8 @@ class Run:
             return
         self.checked_messages.add(room)
         cap = short[0].upper() + short[1:]
-        check(f"{room}: combat lines name the creature ({short})", text, f"{cap} ") if re.search(r"(attacks|hits|misses|scratches|smashes) you", text) else None
-        check(f"{room}: you hit or miss {short}", "yes" if re.search(r"(You (hit|miss|scratch|smash) |strikes |dodges your (bolt|attack))%s|%s dodges your (bolt|attack)" % (re.escape(short), re.escape(short.capitalize())), text) else "no", "yes")
+        check(f"{room}: combat lines name the creature ({short})", text, f"{cap} ") if re.search(r"(attacks|hits|misses|scratches|smashes|nicks|cuts|slashes|cleaves|bruises|thumps|cracks|pricks|stabs|pierces|runs|grazes|shoots) you", text) else None
+        check(f"{room}: you hit or miss {short}", "yes" if re.search(r"(You (hit|miss|scratch|smash|nick|cut|slash|cleave|bruise|thump|crack|prick|stab|pierce|run|graze|shoot) |strikes |dodges your (bolt|attack))%s|%s dodges your (bolt|attack)" % (re.escape(short), re.escape(short.capitalize())), text) else "no", "yes")
         if room != CHAMBER:
             check(f"{room}: '{cap} dies.'", text, f"{cap} dies.")
         look = self.hero.cmd("look")
