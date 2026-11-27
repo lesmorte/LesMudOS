@@ -677,8 +677,8 @@ def run(work, mudlib, box):
     check("a piece with no rule says nothing of callings", warrior.command("look at padded jerkin"), absent=("cannot wear it", "Only "))
     goto(mage, "village/armourers_shed")
     text = mage.command("browse")
-    check("Oswy's list marks the leather jerkin as not for mages", text, "leather jerkin", "50 gold  (not for Mages)")
-    truth("and not the padded jerkin or the cap", all("(" not in l for l in text.splitlines() if "padded jerkin" in l or "leather cap" in l), text)
+    check("Oswy's list marks the leather jerkin as not for mages", text, "leather jerkin", "50 gold  (light leather armour; not for Mages)")
+    truth("and not the padded jerkin or the cap", all("Mages" not in l for l in text.splitlines() if "padded jerkin" in l or "leather cap" in l), text)
     gold = score(mage)["gold"]
     out = mage.command("buy leather jerkin")
     check("buying the jerkin as a mage: a warning before any gold is taken", out, "You cannot wear a leather jerkin.", "No gold has been taken", "buy leather jerkin", absent=("You buy",))
@@ -691,7 +691,7 @@ def run(work, mudlib, box):
     goto(warrior, "village/hedge_scholars_loft")
     text = warrior.command("browse")
     check("Halbert's list marks the robe as for mages and priests only", text, "scholar's robe", "40 gold  (light cloth armour; Mages and Priests only)")
-    truth("and not the staff", all("(" not in l for l in text.splitlines() if "ironshod staff" in l), text)
+    truth("and not the staff", all("only" not in l and "not for" not in l for l in text.splitlines() if "ironshod staff" in l), text)
     gold = score(warrior)["gold"]
     out = warrior.command("buy robe")
     check("buying the robe as a warrior: warned, no gold taken", out, "You cannot wear a scholar's robe.", "Only Mages and Priests can wear it.", "No gold has been taken", absent=("You buy",))
