@@ -517,3 +517,6 @@ A room is lit (light 1 or more), dim (0) or dark (-1 or less): its own `Light` (
 
 ## A dropped connection (24 November 2026)
 A player whose connection ends without `quit` (including the idle timeout) leaves a link-dead body in the room for one minute: it can be attacked, fights back with ordinary attacks, can die, and is taken over again by a login of the same name. `quit` is refused in a fight. See docs/specs/play-feel.md section 14.
+
+## Logging in as a character who is online (27 November 2026)
+A name that is online is asked for its password like any other. With the right password the new connection takes the body over: the old connection is told ("Your character has been taken over from another connection.") and closed, and the character goes on where it stands (no second body, no arrival, fight and state unchanged, a pending question or the editor cancelled). The login object (`/secure/login`, `EnterGame`) finds the body (`FindOnline`), the body tells the old connection (`BeginTakeover`) and takes the new one (`TakenOver`), and the driver moves the connection (the `TakeOver` efun, master operation `takeover`). It counts for the login throttle like any login. See docs/specs/login-throttle.md, "Taking over", and docs/specs/play-feel.md section 16.

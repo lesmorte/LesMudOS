@@ -235,12 +235,38 @@ async def main(work, mudlib, driver, web):
     check("and is escaped in the frame (no raw angle bracket on the wire)", "<" not in last_raw and "\\u003C" in last_raw, last_raw[:200])
 
     # ---- a second login of the same name, and a tell from a telnet player ----
+    # A name that is online asks for the password like any other; the right one takes the body over (docs/specs/login-throttle.md, "Taking over").
     b = await Web.open("203.0.113.10")
     await b.until("known? ")
     await b.say("webtest")
-    t = await b.until("Another name? ")
-    check("a second web login of the same name is refused by the game", "already here" in t, t)
-    await b.ws.close()
+    t = await b.until("Password: ")
+    check("a second web login of the same name is asked for the password (the prompt does not say who is online)", "already here" not in t, t)
+    await b.say(PASSWORD)
+    t = await b.until("You take over your character where it stands.")
+    check("the right password takes the body over: the web player is told", "You take over your character where it stands." in t, t)
+    old_text = ""
+    try:
+        while True:
+            await a.frame(5)
+    except websockets.ConnectionClosed:
+        pass
+    old_text = "".join(f.get("d", "") for f in a.frames if f["t"] == "out") + a.buf
+    check("the old web connection was told in one line and closed", "Your character has been taken over from another connection." in old_text and a.ws.close_code is not None, old_text[-200:])
+    await b.until("> ")
+    a = b
+    # a telnet player takes over from the web, and the web takes over from the telnet player
+    tn = h.Client("webtest", password=PASSWORD)
+    t = tn.read_until("> ")
+    check("a telnet login takes over a web player", "You take over your character where it stands." in t, t)
+    check("and the web connection is told and closed", await a.closed() is not None and "taken over from another connection" in "".join(f.get("d", "") for f in a.frames if f["t"] == "out") + a.buf)
+    a = await Web.open("203.0.113.10")
+    await a.until("known? ")
+    await a.say("webtest")
+    await a.until("Password: ")
+    await a.say(PASSWORD)
+    t = await a.until("You take over your character where it stands.")
+    await a.until("> ")
+    check("and a web login takes over a telnet player, who is told and disconnected", tn.closed(3) and a.gmcp("Room.Info") != [], t)
 
     friend = h.Client("friendly")
     friend.read_until("> ")
