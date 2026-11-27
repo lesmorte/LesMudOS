@@ -590,6 +590,9 @@ public abstract class QuestJournal : Living
         return true;
     }
 
+    /// <summary>The body's connection is a new one (a takeover): the next poll sends the whole GMCP burst again.</summary>
+    protected void JournalNewConnection() => burstSent = false;
+
     private void SendBurstIfWanted()
     {
         if (GmcpActive(Self)) SendBurst();

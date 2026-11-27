@@ -1358,6 +1358,41 @@ public class Player : Adventurer
         Look();
     }
 
+    // ---- Taken over by a new connection (docs/specs/login-throttle.md, "Taking over") ----
+    // The owner logged in again, with the right password, while this body still had a connection (a second window, or a connection that
+    // died without the server noticing). Two steps, both only from the login object that holds the new connection: BeginTakeover tells the old
+    // connection and says whether this body may be taken over; the login object then has the driver move the connection (TakeOver), which closes
+    // the old one and drops any input handler, and calls TakenOver. The body stays where it is, with all its state: no new body, no arrival.
+
+    private bool takeoverBegun;
+
+    public bool BeginTakeover()
+    {
+        var caller = PreviousObject();
+        if (!ready || linkDead || !Self.IsAlive || !Interactive(Self) || !IsLoginObject(caller) || caller!.Domain != "" || !Interactive(caller)) return false;
+        takeoverBegun = true;
+        Tell("\nYour character has been taken over from another connection.\n"); // to this body (Write would go to the login object that is typing)
+        return true;
+    }
+
+    /// <summary>The connection is the new one now. The handler that was waiting for an answer is gone (the driver dropped it): so is what it was for.</summary>
+    public void TakenOver(bool hadHandler)
+    {
+        var caller = PreviousObject();
+        if (!takeoverBegun || !ready || !IsLoginObject(caller) || !Interactive(Self)) return;
+        takeoverBegun = false;
+        idleWarned = false; // the login is activity: the connection's clock started with the password
+        var inEditor = edLines != null;
+        if (inEditor) { edLines = null; edInsertAt = -1; edDirty = false; }
+        LoadObject("/secure/gmcp").Call("Forget", Self);
+        JournalNewConnection();
+        Write("\nYou take over your character where it stands.\n");
+        if (inEditor) Write("The editor was closed with the old connection; what was not written is lost.\n");
+        else if (hadHandler) Write("A question that was waiting for your answer was cancelled.\n");
+        Write("\n");
+        Look();
+    }
+
     // ---- Communication (docs/specs/communication.md) ----
     // A self-contained block. The commands are run by /secure/comm (say, tell, reply, whisper, shout) and /secure/channels
     // (channels); this body binds the verbs and keeps what the character chose: who is ignored, whether shouts are heard, which

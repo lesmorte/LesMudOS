@@ -108,6 +108,16 @@ internal sealed partial class Connection // partial: the network-limits half is 
         _outbox.Writer.TryComplete();
     }
 
+    /// <summary>
+    /// Close for good, also when the peer is gone and the socket is half open (a write that never completes would keep the connection, and its slot
+    /// in the connection limits, until the idle timeout): what is queued is flushed as in Close, and the socket is cut after a few seconds.
+    /// </summary>
+    public void Abort(string reason)
+    {
+        Close(reason);
+        _ = Task.Delay(3000).ContinueWith(_ => { try { _client.Close(); } catch (Exception) { } });
+    }
+
     public async Task RunAsync()
     {
         var stream = _client.GetStream();
