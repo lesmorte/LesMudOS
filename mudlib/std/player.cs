@@ -10,6 +10,7 @@ public class Player : Adventurer
     // Where a new character, or one who did not quit in a logout room, enters the game.
     private const string StartRoom = "/domains/hollow/village/square";
     private const string WizList = "/secure/wizlist";
+    private const string Roster = "/secure/roster";
 
     // Wizard level needed for each wizard command. Level 0 has none of them.
     private const int LevelFiles = 1; // pwd, cd, list, cat; and every changing command inside the wizard's own home
@@ -21,6 +22,7 @@ public class Player : Adventurer
     private const int LevelClone = 3;
     private const int LevelUpdate = 5;
     private const int LevelShutdown = 10;
+    private const int LevelAllPlayers = 10; // docs/specs/who-and-visibility.md, decision 1
 
     private const int MinPasswordLength = 8;
     private const int MaxPasswordChecks = 3;
@@ -29,6 +31,11 @@ public class Player : Adventurer
     [Saved] private string title = "the newcomer";
     [Saved] private int logins;
     [Saved] private long lastLogin;
+    // When the character was made (seconds); 0 for a character saved before this was recorded ("before records began": /secure/roster).
+    [Saved] private long created;
+    // A wizard's own invisibility (docs/specs/who-and-visibility.md): only the `invis` and `vis` commands change it, and /secure/roster holds the set
+    // everyone else asks. Saved, so it survives a reconnect. No function lets any other object read or change it.
+    [Saved] private bool invisible;
     [Saved] private string cwd = "/"; // the mudlib directory a wizard is "in"
     // Made by the HashPassword efun. Empty for accounts saved before passwords
     // existed. No command may ever show it.
@@ -217,7 +224,9 @@ public class Player : Adventurer
         if (CheckNewPassword(password) != null) return false;
         passwordHash = HashPassword(password);
         authenticated = true;
+        if (accountState == "new" && created == 0) created = Time();
         Save();
+        LoadObject("/secure/roster").Call("Note");
         return true;
     }
 
@@ -246,6 +255,7 @@ public class Player : Adventurer
         }
 
         EnableCommands();
+        if (invisible && !LoadObject(Roster).Call<bool>("SetInvisible", true)) invisible = false; // a saved state: only a wizard keeps it
         BindChannelVerbs(); // first, so that no channel name can take over a command the game already has
         BeginAdventure();
         AddAction("say", CmdSay);
@@ -259,6 +269,11 @@ public class Player : Adventurer
         AddAction("channels", a => ToChannels("Listing", ""));
         AddAction("channel", a => ToChannels("Switch", a));
         AddAction("who", CmdWho);
+        AddAction("invis", CmdInvis);
+        AddAction("vis", CmdInvis);
+        AddAction("all-players", CmdAllPlayers);
+        AddAction("allplayers", CmdAllPlayers);
+        AddAction("all", CmdAllPlayers);
         AddAction("title", CmdTitle);
         AddAction("renown", a => { Write(LoadObject("/secure/renown").Call<string>("RenownText", Name) ?? ""); return true; });
         AddAction("date", CmdTime);
@@ -313,7 +328,9 @@ public class Player : Adventurer
         EnsureHome(); // a wizard whose home is missing gets it back
         EnterWorld(StartRoom);
         ClaimLostProperty();
-        Say($"{Name} enters the game.\n");
+        LoadObject(Roster).Call("Note");
+        SayToSeers($"{Name} enters the game.\n");
+        if (invisible) Write("{yellow}You are invisible.{/} Type {cmd}vis{/} to be seen.\n");
         Look();
         if (!returning && QueryNeedsGuild()) Write(LoadObject("/secure/guidepost").Call<string>("Welcome"));
         PublishingNotice();
@@ -371,14 +388,69 @@ public class Player : Adventurer
 
     private bool CmdWho(string args)
     {
-        var users = Users()
-            .Where(u => u.Call<string>("Short") != null)
-            .Select(u => u.Call<string>("Short") + (u.Call<int>("QueryWizLevel") > 0 ? $" [wizard {u.Call<int>("QueryWizLevel")}]" : "") + (u.Call<bool>("QueryIdle") ? IdleSuffix(u.Call<int>("QueryIdleSeconds")) : ""))
-            .ToList();
-        foreach (var dropped in LoadObject("/secure/linkdead").Call<List<ObjectRef>>("All") ?? new List<ObjectRef>()) users.Add(dropped.Call<string>("Short") + " (link-dead)");
+        // Who is listed, and with which marks, is /secure/roster's to say for this viewer (docs/specs/who-and-visibility.md section 1).
+        var roster = LoadObject(Roster);
+        var users = new List<string>();
+        foreach (var u in Users())
+        {
+            if (u.Call<string>("Short") == null) continue;
+            if (roster.Call<string>("WhoMarks", Self, u) is not { } marks) continue;
+            users.Add(u.Call<string>("Short") + (u.Call<int>("QueryWizLevel") > 0 ? $" [wizard {u.Call<int>("QueryWizLevel")}]" : "") + (u.Call<bool>("QueryIdle") ? IdleSuffix(u.Call<int>("QueryIdleSeconds")) : "") + marks);
+        }
+        foreach (var dropped in LoadObject("/secure/linkdead").Call<List<ObjectRef>>("All") ?? new List<ObjectRef>())
+            if (roster.Call<string>("WhoMarks", Self, dropped) is { } marks) users.Add(dropped.Call<string>("Short") + " (link-dead)" + marks);
         Write($"{users.Count} player(s) online:\n  " + string.Join("\n  ", users) + "\n");
         return true;
     }
+
+    /// <summary>When this character was made, in seconds; 0 if the save is older than the record. Not private: the date of a creation is shown by `all-players`.</summary>
+    public long QueryCreated() => created;
+
+    public long QueryLastLogin() => lastLogin;
+
+    /// <summary>
+    /// "invis" and "vis" (also "invis on" and "invis off"): a wizard, any level, hides from or shows themselves to everyone who is not a wizard of
+    /// at least their level. Their own body only; the state is saved and told to /secure/roster, which everything else asks.
+    /// </summary>
+    private bool CmdInvis(string args)
+    {
+        if (QueryWizLevel() < 1) return false; // to anyone else these words do not exist
+        var word = args.Trim().ToLowerInvariant();
+        var wantInvisible = QueryVerb() == "invis";
+        if (QueryVerb() == "vis" ? word != "" : word is not ("" or "on" or "off")) { NotifyFail("Usage: {cmd}invis{/} [on|off] or {cmd}vis{/}"); return false; }
+        if (word == "off") wantInvisible = false;
+        if (wantInvisible == invisible) { Write(invisible ? "You are already invisible.\n" : "You are already visible.\n"); return true; }
+        invisible = LoadObject(Roster).Call<bool>("SetInvisible", wantInvisible) && wantInvisible;
+        Save();
+        Write(invisible ? "You are invisible: mortals and wizards of a lower level cannot see you, and cannot tell you anything unless you speak first. Type {cmd}vis{/} to be seen.\n"
+                        : "You are visible again.\n");
+        return true;
+    }
+
+    /// <summary>"all-players" (also "allplayers" and "all players"): level 10 only; the list is /secure/roster's. To anyone else it is not a command.</summary>
+    private bool CmdAllPlayers(string args)
+    {
+        var rest = args.Trim();
+        if (QueryVerb() == "all")
+        {
+            if (!rest.StartsWith("players", StringComparison.OrdinalIgnoreCase) || (rest.Length > 7 && rest[7] != ' ')) return false;
+            rest = rest.Substring(7).Trim();
+        }
+        if (QueryWizLevel() < LevelAllPlayers) return false;
+        if (LoadObject(Roster).Call<string>("AllPlayers", rest) is not { } text) return false;
+        Write(text);
+        return true;
+    }
+
+    /// <summary>Invisible, and still a wizard: a character who has lost their level is visible again, and stays so.</summary>
+    protected override bool WizUnseen()
+    {
+        if (invisible && QueryWizLevel() < 1) invisible = false;
+        return invisible;
+    }
+
+    /// <summary>An invisible wizard answers to no name asked by someone who cannot see them ("look at mina", "give sword to mina").</summary>
+    public override bool Id(string id) => base.Id(id) && (!WizUnseen() || LoadObject(Roster).Call<bool>("Visible", ThisPlayer(), Self));
 
     private bool CmdTitle(string args)
     {
@@ -452,7 +524,8 @@ public class Player : Adventurer
             Save();
             if (inWorkshop) Write("The workshop's changes were left behind.\n");
             Write("Goodbye.\n");
-            Say($"{Name} leaves the game.\n");
+            SayToSeers($"{Name} leaves the game.\n");
+            LoadObject(Roster).Call("Note");
             ReleaseInventory(); // the carried items are saved as records (path and state) and come back at the next login
         }
         finally
@@ -505,9 +578,9 @@ public class Player : Adventurer
         Write(
             "New here? {cmd}help start{/} says where to begin.\n" +
             "Commands: {cmd}look{/} [at THING], {cmd}say{/} TEXT, {cmd}get{/} [N|all] THING, {cmd}drop{/} [N|all] THING, {cmd}inventory{/} ({cmd}i{/}),\n" +
-            "          {cmd}who{/} (idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}time{/} [-timezone [ZONE|REGION|none]] (your own time zone), {cmd}charset{/} [ascii|utf8] (or {cmd}ascii{/} [on|off]: plain 7-bit characters if the boxes of {cmd}score{/} look wrong), {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
+            "          {cmd}who{/} (who is in the game; idle players are marked), {cmd}title{/} TEXT, {cmd}password{/}, {cmd}save{/}, {cmd}quit{/}, {cmd}ansi{/} [on|off], {cmd}time{/} [-timezone [ZONE|REGION|none]] (your own time zone), {cmd}charset{/} [ascii|utf8] (or {cmd}ascii{/} [on|off]: plain 7-bit characters if the boxes of {cmd}score{/} look wrong), {cmd}verbose{/} [on|off], {cmd}prompt{/} [TEXT|default|off], {cmd}sync{/} TOKEN (a client aid: answers [sync TOKEN]), and the exits of the room you are in.\n" +
             "          Objects nearby add their own verbs (try the lantern and the cat).\n" +
-            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}vitality{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
+            "Fighting:  {cmd}kill{/} (or {cmd}attack{/}) TARGET, {cmd}flee{/} [DIRECTION], {cmd}consider{/} TARGET, {cmd}vitality{/}, {cmd}score{/} ({cmd}sc{/}), {cmd}stats{/} (only the numbers), {cmd}improve{/} [ATTRIBUTE] (place attribute points),\n" +
             "           {cmd}skills{/} (your skills, spells and traits; each skill has its own command word),\n" +
             "           {cmd}stop{/} (cancel a potion, meal or skill you queued while recovering)\n" +
             "           A bow in your hands gives you a head start when you choose the fight: the target's first action waits two seconds more (never when a creature attacks you first).\n" +
@@ -544,6 +617,7 @@ public class Player : Adventurer
               "          {cmd}cat{/} <file>                 show a file with line numbers\n" +
               "          {cmd}goto{/} <room path or player> move yourself to a room or to a player\n" +
               "          {cmd}stat{/} <thing|me|here>       show the numbers of a creature, item or room\n" +
+              "          {cmd}invis{/} / {cmd}vis{/}                hide yourself from mortals and lower wizards / be seen again (saved; {cmd}score{/} reminds you)\n" +
               $"          Your home directory is {{cmd}}{HomePath}{{/}}; ~ in a path means it. In your home you may use every file\n" +
               "          command below, plus update and clone, at any wizard level.\n");
         if (level >= LevelMudstat) Write("          {cmd}mudstat{/}                    driver statistics\n");
@@ -567,6 +641,7 @@ public class Player : Adventurer
         if (level >= 10) Write("          {cmd}slay{/} <target>              kill a creature at once, with kill credit\n");
         if (level >= 10) Write("          {cmd}setlevel{/} <1-100>           set your level (experience, Vitality and resources follow)\n");
         if (level >= LevelSystemFiles) Write("          {cmd}update{/} <path>              recompile a file and replace the loaded object (anywhere)\n");
+        if (level >= LevelAllPlayers) Write("          {cmd}all-players{/} [recent|new|PREFIX] [PAGE]  every character ever made: calling, level, dates, who is in the game\n");
         if (level >= LevelShutdown) Write("          {cmd}throttle{/} [clear <name>|<address>|all]  list the login locks, or lift one\n");
         if (level >= LevelShutdown) Write("          {cmd}shutdown{/}                   stop the driver\n");
         return true;
@@ -1295,7 +1370,8 @@ public class Player : Adventurer
         try
         {
             Save();
-            Say($"{Name} disconnects.\n");
+            SayToSeers($"{Name} disconnects.\n");
+            LoadObject(Roster).Call("Note");
             ReleaseInventory();
         }
         finally

@@ -216,6 +216,7 @@ internal interface IDriverServices
 
     bool SaveObject(ObjectRef caller, string path);
     bool RestoreObject(ObjectRef caller, string path);
+    IReadOnlyList<string> SaveNames(ObjectRef caller, string dir);
 
     bool CheckAdminSecret(ObjectRef caller, string candidate);
     string HashPassword(string password);

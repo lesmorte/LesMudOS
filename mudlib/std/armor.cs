@@ -21,6 +21,14 @@ public class Armor : Item
 
     public int QueryCarryBonus() => CarryBonus;
 
+    /// <summary>
+    /// True for a piece that keeps its wearer off the who list of everyone who is not a wizard (docs/specs/who-and-visibility.md section 5).
+    /// It does nothing else: the wearer is still in the room, still hears tells. Set it in Create (`HidesFromWho = true;`) or override it.
+    /// </summary>
+    protected virtual bool HidesFromWho { get; set; }
+
+    public bool QueryHidesFromWho() => HidesFromWho;
+
     public override string QuerySlot() => Slot;
 
     // WornBy and NotWornBy (callings that may or may not wear this piece) are fields of Item.

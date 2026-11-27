@@ -48,7 +48,7 @@ public class Monster : Npc
     protected override void Noticed(ObjectRef other)
     {
         base.Noticed(other);
-        if (!Aggressive || !(Interactive(other) || other.Call<bool>("QueryLinkDead"))) return;
+        if (!Aggressive || !(Interactive(other) || other.Call<bool>("QueryLinkDead")) || !LoadObject("/secure/roster").Call<bool>("Visible", Self, other)) return; // an invisible wizard is not noticed
         // A sneaking character is asked once, at the entry: the creature may not notice them (0). -1: no standing to ask, it acts as always.
         if (other.Call<bool>("QuerySneaking") && other.Call<int>("SneakNotice", Self) == 0) return;
         CallOut(() => Ambush(other), 0); // after the arrival has finished, so the room is described first
@@ -65,7 +65,7 @@ public class Monster : Npc
     public void Engage()
     {
         var target = PreviousObject();
-        if (target == null || !Aggressive || Dead || !(Interactive(target) || target.Call<bool>("QueryLinkDead")) || !target.IsAlive || Environment(target) != Environment()) return;
+        if (target == null || !Aggressive || Dead || !(Interactive(target) || target.Call<bool>("QueryLinkDead")) || !target.IsAlive || Environment(target) != Environment() || !LoadObject("/secure/roster").Call<bool>("Visible", Self, target)) return;
         CallOut(() => Ambush(target), 0);
     }
 

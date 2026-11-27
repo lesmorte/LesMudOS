@@ -333,6 +333,13 @@ public abstract class MudObject
     protected IReadOnlyList<DirEntry>? GetDir(string path) => D.GetDir(Self, path);
 
     /// <summary>
+    /// The names (lower case, without the extension) of the save files in one directory of the save root, in name order ("/players").
+    /// It lists names and nothing else. Subject to master.ValidOperation("save-names", caller, dir); the master allows it to one
+    /// daemon (/secure/roster) and to nothing restricted.
+    /// </summary>
+    protected IReadOnlyList<string> SaveNames(string dir) => D.SaveNames(Self, dir);
+
+    /// <summary>
     /// The text of a mudlib file, or null if there is no such file. The path
     /// is absolute and includes the extension ("/std/room.cs"). Files over
     /// 256 KB are refused. Subject to master.ValidOperation("read-file", caller, path).
