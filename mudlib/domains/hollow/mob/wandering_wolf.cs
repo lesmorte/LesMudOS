@@ -13,6 +13,7 @@ public class WanderingWolf : Monster
         Name = "Wandering Wolf";
         Ids.Add("wolf");
         ShortDesc = "a wandering wolf";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A lean grey wolf with a ragged coat and a scarred muzzle. It moves along the edge of the road with its head low, and its yellow eyes never leave you.";
         BaseReaction = 2.0;
         AddCombatAction("bite", "Bite", preparation: 0, recovery: 1.0);

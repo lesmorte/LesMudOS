@@ -24,6 +24,7 @@ public class CmForestStalker : Monster
         Ids.Add("stalker");
         Ids.Add("forest stalker");
         ShortDesc = "a forest stalker";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("claw");
         LongDesc = "A lean, long-limbed thing the colour of lichen and old bark crouches motionless on a fallen trunk, so well matched to the wood that only the faint movement of its breath betrays it. It has the gait of a hunting cat and the eyes of nothing you can name. Its claws flex slowly, like hooked twigs.";
         Level = 9;
         MaxVitality = 70;

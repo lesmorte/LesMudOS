@@ -320,6 +320,8 @@ public class Master : MudObject, IMaster
         ["/secure/doors"] = new() { "State", "Open", "Close", "Lock", "Unlock", "Reset" },
         ["/secure/sneak"] = new() { "NoticeChance", "Roll", "Notices" },
         ["/secure/search"] = new() { "Chance", "Check", "Roll", "Succeeds" },
+        // The control rule's pure functions begin with Query, so they are read-only by name already; listed for clarity (the stateful Resolve is not, and refuses a restricted caller itself).
+        ["/secure/control"] = new() { "QuerySaveChance", "QueryStrength", "QueryHalfSeconds", "QueryAuthority" },
         ["/secure/renown"] = new() { "TierIndex", "TierFor", "TierLine", "RenownText", "RecognitionLine" },
         ["/secure/chronicle"] = new() { "YearLength", "DateFor", "DateText", "DateOfTimestamp", "DateCommand" },
         ["/secure/events"] = new() { "PreviewEss", "ClassName", "Describe" },

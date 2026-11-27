@@ -13,6 +13,8 @@ public class Monster : Npc
     protected bool Aggressive;
     /// <summary>Always notices a sneaking Scout: it never rolls (docs/specs/sneak.md). Set on the bosses.</summary>
     protected bool Boss;
+    /// <summary>A mini-boss (the tag "elite", docs/specs/tags-and-saves.md): its saves against control effects are 15 points harder. Not a Boss; set one or the other.</summary>
+    protected bool Elite;
     /// <summary>Keeps watch: +30 points to its chance to notice a sneaking Scout. Set on guards and sentries.</summary>
     protected bool Alert;
     /// <summary>Joins a fight when another monster in the room is attacked.</summary>
@@ -36,7 +38,18 @@ public class Monster : Npc
     /// <summary>Sees in the dark as in a lit room, for its own to-hit and for fighting, and as a dim room for noticing a sneaker (docs/specs/light.md). Set false in Create() for a creature that cannot (the Giant Cave Toad).</summary>
     protected bool DarkSight = true;
 
-    public override bool QueryDarkSight() => DarkSight;
+    public override bool QueryDarkSight() => HasTag("darksight");
+
+    protected override string TagCarrier() => "creature";
+
+    /// <summary>The flags appear as tags: Boss and Elite as the rank, Alert and DarkSight as senses. A creature declares them with the flags, never with Tags.Add.</summary>
+    protected override void CollectTags(List<string> tags)
+    {
+        if (Boss) tags.Add("boss");
+        if (Elite) tags.Add("elite");
+        if (Alert) tags.Add("alert");
+        if (DarkSight) tags.Add("darksight");
+    }
 
     /// <summary>An item that may fall to the floor on death, with this percent chance.</summary>
     protected void AddLoot(string path, int percent)
@@ -54,8 +67,8 @@ public class Monster : Npc
         CallOut(() => Ambush(other), 0); // after the arrival has finished, so the room is described first
     }
 
-    public bool QueryBoss() => Boss;
-    public bool QueryAlert() => Alert;
+    public bool QueryBoss() => HasTag("boss");
+    public bool QueryAlert() => HasTag("alert");
     public bool QueryAggressive() => Aggressive;
 
     /// <summary>

@@ -20,6 +20,7 @@ public class CmStrayWolf : Monster
         Ids.Add("wolf");
         Ids.Add("stray wolf");
         ShortDesc = "a stray wolf";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A rangy grey wolf, cut off from its pack and thin with hunger, shadows the road at a distance. Its ribs show through a matted coat and its lips are drawn back from yellow teeth. Hunger has made it bold enough to bite.";
         Level = 5;
         MaxVitality = 60;

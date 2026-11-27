@@ -464,7 +464,7 @@ SNEAK_ALERT = ("Goblin Guard", "Goblin Elite Guard")   # creatures flagged Alert
 SNEAK_BOSS = ("Goblin Overseer",)                      # flagged Boss: always notices
 
 
-SNEAK_ELITE = ("Goblin Elite Guard",)   # only for the options of docs/BALANCE_SCOUT.md (option C): the game has no Elite flag
+SNEAK_ELITE = ("Goblin Elite Guard",)   # flagged Elite in the mudlib (docs/specs/tags-and-saves.md); the Scout simulator reads it only for the options of docs/BALANCE_SCOUT.md (option C)
 
 # The options of docs/BALANCE_SCOUT.md. Every one is off (the present game) unless `scout_option` switches it on. "second": None, or how the target's
 # second notice roll (while an unnoticed Scout draws Aimed Shot) is made; "per_level": extra notice points per creature level above the Scout
@@ -1689,7 +1689,7 @@ CORRIDOR = [
           (A("swipe", "Swipe", 0, 1.5), A("maul", "Maul", 1.0, 2.0, mult=2), A("roar", "Bellowing Roar", 0.5, 0.5, kind="buff", fx="damage=3,speed=0.85:30")),
           P(cycle=("swipe", "swipe", "maul"), at=((50, "roar"),)), band=(7, 9)),
     CKind("heartwood_goblin", "Goblin Warrior", 8, 56, (5, 8), 3, 4, 230, 3.0,
-          (A("slash", "Slash", 0, 1.0), A("heavy", "Heavy Swing", 0.5, 1.5, mult=2)),
+          (A("slash", "Club Swing", 0, 1.0), A("heavy", "Heavy Swing", 0.5, 1.5, mult=2)),
           P(cycle=("slash", "slash", "slash", "heavy")), gold=(5, 12), loot=(("training_spear", 15), ("iron_dagger", 15), ("healing_potion", 4)),
           band=(7, 9), aggressive=True),
     CKind("highway_bandit", "Highway Bandit", 8, 59, (6, 9), 3, 3, 195, 3.0,
@@ -1706,7 +1706,7 @@ CORRIDOR = [
           (A("bite", "Rending Bite", 0, 1.0), A("howl", "Howl", 0.5, 0.5, kind="buff", fx="damage=2,speed=0.75:25")),
           P(cycle=("bite",), at=((60, "howl"),)), band=(9, 10), aggressive=True),
     CKind("rogue_goblin_veteran", "Rogue Goblin Veteran", 9, 53, (7, 10), 4, 5, 280, 3.5,
-          (A("slash", "Slash", 0, 1.0), A("daze", "Dazing Blow", 0, 1.5, fx="weaken:tohit=-2,damage=-2:12", factor=0.75)),
+          (A("slash", "Mace Blow", 0, 1.0), A("daze", "Dazing Blow", 0, 1.5, fx="weaken:tohit=-2,damage=-2:12", factor=0.75)),
           P(cycle=("slash", "slash", "daze")), gold=(6, 16), loot=(("healing_potion", 7), ("woodcutter_axe", 10), ("trail_ration", 20)),
           band=(8, 10), aggressive=True),
     CKind("restless_spirit", "Restless Spirit", 9, 64, (8, 13), 3, 0, 520, 2.5,
@@ -1999,11 +1999,144 @@ def check_mudlib():
     check_corridor(problems)
     check_opener_cap(os.path.join(root, "..", ".."), problems)
     check_light(os.path.join(root, "..", ".."), problems)
+    check_control(os.path.join(root, "..", ".."), problems)
+    check_tags(os.path.join(root, "..", ".."), problems)
     for p in problems:
         print("MISMATCH", p)
     print("simulation numbers match the mudlib" if not problems else f"{len(problems)} mismatch(es)")
     return not problems
 
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------------
+# Control effects: the saving throw rule of docs/specs/tags-and-saves.md Part B (sections 12 and 13), written once here as functions. Nothing in the game calls
+# the mudlib's /secure/control yet, so nothing else in this file uses these; `python3 tests/balance_sim.py control` prints the worked tables of section
+# 12.4 and the repeat/flood numbers of 12.5, and `check` compares the constants with mudlib/secure/control.cs.
+# ---------------------------------------------------------------------------------------------------------------------------------------------------
+CONTROL = {"save_min": 5, "save_max": 90, "level_pts": 10, "elite_pts": 15, "rank_authority": 4, "window": 60, "flood": 4, "max_repeat": 2}
+# The two casters of the worked tables (the Bureaucrat of docs/specs/bureaucrat.md): (level, Insight, rank of the skill).
+CONTROL_CASTERS = {"level 5, Insight 14, rank I": (5, 14, 1), "level 10, Insight 20, rank III": (10, 20, 3)}
+
+
+def creature_resistance(level):
+    """The resistance of a creature of the attribute template (4 + level / 2 each): 2% a point above 5 of two attributes."""
+    return 2 * 2 * max(0, 4 + level // 2 - 5)
+
+
+def control_authority(insight, resolve, rank):
+    """The caster's Authority: the better of Insight and Resolve, a point for each above 5, plus 4 for each rank above I."""
+    return max(max(0, insight - 5), max(0, resolve - 5)) + CONTROL["rank_authority"] * max(0, rank - 1)
+
+
+def control_save_chance(resistance, level_above, elite, authority):
+    """The save chance in percent, 5 to 90."""
+    c = resistance + CONTROL["level_pts"] * max(0, level_above) + (CONTROL["elite_pts"] if elite else 0) - authority
+    return max(CONTROL["save_min"], min(CONTROL["save_max"], c))
+
+
+def control_strength(boss, repeat_steps, made, made_save_steps=1):
+    """0 (None), 1 (Half) or 2 (Full)."""
+    return max(0, 2 - (1 if boss else 0) - max(0, min(CONTROL["max_repeat"], repeat_steps)) - (max(0, min(2, made_save_steps)) if made else 0))
+
+
+def control_half_seconds(seconds):
+    """Half means half the time, rounded up to a whole second, at least 1."""
+    return max(1, (max(0, seconds) + 1) // 2)
+
+
+def control_outcomes(caster, target_level, kind="ordinary", made_save_steps=1):
+    """(chance of Full, of Half, of None, expected strength) of a first application, in percent; kind: "ordinary", "elite" or "boss"."""
+    level, insight, rank = caster
+    s = control_save_chance(creature_resistance(target_level), target_level - level, kind == "elite", control_authority(insight, insight, rank))
+    p = {0: 0.0, 1: 0.0, 2: 0.0}
+    p[control_strength(kind == "boss", 0, True, made_save_steps)] += s
+    p[control_strength(kind == "boss", 0, False, made_save_steps)] += 100 - s
+    return p[2], p[1], p[0], (p[2] + p[1] / 2) / 100
+
+
+def control_uptime(term, boss=False):
+    """The share of the time a control effect of `term` seconds (Full) is on a target that never makes its save, when it is cast again the moment it
+    ends or can be (decision 14): the repeat steps, the half time, and the window of 60 seconds from the last application that took hold."""
+    t, up, count, last, cycle_start = 0.0, 0.0, 0, None, None
+    horizon = 60 * 60 * 10
+    while t < horizon:
+        if last is not None and t - last >= CONTROL["window"]:
+            count = 0
+        steps = min(CONTROL["max_repeat"], count) if last is not None and t - last < CONTROL["window"] else 0
+        s = control_strength(boss, steps, False)
+        if s == 0:
+            t += 1.0
+            continue
+        seconds = term if s == 2 else control_half_seconds(term)
+        up += seconds
+        count += 1
+        last = t
+        t += seconds
+    return up / t
+
+
+def control_report():
+    print("The control rule (docs/specs/tags-and-saves.md section 12): save chance S, then the outcomes of a first application (percent).")
+    for name, caster in CONTROL_CASTERS.items():
+        level = caster[0]
+        print(f"\nCaster {name}: Authority {control_authority(caster[1], caster[1], caster[2])}")
+        print("  target L  R   S ord   Full/Half   S elite  Full/Half   Boss Half/None   Expected ord/elite/boss")
+        for tl in range(level - 2, level + 4):
+            r = creature_resistance(tl)
+            ords = control_outcomes(caster, tl, "ordinary")
+            eli = control_outcomes(caster, tl, "elite")
+            bos = control_outcomes(caster, tl, "boss")
+            s_o = control_save_chance(r, tl - level, False, control_authority(caster[1], caster[1], caster[2]))
+            s_e = control_save_chance(r, tl - level, True, control_authority(caster[1], caster[1], caster[2]))
+            print(f"  {tl:8d} {r:3d} {s_o:5d}  {100 - s_o:3d} / {s_o:<3d}    {s_e:5d}   {100 - s_e:3d} / {s_e:<3d}    {bos[1]:3.0f} / {bos[2]:<3.0f}        {ords[3] + 1e-9:.2f} / {eli[3] + 1e-9:.2f} / {bos[3] + 1e-9:.2f}")
+    print("\nHow long a control effect can be kept up on a target that never makes its save (cast again as soon as it may be):")
+    for term in (20, 10):
+        print(f"  term {term:2d} s: ordinary {control_uptime(term) * 100:4.1f}%   boss {control_uptime(term, True) * 100:4.1f}%")
+
+
+def check_control(read_root, problems):
+    """Compare the constants of the control rule with mudlib/secure/control.cs and the flags with the creature files."""
+    path = os.path.join(read_root, "secure", "control.cs")
+    if not os.path.exists(path):
+        problems.append("secure/control.cs does not exist")
+        return
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    for const, key in (("SaveMin", "save_min"), ("SaveMax", "save_max"), ("LevelPoints", "level_pts"), ("ElitePoints", "elite_pts"), ("RankAuthority", "rank_authority"),
+                       ("WindowSeconds", "window"), ("FloodLimit", "flood"), ("MaxRepeatSteps", "max_repeat")):
+        m = re.search(rf"\b{const} = (\d+)", text)
+        if m is None or int(m.group(1)) != CONTROL[key]:
+            problems.append(f"secure/control.cs: {const} is {m.group(1) if m else None}, {CONTROL[key]} in the simulation")
+    # The worked tables of the spec, as the mudlib and the simulation both must give them.
+    spec = {"level 5, Insight 14, rank I": {3: (5, 6), 4: (5, 10), 5: (5, 10), 6: (9, 24), 7: (19, 34), 8: (33, 48)},
+            "level 10, Insight 20, rank III": {8: (5, 5), 9: (5, 5), 10: (5, 8), 11: (5, 18), 12: (17, 32), 13: (27, 42)}}
+    for name, rows in spec.items():
+        caster = CONTROL_CASTERS[name]
+        a = control_authority(caster[1], caster[1], caster[2])
+        for tl, (ordinary, elite) in rows.items():
+            r = creature_resistance(tl)
+            got = (control_save_chance(r, tl - caster[0], False, a), control_save_chance(r, tl - caster[0], True, a))
+            if got != (ordinary, elite):
+                problems.append(f"control: caster {name}, target level {tl}: {got} in the simulation, {(ordinary, elite)} in the spec")
+    if round(control_uptime(20) * 1000) != 375 or round(control_uptime(10) * 100) != 21 or round(control_uptime(20, True) * 100) != 17 or round(control_uptime(10, True) * 100) != 8:
+        problems.append("control: the repeat and flood numbers of the spec (37.5%, 21%, 17%, 8%) are not reproduced")
+
+
+def check_tags(read_root, problems):
+    """The tags read from the creature files (Boss, Alert, Elite flags) against the simulation's lists, and the registry's rank and senses words."""
+    flags = {"Boss": set(), "Alert": set(), "Elite": set()}
+    names = {"Goblin Scavenger": "goblin_scavenger", "Spore Bat": "spore_bat", "Goblin Guard": "goblin_guard", "Giant Cave Toad": "giant_cave_toad",
+             "Goblin Warrior": "goblin_warrior", "Goblin Minion": "goblin_minion", "Goblin Elite Guard": "goblin_elite_guard", "Goblin Overseer": "goblin_overseer",
+             "Large Rat": "large_rat", "Giant Rat": "giant_rat", "Wandering Wolf": "wandering_wolf"}
+    for display, f in names.items():
+        with open(os.path.join(read_root, "domains", "hollow", "mob", f + ".cs"), encoding="utf-8") as fh:
+            body = fh.read()
+        for flag in flags:
+            if re.search(rf"\b{flag} = true;", body):
+                flags[flag].add(display)
+    for flag, listed in (("Alert", SNEAK_ALERT), ("Boss", SNEAK_BOSS), ("Elite", SNEAK_ELITE)):
+        if flags[flag] != set(listed):
+            problems.append(f"tags: the creature files flag {sorted(flags[flag])} as {flag}, the simulation lists {sorted(listed)}")
 
 
 def check_opener_cap(read_root, problems):
@@ -4181,6 +4314,9 @@ def ranks_report(runs=3000, parts=()):
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "check":
         sys.exit(0 if check_mudlib() else 1)
+    if len(sys.argv) > 1 and sys.argv[1] == "control":
+        control_report()
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "corridor":
         corridor_table(int(sys.argv[2]) if len(sys.argv) > 2 else 400, tuple(sys.argv[3:]))
         return

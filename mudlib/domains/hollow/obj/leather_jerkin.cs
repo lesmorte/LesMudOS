@@ -15,6 +15,7 @@ public class LeatherJerkin : Armor
         Slot = "body";
         ReactionMod = 0.0;
         Category = "light";
+        Tags.Add("light"); Tags.Add("leather");
         NotWornBy.Add("mage");
         Value = 50;
     }

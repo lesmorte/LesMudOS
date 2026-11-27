@@ -24,6 +24,7 @@ public class CmFallenKnight : Monster
         Ids.Add("knight");
         Ids.Add("fallen knight");
         ShortDesc = "the Fallen Knight";
+        Tags.Add("undead"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword");
         LongDesc = "A knight in a tarnished suit of ancient plate kneels beside a long stone bier, a notched greatsword in his gauntlets and the cracked remains of a faded blue tabard hanging from his shoulders. His helmet is closed, and the darkness inside is full of pale light. When he rises it is slowly, as one obeying a long-given order.";
         Level = 10;
         MaxVitality = 155;

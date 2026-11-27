@@ -10,6 +10,7 @@ public class HuntingBow : Weapon
         ShortDesc = "a hunting bow";
         LongDesc = "A supple yew bow with a worn grip, made for rabbits and rooks. In practiced hands it works just as well on goblins.";
         Category = "bow";
+        Tags.Add("ranged"); Tags.Add("piercing"); Tags.Add("bow"); Tags.Add("wood");
         DamageMin = 8;
         DamageMax = 12;
         ToHit = 1;

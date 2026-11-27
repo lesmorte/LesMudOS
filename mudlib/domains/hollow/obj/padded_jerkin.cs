@@ -15,6 +15,7 @@ public class PaddedJerkin : Armor
         Slot = "body";
         ReactionMod = 0.0;
         Category = "light";
+        Tags.Add("light"); Tags.Add("cloth");
         Value = 20;
     }
 }

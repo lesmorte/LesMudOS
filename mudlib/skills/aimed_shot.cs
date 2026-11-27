@@ -26,7 +26,8 @@ public class AimedShotSkill : Skill
         DamageFactor = 1.75;
         Target = "enemy";
         Spoilable = true;
-        WeaponCategories.Add("bow");
+        WeaponTags.Add("ranged");
+        NeedsWeaponText = "a bow";
         Effect("opener", 2.5);
         FixedKeys.Add("tohit");
         RankRow(2, "factor=2.0;opener=3.0");

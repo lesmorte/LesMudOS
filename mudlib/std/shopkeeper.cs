@@ -131,7 +131,8 @@ public class Shopkeeper : Npc
             {
                 // Padded by the width of the visible text, so markup in a name cannot shift the prices.
                 var item = Cap(sample.Call<string>("Short") ?? "something");
-                var tag = sample.Call<string>("QueryCallingTag") ?? ""; // "Mages and Priests only": nobody should buy what they cannot wear
+                // The short phrase of its tags ("slashing sword") and the calling note ("Mages and Priests only": nobody should buy what they cannot wear).
+                var tag = string.Join("; ", new[] { sample.Call<string>("QueryTagSummary") ?? "", sample.Call<string>("QueryCallingTag") ?? "" }.Where(x => x != ""));
                 text.Append($"  {item}{new string(' ', Math.Max(0, 32 - Markup(item, false).Length))}{UnitPrice(entry),5} gold{(tag == "" ? "" : "  (" + tag + ")")}\n");
             }
         Write(text.ToString());

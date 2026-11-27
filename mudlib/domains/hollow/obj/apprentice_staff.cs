@@ -10,6 +10,7 @@ public class ApprenticesStaff : Weapon
         ShortDesc = "an apprentice's staff";
         LongDesc = "A walking staff of pale ash, its head wrapped in leather and scratched with the first runes a student learns. It is better at pointing than at hitting, but it does both.";
         Category = "staff";
+        Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("staff"); Tags.Add("wood");
         DamageMin = 7;
         DamageMax = 11;
         ToHit = 1;

@@ -74,6 +74,8 @@ One interrupt is needed now, for Shield Bash: an action in its Preparation phase
 
 Every weapon and armor piece gets a category.
 
+Since November 2026 weapons and armour also carry tags (reach, damage type, kind, material); see docs/specs/tags-and-saves.md and BUILDING.md. A category is still what decides who may wield or wear a piece.
+
 | Kind | Categories |
 |---|---|
 | Weapons | dagger, sword, spear, axe, mace, staff, bow |

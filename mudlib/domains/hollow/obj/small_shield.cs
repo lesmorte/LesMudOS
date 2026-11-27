@@ -10,6 +10,7 @@ public class SmallShield : Armor
         LongDesc = "A round wooden shield bound with an iron rim. Small, but it turns a blow.";
         ArmorValue = 1;
         Slot = "shield";
+        Tags.Add("shield"); Tags.Add("wood");
         ReactionMod = 0.5;
         Value = 12;
     }

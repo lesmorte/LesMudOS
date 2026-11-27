@@ -15,6 +15,7 @@ public class ScholarsRobe : Armor
         Slot = "body";
         ReactionMod = 0.0;
         Category = "light";
+        Tags.Add("light"); Tags.Add("cloth");
         WornBy.Add("mage");
         WornBy.Add("priest");
         AttributeBonus["insight"] = 1;

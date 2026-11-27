@@ -20,6 +20,7 @@ public class DeepTravelersHood : Armor
         Slot = "head";
         ReactionMod = 0.0;
         Category = "light";
+        Tags.Add("light"); Tags.Add("cloth");
         HidesFromWho = true;
         Value = 40;
     }

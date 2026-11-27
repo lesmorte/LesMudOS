@@ -21,6 +21,7 @@ public class CmBanditLookout : Monster
         Ids.Add("lookout");
         Ids.Add("bandit lookout");
         ShortDesc = "a bandit lookout";
+        Tags.Add("human"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword");
         LongDesc = "A wiry man in a patched green cloak, a short sword at his hip and a horn on his belt, watches the road from the brush with the patience of someone paid to count travelers. He is quick to decide that you are worth the trouble. His dirt-stained fingers rest easily on the sword hilt.";
         Level = 6;
         MaxVitality = 48;

@@ -15,9 +15,10 @@ public class GoblinWarrior : Monster
         Ids.Add("goblin");
         Ids.Add("warrior");
         ShortDesc = "a goblin warrior";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("spear");
         LongDesc = "A lean goblin with a chipped spear, a patched leather jerkin and a crow's feather tied into its hair. It has the look of a soldier rather than a scavenger, and it steps to one side so that its friends can reach you too.";
         BaseReaction = 3.0;
-        AddCombatAction("slash", "Slash", preparation: 0, recovery: 1.0);
+        AddCombatAction("slash", "Spear Thrust", preparation: 0, recovery: 1.0);
         Level = 3;
         MaxVitality = 28;
         DamageMin = 2;

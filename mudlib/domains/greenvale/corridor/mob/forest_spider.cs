@@ -29,6 +29,7 @@ public class CmForestSpider : Monster
         Ids.Add("spider");
         Ids.Add("forest spider");
         ShortDesc = "a forest spider";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A spider the size of a hunting dog hangs from a rope of silk between two oaks, bristling with pale hairs and eight glittering eyes. Fresh webs cross the path at head height. Its fangs drip a clear fluid that stings wherever it falls.";
         Level = 5;
         MaxVitality = 57;

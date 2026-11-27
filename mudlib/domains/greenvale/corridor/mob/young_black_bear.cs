@@ -25,6 +25,7 @@ public class CmYoungBlackBear : Monster
         Ids.Add("young bear");
         Ids.Add("young black bear");
         ShortDesc = "a young black bear";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("claw");
         LongDesc = "A young black bear, all legs and shoulders, ambles between the trees with its muzzle lifted to scent the air. Its shaggy coat is still a size too large for it. Young or not, it weighs more than three men and has claws like iron hooks.";
         Level = 8;
         MaxVitality = 57;

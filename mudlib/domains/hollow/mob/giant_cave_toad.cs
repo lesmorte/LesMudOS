@@ -18,6 +18,7 @@ public class GiantCaveToad : Monster
         Ids.Add("toad");
         Ids.Add("cave toad");
         ShortDesc = "a giant cave toad";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("lash");
         LongDesc = "A toad the size of a sheep, its warty back slick with black water and its throat pulsing slowly. Its pale eyes do not blink, and it waits in the shallows with a patience that is much more unsettling than speed would be.";
         Level = 3;
         DarkSight = false; // pale, unblinking eyes: it feels the water, not the shape (docs/specs/light.md)
@@ -32,7 +33,7 @@ public class GiantCaveToad : Monster
         Aggressive = true;
         BaseReaction = 4.5;
         AddCombatAction("lash", "Tongue Lash", preparation: 0, recovery: 1.0);
-        AddCombatAction("leap", "Crushing Leap", preparation: 1.0, recovery: 2.0, windUp: "gathers its legs under it, throat swelling", damageMultiplier: 2);
+        AddCombatAction("leap", "Crushing Leap", preparation: 1.0, recovery: 2.0, windUp: "gathers its legs under it, throat swelling", damageMultiplier: 2, reach: "melee", damage: "blunt", tagKind: "slam");
     }
 
     /// <summary>Tongue Lash, Tongue Lash, Crushing Leap, and round again.</summary>

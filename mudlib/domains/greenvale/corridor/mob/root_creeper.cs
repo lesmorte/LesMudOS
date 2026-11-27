@@ -30,6 +30,7 @@ public class CmRootCreeper : Monster
         Ids.Add("root creeper");
         Ids.Add("roots");
         ShortDesc = "a root creeper";
+        Tags.Add("plant"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("lash");
         LongDesc = "A mass of pale roots the thickness of a man's thigh heaves itself along the tunnel floor, a tangle of fibres with a dark hollow at its centre like a mouth. Little white tendrils reach and curl toward anything warm. It leaves a trail of sticky sap.";
         Level = 8;
         MaxVitality = 58;

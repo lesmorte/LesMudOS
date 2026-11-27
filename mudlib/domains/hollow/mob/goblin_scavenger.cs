@@ -15,6 +15,7 @@ public class GoblinScavenger : Monster
         Ids.Add("goblin");
         Ids.Add("scavenger");
         ShortDesc = "a goblin scavenger";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("dagger");
         LongDesc = "A thin, quick goblin with a sack slung over one shoulder and a bent knife in each hand. Its eyes dart to your purse and then to the nearest exit, as if it is weighing which it would rather have.";
         BaseReaction = 1.5;
         AddCombatAction("stab", "Quick Stab", preparation: 0, recovery: 0.5);

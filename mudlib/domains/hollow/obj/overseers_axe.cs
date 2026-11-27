@@ -16,6 +16,7 @@ public class OverseersAxe : Weapon
         ReactionMod = 1.5;
         Recovery = 1.5;
         Category = "axe";
+        Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("axe"); Tags.Add("iron");
         Value = 70;
     }
 }

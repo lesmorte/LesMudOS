@@ -21,6 +21,7 @@ public class CmRoeDeer : Monster
         Ids.Add("roe deer");
         Ids.Add("roe");
         ShortDesc = "a roe deer";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("kick");
         LongDesc = "A roe deer stands at the edge of the trees, its red-brown coat dappled with light and its white rump patch a flag in the shade. It watches the road with huge dark eyes, ready to bound away at the first sudden move. A cornered deer will lash out with sharp hooves.";
         Level = 3;
         MaxVitality = 22;

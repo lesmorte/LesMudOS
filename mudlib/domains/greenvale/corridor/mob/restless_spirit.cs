@@ -30,6 +30,7 @@ public class CmRestlessSpirit : Monster
         Ids.Add("restless spirit");
         Ids.Add("ghost");
         ShortDesc = "a restless spirit";
+        Tags.Add("spirit"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("touch");
         LongDesc = "A pale, ragged figure hangs in the air above the stones, its outline blurred as though seen through water. Its face is too indistinct to read, but the hollows where its eyes should be follow you. The air near it is cold enough to numb your fingers.";
         Level = 9;
         MaxVitality = 64;

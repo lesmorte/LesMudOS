@@ -13,6 +13,7 @@ public class HollowOakStaff : Weapon
         ShortDesc = "a staff of the Hollow Oak";
         LongDesc = "A straight rod of pale heartwood, as long as you are tall and warm to the hand, with a faint grain like the rings of a very old tree. Nothing that grows in the Hollow is this colour. Your thoughts come a little clearer when you hold it.";
         Category = "staff";
+        Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("staff"); Tags.Add("wood");
         DamageMin = 10;
         DamageMax = 14;
         ToHit = 1;

@@ -14,6 +14,7 @@ public class GiantRat : Monster
         Name = "Giant Rat";
         Ids.Add("rat");
         ShortDesc = "a giant rat";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A rat as long as your forearm, with a pointed grey snout, bald pink tail and teeth worn yellow from gnawing on rubble. It shuffles toward you without any fear at all.";
         BaseReaction = 2.0;
         AddCombatAction("bite", "Bite", preparation: 0, recovery: 0.5);

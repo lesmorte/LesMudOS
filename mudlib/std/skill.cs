@@ -38,6 +38,9 @@ public abstract class Skill : MudObject
     protected string Target = "none";
     /// <summary>If not empty, the wielded weapon must be of one of these categories (dagger, sword, spear, axe, mace, staff, bow).</summary>
     protected List<string> WeaponCategories = new();
+    /// <summary>Tags the wielded weapon must carry, every one ("ranged" for Aimed Shot); NeedsWeaponText names it in the refusal ("a bow"). docs/specs/tags-and-saves.md.</summary>
+    protected List<string> WeaponTags = new();
+    protected string NeedsWeaponText = "";
     protected bool NeedsShield;
     protected bool NeedsUnarmed;
     /// <summary>Separate weapon blows one use of an attack skill makes, each with its own hit roll (Double Strike: 2).</summary>
@@ -240,6 +243,8 @@ public abstract class Skill : MudObject
             if (!WeaponCategories.Contains(category))
                 return $"{Title} needs " + (WeaponCategories.Count == 1 ? $"a {WeaponCategories[0]}" : "one of: " + string.Join(", ", WeaponCategories)) + " in your hands.";
         }
+        if (WeaponTags.Count > 0 && !WeaponTags.All(t => user.Call<bool>("QueryWeaponHasTag", t)))
+            return $"{Title} needs {(NeedsWeaponText == "" ? "a fitting weapon" : NeedsWeaponText)} in your hands.";
         if (NeedsShield && !user.Call<bool>("QueryHasShield")) return $"{Title} needs a shield.";
         if (NeedsUnarmed && user.Call<string>("QueryWeaponCategory") != "") return $"{Title} can only be done unarmed.";
         return Check(user, target);

@@ -12,6 +12,7 @@ public class SteelDirk : Weapon
         ShortDesc = "a steel dirk";
         LongDesc = "A narrow, triple-edged dirk of good steel with a plain wire-bound grip. It is quick, it is quiet, and it is not meant for anything you would say out loud.";
         Category = "dagger";
+        Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("dagger"); Tags.Add("steel");
         DamageMin = 8;
         DamageMax = 12;
         ToHit = 1;

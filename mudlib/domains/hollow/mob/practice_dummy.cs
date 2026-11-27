@@ -15,6 +15,7 @@ public class PracticeDummy : Monster
         Ids.Add("training dummy");
         Ids.Add("target");
         ShortDesc = "a training dummy";
+        Tags.Add("construct"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("slam");
         LongDesc = "A man-shaped dummy of sacking and straw on a stout post, its chest painted with a red ring and its arms bound out in a permanent shrug. It is scarred from a hundred blades and has never once complained. It will stand there as long as you care to hit it.";
         Level = 1;
         MaxHp = 10000;

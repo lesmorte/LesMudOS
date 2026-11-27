@@ -566,6 +566,19 @@ public class Player : Adventurer
             Write(LoadObject("/secure/guidepost").Call<string>("Help"));
             return true;
         }
+        if (args.Trim().ToLowerInvariant() is "weapons" or "weapon" or "reach" or "damage" or "kinds" or "tags" or "armour" or "armor" or "authority" or "binding" or "law")
+        {
+            Write("Weapons: every weapon and every creature's attack has a reach (melee, ranged or thrown) and a damage type (slashing, piercing or blunt), and a kind\n" +
+                  "  (a sword, an axe, a mace, a bow and so on). {cmd}appraise{/} and {cmd}examine{/} say it in words, and so do the shops: \"a sword (slashing, melee)\".\n" +
+                  "  The words of a blow follow the damage type: a sword cleaves and slashes, a mace crushes and bludgeons, a dagger or spear pierces, a bow loosed arrows\n" +
+                  "  hit; a bite, a claw or a kick has words of its own. How much a blow does is the same as ever: the wording tells only how hard it landed.\n" +
+                  "  Some skills ask for a kind of weapon: Aimed Shot needs a bow in your hands. Armour has its own kind (light cloth, leather, mail, plate) and a material.\n" +
+                  "  Binding: some effects bind a creature (slow it, hold it, daze it). How well they take hold depends on the creature's level against yours and on its\n" +
+                  "  resistance. A creature of rank (an elite) resists better. A boss is above the law: a binding effect only half holds, and is easily shrugged off, and you\n" +
+                  "  read \"is above the law, and knows it\" when nothing holds. A creature far above you in level \"ignores your authority\" when it throws the effect off. The\n" +
+                  "  same binding used twice within a minute holds less each time, and a creature can only be bound by so many effects in a minute.\n");
+            return true;
+        }
         if (args.Trim().ToLowerInvariant() == "search")
         {
             Write("Search: {cmd}search{/} looks the whole place over for hidden things (a way, a stash, a scrap of writing); {cmd}search{/} THING looks at one spot that a\n" +
@@ -593,6 +606,7 @@ public class Player : Adventurer
             "           (while fighting you cannot get, loot or walk away: {cmd}flee{/})\n" +
             "Corpses:   {cmd}loot{/} [CORPSE], {cmd}get{/} THING (or all) from CORPSE, {cmd}look in{/} CORPSE\n" +
             "Gear:      {cmd}wield{/} THING, {cmd}unwield{/}, {cmd}wear{/} THING, {cmd}remove{/} THING, {cmd}eat{/}/{cmd}drink{/} THING\n" +
+            "           {cmd}help weapons{/}: reach, damage types and kinds, and what \"above the law\" means\n" +
             "Speaking:  {cmd}say{/} TEXT (or {cmd}'{/} TEXT), {cmd}tell{/} PLAYER TEXT, {cmd}reply{/} TEXT, {cmd}whisper{/} TEXT {cmd}to{/} PLAYER, {cmd}shout{/} TEXT\n" +
             "           {cmd}shout off{/} / {cmd}shout on{/} (stop or hear shouts), {cmd}ignore{/} [PLAYER], {cmd}unignore{/} PLAYER,\n" +
             "           {cmd}channels{/} (your channels), {cmd}channel{/} NAME {cmd}on{/}|{cmd}off{/}, {cmd}shout{/} NAME TEXT or NAME TEXT to speak on one\n" +

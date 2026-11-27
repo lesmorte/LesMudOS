@@ -96,6 +96,7 @@ So that a new character plays as today, each statistic acts through how far the 
 | Healing Power | Healing from spells +2% for each point of Spirit above 5 and +1% for each point of Insight above 5. Potions and food are not scaled. | Priest +9% |
 | Mental Resistance | 2% chance for each point of Spirit and Resolve above 5 to shake off fear, charm, confusion and other mind effects (at most 75%). No such effects exist yet; the statistic is computed and ready. | |
 | Physical Resistance | 2% chance for each point of Vigor and Resolve above 5 to resist stagger, slow and knockdown (at most 75%) | Warrior 6% |
+| Authority | The better of Insight above 5 and Resolve above 5, in points (Insight 14 gives 9). Used only by the control rule (`/secure/control`, docs/specs/tags-and-saves.md Part B): it lowers the chance that a creature of higher level shakes off a binding effect. Read with `QueryStat("authority")`; shown nowhere to players. | Insight 14: 9 |
 | Carry Capacity | 50 + Might × 5 pounds, computed and shown. Not enforced: items have no weights and there is no encumbrance system, by the owner's earlier decision. | |
 | Gathering Efficiency | +1 to the harvest quality score for each point of Grace and Insight above 5 | Scout +5 |
 | Crafting Aptitude | +0.02 to the crafted quality shift for each point of Insight and Resolve above 5 | |

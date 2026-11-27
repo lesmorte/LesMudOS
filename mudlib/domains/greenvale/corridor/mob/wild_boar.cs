@@ -24,6 +24,7 @@ public class CmWildBoar : Monster
         Ids.Add("boar");
         Ids.Add("wild boar");
         ShortDesc = "a wild boar";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("gore");
         LongDesc = "A wild boar the size of a calf roots through the leaf litter, bristling with coarse black hair, yellowed tusks curving from its lower jaw. Mud cakes its flanks and its small red eyes miss nothing. It wheels to face anything that comes too close.";
         Level = 6;
         MaxVitality = 40;
@@ -35,7 +36,7 @@ public class CmWildBoar : Monster
         Aggressive = false;
         BaseReaction = 3.5;
         AddCombatAction("gore", "Gore", preparation: 0, recovery: 1);
-        AddCombatAction("charge", "Charge", preparation: 1, recovery: 1.5, windUp: "lowers its tusks and paws at the ground", damageMultiplier: 2, strike: "crashes forward in a bone-shaking charge!");
+        AddCombatAction("charge", "Charge", preparation: 1, recovery: 1.5, windUp: "lowers its tusks and paws at the ground", damageMultiplier: 2, strike: "crashes forward in a bone-shaking charge!", reach: "melee", damage: "blunt", tagKind: "slam");
     }
 
     /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>

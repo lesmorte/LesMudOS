@@ -33,6 +33,7 @@ public class CmBanditLeader : Monster
         Ids.Add("bandit leader");
         Ids.Add("bandit");
         ShortDesc = "the Bandit Leader";
+        Tags.Add("human"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword");
         LongDesc = "A tall, silver-bearded man in a dark coat trimmed with fox fur sits at the head of the camp like a lord at his own table, a curved sabre across his knees and a round shield at his side. The rings on his fingers were taken from other people's hands. His cool gaze takes your measure and finds it wanting.";
         Level = 10;
         MaxVitality = 100;
@@ -48,7 +49,7 @@ public class CmBanditLeader : Monster
         DeathMessage = "The Bandit Leader sinks to one knee, lets the sabre fall from his fingers, and topples over.";
         BaseReaction = 3.5;
         AddCombatAction("slash", "Sabre Slash", preparation: 0, recovery: 1);
-        AddCombatAction("smash", "Shield Smash", preparation: 0.5, recovery: 1.5, windUp: "swings his shield up and round");
+        AddCombatAction("smash", "Shield Smash", preparation: 0.5, recovery: 1.5, windUp: "swings his shield up and round", reach: "melee", damage: "blunt", tagKind: "slam");
         FindAction("smash")!.DamageFactor = 0.75;
         AddCombatAction("rally", "Call the Pack", preparation: 0.5, recovery: 1, windUp: "puts two fingers to his mouth", kind: "summon");
         AddLoot("/domains/hollow/obj/bag_of_coins", 100);

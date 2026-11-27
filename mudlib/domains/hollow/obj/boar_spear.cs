@@ -11,6 +11,7 @@ public class BoarSpear : Weapon
         ShortDesc = "a boar spear";
         LongDesc = "A stout ash spear with a broad leaf-shaped head and a crossbar below it, so that an angry boar cannot run up the shaft. It is the kind of spear a man carries when he means to come home.";
         Category = "spear";
+        Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("spear"); Tags.Add("wood");
         DamageMin = 11;
         DamageMax = 16;
         ToHit = 1;

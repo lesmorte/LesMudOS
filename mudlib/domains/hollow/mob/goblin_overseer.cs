@@ -28,6 +28,7 @@ public class GoblinOverseer : Monster
         Ids.Add("overseer");
         Ids.Add("goblin");
         ShortDesc = "the Goblin Overseer";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("axe");
         LongDesc = "Taller and better armed than any goblin you have seen, the Overseer wears a crow-marked sash over scavenged mail. His eyes are sharp, and he looks at you like a problem to be solved.";
         Level = 5;
         MaxVitality = 114;

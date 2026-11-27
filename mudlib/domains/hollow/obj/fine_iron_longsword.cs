@@ -15,6 +15,7 @@ public class FineIronLongsword : Weapon
         ReactionMod = 1.0;
         Recovery = 1.0;
         Category = "sword";
+        Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword"); Tags.Add("iron");
         Value = 60;
     }
 }

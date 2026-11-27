@@ -28,6 +28,7 @@ public class CmGoblinRaider : Monster
         Ids.Add("raider");
         Ids.Add("goblin raider");
         ShortDesc = "a goblin raider";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("axe");
         LongDesc = "A heavy-browed goblin in a stolen carter's jerkin, his arms ringed with looted copper, swings a notched cleaver as he watches the forest road. Scars cross his forearms and his grin shows broken teeth. He has the swagger of one who has lived off other people's wagons for a long time.";
         Level = 7;
         MaxVitality = 53;

@@ -24,6 +24,7 @@ public class CmForestWolf : Monster
         Ids.Add("wolf");
         Ids.Add("forest wolf");
         ShortDesc = "a forest wolf";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A heavy-shouldered wolf with a coat the colour of wet bark and a pale ruff at its throat pads between the trunks. It moves with the unhurried confidence of an animal that knows these woods better than anyone. Its low growl rises and falls like breathing.";
         Level = 6;
         MaxVitality = 73;

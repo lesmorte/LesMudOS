@@ -3,6 +3,7 @@
 /// <summary>
 /// Barrow Guardian, level 10. Part of the Greenvale Transit Corridor. Numbers and the balance reasoning:
 /// docs/CORRIDOR_BALANCE.md and tests/balance_sim.py (python3 tests/balance_sim.py check compares them with this file).
+/// lint-ok: weapon-words (the stone sword in its description is a planted prop, not an arm: it fights with its fists, Stone Fist and Earthshaker).
 /// It has no respawn of its own: the room that spawns it (AddSpawn) or lets it wander in (AddEncounter) brings a new one at its next reset.
 /// </summary>
 public class CmBarrowGuardian : Monster
@@ -33,6 +34,7 @@ public class CmBarrowGuardian : Monster
         Ids.Add("barrow guardian");
         Ids.Add("statue");
         ShortDesc = "a barrow guardian";
+        Tags.Add("construct"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("slam");
         LongDesc = "A massive figure of weathered grey stone, vaguely like a man, stands against the barrow wall with its fists resting on the pommel of a stone sword as long as a door. Chipped runes glow faintly across its chest. It does not breathe, and yet it seems to watch.";
         Level = 10;
         MaxVitality = 150;

@@ -15,6 +15,7 @@ public class EnchantedDagger : Weapon
         Recovery = 0.5;
         ToHit = 2;
         Category = "dagger";
+        Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("dagger"); Tags.Add("steel");
         Magic = "the blade is enchanted: +2 to hit";
         Value = 80;
     }

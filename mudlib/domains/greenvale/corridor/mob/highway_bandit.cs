@@ -30,6 +30,7 @@ public class CmHighwayBandit : Monster
         Ids.Add("highwayman");
         Ids.Add("highway bandit");
         ShortDesc = "a highway bandit";
+        Tags.Add("human"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword");
         LongDesc = "A road-hardened man in a travel-stained cloak, a sabre at his belt and a crossbow slung across his back, leans against a milestone as though waiting for a friend. He makes no secret of what he wants. A brass-buckled belt marks him as one of the camp's regulars.";
         Level = 8;
         MaxVitality = 59;
@@ -43,7 +44,7 @@ public class CmHighwayBandit : Monster
         Aggressive = true;
         BaseReaction = 3;
         AddCombatAction("slash", "Slash", preparation: 0, recovery: 1);
-        AddCombatAction("pommel", "Pommel Strike", preparation: 0, recovery: 1.5);
+        AddCombatAction("pommel", "Pommel Strike", preparation: 0, recovery: 1.5, reach: "melee", damage: "blunt", tagKind: "club");
         FindAction("pommel")!.DamageFactor = 0.5;
         AddLoot("/domains/hollow/obj/rusty_sword", 15);
         AddLoot("/domains/hollow/obj/healing_potion", 6);

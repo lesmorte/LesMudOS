@@ -19,7 +19,8 @@ public class GoblinEliteGuard : Monster
         Ids.Add("elite");
         Ids.Add("elite guard");
         ShortDesc = "a goblin elite guard";
-        LongDesc = "A goblin twice the size of its kin, wearing a helm of black iron and a breastplate studded with bone. It carries a long-hafted axe in both hands and stands between you and the Overseer's door as if it has been waiting all its life for you to try.";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("axe");
+        LongDesc = "A goblin twice the size of its kin, wearing a helm of black iron and a breastplate studded with bone, with a heavy bone-rimmed shield strapped to one arm. It carries a long-hafted axe in the other hand and stands between you and the Overseer's door as if it has been waiting all its life for you to try.";
         Level = 4;
         MaxVitality = 40;
         DamageMin = 3;
@@ -31,10 +32,11 @@ public class GoblinEliteGuard : Monster
         GoldMax = 22;
         Aggressive = true;
         Alert = true;
+        Elite = true;
         BaseReaction = 3.5;
         AddCombatAction("slash", "Slash", preparation: 0, recovery: 1.0);
         AddLoot("/domains/hollow/obj/captains_sabre", 10);
-        AddCombatAction("bash", "Shield Bash", preparation: 0.5, recovery: 1.5, windUp: "drops a shoulder behind the shield", damageMultiplier: 2);
+        AddCombatAction("bash", "Shield Bash", preparation: 0.5, recovery: 1.5, windUp: "drops a shoulder behind the shield", damageMultiplier: 2, reach: "melee", damage: "blunt", tagKind: "slam");
     }
 
     /// <summary>Slash, Slash, Slash, Shield Bash, and round again.</summary>

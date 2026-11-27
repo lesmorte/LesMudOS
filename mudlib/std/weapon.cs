@@ -31,8 +31,28 @@ public class Weapon : Item
 
     public string QueryCategory() => Category;
 
+    protected override string TagCarrier() => "weapon";
+
+    /// <summary>A weapon whose file states no kind has its Category as its kind (the runtime implies its reach and damage type from that, /secure/tags).</summary>
+    protected override void CollectTags(List<string> tags)
+    {
+        if (Category == "") return;
+        List<string> kinds;
+        try { kinds = LoadObject("/secure/tags").Call<List<string>>("QueryWeaponKinds") ?? new List<string>(); }
+        catch (MudRuntimeException) { return; }
+        if (!tags.Any(t => kinds.Contains(t))) tags.Add(Category);
+    }
+
+    /// <summary>" (slashing, melee)" for a weapon with tags, else "".</summary>
+    private string TagWords()
+    {
+        var damage = QueryTagIn("damage");
+        var reach = QueryTagIn("reach");
+        return damage == "" && reach == "" ? "" : " (" + string.Join(", ", new[] { damage, reach }.Where(x => x != "")) + ")";
+    }
+
     public override string Appraisal() =>
-        $"{Cap(Short() ?? Name)}: a {(Category == "" ? "weapon" : Category)}. Damage {DamageMin}-{DamageMax}, to hit +{ToHit}, reaction modifier {Num(ReactionMod)}, recovery {Num(Recovery)}. Worth {QueryValue()} gold." + AppraisalQuality() +
+        $"{Cap(Short() ?? Name)}: {(Category == "" ? "a weapon" : AOrAn(Category))}{TagWords()}. Damage {DamageMin}-{DamageMax}, to hit +{ToHit}, reaction modifier {Num(ReactionMod)}, recovery {Num(Recovery)}. Worth {QueryValue()} gold." + AppraisalQuality() +
         (Magic != "" ? $" Magical property: {Magic}." : " It holds no magic.") + "\n";
 
     public override string Stat() => base.Stat() + $"  Weapon: damage {DamageMin}-{DamageMax}, to hit {ToHit}, reaction {Num(ReactionMod)}, recovery {Num(Recovery)}\n";

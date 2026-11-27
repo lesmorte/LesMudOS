@@ -18,7 +18,179 @@ public abstract class Thing : MudObject
     public virtual bool CanGet() => false;
 
     /// <summary>The numbers a builder wants to see: shown by the wizard command "stat".</summary>
-    public virtual string Stat() => $"{Self.Name}: {Name}\n";
+    public virtual string Stat() => $"{Self.Name}: {Name}\n" + TagStatLine();
+
+    // ---- Tags (docs/specs/tags-and-saves.md) ----
+    // A tag is a registered lower-case word (reach, damage type, kind, material, rank, nature, senses) that states what a thing IS. An
+    // object declares its own in Create() (Tags.Add("sword")); the set is checked against /secure/tags the first time anyone reads it, so
+    // an unregistered, reserved or doubled tag (from a wizard's object, say) is dropped, never trusted. There is deliberately no public
+    // function that adds or removes a tag: only the object's own code writes Tags, and the readers below only read.
+
+    /// <summary>The tags this object declares, written in Create(). Weapons, armour and creatures add what their kind implies when it is read.</summary>
+    protected readonly List<string> Tags = new();
+
+    private HashSet<string>? tagSet;
+    private Dictionary<string, string>? tagExclusive;
+    private List<string>? tagDropped;
+
+    /// <summary>"weapon", "armour" or "creature" for the kinds of thing the registry has rules for; "" otherwise.</summary>
+    protected virtual string TagCarrier() => "";
+
+    /// <summary>Add the tags that come from somewhere other than Tags: a weapon's kind from its Category, a creature's flags. Called once, when the tags are first read.</summary>
+    protected virtual void CollectTags(List<string> tags) { }
+
+    private void EnsureTags()
+    {
+        if (tagSet != null) return;
+        var set = new HashSet<string>();
+        var exclusive = new Dictionary<string, string>();
+        var dropped = new List<string>();
+        var all = new List<string>(Tags);
+        CollectTags(all);
+        if (all.Count > 0)
+        {
+            List<string>? resolved = null;
+            try { resolved = LoadObject("/secure/tags").Call<List<string>>("QueryResolved", all, TagCarrier()); }
+            catch (MudRuntimeException) { }
+            if (resolved == null) foreach (var tag in all) set.Add(tag); // no registry (it did not compile): the object's own words, unchecked
+            else
+                foreach (var entry in resolved)
+                {
+                    if (entry.StartsWith("!")) { dropped.Add(entry.Substring(1)); continue; }
+                    var parts = entry.Split(':');
+                    if (parts.Length != 3) continue;
+                    set.Add(parts[2]);
+                    if (parts[0] == "E") exclusive[parts[1]] = parts[2];
+                }
+        }
+        tagExclusive = exclusive;
+        tagDropped = dropped;
+        tagSet = set;
+    }
+
+    /// <summary>Does the object carry this tag (declared, implied by its kind, or derived from a flag)?</summary>
+    public bool HasTag(string tag)
+    {
+        EnsureTags();
+        return tag != null && tagSet!.Contains(tag);
+    }
+
+    /// <summary>Every tag of the object, sorted (a copy). A player carries none.</summary>
+    public List<string> QueryTags()
+    {
+        EnsureTags();
+        var list = tagSet!.ToList();
+        list.Sort(StringComparer.Ordinal);
+        return list;
+    }
+
+    /// <summary>The object's one tag of an exclusive family ("reach", "damage", "kind", "armour", "material", "rank"), or "".</summary>
+    public string QueryTagIn(string family)
+    {
+        EnsureTags();
+        return family != null && tagExclusive!.TryGetValue(family, out var tag) ? tag : "";
+    }
+
+    /// <summary>The tags the object declared that the registry refused (not registered, reserved, a second of an exclusive family). Empty for real files that passed the lint.</summary>
+    public List<string> QueryDroppedTags()
+    {
+        EnsureTags();
+        return new List<string>(tagDropped!);
+    }
+
+    private string TagStatLine()
+    {
+        EnsureTags();
+        if (tagSet!.Count == 0 && tagDropped!.Count == 0) return "";
+        var line = "  Tags: " + string.Join(" ", QueryTags());
+        if (tagDropped!.Count > 0) line += (tagSet.Count > 0 ? " " : "") + "(unregistered or refused: " + string.Join(" ", tagDropped.Take(8)) + ")";
+        return line + "\n";
+    }
+
+    /// <summary>"a" or "an" and the word.</summary>
+    protected static string AOrAn(string word) => (word.Length > 0 && "aeiou".IndexOf(word[0]) >= 0 ? "an " : "a ") + word;
+
+    private static string MaterialWord(string material) => material == "wood" ? "wooden" : material;
+
+    /// <summary>
+    /// The short phrase for displays (the shop's list, appraise): "slashing sword", "piercing bow, at range", "light leather armour",
+    /// "goblin, elite". "" for a thing with no tags that say so.
+    /// </summary>
+    public string QueryTagSummary()
+    {
+        EnsureTags();
+        switch (TagCarrier())
+        {
+            case "weapon":
+            {
+                var damage = QueryTagIn("damage");
+                var kind = QueryTagIn("kind");
+                var words = (damage + " " + kind).Trim();
+                if (words == "") return "";
+                var reach = QueryTagIn("reach");
+                return words + (reach == "ranged" || reach == "thrown" ? ", at range" : "");
+            }
+            case "armour":
+            {
+                var type = QueryTagIn("armour");
+                var material = QueryTagIn("material");
+                if (type == "") return "";
+                if (type == "shield" || type == "trinket") return (material == "" ? "" : MaterialWord(material) + " ") + type;
+                return type + (material == "" ? "" : " " + material) + " armour";
+            }
+            case "creature":
+            {
+                var words = new List<string>();
+                foreach (var n in QueryTagsOfFamily("nature")) words.Add(n);
+                var rank = QueryTagIn("rank");
+                if (rank != "") words.Add(rank);
+                return string.Join(", ", words);
+            }
+        }
+        return "";
+    }
+
+    private List<string> QueryTagsOfFamily(string family)
+    {
+        EnsureTags();
+        var members = new List<string>();
+        try { members = LoadObject("/secure/tags").Call<List<string>>("QueryTagsOf", family) ?? members; } catch (MudRuntimeException) { }
+        return members.Where(t => tagSet!.Contains(t)).ToList();
+    }
+
+    /// <summary>
+    /// The sentence that look adds for a weapon or a piece of armour: "It is a sword: it cuts, and it is used up close." / "It is light armour,
+    /// made of leather." Empty for a thing whose tags say nothing.
+    /// </summary>
+    protected string TagSentence()
+    {
+        EnsureTags();
+        switch (TagCarrier())
+        {
+            case "weapon":
+            {
+                var kind = QueryTagIn("kind");
+                var damage = QueryTagIn("damage") switch { "blunt" => "crushes", "slashing" => "cuts", "piercing" => "pierces", _ => "" };
+                var reach = QueryTagIn("reach") switch { "melee" => "used up close", "ranged" => "used from a distance", "thrown" => "made to be thrown", _ => "" };
+                if (kind == "" && damage == "" && reach == "") return "";
+                var head = kind == "" ? "It" : $"It is {AOrAn(kind)}";
+                var rest = new List<string>();
+                if (damage != "") rest.Add($"it {damage}");
+                if (reach != "") rest.Add($"it is {reach}");
+                if (rest.Count == 0) return head + ".";
+                return head + (kind == "" ? " " : ": ") + string.Join(", and ", rest) + ".";
+            }
+            case "armour":
+            {
+                var type = QueryTagIn("armour");
+                if (type == "") return "";
+                var material = QueryTagIn("material");
+                var noun = type == "shield" || type == "trinket" ? AOrAn(type) : type + " armour";
+                return $"It is {noun}" + (material == "" ? "" : $", made of {material}") + ".";
+            }
+        }
+        return "";
+    }
 
     private const string AnsiReset = "\u001b[0m";
     private const int MaxTagLength = 8; // the longest style tag ("bmagenta")

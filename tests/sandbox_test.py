@@ -421,6 +421,35 @@ def efun_method():
 '''
 
 
+TAGMEDDLE = '''// @inherit /std/item
+public class WrenTagMeddle : Item
+{
+    public override void Create() { Name = "tagmeddle"; Ids.Add("tagmeddle"); ShortDesc = "a tag meddler"; }
+    public override void Init() { base.Init(); AddAction("tagmeddle", Meddle); }
+    private bool Meddle(string args)
+    {
+        var me = ThisPlayer()!;
+        var w = Present("sword", me);
+        var control = LoadObject("/secure/control");
+        var tags = LoadObject("/secure/tags");
+        var r = new List<string>();
+        void Try(string l, Func<object?> f) { try { r.Add(l + "=" + (f() ?? "null")); } catch (MudRuntimeException) { r.Add(l + "=ERR"); } }
+        Try("addtag", () => w?.Call("AddTag", "blunt"));
+        Try("settags", () => w?.Call("SetTags", "frost"));
+        Try("setprop", () => w?.Call("SetProperty", "tags", "frost"));
+        Try("registry", () => tags.Call("Family", "x", "y"));
+        Try("settest", () => control.Call("SetTestRolls", "save:0.0"));
+        Try("clock", () => control.Call("SetTestClock", 5));
+        Try("forget", () => control.Call("ForgetAllRecords"));
+        Try("resolve", () => control.Call("Resolve", me, me, "x", "physical", 1, 1, "order"));
+        Try("read", () => w == null ? null : w.Call<bool>("HasTag", "slashing"));
+        Try("chance", () => control.Call<int>("QuerySaveChance", 10, 2, false, 3));
+        Write("TAGMEDDLE " + string.Join(" ", r) + "\\n");
+        return true;
+    }
+}
+'''
+
 LAB = '''// @inherit /std/room
 // @use /wiz/wren/lib
 public class WrenLab : Room
@@ -761,7 +790,7 @@ def main():
     os.makedirs(os.path.join(mudlib, "wiz", "wren", "area"), exist_ok=True)
     os.makedirs(os.path.join(mudlib, "wiz", "rev", "nook"), exist_ok=True)
     h.write(mudlib, "/wiz/rev/nook/nook", "// @inherit /std/room\npublic class RevNook : Room { public override void Create() { ShortDesc = \"Rev's Nook\"; LongDesc = \"Small.\"; } }\n")
-    for name, src in (("lib", LIB), ("lab", LAB), ("gem", GEM), ("wand", WAND), ("imp", IMP), ("ticker", TICKER), ("greeter", GREETER), ("gob", GOB), ("quester", QUESTER),
+    for name, src in (("lib", LIB), ("lab", LAB), ("gem", GEM), ("wand", WAND), ("imp", IMP), ("ticker", TICKER), ("greeter", GREETER), ("gob", GOB), ("quester", QUESTER), ("tagmeddle", TAGMEDDLE),
                       ("area/glade", AREA_ROOM), ("area/inner", AREA_INNER), ("area/beast", AREA_BEAST), ("area/shiny", AREA_SHINY)):
         h.write(mudlib, W + name, src)
     proc, log = start(work, mudlib)
@@ -1205,6 +1234,17 @@ def main():
         check("publish: waiting requests are counted at login", rev.read_until("waiting", timeout=10), "publishing request(s) are waiting")
         rev.read_until("> ")
         check("publish: the register survives a look", chief.command("submissions all"), f"#{rid2} waiting")
+
+        # ================================================================ tags and the control rule (docs/specs/tags-and-saves.md)
+        chief.command("clone /domains/hollow/obj/rusty_sword")
+        chief.command("give sword to wren")
+        wren.command("lab")
+        wren.command("clone " + W + "tagmeddle")
+        got = wren.command("tagmeddle")
+        check("tags: a workshop object cannot change a real weapon's tags or the registry, or set the control rule's dice or clock, or record an effect",
+              got, "addtag=null", "settags=null", "registry=null", "settest=null", "clock=null", "forget=null", "resolve=null", absent=("addtag=True", "settest=True", "resolve=2", "resolve=1"))
+        check("tags: it may read tags and the pure rule", got, "read=True", "chance=")
+        check("tags: the setprop path changed nothing", got, "setprop=False")
 
         # ================================================================ there is no test-only path in this server
         out = open(os.path.join(work, "driver.log")).read()

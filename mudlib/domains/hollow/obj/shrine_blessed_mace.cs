@@ -13,6 +13,7 @@ public class ShrineBlessedMace : Weapon
         ShortDesc = "a shrine-blessed mace";
         LongDesc = "A plain mace whose head has been washed in the shrine's still water and left a night in the open hand carved above its door. It looks like any other mace, until it is raised, and then it is very quiet.";
         Category = "mace";
+        Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("mace"); Tags.Add("iron");
         DamageMin = 13;
         DamageMax = 18;
         ReactionMod = 0.5;

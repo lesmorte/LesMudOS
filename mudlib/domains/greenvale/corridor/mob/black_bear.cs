@@ -27,6 +27,7 @@ public class CmBlackBear : Monster
         Ids.Add("bear");
         Ids.Add("black bear");
         ShortDesc = "a black bear";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("claw");
         LongDesc = "A full-grown black bear, glossy and thick-necked, stands on its hind legs to scratch its back against an ancient trunk. Its small eyes are mild until they are not. The claw marks scored in the bark would flay a man.";
         Level = 8;
         MaxVitality = 54;

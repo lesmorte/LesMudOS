@@ -409,6 +409,273 @@ def in_scope(mudpath):
     return True
 
 
+# ---- Check 17: tags (docs/specs/tags-and-saves.md section 3). Check 18: what a name or a description says about a weapon. ----
+
+TAG_SCOPES = ("/std/", "/secure/", "/skills/", "/classes/", "/domains/")
+DERIVED_TAGS = {"boss": "Boss = true;", "alert": "Alert = true;", "darksight": "DarkSight (it is true unless the file sets DarkSight = false;)", "elite": "Elite = true;"}
+
+# A word in the name of an action or a weapon says what it does: (stem, kind it names or None, damage type it needs or None). The stems are the
+# start of a word; "crush" and "maul" are left out on purpose (a crushing blow may be struck with a blade).
+NAME_WORDS = (
+    ("spear", "spear", "piercing"), ("jab", None, "piercing"), ("stab", None, "piercing"), ("thrust", None, "piercing"), ("pierc", None, "piercing"),
+    ("dagger", "dagger", "piercing"), ("dirk", "dagger", "piercing"), ("fang", None, "piercing"), ("nip", None, "piercing"), ("gore", "gore", "piercing"),
+    ("pick", "pick", "piercing"), ("bite", "bite", "piercing"),
+    ("slash", None, "slashing"), ("cleav", None, "slashing"), ("hack", None, "slashing"), ("sabre", "sword", "slashing"), ("sword", "sword", "slashing"),
+    ("axe", "axe", "slashing"), ("claw", "claw", "slashing"), ("swipe", None, "slashing"), ("rak", None, "slashing"),
+    ("hammer", "mace", "blunt"), ("mace", "mace", "blunt"), ("club", "club", "blunt"), ("staff", "staff", "blunt"), ("bash", None, "blunt"),
+    ("smash", None, "blunt"), ("pommel", None, "blunt"), ("kick", "kick", "blunt"), ("slam", "slam", "blunt"), ("lash", "lash", "blunt"),
+    ("touch", "touch", "blunt"), ("fist", None, "blunt"),
+)
+WEAPON_NAME_WORDS = (("sword", "sword"), ("sabre", "sword"), ("dagger", "dagger"), ("dirk", "dagger"), ("spear", "spear"), ("axe", "axe"), ("mace", "mace"),
+                     ("staff", "staff"), ("bow", "bow"), ("longbow", "bow"), ("recurve", "bow"))
+# A carried weapon a description may name, and the kind an action must then have. Natural weapons (teeth, claws) are not carried.
+CARRIED_WORDS = (("sword", "sword"), ("sabre", "sword"), ("longsword", "sword"), ("greatsword", "sword"), ("cutlass", "sword"), ("dagger", "dagger"), ("knife", "dagger"),
+                 ("spear", "spear"), ("axe", "axe"), ("cleaver", "axe"), ("hatchet", "axe"), ("mace", "mace"), ("hammer", "mace"), ("club", "club"), ("cudgel", "club"),
+                 ("pick", "pick"), ("staff", "staff"))
+
+
+def read_registry(lib):
+    """The vocabulary of /secure/tags, read from its text: families {name: (exclusive, active, carriers, tags)}, only, implied, ladders."""
+    if not lib.is_file("/secure/tags"):
+        return None
+    text = lib.source("/secure/tags").text
+    fam = {}
+    for m in re.finditer(r'^\s*Family\("(\w+)",\s*(Exclusive|Open),\s*(Active|Reserved),\s*"([^"]*)",\s*"([^"]*)"\);', text, re.M):
+        fam[m.group(1)] = (m.group(2) == "Exclusive", m.group(3) == "Active", m.group(4).split(), m.group(5).split())
+    only = {(m.group(1), m.group(2)): m.group(3).split() for m in re.finditer(r'Only\("(\w+)",\s*"(\w+)",\s*"([^"]*)"\)', text)}
+    implied = {m.group(1): (m.group(2), m.group(3)) for m in re.finditer(r'Implied\("(\w+)",\s*"(\w+)",\s*"(\w+)"\)', text)}
+    ladders = {(m.group(1), m.group(2)) for m in re.finditer(r'Ladder\("(\w+)",\s*"(\w+)"\)', text)}
+    natural = set()
+    if lib.is_file("/secure/blows"):
+        m = re.search(r'Natural\("([^"]*)"\)', lib.source("/secure/blows").text)
+        natural = set(m.group(1).split()) if m else set()
+    return fam, only, implied, ladders, natural
+
+
+def family_of(reg, tag):
+    fam = reg[0]
+    for name, (_ex, _act, _car, tags) in fam.items():
+        if tag in tags:
+            return name
+    if re.fullmatch(r"(weak|resists|immune)-(fire|frost|shock|holy|shadow)", tag):
+        return "affinity"
+    return None
+
+
+def call_parts(toks, k):
+    """The arguments of the call at toks[k] as (positional token lists, {name: token list})."""
+    if not is_op(at(toks, k + 1), "("):
+        return None
+    pos, named, cur, depth, j = [], {}, [], 0, k + 2
+
+    def flush():
+        if not cur:
+            return
+        if len(cur) >= 3 and cur[0][0] == "id" and is_op(cur[1], ":") and not is_op(at(cur, 2), ":"):
+            named[cur[0][1]] = cur[2:]
+        else:
+            pos.append(list(cur))
+
+    while j < len(toks):
+        t = toks[j]
+        if is_op(t, "(") or is_op(t, "[") or is_op(t, "{"):
+            depth += 1
+        elif is_op(t, ")") or is_op(t, "]") or is_op(t, "}"):
+            if depth == 0:
+                break
+            depth -= 1
+        if depth == 0 and is_op(t, ","):
+            flush()
+            cur = []
+        else:
+            cur.append(t)
+        j += 1
+    flush()
+    return pos, named
+
+
+def tag_literals(toks):
+    """Every `Tags.Add("x")` / `Tags.AddRange(new[] { "a", "b" })` in order, as a list of literal strings."""
+    out = []
+    for k in range(len(toks)):
+        if is_id(toks[k], "Tags") and is_op(at(toks, k + 1), ".") and at(toks, k + 2)[0] == "id" and at(toks, k + 2)[1] in ("Add", "AddRange"):
+            parts = call_parts(toks, k + 2)
+            if parts:
+                for arg in parts[0]:
+                    out.extend(t[1].raw for t in arg if is_str(t) and not t[1].interp)
+    return out
+
+
+def string_after_call(toks, name):
+    """Literal first arguments of every `name("...")` call."""
+    out = []
+    for k in range(len(toks)):
+        if is_id(toks[k], name) and is_op(at(toks, k + 1), "(") and is_str(at(toks, k + 2)):
+            out.append(at(toks, k + 2)[1].raw)
+    return out
+
+
+def lit_value(tokens):
+    return tokens[0][1].raw if len(tokens) == 1 and is_str(tokens[0]) and not tokens[0][1].interp else None
+
+
+def lint_tags(lib, everything, report):
+    reg = read_registry(lib)
+    if reg is None:
+        return
+    fam, only, implied, ladders, natural = reg
+    exclusive = {n for n, v in fam.items() if v[0]}
+    for p in everything:
+        if not p.startswith(TAG_SCOPES) or p == "/secure/tags" or p.startswith("/domains/town/") or p.split("/")[-1] == "area":
+            continue
+        src = lib.source(p)
+        toks = src.toks
+        # 1. Every tag a file writes is registered; a reserved one is an error; a derived one is declared with its flag.
+        declared = tag_literals(toks)
+        for tag in declared + string_after_call(toks, "HasTag"):
+            if tag in DERIVED_TAGS and tag in declared:
+                report(p, 17, ERROR, f"Tags.Add(\"{tag}\"): declare it with {DERIVED_TAGS[tag]} (the tag is derived from the flag)")
+                continue
+            f = family_of(reg, tag)
+            if f is None:
+                report(p, 17, ERROR, f"tag '{tag}' is not registered in /secure/tags")
+            elif not fam[f][1]:
+                report(p, 17, ERROR, f"tag '{tag}' is reserved: no rule reads it yet")
+        for f in string_after_call(toks, "QueryTagIn"):
+            if f not in fam:
+                report(p, 17, ERROR, f"QueryTagIn(\"{f}\"): '{f}' is not a registered family")
+        # 3. Two tags of one exclusive family in one file.
+        seen = {}
+        for tag in declared:
+            f = family_of(reg, tag)
+            if f in exclusive:
+                if f in seen and seen[f] != tag:
+                    report(p, 17, ERROR, f"tags '{seen[f]}' and '{tag}' are both of the exclusive family '{f}'")
+                seen.setdefault(f, tag)
+        if "Boss = true" in re.sub(r"\s+", " ", src.text) and "Elite = true" in re.sub(r"\s+", " ", src.text):
+            report(p, 17, ERROR, "Boss = true and Elite = true: a creature has one rank")
+        if not p.startswith("/domains/"):
+            continue
+        # 4. Weapons, armour and creatures state what they are.
+        carrier = {"/std/weapon": "weapon", "/std/armor": "armour", "/std/monster": "creature"}.get(src.inherit or "")
+        if carrier is None:
+            continue
+        for tag in declared:
+            f = family_of(reg, tag)
+            if f and fam[f][1] and carrier not in fam[f][2]:
+                report(p, 17, ERROR, f"tag '{tag}' ({f}) is not for a {carrier}")
+            if f and (carrier, f) in only and tag not in only[(carrier, f)]:
+                report(p, 17, ERROR, f"tag '{tag}' is not a {f} of a {carrier}")
+        have = {f: seen.get(f) for f in ("reach", "damage", "kind", "armour")}
+        text_one = re.sub(r"\s+", " ", src.text)
+        if carrier == "weapon":
+            for f in ("reach", "damage", "kind"):
+                if not have[f]:
+                    report(p, 17, ERROR, f"weapon states no {f} tag")
+            cat = re.search(r'\bCategory = "(\w*)";', text_one)
+            if have["kind"] and cat and cat.group(1) != have["kind"]:
+                report(p, 17, ERROR, f"weapon kind '{have['kind']}' is not its Category '{cat.group(1)}'")
+        elif carrier == "armour":
+            if not have["armour"]:
+                report(p, 17, ERROR, "armour states no armour tag")
+            else:
+                slot = re.search(r'\bSlot = "(\w*)";', text_one)
+                cat = re.search(r'\bCategory = "(\w*)";', text_one)
+                want = slot.group(1) if slot and slot.group(1) in ("shield", "trinket") else (cat.group(1) if cat else None)
+                if want is not None and want != have["armour"]:
+                    report(p, 17, ERROR, f"armour tag '{have['armour']}' is not its {'Slot' if want == (slot.group(1) if slot else None) else 'Category'} '{want}'")
+        else:
+            for f in ("reach", "damage", "kind"):
+                if not have[f]:
+                    report(p, 17, ERROR, f"creature states no {f} tag for its basic attack")
+        # 5. Every (reach, damage) pair has a ladder, or its kind has its own.
+        pairs = [(have["reach"], have["damage"], have["kind"], "its basic attack")] if carrier in ("weapon", "creature") else []
+        if carrier == "creature":
+            for k in range(len(toks)):
+                if is_id(toks[k], "AddCombatAction"):
+                    parts = call_parts(toks, k)
+                    if not parts:
+                        continue
+                    pos, named = parts
+                    label = lit_value(pos[1]) if len(pos) > 1 else "an action"
+                    for key, f in (("reach", "reach"), ("damage", "damage"), ("tagKind", "kind")):
+                        if key in named:
+                            v = lit_value(named[key])
+                            if v is None:
+                                continue
+                            fm = family_of(reg, v)
+                            if fm != f:
+                                report(p, 17, ERROR, f"action {label}: {key} '{v}' is not a {f} tag")
+                    if any(k2 in named for k2 in ("reach", "damage", "tagKind")):
+                        r = lit_value(named.get("reach", [])) or have["reach"]
+                        d = lit_value(named.get("damage", [])) or have["damage"]
+                        kd = lit_value(named.get("tagKind", [])) or have["kind"]
+                        pairs.append((r, d, kd, f"action {label}"))
+        for r, d, kd, label in pairs:
+            if r and d and (r, d) not in ladders and kd not in natural:
+                report(p, 17, ERROR, f"{label}: no hit-wording ladder for ({r}, {d}); write one in /secure/blows and a Ladder line in /secure/tags")
+
+
+def lint_words(lib, everything, report):
+    """Check 18: a weapon's name and a creature's action names agree with the tags; a creature's description names only weapons it can use (a warning)."""
+    reg = read_registry(lib)
+    if reg is None:
+        return
+    for p in everything:
+        if not p.startswith("/domains/") or p.startswith("/domains/town/") or p.split("/")[-1] == "area":
+            continue
+        src = lib.source(p)
+        if src.inherit not in ("/std/weapon", "/std/monster"):
+            continue
+        toks = src.toks
+        declared = tag_literals(toks)
+        have = {}
+        for tag in declared:
+            f = family_of(reg, tag)
+            if f in ("reach", "damage", "kind"):
+                have.setdefault(f, tag)
+        if src.inherit == "/std/weapon":
+            names = assignments(toks, "Name")
+            words = re.findall(r"[a-z]+", " ".join(l.raw for lits, _ in names for l in lits).lower())
+            for word, kind in WEAPON_NAME_WORDS:
+                if word in words and have.get("kind") and have["kind"] != kind:
+                    report(p, 18, ERROR, f"the name says '{word}' but the weapon's kind is '{have['kind']}'")
+            continue
+        # A creature: each action's name against its effective tags.
+        effective = []
+        for k in range(len(toks)):
+            if not is_id(toks[k], "AddCombatAction"):
+                continue
+            parts = call_parts(toks, k)
+            if not parts or len(parts[0]) < 2:
+                continue
+            pos, named = parts
+            label = lit_value(pos[1]) or ""
+            kind_literal = lit_value(named.get("kind", []))
+            if kind_literal not in (None, "attack"):
+                continue  # a cry, a summon, a buff: not a blow
+            damage = lit_value(named.get("damage", [])) or have.get("damage")
+            kind = lit_value(named.get("tagKind", [])) or have.get("kind")
+            effective.append(kind)
+            for word in re.findall(r"[a-z]+", label.lower()):
+                for stem, want_kind, want_damage in NAME_WORDS:
+                    if word.startswith(stem):
+                        if want_damage and damage and damage != want_damage:
+                            report(p, 18, ERROR, f"action '{label}' says '{word}' ({want_damage}) but its damage type is '{damage}'")
+                        elif want_kind and kind and kind != want_kind:
+                            report(p, 18, ERROR, f"action '{label}' says '{word}' ({want_kind}) but its kind is '{kind}'")
+                        break
+        if not re.search(r"lint-ok: weapon-words", src.text):
+            desc = " ".join(l.raw for lits, _ in assignments(toks, "LongDesc") for l in lits).lower()
+            named_kinds = set()
+            for word, kind in CARRIED_WORDS:
+                if re.search(r"\b" + word + r"\b(?!\s+(?:wound|scar|mark))", desc):
+                    named_kinds.add((word, kind))
+            for word, kind in sorted(named_kinds):
+                if kind not in effective:
+                    report(p, 18, WARN, f"the description names a {word} but no attack of the creature is of kind '{kind}'")
+
+
 def lint_hidden(lib, p, src, exits, report):
     calls = hidden_calls(src.toks)
     spawned = spawn_paths(src.toks)
@@ -600,7 +867,7 @@ def run(root, flt):
             if value is None or value <= 0:
                 report(p, 13, ERROR, f"{call} price {price!r} is not a positive number")
 
-        # Check 17: HidesFromWho (docs/specs/who-and-visibility.md section 5) belongs to armour and is `true` or `false`.
+        # Check 19: HidesFromWho (docs/specs/who-and-visibility.md section 5) belongs to armour and is `true` or `false`.
         for m in re.finditer(r"\bHidesFromWho\s*(=|=>)\s*([^;]*);", src.text):
             if src.inherit != "/std/armor":
                 report(p, 17, ERROR, "HidesFromWho is set on something that does not inherit /std/armor")
@@ -672,6 +939,10 @@ def run(root, flt):
             for word, p in entries:
                 others = ", ".join(o for _, o in entries if o != p)
                 report(p, 6, WARN, f'first name "{word}" is also used by {others}')
+
+    # Checks 17 and 18: tags, and what names and descriptions say about weapons (they read the registry's text; a mudlib without one skips them).
+    lint_tags(lib, everything, report)
+    lint_words(lib, everything, report)
 
     shown = [r for r in problems if flt in r[0]]
     shown.sort(key=lambda r: (r[0], r[1], r[3]))
