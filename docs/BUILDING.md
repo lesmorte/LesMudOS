@@ -522,6 +522,10 @@ public class ExampleRat : Monster
 }
 ```
 
+### Tags: what a creature is and how it hits
+
+Every creature declares `Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("mace");` after its short description: a nature (`goblin`, `beast`, `human`, `undead`...), the reach and damage type of its basic attack, and a kind (a weapon kind, or a natural one: `bite`, `claw`, `gore`, `kick`, `slam`, `lash`, `touch`, `spit`, `thorns`). The flags `Boss`, `Elite`, `Alert` and `DarkSight` become the tags `boss`, `elite`, `alert` and `darksight` by themselves; read them with `HasTag`. An action that differs says so: `AddCombatAction("bash", "Shield Bash", ..., reach: "melee", damage: "blunt", tagKind: "slam")`. Words of a blow come from the kind and the damage type, so a creature that the text arms with a spear needs a piercing action. `tests/lint_area.py` checks the tags (check 17) and the name words (check 18).
+
 ### Timing: a creature with one action, and one with a pattern
 
 Combat has no rounds: every creature acts on the event clock of [COMBAT_TIMING.md](COMBAT_TIMING.md), exactly as a player does. A creature has a **base Reaction Time** (`BaseReaction`, 1.0 fast to 6.0 slow, steps of 0.5; default 2.5, the same as a player) and a list of **actions**. Each action has a `preparation` (a wind-up before it takes effect, 0 for a plain attack) and a `recovery`, both in time units of 2 seconds, and the time to its next action is `(Reaction Time + recovery) x 2` seconds. A rat with Reaction Time 2.0 and a bite with recovery 0.5 acts every `(2.0 + 0.5) x 2 = 5` seconds. The rest of the numbers (Vitality, damage, to hit, armor) work as before; because actions are several seconds apart, damage and Vitality are larger than they were when a round was 2 seconds (the table in GAME_SYSTEMS.md has the Hollow's).
@@ -594,6 +598,8 @@ Every item has `Name`, `Ids` (words that name it), `ShortDesc` (with article, fo
 
 `wield` it. Damage replaces the unarmed 2-5; `ToHit` is added to attack rolls. Two timing fields: `ReactionMod` is added to the wielder's Reaction Time for as long as it is wielded (heavy weapons are slow to bring to bear), and `Recovery` is the Recovery of a basic attack with it. A player with Reaction Time 2.5 attacks every `(2.5 + ReactionMod + Recovery) x 2` seconds: 6 with fists, 9 with this sword (`0.5` and `1.0`). A slower weapon must hit harder so that its damage per second is no worse (see the weapon table in GAME_SYSTEMS.md). Set `Category` to one of `dagger`, `sword`, `spear`, `axe`, `mace`, `staff`, `bow`: a character may only wield categories their calling allows (`Magic = "the blade is enchanted: +2 to hit"` is a note shown by Appraise and Magical Lore).
 
+**Tags.** A weapon declares what it is with `Tags.Add(...)`, one per family: a reach (`melee`, `ranged`, `thrown`), a damage type (`slashing`, `piercing`, `blunt`), a kind (the category word: `sword`, `axe`, `mace` and so on) and a material (`iron`, `wood` and so on). If you add no kind tag the `Category` is the kind. A kind implies a reach and a damage type, so a plain sword is melee and slashing without saying so; add the others only to differ (a thrown spear). The words of a blow follow the damage type, and `appraise`, `examine` and the shops show "a sword (slashing, melee)". A misspelt or unknown tag is dropped by the registry without an error (`stat` shows what was dropped; the lint makes it an error). A description and an attack must agree: a creature whose text carries a hammer has a hammer blow (`mace`, `blunt`), not a spear jab (the lint warns when a description names a weapon that none of its attacks use).
+
 ```csharp
 // File: /domains/example/sword.cs
 // @inherit /std/weapon
@@ -618,6 +624,8 @@ public class ExampleSword : Weapon
 ### Armor
 
 `wear` it. `Slot` is one of `shield`, `body`, `head`, `trinket`. `ArmorValue` adds to the wearer's armor; `MaxVitalityBonus` (optional) adds to maximum Vitality while worn. `ReactionMod` (optional, default 0) is added to the wearer's Reaction Time while worn: a shield or heavy armor makes its wearer a little slower. `Category` is `light`, `medium` or `heavy` for body and head armor (it decides who may wear it; a shield or trinket needs none). `WornBy` and `NotWornBy` restrict a piece by calling as well (next section).
+
+Armour tags: the `Category` is the armour tag (`light`, `medium`, `heavy`; shown in words as "light cloth armour" with the material) and `Tags.Add("cloth")` or `"leather"`, `"iron"` and so on gives the material.
 
 ```csharp
 // File: /domains/example/helm.cs

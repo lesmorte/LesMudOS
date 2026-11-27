@@ -690,7 +690,7 @@ def run(work, mudlib, box):
     check("a mage buying a piece it can wear is not warned", out, "You buy a padded jerkin", absent=("No gold",))
     goto(warrior, "village/hedge_scholars_loft")
     text = warrior.command("browse")
-    check("Halbert's list marks the robe as for mages and priests only", text, "scholar's robe", "40 gold  (Mages and Priests only)")
+    check("Halbert's list marks the robe as for mages and priests only", text, "scholar's robe", "40 gold  (light cloth armour; Mages and Priests only)")
     truth("and not the staff", all("(" not in l for l in text.splitlines() if "ironshod staff" in l), text)
     gold = score(warrior)["gold"]
     out = warrior.command("buy robe")

@@ -123,7 +123,7 @@ Slow weapons must hit correspondingly harder, or nobody would use them: damage p
 | Wandering Wolf | 2.0 | Bite 0 / 1.0 | Every 6 s |
 | Goblin Scavenger | 1.5 | Quick Stab 0 / 0.5 | Every 4 s; fast but fragile |
 | Spore Bat | 1.5 | Swoop 0 / 0.5 | Every 4 s |
-| Goblin Guard | 3.5 | Spear Jab 0 / 1.0 | Every 9 s; defensive |
+| Goblin Guard | 3.5 | Hammer Blow 0 / 1.0 | Every 9 s; defensive |
 | Goblin Warrior | 3.0 | Slash 0 / 1.0 | Every 8 s |
 | Goblin Minion | 2.5 | Stab 0 / 0.5 | Every 6 s |
 | Giant Cave Toad | 4.5 | Tongue Lash 0 / 1.0; Crushing Leap 1.0 / 2.0 every third action | 11 s, then 13 s with a 2 s warning |

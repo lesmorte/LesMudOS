@@ -169,7 +169,7 @@ On death: a death line for the room; experience at once, shared by the players w
 | Wandering Wolf | 2 | 26 | 2-4 | 1 | 1 | 25 | 0 | 2.0 | Bite 0 / 1.0; aggressive; encounter |
 | Goblin Scavenger | 2 | 13 | 1-3 | 2 | 1 | 22 | 2-8 | 1.5 | Quick Stab 0 / 0.5; fast but fragile |
 | Spore Bat | 2 | 9 | 1-2 | 1 | 3 | 20 | 0 | 1.5 | Swoop 0 / 0.5; evasive |
-| Goblin Guard | 2 | 26 | 2-4 | 0 | 2 | 32 | 4-12 | 3.5 | Spear Jab 0 / 1.0; one carries the Rusty Key |
+| Goblin Guard | 2 | 26 | 2-4 | 0 | 2 | 32 | 4-12 | 3.5 | Hammer Blow 0 / 1.0; one carries the Rusty Key |
 | Giant Cave Toad | 3 | 66 | 2-4 | 0 | 0 | 50 | 0 | 4.5 | Tongue Lash 0 / 1.0; Crushing Leap 1.0 / 2.0 (x2 damage) as every third action |
 | Goblin Warrior | 3 | 28 | 2-4 | 0 | 2 | 42 | 5-14 | 3.0 | Slash 0 / 1.0 |
 | Goblin Minion | 2 | 20 | 2-4 | 0 | 1 | 15 | 0 | 2.5 | Stab 0 / 0.5; summoned by the boss only |

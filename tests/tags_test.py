@@ -690,6 +690,10 @@ def step_creatures_hit(c):
 # ---------------------------------------------------------------- 7. the goblins and the lint
 
 def step_goblins(c):
+    out = c.command("help weapons")
+    check("help weapons: reach, damage, kinds, the control wording", out, "reach", "slashing", "above the law", "ignores your authority", "binding")
+    check("help weapons names no hidden class, spell or place", out.lower(), absent=("bureaucrat", "chancery", "registrar", "triplicate", "restraining", "cease and desist", "red tape", "circle of ash"))
+    check("the plain help points to it", c.command("help"), "help weapons")
     print("\n=== the three goblins")
     src = lambda p: open(os.path.join(ROOT, "mudlib", p.lstrip("/") + ".cs")).read()
     for path, hammer in ((HOLLOW + "goblin_guard", True), (HOLLOW + "goblin_guard_keyholder", True)):
