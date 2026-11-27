@@ -34,7 +34,7 @@ Each has a recommendation and the alternative. The spec is written, and the code
   Dana the newcomer (link-dead)
 ```
 
-Marks, in this order after the name: `[wizard N]`, `(idle Nm)`, `(link-dead)`, then `(invis)` for an invisible wizard the asker may see (and for the wizard themselves), then `(hidden)` for a wearer of a hiding item, shown to wizards and to the wearer. The look and columns are as before. The count is the number of rows.
+Marks, in this order after the name: `[wizard N]`, `(idle Nm)` (a link-dead body has `(link-dead)` in its place), then `(invis)` for an invisible wizard the asker may see (and for the wizard themselves), then `(hidden)` for a wearer of a hiding item, shown to wizards and to the wearer. The look and columns are as before. The count is the number of rows.
 
 Who is shown to whom (`Roster.WhoMarks(viewer, target)`, null meaning not listed):
 
@@ -77,6 +77,8 @@ Messages, per type, each decided once:
 * **"Someone":** say, shout, whisper to another, tell, a room line about an ordinary deed.
 * **revealing:** a deed done to someone, and speech on a wizard-level channel.
 
+Changes an invisible wizard makes while in a workshop are left behind when they leave it, like everything else done there (the workshop's body is restored from the checkpoint): they should type `invis` outside.
+
 ## 3. Tell, reply and whisper
 
 `/secure/comm` asks `Roster.Visible` where it used to ask `QueryInvisible` of the body (no body answers that now). When a wizard sends a `tell`, `reply` or `whisper` to a character, comm tells the registry (`NoteSpoke`) and the registry remembers the pair of bodies. `Roster.Spoke(wizard, mortal)` is then true while both bodies live and the wizard has not typed `vis` or `invis`. Comm lets a tell or whisper reach an invisible wizard if `Visible` or `Spoke` holds; the name shown is still "Someone" (the existing test: "You tell Someone: who is this"). Everyone else gets the same words as for a name not in the game.
@@ -97,23 +99,23 @@ all-players [recent | new | PREFIX] [PAGE]
 | `all-players new` | by creation, newest first (those with no date last, by name) |
 | `all-players ra` | names beginning with "ra" (letters only), by name |
 
-A page is 40 rows. Sample, 80 columns, a row to a line:
+A page is 40 rows. Sample (80 columns at most; each column is as wide as its longest entry, a class name is cut to fit):
 
 ```
-Name        Calling   Class      Lvl  Wiz  Created     Last login  Now
-Alice       Scout     -            7    -  2026-11-02  2026-11-27  yes
-Rayek       Warrior   Knight      12    -  before records began  2026-11-26  -
-Warden      Mage      -           10   10  2026-10-01  2026-11-27  yes
+Name   Calling    Class  Lvl Wiz Created              Last login Now
+Alice  Adventurer -        7   - 2026-11-27           2026-11-27 yes
+Oldie  Warrior    Knight  12   - before records began 2023-11-14 -
+Warden Mage       -       10  10 2026-10-01           2026-11-27 yes
 3 character(s). Page 1 of 1.
 ```
 
-(Exact columns are in the code; the sample is regenerated in the final report.) The columns are exactly: name, calling, class, level, wizard level, created, last login, in the game now. Never shown: addresses or their keyed hashes, password hashes, the ignore list, inventory, anything else.
+The columns are exactly: name, calling, class, level, wizard level, created, last login, in the game now. Never shown: addresses or their keyed hashes, password hashes, the ignore list, inventory, anything else.
 
 How it is read. `/secure/roster` is a blueprint that declares only eight `[Saved]` fields with the names of the player's own (`Level`, `archetype`, `advancedClass`, `subclass`, `prestigeClass`, `logins`, `lastLogin`, `created`). The master lets that one blueprint read a file under `/players/` (`ValidRead`), and the driver's `RestoreObject` loads only the fields the object declares, so the password hash and the address hashes are never loaded into any object but the player's own. The index (name, those fields) is in memory. It is built at boot by a call-out that reads 40 saves every quarter second; it is updated when a body logs in (`Note`), when a character is made, and when it logs out; each use of the command lists the save directory (`SaveNames`) and drops the characters whose file is gone and queues the ones it does not know. While the index is still being built the command says so and lists what it has. A caller must be the real body of a level 10 wizard acting on their own command (`ThisPlayer`), never restricted code, never a clone made in a workshop. One log line is written when it is used: "all-players: NAME" (no output). No character deletion exists today; the list follows the save directory, so a deleted save leaves it.
 
 ## 5. The hiding item
 
-`Armor` (and so every wearable) has `protected virtual bool HidesFromWho` (false), and `public bool QueryHidesFromWho()`. A builder writes `HidesFromWho = true;` in `Create`; docs/BUILDING.md says so; `tests/lint_area.py` check 17 reports it on anything that is not armour, with a value that is not `true` or `false`, or on an item that sets it without a Value and a price in a shop. The body answers `QueryHiddenFromWho()` (any worn item hides). That is all it does: the wearer is in the room list, hears `tell`, shows link-dead in the room, and is named in say. A wizard sees "(hidden)". The wearer's `score` has "You are keeping out of sight of the who list." Taking the item off shows them at once (nothing is stored).
+`Armor` (and so every wearable) has `protected virtual bool HidesFromWho` (false), and `public bool QueryHidesFromWho()`. A builder writes `HidesFromWho = true;` in `Create`; docs/BUILDING.md says so; `tests/lint_area.py` check 17 reports it on anything that does not inherit `/std/armor` and on a value that is not `true` or `false`. The body answers `QueryHiddenFromWho()` (any worn item hides). That is all it does: the wearer is in the room list, hears `tell`, shows link-dead in the room, and is named in say. A wizard sees "(hidden)". The wearer's `score` has "You are keeping out of sight of the who list." Taking the item off shows them at once (nothing is stored).
 
 The Deep Traveler's Hood: `/domains/greenvale/oakenfell/southgate/obj/deep_hood`; "a deep traveler's hood", "A hood of heavy grey wool, cut deep enough to hide a face and long enough to fall over the shoulders. It has seen a good many roads and does not mind who knows it."; head, armour 0, light, any calling, Value 40, 120 gold at Corwin Dray, with one line of talk: "A deep hood, for those who would rather not be asked for at every inn. Folk who wear one are left off the lists the town criers keep. One hundred and twenty gold."
 
@@ -128,25 +130,26 @@ Later items (not built): **the Veil Ring** (a trinket, a quest reward from a Cha
 
 ## 7. `stats`
 
-For any player (and a wizard's own). No box, no Chronicle, no quests, no equipment: two columns of label and value, 12 rows, at most 48 columns (so it also reads in 80 and in a narrow client), plain ASCII only, so `charset ascii` changes nothing.
+For any player (and a wizard's own). No box, no Chronicle, no quests, no equipment: two columns of label and value, 12 rows (13 with the points line), at most 48 columns (so it also reads in 80 and in a narrow client), plain ASCII only, so `charset ascii` changes nothing.
 
 ```
-Rayek - Scout - Level 5
-Might       5          Grace       9
-Vigor       5          Insight     6
-Spirit      5          Resolve     6
-Vitality    45/58      Damage      8-12
-Endurance   106/108    To hit      +3
-Focus       20/24      Defense     1
-Armor       0          Dodge       5%
-Block       0%         Critical    6%
-Reaction    2.5        Attack Time 7.0 s
-Mental Res  11         Physical Res 10
-Carry       75 lb
+Alice - Adventurer - Level 7
+Might       6          Grace        6
+Vigor       6          Insight      6
+Spirit      6          Resolve      6
+Points to place: 12 (improve ATTRIBUTE)
+Vitality    38/78      Damage       8-12
+Endurance   82/82      To hit       +8
+Focus       82/82      Defense      6
+Armor       0          Dodge        0%
+Block       0%         Critical     5.25%
+Reaction    2.5        Attack Time  7.0 s
+Mental Res  12         Physical Res 12
+Carry       80 lb
 ```
 
-A line "Attribute points to place: 2 (improve ATTRIBUTE)" follows the attributes when there are points. An attribute raised or lowered by an effect shows the base in brackets as `score` does ("Might 6 (5)"). `help` lists it with `score`.
+A line "Points to place: 2 (improve ATTRIBUTE)" follows the attributes when there are points. An attribute raised or lowered by an effect shows the base in brackets as `score` does ("Might 6 (5)"). `help` lists it with `score`.
 
 ## 8. Tests
 
-`tests/who_test.py` (port 4843) covers sections 1 to 7: mortals see mortals; an invisible wizard is absent for mortals and lower wizards, marked for equal and higher, seen by level 10; the count lines; the room, `look at`, the arrival and login lines; `tell` and `whisper` refused with the same words as an absent name, byte for byte, and allowed after the wizard spoke; it persists over a reconnect and a take-over; the hood; `all-players` refused for level 9 and mortals with the unknown-command words, working for level 10, with every stored hash of the test characters grepped out of the output, sorting, prefix, paging, dates on new and old saves; `stats` widths and `charset ascii`; and a /wiz probe that cannot set or read invisibility or call the roster. `tests/comm_test.py` uses the real `invis` and `vis` where it used a test-only command.
+`tests/who_test.py` (180 checks, port 4843) covers sections 1 to 7: mortals see mortals; an invisible wizard is absent for mortals and lower wizards, marked for equal and higher, seen by level 10; the count lines; the room, `look at`, the arrival and login lines; `tell` and `whisper` refused with the same words as an absent name, byte for byte, and allowed after the wizard spoke; it persists over a reconnect and a take-over; the hood; `all-players` refused for level 9 and mortals with the unknown-command words, working for level 10, with every stored hash of the test characters grepped out of the output, sorting, prefix, paging, dates on new and old saves; `stats` widths and `charset ascii`; and a /wiz probe that cannot set or read invisibility or call the roster. `tests/comm_test.py` uses the real `invis` and `vis` where it used a test-only command.
