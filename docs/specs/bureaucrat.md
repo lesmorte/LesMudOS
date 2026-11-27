@@ -1,81 +1,145 @@
-# The Bureaucrat: a control caster of the Chancery of Oakenfell (proposed 27 November 2026)
+# The Bureaucrat: the Mage's hidden class, found by jury duty (revised 27 November 2026)
 
-Owner's idea (27 November 2026): "a funny class 'Bureaucrat', it would be a caster class and it would cast things like 'forms in triplicate' (which is basically a slow spell) or 'restraining order' (can't get within melee range, ranged weapons only)". His adviser proposed, and he did not object: an advanced class pledged at a chancery or hall of records in Oakenfell, open to Mages and perhaps Adventurers, with an in-world title (Clerk of the Chancery / Notary) that players call the Bureaucrat; a control caster with low Vitality and weak direct damage, Focus as its resource, Insight and Resolve as its attributes. The humour comes from clerks treating a goblin ambush as a filing matter, and nobody in the fiction thinks it is funny.
+Owner's idea (27 November 2026): "a funny class 'Bureaucrat', it would be a caster class and it would cast things like 'forms in triplicate' (which is basically a slow spell) or 'restraining order' (can't get within melee range, ranged weapons only)". The humour comes from clerks treating a goblin ambush as a filing matter, and nobody in the fiction thinks it is funny.
 
-This is built on [tags-and-saves.md](tags-and-saves.md): it needs the `melee` and `ranged` tags (Part A) and the saving-throw rule (Part B: "above the law" for bosses, "ignores your authority" for higher level). Every number is a starting value for `tests/balance_sim.py` and play-testing; nothing here has been run in the game. "Today" means the files in the repository on 27 November 2026.
+Owner's decisions of 27 November 2026, now folded into this spec: the Bureaucrat "should be a 'hidden' type of class without an OBVIOUS training/pledger", each path gets one, and this is the Mage's; the Chancery room is redesigned; it is found by "a 'jury duty summons' in loot ONCE", and "if they arrive for jury duty the quest should begin and end with them having the option of taking the b class"; "A bureaucrat probably isn't fighting the Overseer anyway", so the class starts in Oakenfell and the Overseer is no longer its yardstick. The owner accepts that this spec sits in a public repository for now.
 
+This spec is the first use of [hidden-classes.md](hidden-classes.md), which holds the pattern: the register, the summons roll, the gated door, the shape of the quest, the leak fixes and the lint check. Read it first; this file does not repeat it, and says "the pattern" where it relies on it. It is built on [tags-and-saves.md](tags-and-saves.md): it needs the `melee` and `ranged` tags (Part A) and the saving-throw rule (Part B: "above the law" for bosses, "ignores your authority" for higher level). Every number is a starting value for `tests/balance_sim.py` and play-testing; nothing here has been run in the game. "Today" means the files in the repository on 27 November 2026.
 
-> **Owner's decisions, 27 Nov 2026 (after this spec was written; they override what follows where they differ):**
-> 1. **This is a HIDDEN class.** It has no obvious trainer or pledger: nothing in the Hall of Legends, no banner, no hallmaster's remark and no help page points to it, and the website never lists it. It is found. How it is found is not yet designed: decision 4 (the Chancery behind City Hall's inner door, with a Registrar who offers the pledge) and decision 5 must be reworked before this is built.
-> 2. **Each path gets one hidden class.** The Bureaucrat is the Mage's. The other four are not designed.
-> 3. **The Overseer is not this class's fight** ("A bureaucrat probably isn't fighting the Overseer anyway"): the class starts at level 5 in Oakenfell, so the standard Overseer test is not its balance yardstick. A yardstick for levels 5 to 10 is needed before the spells are tuned.
-> 4. Tags and saves (docs/specs/tags-and-saves.md) are being built first.
+**Nothing in this spec may appear in any public text** (hidden-classes.md section 2): not the class title, not its skills, not the quest name, not the Chancery's rooms and people, not the summons. This document is the one place they are named, and it is a spec.
 
 ## Decisions for the owner
 Each has a recommendation and the alternative. The spec is written as if you accept every recommendation.
 
-1. **An advanced class, taken at level 5 at a new place in Oakenfell, built before the other fourteen.** Recommendation: yes. It needs one class file, a `pledge` verb on a small shared base (so the other fourteen reuse it), one small change to the trainer, one change that lets a class give a skill at a level, and a room and a person (section 2). Alternative: **a sixth base calling**, chosen at character creation. It needs a starting kit, a village trainer and a balance of levels 1 to 5 in the Hollow where there is almost nothing for a control caster to control; it is listed in section 2.3 with its costs and I do not recommend it.
-2. **Open to Mages only at launch.** The class's resource numbers replace the Mage's, and the Mage's Focus Efficiency (spells cost 20% less) comes with the Mage. An Adventurer who pledged would have no such discount and a smaller Focus pool; widening it needs one more requirement and a small trait (section 2.4). Recommendation: Mage only now, Adventurer a later decision. Alternative: both now.
-3. **The in-world name is "Clerk of the Chancery"; "Bureaucrat" is the word players use** (the class id, `help bureaucrat`, `ask registrar about bureaucrat`, the line under the name on the banner). `score` and the Chronicle say "Clerk of the Chancery". Alternative: name it "Bureaucrat" everywhere (the joke is then on the surface, which is against "nobody in the fiction thinks it is funny").
-4. **The place is City Hall's inner door**, which already exists in the description and leads nowhere: behind it, a new room, **The Chancery**, with a new person, **Marian Ashcombe, Registrar of the Chancery**. Alternative: a new building off Founder's Square. Recommendation: the inner door; it is a real place, it is in the Founder's District (the Assembly's), and it costs one room.
-5. **The pledge is made at the Chancery, not at the Hall of Legends.** Level 5, a Mage, 25 gold, the two-step confirmation of docs/CLASS_SYSTEM.md section 8, a ceremony the room sees. The Hall's hallmasters know of it and say so. Alternative: through Ilsabet, which needs the Hall's rite to be opened for everyone first.
-6. **Resources: Vitality 6 + 7 a level, Endurance 14 + 1 a level, Focus 76 + 4 a level**, replacing the Mage's (4 + 7, 14 + 1, 71 + 4). It is a Mage's body with a few more Focus: low Vitality, nothing for fighting. Alternative: name no numbers (the Mage's stand): five Focus fewer.
-7. **No new weapon kind and never a ranged weapon.** The Bureaucrat wields what Mages wield (dagger, staff). Two small items carry the fiction: **the Clerk's Staff of Office** (a staff; `staff`, `blunt`, `melee`) and **the Notary's Seal** (a trinket, +2 Authority). A quill is not a weapon. Recommendation: this. It also removes the owner's worry about "restrain, then plink with a bow": a Mage cannot wield a bow.
-8. **Eleven spells: six at launch (levels 5 to 10), five later (12 to 20).** Launch: Forms in Triplicate, Restraining Order, Cease and Desist, Red Tape, Audit, Application Denied. Later: Per My Last Letter, Stamp of Approval, Take a Number, Summons, Due Process. Recommendation: this order; the class keeps the Mage's Arcane Bolt as its damage until Per My Last Letter at 12.
-9. **Restraining Order bars melee attacks against the caster only** (section 6.2). A restrained creature uses a ranged action if it has one, else attacks someone else in the room, else waits; it is never made to do nothing for longer than the order. The order lapses at once if the caster strikes the target in melee.
-10. **Audit does not give a to-hit bonus** (the adviser's list had one): the Bureaucrat makes almost no attack rolls, so the bonus would be a dead word. It gives a save penalty on the next order served on the target instead (section 6.5). Alternative: the bonus as written, useful only to a Bureaucrat who also swings a staff.
-11. **Prices and ranks are the existing ladder**: II 40, III 150, IV 400, V 900 gold, rank r at level 5 x (r - 1), all from the Registrar; no unlock beyond level and gold at launch. Alternative: an unlock on rank II (kills of a kind, as Arcane Bolt II asks ten goblins); candidates are in section 5.
-12. **Ally spells (Stamp of Approval, Application Denied) work on any player in the room.** There is no party system. Recommendation: yes; a party system later changes nothing in them.
-13. **The Overseer stays a boss ("above the law")**: nothing here makes him easier than the Mage is today. The class's gifts against him are small by design (section 8) and the standard test must stay between 72% and 83%.
-14. **Small engine changes**, each a few lines and each listed in section 7: classes can give a skill at a level; the trainer teaches the advanced class's skills; a creature's actions can carry a bar, a restraint or a ward; Cease and Desist can interrupt a preparation without the stagger's resistance roll.
+1. **The Bureaucrat is hidden, and found by jury duty.** A Mage of level 5 or more with no advanced class may find a "summons to attend as juror" once, in the loot of an ordinary creature. It sends them to City Hall's inner door; the quest "Jury Duty" ends with the offer of the class (sections 2 and 11). Recommendation: yes, as you described. Alternative: the first spec's open Registrar who offers a pledge for 25 gold (withdrawn: it contradicts "hidden").
+2. **x for this class: nothing in the first 10 eligible loots; 2.0% on the 11th, rising 0.5 points a loot; certain on the 50th** (the pattern's numbers, hidden-classes.md section 5.2). Expected 24.8 eligible loots. **For a level 5 Mage, that is about 2.3 hours of hunting on average at 11 eligible kills an hour** (3.1 hours at 8 an hour, 1.7 at 15), never in the first 55 minutes, and certain by about 4.5 hours at 11 an hour. Eligible kills are ordinary creatures of level 4 to 7 for a level 5 character: eleven kinds exist (Grey Fox, Goblin Elite Guard, Forest Spider, Stray Wolf, Bandit Lookout, Wild Boar, Forest Wolf, Tunnel Rat, Goblin Raider, Boar Brute, Goblin Scout). Alternative: a flat 2% (a third of Mages would still be waiting after 50 kills).
+3. **The class is Mage only, taken at level 5 or later, trained at the Chancery afterwards.** The first spec said "taken at level 5 at a pledge"; now any level from 5 up may take it, and a Mage who takes it at level 8 receives every skill whose level is at most 8 at once, at rank I. Adventurer is a later decision. Recommendation: yes. Alternative: Mage and Adventurer now (section 2.6).
+4. **Nothing points to it from outside the Chancery.** No hallmaster, no clerk, no banner, no help page, no website line (the first spec's Ilsabet "fourth road" line, Mabyn's and Maude's topics and the Registrar's open pledge are all removed). The Hall of Legends files do not change at all. Recommendation: yes.
+5. **The place is City Hall's inner door**, which exists today in the description and leads nowhere. It becomes a gated door that exists only for someone holding the summons (or the class). Behind it are two new rooms: **a waiting room** (the Chancery proper: ticket machine, benches, a clock that is wrong, the Registrar behind a counter) and **a hearing room** (the Clerk of the Court, the parties, the goose). Recommendation: yes. Alternative: a new building off Founder's Square (costs a district exit and gives the secret away on the map).
+6. **The quest "Jury Duty" is a self-contained case, "Pruett v. Marrowby, the matter of the goose": 15 to 25 minutes, no combat, one comic interruption.** The player uses `ask`, `read`, `search`, hands in two exhibits and gives a yes or no verdict, and uses trial versions of three of the class's orders (restrain, desist, triplicate) on authority the court lends them. It is not abandonable and cannot fail. Recommendation: yes.
+7. **It ends with a two-step choice either way, and no fee.** `pledge` twice within a minute takes the class; `decline` twice within a minute refuses it for ever ("The Chancery does not summon twice."). Both pay the same: 1 gold and 250 experience. A taker also receives the Notary's Seal (60 gold in the shop; a gift once); a decliner receives a keepsake Certificate of Jury Service. No Renown either way. Recommendation: yes. Alternative: a taker pays a fee (the first spec's 25 gold); it would make the secret cost money and the refusal free.
+8. **The Overseer is not the yardstick.** The class is judged by its own pace and survival at levels 5 to 10 against its calling and the five callings, and by four set pieces (section 10). The three boss files' small summon-flag edits stay (they are needed for Red Tape to be correct, section 7.5) but nothing is tuned to the Overseer. Recommendation: yes (your words).
+9. **Resources: Vitality 6 + 7 a level, Endurance 14 + 1 a level, Focus 76 + 4 a level**, replacing the Mage's (4 + 7, 14 + 1, 71 + 4). Alternative: name no numbers (the Mage's stand): five Focus fewer.
+10. **No new weapon kind and never a ranged weapon.** Dagger and staff. The Clerk's Staff of Office (45 gold) and the Notary's Seal (60 gold) carry the fiction. Both are sold only to holders of the class (the Registrar's shop). Recommendation: this.
+11. **Eleven spells: six at launch (levels 5 to 10), five later (12 to 20).** Launch: Forms in Triplicate, Restraining Order, Cease and Desist, Red Tape, Audit, Application Denied. Later: Per My Last Letter, Stamp of Approval, Take a Number, Summons, Due Process. A class gives a skill at a level (section 7.1).
+12. **Restraining Order bars melee attacks against the caster only** (section 6.2); it lapses at once if the caster strikes in melee. **Audit gives a penalty on the next order's save, not a to-hit bonus** (section 6.5).
+13. **Prices and ranks are the existing ladder** (II 40, III 150, IV 400, V 900 gold; rank r at level 5 x (r - 1)), all from the Registrar, who teaches only holders. A Bureaucrat still buys Arcane Bolt ranks from the Mage hallmaster. Alternative: rank unlocks (section 5).
+14. **Ally spells (Stamp of Approval, Application Denied) work on any player in the room**; there is no party system.
+15. **Small engine changes**, each a few lines and each listed in section 7: a skill at a level; the trainer teaches an advanced class; bars, restraints, wards, interrupts; a journal progress note; the court's `submit` verb. The shared pieces are in hidden-classes.md section 9.
 
-## 1. What the owner and CLASS_SYSTEM.md already promise
-Read of docs/CLASS_SYSTEM.md (sections 1, 2, 6, 8, 9, 12, 13) and docs/specs/skill-ranks.md; what exists and what is promised but not built:
+## 1. What exists, what is promised, and what the world lacks
+Read of docs/CLASS_SYSTEM.md (sections 1, 2, 6, 8, 9, 12, 13), docs/specs/skill-ranks.md and the files named below on 27 November 2026.
 
 | Already there | Not built |
 |---|---|
-| A class is data: `/classes/<id>.cs` inheriting `/std/pclass`, with `Tier = "advanced"`, `Parent`, `Require("level", "5")` and kinds `level`, `quest`, `item`, `class`, the skills and traits it grants, the equipment access it adds, its own resource numbers, `ExpModifier`, `AttackRate`, `Guild`, `Modifiers`. The registry `/secure/classes` finds a new file without a restart. | **No advanced class file exists**: `/classes` holds only the five callings. The fifteen are described (section 9 of CLASS_SYSTEM.md) and the Hall's banners name them. |
-| `Adventurer.ApplyClass(id)`: gives an advanced, subclass or prestige class; only another object (not a player's own command) may call it; checks the class exists and is enabled, the tier is free, the parent is held and every requirement; returns null or a sentence; then refreshes classes, binds skill commands and tells the player "You are now a {title}." The class is saved as an id (`advancedClass`) and nothing derived. | **The `pledge <class>` verb**: the two-step choice within a minute, the ceremony the room sees, the refusals below level 5 and to a character who already has an advanced class. The hallmasters say "the rite of pledging is not yet open". The only `pledge` in the repository is a test fixture in `tests/class_test.py`. |
-| The Hall of Callings, with five hallmasters (Gorrim, Veyla, Anselm, Ilsabet, Jory), the readable wall of fifteen banners, and the rank trainers for ranks III to V. | A **level for each skill**: a class grants every skill it lists the moment it is taken. |
-| `score` shows "Class {title}" for an advanced class; the Chronicle has the events `class.advanced` ("First {class}", a server first) and `class.prestige`. Skill ranks: "advanced-class skills start at rank I when the class is taken." | Nothing reports `class.advanced` when `ApplyClass` runs. The trainer answers by the **archetype** only (`QueryArchetype`), so it cannot teach an advanced class's ranks. |
-| `WornBy` and `NotWornBy` already count a character's advanced class id as well as the calling it grew from. | Fifteen classes' skills ("full skill trees come later"; CLASS_SYSTEM.md decision 1 promised **two signature abilities** per class). |
+| A class is data: `/classes/<id>.cs` inheriting `/std/pclass`, `Tier = "advanced"`, `Parent`, `Require("level", "5")`, kinds `level`, `quest`, `item`, `class`, skills, traits, its own resource numbers, `ExpModifier`, `AttackRate`, `Guild`. `/secure/classes` finds a new file without a restart. | **No advanced class file exists**: `/classes` holds only the five callings. |
+| `Adventurer.ApplyClass(id)`: only another object may call it; checks parent and requirements; refuses a second advanced class; tells "You are now a {title}."; saves the id. | A Chronicle report from `ApplyClass`, a `pledge` verb (the Hall's hallmasters say "the rite of pledging is not yet open"), a **hidden** flag, a skill **at a level**. The trainer answers by the archetype only. |
+| The quest journal: states 0/1/2, tagged dialogue, `DefineQuest(..., abandonable)`; the objective lines `kill` and `have`. | No real quest uses `abandonable: no`; the journal has no per-stage text (section 7.7). |
+| City Hall has an inner door described but not built: its only exit is `out`. `in`, `knock` and `open door` print "What?" today. Maude Tarrow and Barnaby are its clerks; Maude's topics are districts, founder, market, river, guild, southgate. | The Chancery. Everything in section 2.4 is new. |
 
-The Bureaucrat is therefore the first advanced class and the first with a full list of skills: eleven, where the plan promised two. That is a decision the owner takes by accepting this spec; the other fourteen can still be built with two.
+**What the world lacks, plainly.**
+- **No Oakenfell creatures.** The city has none (no monster file under `oakenfell/`): all 44 monster files are in Vincent's Hollow and the Corridor. A Mage who stays in the city never meets the summons; the first eligible kills are in the Hollow cellars (level 4) and the Corridor (`south_road`, `eldergreen_edge`, ...).
+- **No creature above level 10, and the level-10 ones are all bosses.** The roll's window above level 9 has only the six level-9 kinds; the class's balance can be measured only on levels 5 to 9 ordinary creatures and the five level-10 bosses.
+- **`give` refuses NPCs** (`CmdGive`: "does not take things from you. You can give things only to other players."), so the case's "giving an item" is a new verb on the Clerk, `submit`.
+- **No weight, no calendar item.** The summons prints the game date from `/secure/chronicle` (`DateText()`: "the 17th Day of Harvest, Year 3").
+- **No `knock` verb exists**; the gated door binds it (hidden-classes.md section 6).
+- **The journal has one text per quest state**, not per stage; section 7.7 adds `ProgressNote`.
 
-**What "pledging" needs, precisely.** (a) A class file (done by this spec). (b) A verb that, with a two-step confirmation inside a minute and a fee, calls `ApplyClass(id)` from an NPC (new, section 2.2). (c) A person and a place (new). (d) A report of `class.advanced` to the Chronicle (new, three lines). (e) The trainer teaching the advanced class's ranks (a change in `/std/trainer`, section 7). (f) A way for a class to give a skill at a level (section 7). (g) Text in the Hall: the Mage hallmaster's "paths" answer and the banners (section 9). Nothing else: the other fourteen classes need (a) each, and (b) to (g) are shared.
-
-## 2. How it sits in the class plan
-
+## 2. How it is found and where it sits
 ### 2.1 The class, in the Chancery's own words
-- **Name** (`ClassName`, `Title`): "Clerk of the Chancery". **Id**: `bureaucrat`. **Tier**: `advanced`. **Parent**: `mage`. **Guild**: `chancery`. **Experience modifier** 1.0. **Tagline**: "The Bureaucrat: nothing may happen until the correct form has been lodged."
-- **Requirements:** `Require("level", "5")`, `Require("class", "mage")`. (The parent check of `ApplyClass` already demands the Mage; the second line gives a clear refusal text.) The fee (25 gold) is taken by the Registrar, not by the class.
-- **Description** (the owner's text, kept word for word, for `help bureaucrat` and the Registrar):
+- **Name** (`ClassName`, `Title`): "Clerk of the Chancery". **Id**: `bureaucrat`. **Tier**: `advanced`. **Parent**: `mage`. **Guild**: `chancery`. **Hidden**: true. **Experience modifier** 1.0. **Tagline**: "The Bureaucrat: nothing may happen until the correct form has been lodged." (never printed outside the class's own files and a holder's `help`).
+- **Requirements:** `Require("level", "5")`, `Require("class", "mage")`, `Require("hidden", "bureaucrat")` (the quest's offer is open). **QuestId** `jury-duty`; **GateKey** `inner-door`; **SummonsItem** `/domains/greenvale/oakenfell/founders/obj/jury_summons`; **OwnPaths** `/domains/greenvale/oakenfell/founders/chancery`, `.../founders/npc/registrar_ashcombe`, `.../npc/clerk_crake`, `.../npc/pruett`, `.../npc/marrowby`, `.../npc/goose`, `.../founders/obj/jury_`, `.../obj/jurors_badge`, `.../obj/clerks_staff`, `.../obj/notarys_seal`, `/classes/bureaucrat`, `/skills/bureaucrat/` (the skill files go in their own folder so one prefix covers them). Roll fields: the pattern's defaults (10, 2.0, 0.5, 50).
+- **Description** (the owner's text, kept word for word, for `help bureaucrat` once held and for the Registrar after):
 
 > The Chancery of Oakenfell has never lost a war, because it has never agreed that one was properly declared. Its clerks carry no blade worth the name. They carry seals, ledgers and the absolute conviction that nothing may happen until the correct form has been lodged. Creatures that cannot read are bound all the same; ignorance of the procedure is no defence.
 
   The class file's `Description` adds the plain facts: "A Clerk of the Chancery is a Mage who has taken the Chancery's seal. Control, not damage: it slows, bars, interrupts and delays, and leans on Insight and Resolve. Weapons: dagger, staff. Armor: light."
 
-### 2.2 The place and the people
-**The Chancery** (`/domains/greenvale/oakenfell/founders/chancery.cs`, a `Safe` room; area `Oakenfell`, region `Greenvale`; reached by a new exit `in` from City Hall, `/domains/greenvale/oakenfell/founders/city_hall.cs`, which gets `Exits["in"]`, a detail line for the exit, and its existing details for the inner door: "the carved letters over the inner door" now lead somewhere). City Hall's existing text already has the counter, the pigeonholes, the queue and the motto "FROM STRONG ROOTS GROW GREAT THINGS" over the inner door.
+### 2.2 The summons (verbatim, as `read summons` prints it)
+`{serial}` is 4400 plus the register's serial (so the first summons ever served reads 4401); `{date}` is the game date; `{Name}` is the character's name. The text never says "class", "path", "seal", "Bureaucrat", "Clerk of the Chancery" or what the court does.
 
-> **The Chancery of Oakenfell.** A narrow, windowless room, lit by a row of green-shaded lamps and very quiet. A long table of black oak runs its whole length, bare but for an inkwell, a sand-shaker, a stick of red wax and a book as large as a door, chained to its lectern: the Book of Proceedings. Behind the table, floor to ceiling, climb pigeonholes, each with a rolled paper and a brass number; the numbers do not run in order, and the order they do run in has never been explained. The air smells of ink, hot wax and old paper, and the only sound is a pen. A small brass plate by the door reads NOTHING IS DONE UNTIL IT IS ENTERED.
+```
+                      THE CHANCERY OF OAKENFELL
+                    SUMMONS TO ATTEND AS JUROR
+              Form 27-J (third copy: the bearer's copy)
 
-Details: the Book of Proceedings (`read book`: "Entries in a dozen hands. The latest, dated this morning: 'Goblins, Vincent's Hollow: boundary dispute, referred.'"), the pigeonholes, the seal and wax, the plate (readable: the motto; below it, smaller: "Fees are posted. The clerks are not to be hurried."), the lamps.
+  Reference:  CH/J/{serial}-B
+  Issued:     {date}, being the date on which you read this
+  To:         {Name}, a person of sufficient standing to be inconvenienced
 
-**Marian Ashcombe, Registrar of the Chancery** (`/domains/greenvale/oakenfell/founders/npc/registrar_ashcombe.cs`, inherits `/std/pledger`, which inherits `/std/trainer`): "A tall, unhurried woman in a grey coat with ink to the second knuckle and a brass seal on a cord at her throat. She is writing, and does not look up until she has finished the line." Level 20. Her lines are in section 11. She is also the rank trainer: `TeachCalling("bureaucrat", 2, 5)`.
+  You are hereby summoned to attend the Chancery as a juror in a matter
+  to be heard. Present this summons at the inner door of City Hall,
+  Founder's Square, Oakenfell. Knock.
 
-**`/std/pledger`** (new, small; shared by the other fourteen): a trainer that offers `AddPledge("bureaucrat", fee: 25)`. It binds the verb `pledge` (a protected verb to the NPC: it refuses a sandbox caller and a non-player), and:
-1. `pledge` with no word: lists the classes it offers and what each needs.
-2. `pledge bureaucrat` (first time): checks the class (`QueryEnabled`, tier, parent, `CheckRequirements`, gold) **without changing anything** and, if all hold, says the **permanence line** and the fee, and records the offer for this player for 60 seconds. If not, the refusal (section 11).
-3. `pledge bureaucrat` again within 60 seconds: takes the fee, calls `player.Call("ApplyClass", id)` (the NPC is "another object", as `ApplyClass` demands), tells the room the ceremony, reports `class.advanced` to `/secure/events` with the subject `bureaucrat` and `names["class"]` = "Clerk of the Chancery" (the NPC is a trusted tree; wizards are dropped by the event service as always), and says the closing line. If `ApplyClass` refuses after the fee was taken, the fee is returned in the same call.
-4. A character who already has an advanced class: "You have already taken a seal." A wizard in the workshop cannot be pledged (the class is applied to a checkpointed body and lost on leaving: unchanged behaviour).
+  You must attend within fourteen days of the date of issue. The date of
+  issue is the date on which you read this. The Chancery does not regard
+  this as circular.
 
-### 2.3 The alternative: a sixth base calling
-A sixth archetype, "Clerk", chosen at character creation: needs a `/classes/clerk.cs` with `Tier = "archetype"`, `SortOrder = 6`, starting attributes (Insight and Resolve), kit, a rank II trainer in Vincent's Hollow (the Hollow's `TeachCalling`), a place in the creation list and `help`, the Hall's banner and a sixth hallmaster, a new simulator column, and a whole play-through (`tests/playthrough_test.py` runs one per archetype); and **a balance of levels 1 to 5 in the Hollow**, where a character with a slow, a bar and an interrupt but no damage must kill goblins alone. It also makes the Mage, Priest and Adventurer less distinct from it: the Mage's whole identity is Focus and spells. It is two to three times the work of 2.1 and it turns away the "advanced class" idea. **Not recommended.** If the owner prefers it, sections 4 to 9 stand with level 1 in place of level 5 and the levels of 6.1 shifted down by four.
+  Bring this summons. Do not bring a weapon, an opinion or a friend. You
+  will not be required to remember anything. You will be required to be
+  present while it happens.
 
-### 2.4 Mages and Adventurers
-At launch `Parent = "mage"`. To open it to Adventurers: remove `Parent` (an advanced class with no parent skips that test in `ApplyClass`), override `CheckRequirement` in the class file for a new kind `calling` taking "mage,adventurer" (the file may override it; `pclass.cs` needs no change), and give the class a small trait (a "Clerical Efficiency", spells cost 20% less) for those without Focus Efficiency, or accept that an Adventurer pays 25% more. The resource numbers of 2.1 replace the Adventurer's (Vitality 6 + 7 a level against 10 + 8: a thin price for their Focus), which is why this is a later decision.
+  Failure to attend renders you liable to a fine of THIRTY-SEVEN GOLD AND
+  ONE THIRD OF A GOLD (37 1/3), together with one eighth of a gold for
+  the paper this notice is written on. The Chancery will write to you
+  about the fine. It has never been known to finish the letter.
 
+  Jurors are paid. The rate is one gold. It is entered.
+
+                                   For the Chancery, M. Ashcombe, Registrar.
+                                   Stamped in red. NOTHING IS DONE UNTIL IT
+                                   IS ENTERED.
+```
+
+- **When found** (`SummonsFound`, to the taker only; the room sees nothing): "Among the coins and oddments you take from {the corpse}, one thing is not like the others: a stiff buff-coloured paper, folded in three, with your name on it in a clerk's hand. You do not remember picking it up. It is already in your hand." (The corpse's own label fills the name.)
+- **`look at summons`, `inventory`:** "a summons" / "A stiff buff-coloured paper, folded in three and stamped in red. It has your name on it. You could {cmd}read{/} it."
+- **The pack:** it is `Bound` and `QuestItem` (hidden-classes.md 5.6): "It is addressed to you. It is not a thing one drops."
+- **At the end** the Registrar retains it: a taker's is "entered", a decliner's "kept by the court" (section 11.6); in both cases the item is removed by the giver and the register stage is 9.
+
+### 2.3 City Hall's inner door
+The pattern's `GatedExit("in", ".../founders/chancery", "inner-door", "in", "enter", "knock", "open")` goes in `city_hall.cs`. Nothing else in that file changes: not the long description (it already says "above the inner door a line of carved letters has been picked out in old gilt"), not the `AddDetail` and `AddReadable` lines, not the spawns, not the `out` exit.
+
+**Without a summons (and for everyone who has declined or been released): today's exact text, kept.**
+- `look at door` (also `inner door`, `letters`, `lintel`, `motto`, `gilt`): "Carved over the inner door, with the gilt rubbed off the high points of each letter, are the words of the city's motto. You could {cmd}read{/} them."
+- `read letters` (also `lintel`, `motto`, `inscription`): "Carved over the inner door:" then, on the next line, "FROM STRONG ROOTS GROW GREAT THINGS" in double quotes.
+- `in`, `enter`, `go in`, `knock`, `open door`, `knock on door`: "What?" (the unknown-command answer; byte for byte what they print today). The exits line shows only `out`. `search` finds nothing.
+
+**With the summons outstanding (stage 1 or later, not finished):**
+- `look at door`: today's text, then on a new line: "The door is plain oak under the gilt, with a brass knocker in the shape of a rubber stamp. It looks as though it has been expecting someone with paper."
+- The exits line also shows `in`.
+- `knock` (also `in`, `enter`, `open door`), first time (stage 1): "You knock on the inner door, under the gilt letters. A voice on the other side says, without hurry, 'Reference?' You hold up the summons. The door opens, politely, as though it had been about to." and you are moved in. Room (City Hall): "{Name} knocks on the inner door and goes through it. It closes behind {them}." Room (waiting room): "{Name} comes in from City Hall, holding a summons the way people hold a ticket."
+- Again (stage 2 to 4): "You knock. 'Come in,' says the voice. 'You are expected. You are always expected. It is the Chancery's only courtesy.'"
+- In a fight: the usual refusal. A watcher in City Hall learns that someone went through the inner door; nothing more. That is accepted (the pattern, section 6).
+
+**With the class (stage 9, outcome taken):** `knock` or `in`: "The inner door opens before you knock. It has your file." The summons text and the Registrar's file are the only records.
+
+### 2.4 The rooms (both `Safe`, area Oakenfell, region Greenvale; new files in `mudlib/domains/greenvale/oakenfell/founders/`)
+**The Chancery: Waiting Room** (`chancery.cs`). Exits: `out` (City Hall) and `east` (the court; locked with `LockExit("east", "jurors badge", ...)`, the same mechanism as the north road's travel pass; the badge item's `Ids` include "jurors badge" and "badge"; refusal below).
+
+> **The Chancery: Waiting Room.** A long, low room with a floor of worn green tile and a ceiling that has been repainted so often it has lost its corners. Wooden benches, each bolted to the floor facing a different wall, run down one side. At the far end a brass counter with a grille divides the room in two, and behind it, floor to ceiling, climb pigeonholes whose brass numbers do not run in order; a chained lectern beside the counter holds a book as large as a door. A green iron machine by the entrance wears a small sign, and above the counter a clock tells the wrong time with great confidence. A door in the east wall has two cards pinned to it. The air smells of ink, hot wax and old tea, and the only sound is a pen.
+
+Details and readables (the exact words):
+- *ticket machine, machine, crank, slot, ticket* : "A green iron machine with a crank, a brass slot and a glass window. The window says NOW SERVING: 3. A plate beneath it says: THE WINDOW DOES NOT CHANGE. A sign says: TAKE A NUMBER." `take number` (also `turn crank`, `pull ticket`, `take ticket`; room verbs): "You turn the crank. The machine clanks, thinks about it, and drops a paper ticket into your hand: 'No. {serial}.'" Room: "{Name} turns the crank on the ticket machine." One ticket per juror (a second: "The machine has already issued you a number. It does not do refunds."). `read ticket`: "No. {serial}. Please hold this ticket until you are called, and for some time afterwards." The ticket is a harmless item that vanishes when the quest ends or the character leaves the Chancery for City Hall.
+- *benches, bench, seats* : "Eleven benches, bolted down facing eleven different walls. They are empty. A faded paper sign says TAKE A SEAT, and someone has added in another hand: NOT THAT ONE. You cannot tell which one."
+- *clock, wrong clock* : "A plain wooden clock with its hands at twenty past nine. It has been at twenty past nine for as long as anyone can say. A card beneath it reads: THE CLOCK IS CORRECT. THE TIME IS WRONG." (`read card`: the same.)
+- *counter, grille, brass counter* : "A brass counter with a grille. The brass hatch for passing papers is the only part of it that is ever opened."
+- *pigeonholes, pigeonhole, rolls, holes* : "Hundreds of pigeonholes, each with a rolled paper and a brass number. The numbers do not run in order, and the order they do run in has never been explained. A neat card gives the filing rule: BOUNDARIES UNDER WEATHER. WEATHER UNDER ADJOURNMENTS." (`search pigeonholes`: section 11.4.)
+- *book, lectern, book of proceedings* readable: "Entries in a dozen hands. The latest, dated this morning: 'Goblins, Vincent's Hollow: boundary dispute, referred.'" For a juror (stage 2 to 4) a further line: "Below it, in a fresh hand: 'Pruett v. Marrowby: the matter of the goose. Set down for hearing, a jury having been found.'"
+- *card, cards, east door, door* : "Two cards on the east door. The first: JURORS ONLY. The second, underneath: ALL OTHERS TAKE A NUMBER." The east exit's refusal (no badge): "The east door is shut. The Registrar says, without looking up, 'Jurors are sworn first. It is not a complicated rule. It is merely a rule.'" (If the Registrar is not present the card text only.)
+- *plate, brass plate, motto* readable: "NOTHING IS DONE UNTIL IT IS ENTERED. Below it, smaller: Fees are posted. The clerks are not to be hurried."
+- *lamps* : "Green-shaded lamps on short brass arms. They burn all day. The Chancery has a view on daylight and has not yet shared it."
+
+**The Chancery: Court of First Instance** (`chancery_court.cs`). Exit: `west` only.
+
+> **The Chancery: Court of First Instance.** A small, high court with a raised bench of black oak, a clerk's desk below it, a witness stand with a rail worn pale by hands, and two long tables facing each other across a strip of green carpet. A box of twelve chairs stands to one side; one of them has a cushion. A tall window of painted glass shows a sky that has been the same since the room was built. A brass plate on the bench reads THE COURT IS ALWAYS SITTING. There is straw on the floor, and a smell of goose.
+
+Details: *bench* ("The Clerk of the Court's bench. A brass plate reads THE COURT IS ALWAYS SITTING. Beneath it, in pencil: whether at you is another matter."), *desk, clerk's desk* ("Piled with exhibit tags, a stamp pad and a bell that says 'ring for the clerk'. The clerk is two feet away."), *witness stand, stand, rail* ("A rail worn pale by hands. Everyone who has stood here has held on."), *tables, table* (the search target; section 11.4: `search table`), *chairs, box, jury box, cushion* ("Twelve chairs. Eleven are for the other jurors, who have not come. The twelfth has a cushion, and is yours. It is a very good cushion. It has been sat on by an honest person, once."), *window, glass* ("Painted glass: a sky, a hill, a small scale held by a hand. The scale is very slightly out."), *straw* ("It is straw. It is not decorative.").
+
+### 2.5 Mage only, level 5 or later
+`Parent = "mage"`. `ApplyClass` already demands the Mage. The offer needs level 5 (the class file's requirement), so nobody under 5 sees the offer even if they were summoned (the roll's level floor is 5, so none is). A character who levels nothing after the summons is unaffected: the quest has no level gate beyond 5. The resource numbers replace the Mage's (section 3). Everything a Mage has is kept (the pattern, 8.3).
+
+### 2.6 Opening it to Adventurers (a later decision)
+Change `Parent` to none, add a `Require("calling", "mage,adventurer")` via `CheckRequirement` in the class file, make the pattern's `RollOnLoot` read a list of parent callings (`SummonsCallings`), and give the Adventurer a small trait for the Mage's Focus Efficiency (spells 20% less). Their Vitality falls from 10 + 8 a level to 6 + 7. Not in this spec.
 ## 3. Resources and attributes (docs/ATTRIBUTES.md sections 2, 8 and 9)
 An advanced class that names its own numbers **replaces** the archetype's (`Adventurer.RefreshClasses`: "the archetype's, then any later class that names its own"). The Bureaucrat names all three:
 
@@ -105,12 +169,12 @@ A Mage's Focus Efficiency applies to every Bureaucrat spell (they are `Kind = "s
 ## 4. Armour, weapons and the fiction of the staff
 - **Armour:** light only (the Mage's `ArmorTypes`); no shield. **Weapons:** dagger and staff, as a Mage; the class adds none. **A Bureaucrat can never use a ranged weapon** (a Mage's weapon access has no bow): the degenerate loop of "restrain a melee creature and shoot it" is closed at the door (section 8). The class's own damage is a spell.
 - **Tags (tags-and-saves.md section 2):** every item below states its reach, damage and kind.
-- **The Clerk's Staff of Office** (`/domains/greenvale/oakenfell/founders/obj/clerks_staff.cs`; sold by the Registrar for 45 gold): a black-ash staff capped with a brass seal-head. `Category = "staff"`; tags `staff`, `blunt`, `melee`, `wood`; Damage 5-9, to hit 0, Reaction modifier 0.5, Recovery 1.0 (the Apprentice's Staff is 7-11, +1; the Clerk's is lighter in the hand and weaker, on purpose); `AttributeBonus["resolve"] = 1`; `WornBy.Add("bureaucrat")`. Description: "A staff of black ash, shod in brass, its head a flat seal-die. It is better for pressing wax than for hitting, and the Chancery does not recommend using it for anything else." (`Magic`: "the seal-head carries the Chancery's mark: +1 Resolve while wielded".)
-- **The Notary's Seal** (`.../founders/obj/notarys_seal.cs`; 60 gold): a trinket on a cord; tags `trinket`, `steel`; `StatBonus["authority"] = 2`. "A brass seal-die with a plain wooden grip. What it presses becomes official, and a good deal of what it presses becomes binding."
+- **The Clerk's Staff of Office** (`/domains/greenvale/oakenfell/founders/obj/clerks_staff.cs`; sold by the Registrar to holders of the class for 45 gold): a black-ash staff capped with a brass seal-head. `Category = "staff"`; tags `staff`, `blunt`, `melee`, `wood`; Damage 5-9, to hit 0, Reaction modifier 0.5, Recovery 1.0 (the Apprentice's Staff is 7-11, +1; the Clerk's is lighter in the hand and weaker, on purpose); `AttributeBonus["resolve"] = 1`; `WornBy.Add("bureaucrat")`. Description: "A staff of black ash, shod in brass, its head a flat seal-die. It is better for pressing wax than for hitting, and the Chancery does not recommend using it for anything else." (`Magic`: "the seal-head carries the Chancery's mark: +1 Resolve while wielded".)
+- **The Notary's Seal** (`.../founders/obj/notarys_seal.cs`; 60 gold from the Registrar to holders; the first is a gift at the end of Jury Duty, section 11.6): a trinket on a cord; tags `trinket`, `steel`; `StatBonus["authority"] = 2`. "A brass seal-die with a plain wooden grip. What it presses becomes official, and a good deal of what it presses becomes binding."
 - **No quill, no ledger as an item with a skill.** The ledger and the quill are in the words (the wind-up lines of the spells), not in an item slot. A "held focus" slot does not exist and the spec adds none.
 
 ## 5. The spells in one table
-Prices for every rank: **II 40, III 150, IV 400, V 900 gold**, all from the Registrar (`TeachCalling("bureaucrat", 2, 5)`; `RankDaemon.RankPrices`); rank r needs level 5 x (r - 1) (rank II at 5, III at 10, IV at 15, V at 20); a spell starts at rank I when it is learned; the command word never changes. A spell is learned **when the character reaches its level** (section 7) or, at the pledge, the level-5 one. No unlock beyond level and gold at launch; candidates if the owner wants one: Forms in Triplicate II asks "kills goblin 10" (as Arcane Bolt II does), Cease and Desist III asks "kills_with desist 10", Application Denied II asks the quest "the-quiet-offering".
+Prices for every rank: **II 40, III 150, IV 400, V 900 gold**, all from the Registrar, who teaches only holders (`TeachCalling("bureaucrat", 2, 5)` in `/std/hiddengiver`; `RankDaemon.RankPrices`); rank r needs level 5 x (r - 1) (rank II at 5, III at 10, IV at 15, V at 20); a spell starts at rank I when it is learned; the command word never changes. A spell is learned **when the character reaches its level** (section 7), or all at once at rank I if the class is taken later than its level. No unlock beyond level and gold at launch; candidates if the owner wants one: Forms in Triplicate II asks "kills goblin 10" (as Arcane Bolt II does), Cease and Desist III asks "kills_with desist 10", Application Denied II asks the quest "the-quiet-offering".
 
 | Level | Spell | Command | Focus (I) | Prep / Recovery | What it does | Save |
 |---|---|---|---|---|---|---|
@@ -140,7 +204,7 @@ Prices for every rank: **II 40, III 150, IV 400, V 900 gold**, all from the Regi
 ## 6. The spells, one by one
 
 ### 6.1 Forms in Triplicate (`triplicate`), level 5
-*Learned at the pledge.* Wind-up (the room reads): "{Name} draws three sheets of paper and a carbon from a satchel..."
+*Given with the class (a character takes it at level 5 or later, so always).* Wind-up (the room reads): "{Name} draws three sheets of paper and a carbon from a satchel..."
 
 | Rank (level) | I (5) | II (5) | III (10) | IV (15) | V (20) |
 |---|---|---|---|---|---|
@@ -310,10 +374,10 @@ Prep 1.0, Recovery 2.0. Wind-up: "{Name} opens the Book of Proceedings to a mark
 
 ## 7. What the engine and the files must gain (small, listed)
 ### 7.1 A class gives a skill at a level
-`/std/pclass.cs`: `protected void SkillAt(string skillId, int level)` and `public int QuerySkillLevel(string skillId)` (0 for a skill the class gives at once, as every class does now). `/std/adventurer.cs` `RefreshClasses` grants only the skills whose level is at most the character's level; `CheckLevelUp` calls `RefreshClasses()` and `BindSkillCommands()` after a level is gained and tells the player: "You have learned {Title}: {cmd}{command}{/}." (the existing level-up message gains the line). Existing classes name no level, so nothing changes for them. Test: a test class with a skill at level 3.
+`/std/pclass.cs`: `protected void SkillAt(string skillId, int level)` and `public int QuerySkillLevel(string skillId)` (0 for a skill the class gives at once, as every class does now). `/std/adventurer.cs` `RefreshClasses` grants only the skills whose level is at most the character's level; `CheckLevelUp` calls `RefreshClasses()` and `BindSkillCommands()` after a level is gained and tells the player: "You have learned {Title}: {cmd}{command}{/}." (the existing level-up message gains the line). A class taken at a level above a skill's level grants that skill at once at rank I, each with the same "You have learned" line. Existing classes name no level, so nothing changes for them. Test: a test class with a skill at level 3.
 
 ### 7.2 The trainer teaches an advanced class's skills
-`/std/trainer.cs` `CallingOf`: the calling a trainer answers a player as is, in order, the player's **advanced class** if the trainer teaches it, else the archetype (so a Bureaucrat still buys Arcane Bolt ranks from the Mage hallmaster and Bureaucrat ranks from the Registrar). `OffersFor` already reads `ClassFile(c).QuerySkills()` for any class id; `ranks` shows locked skills as "level 12" (a skill the class has not yet given).
+`/std/trainer.cs` `CallingOf`: the calling a trainer answers a player as is, in order, the player's **advanced class** if the trainer teaches it, else the archetype (so a Bureaucrat still buys Arcane Bolt ranks from the Mage hallmaster and Bureaucrat ranks from the Registrar). `OffersFor` already reads `ClassFile(c).QuerySkills()` for any class id; `ranks` shows locked skills as "level 12" (a skill the class has not yet given). **The Registrar teaches only holders:** her `ranks`, `train` and shop verbs are bound by `/std/hiddengiver` only for a character whose advanced class is `bureaucrat`; for anyone else they print "What?".
 
 ### 7.3 Actions that can be barred, restrained or refused (`/std/living.cs`)
 New small members, each guarded as `Stagger` and `SpoilPreparation` are (the caller is the creature's enemy, or a skill from `/skills/` of a real object; checked with `PreviousObject()`; never a sandbox object):
@@ -333,23 +397,31 @@ New small members, each guarded as `Stagger` and `SpoilPreparation` are (the cal
 Each control spell, in its `Resolve`, calls `/secure/control.Resolve(user, target, effectId, kind, RankOf(user))` and applies strength 2, 1 or 0, the half time from `QueryHalfSeconds`, the line it prints (tags-and-saves.md section 13).
 
 ### 7.5 Content files that read a bar
-`goblin_overseer.cs`: `if (!summoned && Vitality * 2 <= QueryMaxVitality() && !QueryActionBarred("summon"))` (the flag set only when it really happens); `bandit_leader.cs`, `warren_broodmother.cs`: the same for their summons. A creature that does not summon is unchanged.
+`goblin_overseer.cs`: `if (!summoned && Vitality * 2 <= QueryMaxVitality() && !QueryActionBarred("summon"))` (the flag set only when it really happens); `bandit_leader.cs`, `warren_broodmother.cs`: the same for their summons. A creature that does not summon is unchanged. These three edits exist so that Red Tape is correct against any summoner; no number in this spec is tuned to the Overseer.
 
-### 7.6 Everything else
+### 7.6 Everything else (the Bureaucrat's own files; the shared files are in hidden-classes.md section 9)
 | File | Change |
 |---|---|
-| `mudlib/classes/bureaucrat.cs` (new) | the class (2.1, 3): `SkillAt` for the eleven skills |
-| `mudlib/skills/triplicate.cs`, `restraining_order.cs` (command `restrain`), `cease_and_desist.cs`, `red_tape.cs`, `audit.cs`, `application_denied.cs`, and later `per_my_last_letter.cs`, `stamp_of_approval.cs`, `take_a_number.cs`, `summons.cs`, `due_process.cs` (new) | one file per skill, inheriting `/std/skill`, rank tables as `RankRow` lines (section 6) |
-| `mudlib/std/pledger.cs` (new) | the shared pledge (2.2) |
-| `mudlib/domains/greenvale/oakenfell/founders/chancery.cs`, `npc/registrar_ashcombe.cs`, `obj/clerks_staff.cs`, `obj/notarys_seal.cs` (new); `city_hall.cs` (an exit and one detail line) | the place and people |
-| `mudlib/domains/greenvale/oakenfell/guild/npc/hallmaster_mage.cs`, `hall_clerk.cs`, `founders/npc/clerk_maude.cs` | topics (section 11) |
+| `mudlib/classes/bureaucrat.cs` (new) | the class (2.1, 3): `Hidden`, the pattern's fields, `SkillAt` for the eleven skills, the summons text, the gate lines |
+| `mudlib/skills/bureaucrat/triplicate.cs`, `restraining_order.cs` (command `restrain`), `cease_and_desist.cs`, `red_tape.cs`, `audit.cs`, `application_denied.cs`, and later `per_my_last_letter.cs`, `stamp_of_approval.cs`, `take_a_number.cs`, `summons.cs`, `due_process.cs` (new) | one file per skill, inheriting `/std/skill`, rank tables as `RankRow` lines (section 6). The folder is new, so the lint's own-paths rule covers them |
+| `mudlib/domains/greenvale/oakenfell/founders/chancery.cs`, `chancery_court.cs` (new) | the two rooms (2.4) |
+| `.../founders/npc/registrar_ashcombe.cs`, `clerk_crake.cs`, `pruett.cs`, `marrowby.cs`, `goose.cs` (new) | the people (11.1); the Registrar inherits `/std/hiddengiver` |
+| `.../founders/obj/jury_summons.cs`, `jury_ticket.cs`, `jurors_badge.cs`, `boundary_roll.cs`, `mason_chit.cs`, `jury_certificate.cs`, `clerks_staff.cs`, `notarys_seal.cs` (new) | the items |
+| `.../founders/city_hall.cs` | one `GatedExit` line, nothing else (2.3) |
 | `mudlib/secure/control.cs`, `tags.cs`, `blows.cs` | tags-and-saves.md |
-| `mudlib/std/living.cs`, `adventurer.cs`, `pclass.cs`, `trainer.cs` | 7.1 to 7.3 |
-| `tests/balance_sim.py`, `tests/class_test.py`, `tests/bureaucrat_test.py` (new), `tests/lint_area.py` | section 14 |
-| `docs/CLASS_SYSTEM.md` (section 9, a seventh path for the Mage; section 12, `SkillAt`; "pledge"), `docs/BUILDING.md` (a short "A class gives a skill at a level" and "A pledging NPC"), `docs/specs/skill-ranks.md` (the Registrar) | one paragraph each |
+| `mudlib/std/living.cs`, `adventurer.cs`, `pclass.cs`, `trainer.cs`, `questjournal.cs` | 7.1 to 7.3, 7.7 |
+| `tests/bureaucrat_test.py` (new), `tests/class_test.py`, `tests/balance_sim.py`, `tests/lint_area.py` | section 15 |
+| `docs/CLASS_SYSTEM.md` (section 12, `SkillAt`), `docs/BUILDING.md` (a class gives a skill at a level; the hidden-class pattern) | one paragraph each. The docs are public, so the Bureaucrat is not named in them |
+
+The Hall of Legends files (`guild/hall_of_callings.cs`, `guild/npc/hallmaster_mage.cs`, `guild/npc/hall_clerk.cs`) and `founders/npc/clerk_maude.cs` **do not change**: the first spec's topics there are removed.
+
+### 7.7 The quest's own pieces
+- **`ProgressNote`** (`/std/questjournal.cs`): a virtual `ProgressNote(string questId, ObjectRef who)` on the giver NPC, returning one line that the journal appends under the objectives of an active quest (null for none). Existing quests return null. `/std/hiddengiver` returns the line for the register's stage (section 11.5).
+- **`submit`** (`/std/hiddengiver` and the Clerk): `submit ITEM` in the room with the Clerk takes a carried exhibit (a `QuestItem` the Clerk knows) and records it. It exists because `give` refuses NPCs today. It prints nothing for anyone who is not a sworn juror (the verb falls through to "What?").
+- **The trial verbs** (`triplicate`, `restrain`, `desist`) in the hearing room only: bound by `chancery_court.cs` in `Init`, a handler that returns false unless the register's stage for the character is 3 (sworn, case open), so a character who is not a juror, or has finished, falls through to their own skill command if they have one, else "What?". They cost nothing, need no skill and are not saved. Their strengths are fixed by the scene, not by the tags-and-saves daemon; they do not touch `/secure/control`.
 
 ## 8. Balance: why it stays in the same band
-The standard test (docs/BALANCE_HUMAN.md and `tests/balance_sim.py`): a level 5 character in starting gear, 4 potions, points placed, the middle human, RestFactor 5, the Overseer from the cellar entrance. Today the five callings are 81 / 71 / 84 / 73 / 74 (mean about 77; the owner's band is **72% to 83%**). Nothing here has been measured; what follows is the argument and the list of what the simulator must check.
+The first spec judged the class by the Overseer at level 5 (band 72% to 83%). That test is withdrawn for this class (decision 8; the owner: "A bureaucrat probably isn't fighting the Overseer anyway"): the class starts at level 5 or later, in a city, and its control spells do half or nothing against a boss. The yardstick is section 10. This section keeps the argument for why control does not break the game, and the list of what keeps the class near its calling. Nothing has been measured.
 
 ### 8.1 Rough numbers: control against a damage cast
 Assumptions (stated so they can be changed): a Mage-origin Bureaucrat at level 7, Insight 17, spell power +26%, Focus 145 (Focus Efficiency applies), staff (Reaction 3.0, so every spell is an 8-second cast), Arcane Bolt average 9.5 for 16 Focus; a creature of level 7 with 53 Vitality, armour 3, damage 7-11 (average 9), a delay of 7 s, hitting a character 60% of the time: **0.77 damage a second**. Pure bolting kills it in 6 bolts: **48 seconds, 37 Vitality lost**. Count each cast as one 8-second slot in which the caster is not bolting; a bolt in that slot saves about 8 seconds of the creature's life, worth 6.2 Vitality.
@@ -369,54 +441,153 @@ With **this spec's rules**: the order is Full once, Half once, then None for 60 
 ### 8.2 What keeps the class in the band
 - **Weak damage** (the Mage's bolt, and Per My Last Letter, which needs seven casts on one target to equal a bolt; the Clerk's Staff 5-9).
 - **Low Vitality** (Mage's, +2).
-- **A boss gives half or nothing** (the standard test is the Overseer, a boss: every control spell is Half 95% of the time at level 5, None 5%). The Forms in Triplicate at Half slows him for 10 seconds, saving about 1.8 Vitality (his Axe Slash cycle is 10 s, the Power Strike 12 s; his damage rate is about 0.61 a second): worth about a third of one bolt. A Bureaucrat at level 5 in the standard test is a Mage with five more Focus and two more Vitality and one spell that is a bad trade against a boss: **expected 73% to 78%** (the Mage is 73%).
-- **The repeat and flood rules** (a slow at most 38% of the time; an order 21%; against a boss 17% and 8%).
+- **A boss gives half or nothing:** every control spell is Half or None against a boss (tags-and-saves.md section 12.4). The class is a poor choice for fighting bosses alone and a good one for the creatures between them.
+- **The repeat and flood rules** (a slow at most 38% of the time; an order 21%).
 - **Everything costs Focus at 24 to 32** (the bolt costs 16 to 20), and a long fight is Focus-limited.
 - **No ranged weapon, ever.** Weapons: dagger and staff.
+- **The class is given at level 5 or later with every skill whose level has passed,** so a Mage who takes it at level 9 has four control spells at rank I and nothing yet at rank II or above: they are bought (II at 5, III at 10). It is a gain of control and a loss of nothing, and the yardstick checks the pace does not rise above the Mage's by more than 8%.
 
-### 8.3 What `tests/balance_sim.py` must model
-- The class: Vitality 6 + 7, Endurance 14 + 1, Focus 76 + 4, the Mage's attributes and placement (Insight, then Resolve), Focus Efficiency, the Clerk's Staff and the Notary's Seal as options.
-- The control module of tags-and-saves.md section 18 with each spell's strength, half time and repeat steps; Authority from placement and rank.
-- Each spell as an action on the combat clock with its Preparation, Recovery and Focus cost: slow as a factor on a creature's Reaction Time (and the x2.0 cap); the restraint as the substitution of 6.2 (another enemy, a declared ranged action, or a Reaction-Time wait) for creatures with the real actions of the files; a bar; the ward (refuse before dodge); the interrupt of a preparation as the engine does it (which depends on the creature's real Preparation times: the Overseer's Power Strike 1.0 = 2 s, the Elite Guard's Shield Bash 0.5 = 1 s, so a human who types within 1.5 to 3 seconds misses the second and often the first); Per My Last Letter's stack; Stamp's discount; the queue; the summons; the hold.
-- The Overseer's pattern (Battle Cry, Axe Slash, Axe Slash, Power Strike; Summon once at half Vitality) with Red Tape's bar and the `summoned` flag fix.
-- The human model (docs/BALANCE_HUMAN.md): a delay before an interrupt, skipped casts, a late potion; a Bureaucrat's policy ("cast Forms on a creature that is not a boss and has more than half its life; Cease and Desist on a telegraphed action when ready; Audit before the first order on a creature that is above your level; Restrain when two or more are present or when a ranged action is absent").
-- Table: the standard test at level 5 (only Forms in Triplicate and the Mage's kit: **target 72% to 83%, expected 73% to 78%**); the same character at level 6 to 10 against: the Goblin Elite Guards in the Overseer Hall (an elite: S +15), the Overseer with all launch spells, three corridor groups (a Goblin Raider with a Scout, Boar Brute and Wild Boar), and the five level 10 bosses; each calling's own numbers beside it. **The gap between the Bureaucrat and the other callings at levels 5 and 10 must not be wider than the gap between the callings is today**, as skill-ranks.md requires of every calling.
+### 8.3 What `tests/balance_sim.py` must model for the class
+- Vitality 6 + 7, Endurance 14 + 1, Focus 76 + 4, the Mage's attributes and placement (Insight, then Resolve), Focus Efficiency, the Clerk's Staff and the Notary's Seal as options.
+- The control module of tags-and-saves.md section 18: each spell's strength, half time and repeat steps; Authority from placement and rank.
+- Each spell as an action on the combat clock with its Preparation, Recovery and Focus cost: slow as a factor on a creature's Reaction Time (and the x2.0 cap); the restraint as the substitution of 6.2 (another enemy, a declared ranged action, or a Reaction-Time wait) for the creatures' real actions; a bar; the ward (refuse before the dodge); the interrupt of a preparation as the engine does it (a human's delay before typing, BALANCE_HUMAN.md); Per My Last Letter's stack; Stamp; the queue; the summons; the hold.
+- **The class's policy** (a human of the class): Forms on a creature that is not a boss and has more than half its life; Cease and Desist on a telegraphed action when ready (Wild Boar Charge, Boar Brute Trample, Goblin Raider War Whoop); Audit before the first order on a creature above your level; Restrain when two or more melee creatures are present or when a creature has no ranged action; Application Denied on the caster when a Charge or Trample is not answerable.
+- Pace (`pace_cell`, `pace_mix`) with the class as a sixth column beside the five callings, and a column for the Mage who took the class at level 5 and one who took it at 8.
 - A solo "loop" test: restrain, bolt, restrain, bolt, to check the section 8.1 figures (a 38-second fight with two orders should show no gain).
+- **Not simulated:** the summons roll (a tally, exact table in hidden-classes.md section 5.2) and the quest (no combat).
 
 ## 9. Groups: the party system does not exist
-Application Denied and Stamp of Approval use `Target = "friend"`, which is the caster or **any player character in the room** (as Blessing). They need no party and no consent (a friend cannot refuse a blessing today either). Take a Number protects whoever the creatures fight. Restraining Order shields only the caster (the order is the caster's) and Audit marks for the caster's own next order. When a party system arrives: Stamp of Approval may be limited to party members; nothing else changes. A second Bureaucrat in the room is allowed: orders from two casters on one creature are separate on the creature but the daemon's repeat and flood records are per target (tags-and-saves.md section 14), so the pair gets Full once.
+Application Denied and Stamp of Approval use `Target = "friend"`, which is the caster or **any player character in the room** (as Blessing). They need no party and no consent. Take a Number protects whoever the creatures fight. Restraining Order shields only the caster and Audit marks for the caster's own next order. When a party system arrives: Stamp of Approval may be limited to party members; nothing else changes. A second Bureaucrat in the room is allowed: orders from two casters on one creature are separate on the creature but the daemon's repeat and flood records are per target (tags-and-saves.md section 14), so the pair gets Full once.
 
-## 10. The Overseer fight specifically
-He is a **boss** (`Boss = true`, so the tag `boss`): "above the law". Level 5, Vitality 114, armour 3, Reaction 4.0; the actions in the file are Battle Cry first (+2 damage for 30 s), then Axe Slash, Axe Slash, Power Strike (1.0 preparation, announced "draws his axe far back", damage x2), and once, as his next action when his Vitality first falls to half, Summon Goblin Minion.
-- **At level 5 (the standard test):** one control spell, Forms in Triplicate: Half (10 s, x1.5) 95% of the time, None 5% (S = 4% - Authority 9, floor 5%). It saves about 1.8 Vitality a cast against a bolt's 4.9: **the class plays like a Mage here** and the band is not touched.
-- **At level 6 to 9, with the launch spells:** **Restraining Order**: Half (5 s) 95%: he waits one Reaction Time (his own, 8 s at the slow end) instead of striking: three seconds saved, once a minute. **Cease and Desist**: his Power Strike is a 2-second wind-up; an interrupt cancels a 15-point blow (x2 of 7.5 after the cry) nineteen times in twenty (Half): the one strong answer, and one that needs the caster ready at that moment (Recovery 1.5 after a spell of 8 seconds: the best moment is the cast after the second Slash). **Red Tape**: Half (10 s) holds back the summons: his minion comes ten seconds later than it would. **Audit**: shows the numbers (and "above the law"). **Application Denied (level 10)**: refuses the Power Strike, but he often slashes first and the ward takes that.
-- **His summons and his minions:** a goblin minion (level 2) is an ordinary creature: Restraining Order and Forms land in full 95%. A Bureaucrat who puts a Restraining Order on the minion and a Cease and Desist on the next Power Strike has fought the Overseer on his terms and the Chancery's. It is a nicer fight for the class and it is not an easier one.
-- **The numbers to check:** the Bureaucrat at levels 6 to 9 against him should not exceed the Mage by more than 8 points with the launch spells, since the boss rule halves everything and the ordinary rule gives the minion's side to the caster.
+## 10. The yardstick for levels 5 to 10 (replaces the Overseer test)
+Run `python3 tests/balance_sim.py pace` and `corridor` for the class at levels 5, 6, 7, 8 and 9 in the four variants of the pace model (perfect; no haven; no potions; neither), with the policy of 8.3. Pass means every line below holds; the owner then sets the exact band. The method is the pattern's (hidden-classes.md section 11); these are the class's own set pieces and numbers.
 
-## 11. People, in voice
-**Marian Ashcombe, Registrar of the Chancery** (Level 20, Vitality 90, a trainer, a pledger). `AddChat` (spoken in turn): "The Chancery is open. Kindly state your business, in writing if you can." / "A matter not entered is a matter that has not occurred. I say this to everyone. It is generally the first thing they dispute." / "Please form a queue. There is no queue. Please form one anyway."
+1. **Pace.** Experience an hour on `prey(level)` (the ordinary creatures of the character's level and one above): **within 8% of the Mage's at each level 5 to 9** (CORRIDOR_BALANCE.md figures for the Mage today, perfect play: 2,189 an hour at level 5, 2,846 at 6, 3,968 at 9; "neither": 1,187, 1,562, 3,239), and **within 12% of the harmonic mean of the five callings** (2,180 at level 5, 2,654 at 6, 3,234 at 7, 3,532 at 8, 3,797 at 9). The class at level 5 has only Forms in Triplicate: expect it a few points under the Mage, never over.
+2. **Survival.** Deaths an hour: no more than the Mage's by more than 25% at any level.
+3. **Four set pieces**, the policy's win rate within 10 points of the Mage's:
+   - **Wild Boar** (level 6, 40 Vitality, damage 11-19, opens with Charge: wind-up one unit = 2 s, damage x2, recovery 1.5; then Gore). The interrupt answer: Cease and Desist at the wind-up.
+   - **Boar Brute** (level 7, 45 Vitality, damage 8-14, Trample with a one-unit preparation: interruptible).
+   - **Thorn Woodling** (level 9, 53 Vitality, Thorn Barrage with a half-unit preparation = 1 s): only answerable by prediction; the table must show the human policy cannot interrupt it reliably, and the class wins by other means (a slow, a ward).
+   - **A Goblin Raider (level 7, 53 Vitality, War Whoop buff, half-unit preparation) with a Goblin Scout (level 7, 80 Vitality):** a pair, the class's Restraining Order and Forms against two.
+4. **The gap between the five callings and the class** at levels 5 and 10 is not wider than the gap between the callings today (skill-ranks.md).
+5. **Bosses are reported, not required:** the Overseer (level 5) and the five level-10 bosses (Bandit Leader, Fallen Knight, Forest Panther, Warren Broodmother, Barrow Guardian) are run and printed with no band.
+6. **What exists to measure on:** the 44 creatures of the Hollow and the Corridor. Level 4: 2 kinds; 5: 2 (and the Overseer); 6: 3; 7: 4; 8: 8; 9: 6; 10: five bosses. Nothing above 10. The yardstick therefore ends at level 9 for ordinary creatures; levels 10 and above wait for content.
 
-Topics (`AddTopic`), in her mouth:
+## 11. The people and the quest "Jury Duty"
+Everything in this section is in the class's own files (`OwnPaths`), reachable only through the gated door. The giver, the Registrar, inherits `/std/hiddengiver` (hidden-classes.md section 7), which inherits `/std/trainer`. The journal quest is `jury-duty`, title "Jury Duty", area "Oakenfell", **not abandonable**. Case state is kept in the register's `stage` and `notes` for each character (hidden-classes.md section 3), so it survives a logout or a restart; the NPCs are shared, the state is each player's.
+
+### 11.1 The people
+All are `Peaceful`, pay no experience and cannot be fought (the rooms are `Safe`). Their first names are unused elsewhere (lint check 6; checked against `mudlib`).
+- **Marian Ashcombe, Registrar of the Chancery** (`npc/registrar_ashcombe.cs`, Level 20, Vitality 90; waiting room, behind the counter): "A tall, unhurried woman in a grey coat with ink to the second knuckle and a brass seal on a cord at her throat. She is writing, and does not look up until she has finished the line." Giver, swearer, finisher and, afterwards, the class's trainer and shop. `AddChat` (in turn, only while a juror is present): "The Chancery is open. Kindly state your business, in writing if you can." / "A matter not entered is a matter that has not occurred. I say this to everyone. It is generally the first thing they dispute." / "Please form a queue. There is no queue. Please form one anyway."
+- **Osbert Crake, Clerk of the Court** (`npc/clerk_crake.cs`, Level 12, Vitality 60; court): "A small, pale man in a black gown and a wig that was made for a larger head. He holds a bell in one hand, a pen in the other, and an air of having been right for a long time without anyone noticing." Takes the evidence and the verdict.
+- **Gervase Pruett, plaintiff** (`npc/pruett.cs`, Level 3; court, left table): "A square man in a gardener's apron, red to the ears. He is gripping a marrow-shaped hole in the air."
+- **Tilda Marrowby, defendant** (`npc/marrowby.cs`, Level 3; court, right table): "A broad, composed woman in a good shawl, who looks at the court as one would look at weather."
+- **The goose, Counsel for the Defence** (`npc/goose.cs`, Level 1; court, on the right table): "A large grey goose with an expression of settled judgement. A small card on a string round its neck reads COUNSEL." Never fights; `kill goose` prints "The court takes a dim view." and nothing happens.
+
+### 11.2 The Registrar, by stage (every line below is quest-tagged `jury-duty`)
+"Stage" is the register's stage (hidden-classes.md section 3). A line shows only at the stage named. Anything not listed gets the unknown-word answer.
+
+**Entry (stage 1 to 2; the room's `Noticed` begins the quest).** Room line for the player: "Marian Ashcombe does not look up from her ledger until she has finished the line. 'Summons.' It is not a question. You hold it up. She reads the front, and the back, and stamps the corner. 'Reference accepted. You are Juror Twelve of Twelve. The other eleven are not coming. They never do. That is not your concern, and it is now partly your duty.' She slides a card across the counter. TAKE A NUMBER, it says, in case you had not noticed the machine. 'Take a number. Then ask me about the oath. The court sits when it is sworn.'" The journal begins (quest state 1); stage 2.
+
+| Topic keys (stage) | She says |
+|---|---|
+| *oath, swear, sworn, badge* (2, no ticket) | "I cannot swear an unnumbered juror. It has been tried. Take a number." |
+| *oath, swear, sworn, badge* (2, ticket taken) | Marian Ashcombe rises. "Raise your right hand. The other one. Repeat after me. I will hear the matter. I will not be moved by the length of the speeches. I will say yes or no, and mean one of them." You say it. She stamps a small brass badge on the pad and slides it across. "A juror's badge. It is a loan from the court and it will be asked for back. Through the east door. Clerk Crake will take it from there. Do not touch the goose." (The badge is given; stage 3. Journal objective met.) |
+| *number, machine, ticket, clock* (2) | "The machine is correct. The clock is correct. The time is wrong. If you can explain that to me, I will find you something better to do." |
+| *summons, form, reference, juror, jury, duty* (2, 3) | "Form 27-J. Third copy. It means what it says. It said fourteen days, from the date you read it. You have read it. Nobody has ever been late." |
+| *fine, thirty-seven, one third* (2, 3) | "The fine is thirty-seven gold and one third of a gold. It has never been collected. The third of a gold is the difficulty." |
+| *court, east door, hearing, case, matter, goose* (2) | "The court sits when you are sworn. It is Pruett against Marrowby, the matter of the goose. You will know it when you hear it." |
+| *orders, authority, borrowed, trial, forms* (3) | "In the court a juror may serve three of the court's orders, on its authority and for the length of the hearing. A restraining order, a notice to cease and desist, and a form in triplicate. They are on loan. They work on the parties and on Counsel, and nowhere else. They will not work in a corridor. Do not become attached." |
+| *roll, boundary, pigeonhole, pigeonholes, weather* (3) | "Boundary matters are filed under Weather, because they are always changing, and Weather is under Adjournments. Pigeonhole two hundred and twelve. I cannot stop you looking. I am not permitted to help." |
+| *verdict, clerk, crake* (3) | "That is for Clerk Crake. I only enter it." |
+| *badge, lost* (3) | If the badge is gone: "Again? It is a loan." and another is given. Otherwise: "You have it. You are wearing it. Is it not remarkable?" |
+| *anything else, chat* (2, 3) | the `AddChat` lines |
+
+**Return (stage 4: the Registrar's `Noticed` fires when a stage-4 juror enters or speaks to her).** "Marian Ashcombe holds out her hand. You give her the badge. She enters the verdict in the Book of Proceedings and reads it back to you, without comment, and with a different comment for each kind of verdict." The closing remark by verdict and by the number of exhibits the player entered (none, one, both):
+
+| Verdict | no exhibits | one exhibit | both exhibits |
+|---|---|---|---|
+| liable (y) | "Liable, on no exhibits. The court admires decisiveness. The court also wonders what it was based on." | "Liable, on one exhibit. A sound habit: when in doubt, find against the person who has been shouting." | "Liable, on both exhibits, with the elm in evidence. Rigorous. Mrs Marrowby has been told that the goose will in future be supervised." |
+| not liable (n) | "Not liable, on no exhibits. Generous. The Chancery does not hold it against you." | "Not liable, on one exhibit. Cautious. It will survive an appeal, which is no part of the verdict." | "Not liable, on both exhibits. The elm has been moved, the marrows were on her side, and the goose cannot be shown to have known. Mr Pruett has appealed. He has appealed to the elm." |
+
+Then she pays: "The juror's fee is one gold. It is entered." You receive 1 gold and 250 experience ("You have served the court."). Stage 5; the offer follows at once (11.6).
+
+### 11.3 The Clerk, the parties and the case
+All of this is stage 3. A juror enters the court from the waiting room.
+
+**On first entry** (once; the room, to the juror): "Clerk Crake rings his bell. 'All rise,' he says, and then, seeing that you are already standing, 'Noted.' He consults a paper. 'Pruett against Marrowby: the matter of the marrows. Three marrows, prize, the Harvest Show nine days hence, said to have been eaten by a goose, said to belong to the defendant, said by the defendant to belong to no one. The plaintiff claims eleven gold, and the stakes. Counsel for the defence is the goose, entered as such since Tuesday. The jury is you.' He puts the bell down. 'You will hear the plaintiff and the defendant. You may examine the exhibits, which are not yet exhibits. You will give a verdict, yes or no. You may use the court's orders on the parties if the proceedings require it. They usually do.'"
+
+**Asking the parties** (`ask X about ...`):
+- *Pruett: marrows, marrow, goose, boundary, elm, claim, line* (first time sets `p_heard`): "'Three marrows. Three! Prize marrows, madam, sir, whatever you are. The Harvest Show is in nine days. The goose ate them, and the goose is hers, and the line is where the Roll says it is, and the Roll says my bed is mine. Eleven gold. And the stakes.' He sits. He stands again. 'And the stakes.'" Repeats: "'Eleven gold. And the stakes.'"
+- *Tilda (and the goose) while Pruett is unrestrained* (note `pr` is 0): "Gervase Pruett is on his feet before she can answer. 'Objection! She is lying! The goose is hers! The goose has always been hers!' The Clerk rings his bell. 'The court notes the objection,' he says. 'The court notes that it was not made to anything.' Tilda looks at her hands. 'Jurors,' Clerk Crake adds, to no one in particular, 'have been known to have a form for that.'"
+- **`restrain pruett`** (trial order, first use sets `pr`): "You serve Gervase Pruett with a trial restraining order, on the court's authority. He may not come within reach of Tilda Marrowby, which he takes personally. He sits, writes something, and underlines it." Room: "{Name} serves Gervase Pruett with a restraining order. Pruett sits." Repeat: "Pruett has been served. He is writing about it."
+- **`ask tilda about goose`** with `pr` set (first time): "Tilda Marrowby draws a very long breath. 'It begins,' she says, 'with my great-grandmother, Hester Marrowby, who came to Greenvale in the year of the late frost, and who kept geese, and whose mother kept geese, and whose mother's mother-'" **A window of 8 seconds opens** (memory only, not saved).
+  - **`desist tilda` inside the window** (note `ds` = 1): "You serve Tilda Marrowby with a trial notice to cease and desist, on the court's authority. Her great-grandmother stops mid-sentence. 'Oh,' says Tilda. 'Well. Briefly, then.'"
+  - **Outside the window or not at all** (`ds` = 2): "The history proceeds as far as the Founders' second winter. Clerk Crake rings his bell and waits. At length: 'Briefly, then,' says Tilda, and has the grace to look tired." The Clerk takes no question for the next 20 seconds ("The court is recovering."). No other penalty.
+  - **`desist tilda` with no window open:** "Tilda Marrowby is not saying anything that has not already been filed."
+  - Either way, then (sets `t_heard`): "'The goose is mine. I have never said otherwise. I said it is not guilty, which is different. It was on my side of the line when it ate his marrows. Ask the court where the line is. Hollis the mason moved the old elm, and Pruett's father paid him for it; there will be a receipt, because there is always a receipt. Try the table.'"
+- *Goose: any topic:* "The goose looks at you. You have the impression of having been entered." (`ask goose about roll`, while it holds the Roll: "The goose looks at the Roll, and then at you, and holds the Roll a little higher.")
+
+**The Boundary Roll (the comic interruption).** The roll is found in the waiting room (11.4). When a juror with the Roll (`roll` = 1) walks east into the court and the goose has not yet been served (`gs` = 0):
+> "Counsel rises. It crosses the court with great dignity and at surprising speed, takes the Boundary Roll out of your hand, and returns to the right-hand table with it. Clerk Crake does not look up. 'Counsel has asked to see the exhibit,' he says. 'Counsel always asks to see the exhibit.'"
+The Roll leaves the pack (`roll` = 2). `take roll` then: "The goose is holding it. The goose looks at you." **`triplicate goose`** (the trial form, sets `gs`): "You serve the goose with a trial Form 27-B, in triplicate, on the court's authority. It begins, slowly, to look for the second copy. It does not put the Roll down. It is, however, looking elsewhere." Room: "{Name} serves the goose with a form. The goose studies it." After this `take roll` works ("The goose is still looking for the second copy. You take the Roll from under its wing. It lets you."), `roll` = 1, and it is not taken again. If `gs` was already 1 when the Roll arrives: "Counsel rises, looks at you, and then at the Roll, and then, slowly, at the space where its second copy should be. It sits." No interruption. `restrain goose` or `desist goose`: "The court's authority does not stretch that far. The goose is Counsel, not a party." Nothing in this needs combat.
+
+**Exhibits.** `read roll`: "BOUNDARY ROLL: MARROW LANE. 'The line runs from the great elm, west two paces to the stake, and thence to the pump. Weather: fair. Entered in the year of the late frost. Witness: H. Hollis, mason.'" `read chit` (the mason's receipt, found by `search table`, 11.4): "'Received of Mr G. Pruett, senior, three gold, for moving the great elm two paces east, the old one being in his opinion in the wrong place. Entered. H. Hollis, mason. (Nobody asked for a receipt. This is it.)'"
+- **`submit roll`** / **`submit chit`** (the Clerk, in the court): takes the item (a Bound exhibit): "You hand the Roll to Clerk Crake. He holds it at arm's length, as one holds a baby that has been returned. 'Exhibit One,' he says, and writes." / "Clerk Crake reads the chit twice. 'Exhibit Two,' he says, quietly. At the left-hand table Gervase Pruett finds something very interesting in his boots." (`roll` = 3, `chit` = 3.) `submit` anything else: "Clerk Crake does not accept that. The court has never accepted that." Nothing in the pack that matches: "You have nothing the court recognises."
+
+**The verdict.** `ask clerk about verdict` (also `verdict`, `finished`, `decide`): if `p_heard` and `t_heard` are not both set: "The court cannot take a verdict from a juror who has not heard the parties. It has tried." Otherwise Clerk Crake asks, and the next line the juror types answers (the prompt is `InputTo` with the Clerk as owner): "Clerk Crake rises. 'The jury will say, yes or no, and without elaboration. Is the defendant liable for the marrows? (y/n)'"
+- `y` / `yes`: "'The court enters: liable.' He writes. 'Eleven gold, and the stakes. The court regrets the stakes.'" (`v` = 1)
+- `n` / `no`: "'The court enters: not liable.' He writes. 'Mr Pruett will be informed. He will be informed at length.'" (`v` = 2)
+- Anything else: "'The court requires a yes or a no. The court has waited longer for less.'" and asks once more; a second wrong line ends the prompt with "'The court will ask again when you are ready.'" (no verdict; ask again later).
+Then both parties: Pruett: "'The marrows,' says Gervase Pruett, to no one. 'The stakes.'" Tilda: "Tilda Marrowby nods to the court as one nods to the weather, and collects the goose." The Clerk: "'The matter is heard. Return your badge to the Registrar. She will have a question for you. I would not be hurried.'" The register moves to stage 4. The case cannot be reheard. A juror who walks away at any point before the verdict finds the case where it was left.
+
+### 11.4 The two finds (hidden things, per character)
+- **`search pigeonholes`** (waiting room; only a juror at stage 3 with `roll` = 0): the room declares one `HideItem`-style find under the search rules (`/secure/search.cs`): difficulty Moderate (12), a per-character find (`/std/find` with first <= 0), item `boundary_roll` (`QuestItem`, `Bound`). First failures: "You go through the pigeonholes. They hold a great many things that are not what you want." On success: "In pigeonhole two hundred and twelve, between a notice of adjournment and a very old umbrella, is a long roll tied with green tape. You take it." If lost: the same pigeonhole yields it again: "The Roll is in the pigeonhole again. It generally is."
+- **`search table`** (court; stage 3, `chit` = 0, and `t_heard` set, so Tilda has said where to look): the same rule, Moderate (12), item `mason_chit`. Fail: "You find an inkwell, a stub of wax and a peppermint of some age." Success: "In the drawer of the left-hand table, under a stub of wax and a peppermint, is a slip of paper, curled with age. You take it." A character who has not heard Tilda yet does not find it: "You find an inkwell and a peppermint. Perhaps someone in the room has a suggestion." (A search that cannot succeed yet still takes its normal time; no lockout.)
+- Neither find is visible to a character who is not a juror; neither is a lint-reported hidden thing for the world (check 15 learns the class's own paths are exempt).
+- Neither is needed to finish: a juror who finds nothing still gets a verdict (the closing remark says "no exhibits").
+
+### 11.5 The journal
+`DefineQuest("jury-duty", "Jury Duty", "Oakenfell", completed, abandoned, items: the three exhibit paths, objectives: "have|/domains/greenvale/oakenfell/founders/obj/jurors_badge|Be sworn in and take a juror's badge|1", abandonable: false)`. `Follow()` reads the summaries from the caller's definition, so the Registrar (finisher) defines it too (hidden-classes.md section 7).
+- **Completed** (the same for either answer): "You were summoned to the Chancery of Oakenfell, sworn as a juror, heard the matter of the goose and the marrows, gave your verdict and answered the Registrar's last question. The court has entered all of it."
+- **Abandoned** (written because `DefineQuest` requires it; never shown unless a wizard clears the quest): "You set the summons aside. The court notes that the matter is still open."
+- **Rewards line** at completion (what `quests` shows): a taker: "1 gold, 250 experience and a seal of the Chancery."; a decliner: "1 gold, 250 experience and a Certificate of Jury Service."
+- **`ProgressNote`** (below the objective, by register stage): 2: "You are at the Chancery with a summons. Take a number, then ask the Registrar about the oath." 3: "You are sworn. The court sits to the east: Pruett against Marrowby, the matter of the goose. Hear the parties; the Clerk will take your verdict." 4: "The verdict is entered. Return your badge to the Registrar." 5: "The Registrar has a question for you. Neither answer is urgent. Neither is reversible." Nothing says "class".
+
+### 11.6 The ending: the offer, `pledge`, `decline`
+After the fee (11.2), stage 5. The Registrar says, in order:
+> "Marian Ashcombe closes the Book of Proceedings and, for the first time, looks at you. 'One further matter. The court has an opening. It is not a post, and it is not advertised, and nobody applies to it. A clerk of the Chancery is a mage who has taken the seal. You have this afternoon served three orders in this building without being struck by lightning, which is not nothing. If you wish to take the seal, say {cmd}pledge{/}. If you do not, say {cmd}decline{/}. Whichever you say, the juror's fee is yours and the court thanks you. I would think about it.'"
+The two verbs are bound by the giver only while the register says the offer is open (stage 5, no outcome), otherwise "What?".
+
+**`pledge`, first time** (the permanence line): "Marian Ashcombe sets down her pen. 'I will say this once, as the Chancery requires. The seal is for life. You will keep all you are: the staff, the Bolt, the Lore. You will gain the seal, and the forms that go with it, and you will not be able to put either down. No fee is asked. If you are sure, say {cmd}pledge{/} again within the minute.'" A 60-second memory timer starts (not saved).
+**`pledge`, second time within the minute:** `ApplyClass("bureaucrat")` (level 5, Mage, no other advanced class, the offer open), then the **ceremony**: to you: "Marian Ashcombe rises. 'Raise your right hand. The other one. Repeat after me. I will lodge before I act. I will bind nothing that has not been served. I will not, upon any provocation, agree that a war was properly declared.' She takes the seal from the cord at her throat, presses it into a pool of hot wax beside your name in the Book of Proceedings, and blows on it. 'It will be dry in a moment.'" Room: "Marian Ashcombe presses the Chancery's seal into hot wax beside {Name}'s name in the Book of Proceedings. The room is very still." Then the engine's own line "You are now a Clerk of the Chancery." and hers: "Your first form is Form 27-B. It is in triplicate. Please do not lose the carbon. And take this. The Chancery issues one to every clerk, and it is not to be sold." (the Notary's Seal enters your pack; the summons is "entered": taken from the pack.) Skills whose level is at most yours are bound at once (section 7.1). The register records "taken" and stage 9; the journal completes; `class.hidden` is reported (section 14). A `pledge` after the minute is a first `pledge` again. If `ApplyClass` refuses (another advanced class taken meanwhile: section 11.7) nothing is taken and she says the release line.
+**`decline`, first time:** "Marian Ashcombe inclines her head. 'You may decline. It is permitted, and it is final. The Chancery does not summon twice. Say {cmd}decline{/} again within the minute and it is entered.'"
+**`decline`, second time within the minute:** "'Entered.' She writes. 'Declined, with thanks. The court keeps the summons.' She takes it from your pack and files it under Weather. She stamps a small card and hands it to you. 'A certificate of jury service. You are exempt for seven years. This is not a joke and it is not, so far as I know, a lie.' She looks back at her ledger. 'The door will not trouble you again.'" The register records "declined", stage 9; the journal completes; the certificate (a keepsake: `read certificate`: "CERTIFICATE OF JURY SERVICE. The bearer has served. The bearer is exempt from further service for seven years, or until the Chancery forgets, whichever is the longer.") enters the pack. **No `class.hidden` is reported for a decline** (nothing happened). The inner door answers "What?" from then on for ever.
+**Neither:** walking away, or typing anything else, leaves the offer open. When the character next enters the waiting room the Registrar says, once: "Marian Ashcombe looks up. 'Still pending. It is perfectly in order for it to remain so.'"
+**A character who `pledge`s with no offer open:** "What?".
+
+### 11.7 Edge cases
+- **Quit, crash or restart mid-case:** register and notes persist; an open prompt (the verdict, the 8-second window, the 60-second timers) is dropped and begins again. The summons survives (or is re-issued at the door).
+- **A second player in the room:** each juror's case is separate (the notes are per character); the NPCs speak to the one who asked and the rooms show the others each other's lines. Two jurors may hold the case together; the goose takes each one's roll.
+- **A lost badge, roll or chit:** the badge from the Registrar ("Again? It is a loan."); the roll and chit by searching again.
+- **A juror who takes an ordinary advanced class while summoned:** at the next knock, or at the offer, the register finds an advanced class: the Registrar says, and nothing else is offered: "You have taken another seal. The Chancery does not issue a second. The fine is waived, as it was always going to be. The juror's fee is one gold, entered." (1 gold and 250 experience; the journal completes; the door closes; the summons is retained.)
+- **Level up, or a different level at the offer:** no effect; the offer needs level 5, and the character has it.
+- **A wizard:** the door and the roll treat wizards as the pattern says; a wizard cannot start the case. The `hidden` command can set a stage for a test character (hidden-classes.md section 9).
+- **Dropping or giving:** the summons, badge, roll and chit are `Bound`; `drop`/`give` print "It is addressed to you. It is not a thing one drops." (the summons) and, for the others, "It belongs to the court."
+- **Dying:** impossible in the Chancery (`Safe`, no creatures).
+- **The trial orders outside the court:** "What?" (the handlers are the court's). A Bureaucrat who returns later and types `restrain` in the court gets their own skill's answer (the room handler returns false at stage 9).
+- **A character who never speaks to the Registrar after the verdict:** stays at stage 4, may stand in the court as long as they like, and cannot leave the offer behind: the Registrar says it on entry.
+
+### 11.8 After the class (holders only)
+The Registrar then trains and sells. **Topics for holders** (`AddTopic`, untagged to a quest; the unknown-word answer for anyone else):
 - *chancery, this place:* "The Chancery of Oakenfell keeps the Assembly's papers and the city's peace, in that order, and the one has never once required the other. We have never lost a war. We have never agreed that one was properly declared."
 - *bureaucrat, clerk, clerks, class, path, seal:* "A Clerk of the Chancery is a Mage who has taken the seal. The common word is Bureaucrat, and I do not correct it, because to correct it would be to open a file. A clerk slows what must wait, bars what must not approach, stays what must not be said, and serves notice on what cannot read. It is not a calling for the impatient."
-- *pledge, take the seal, join, apply:* "To take the seal, one must be a Mage and of the fifth level, and pay twenty-five gold, entered. The seal is not a hat. It is for life. Everything you are, you keep: the staff, the Bolt, the Lore. If you are sure, say {cmd}pledge bureaucrat{/}."
 - *spells, forms, triplicate, restraining order, desist, tape, audit:* one line each. *Forms in Triplicate:* "Form 27-B. Three copies. The creature keeps none and wishes it understood why." *Restraining Order:* "It may not come within reach of you. It may do other things. The order is quite specific." *Cease and Desist:* "Served at the moment it begins, which is the only moment it may be served." *Red Tape:* "A creature may not call for help without a countersignature. I need not tell you who countersigns." *Audit:* "Nothing is so useful as knowing precisely what one is dealing with. Nothing is so unpopular."
 - *boss, above the law, ignores your authority:* "There are things in Hollowmere that are above the law, and they are almost always the things one most wishes to serve. Half the order will hold; sometimes none. There are also things that ignore your authority, as there are in any office: they are only above your grade. They are served more often than you would think. A senior clerk is a good deal harder to ignore."
-- *hall, hallmaster, ilsabet:* "The Hall of Legends is very good to us, and very correct. Ilsabet is a stickler, and I mean that as the highest praise."
-- *fee, gold, price:* "Twenty-five, entered. Ranks are forty, a hundred and fifty, four hundred and nine hundred, entered separately. Fees are posted."
-- *oath:* the oath is not told until it is sworn (it is a surprise in the pledge).
-Refusals: below level 5: "The Chancery does not take clerks of less than five levels' standing. Return when you have some. Nobody has ever been refused twice for the same reason." Not a Mage: "The Chancery's clerks are drawn from the Mages. (For now. There is a form.)" Already has a class: "You have taken a seal already. The Chancery will not duplicate it." Too poor: "The fee is twenty-five gold. The Chancery does not extend credit; it extends time." Not at the Chancery: n/a.
-
-**The permanence line** (first `pledge`): "Marian Ashcombe sets down her pen. 'I will say this once, as the Chancery requires. The seal is for life. You will keep all you are: the staff, the Bolt, the Lore. You will gain the seal, and the forms that go with it, and you will not be able to put either down. The fee is twenty-five gold, entered. If you are sure, say {cmd}pledge bureaucrat{/} again within the minute.'"
-
-**The ceremony** (second `pledge`): you read: "Marian Ashcombe rises. 'Raise your right hand. The other one. Repeat after me. I will lodge before I act. I will bind nothing that has not been served. I will not, upon any provocation, agree that a war was properly declared.' She takes the seal from the cord at her throat, presses it into a pool of hot wax beside your name in the Book of Proceedings, and blows on it. 'It will be dry in a moment.'" Room: "Marian Ashcombe presses the Chancery's seal into hot wax beside {Name}'s name in the Book of Proceedings. The room is very still." Then the engine's own line "You are now a Clerk of the Chancery." and hers: "Your first form is Form 27-B. It is in triplicate. Please do not lose the carbon."
-
-**Ilsabet (Hallmaster of the Mages), a new topic** (*chancery, bureaucrat, clerk, clerks, seal, form*): "The Chancery? Do not look at me like that. They file things. The filing is, regrettably, effective. If you mean to take their seal you will not do it here; the Hall's rite for the paths is for the Hall's paths. Walk to City Hall, and go through the inner door, and be polite. They remember." Her existing "paths" answer ("Three roads for a Mage") gains: "There is a fourth, outside the banners, and I do not endorse it. It is also not wrong."
-
-**Mabyn (Clerk of the Hall of Legends), a new topic** (*chancery, registrar*): "The Chancery is a good neighbour and a hard correspondent. We are, I am told, in its files. I have never seen the file." **Maude Tarrow (City Hall)**: topic *inner door, chancery, door*: "Through the inner door? That is the Chancery. Mind the queue, and say please. Mind the Registrar; she has never been wrong, because she has never been agreed with."
-
-**Rank trainer** (`ranks`, `train`): "Ranks are bought of me and entered." The refusal lines of `/std/trainer` are used unchanged.
-
+- *fee, gold, price, ranks, staff, seal:* "Ranks are forty, a hundred and fifty, four hundred and nine hundred, entered separately. The staff is forty-five. A second seal is sixty. Fees are posted."
+- *jury, court, goose:* "Mrs Marrowby's goose is, I understand, in good health. Mr Pruett's marrows are not." 
+- **Rank trainer** (`ranks`, `train`): "Ranks are bought of me and entered." The refusal lines of `/std/trainer` are used unchanged. She sells the Clerk's Staff of Office and the Notary's Seal (`sell` list) to holders only.
+- **A character who declined:** the door is closed, so none of this is reachable.
 ## 12. Sample fights (the tone)
 Prompt and wiz lines are omitted. A level 7 Bureaucrat (a Mage, rank I spells, Focus Efficiency), Insight 17, Authority 9.
 
@@ -465,32 +636,25 @@ Your order against the goblin guard lapses: you struck it in person. A petitione
 The goblin guard pierces you deeply.
 ```
 
-### 12.3 The Goblin Overseer (level 5, boss) against a level 8 Bureaucrat
+### 12.3 A Wild Boar (level 6, 40 Vitality): its Charge, answered
+The boar opens with Charge (wind-up one unit, 2 seconds, damage x2 of 11-19), then Gore. The interrupt must be typed in those two seconds; Cease and Desist has no wind-up of its own, so it resolves the moment the caster is ready.
 ```
-> audit overseer
-You open your ledger on the Goblin Overseer and make an entry.
-  Goblin Overseer: level 5, above the law (a boss).
-  Vitality 114 of 114   Armor 3   Defense 4   Attack 7   Damage 4-7
-  Resists: mind 4%, body 4%.
-  Acts every 10.0 s: Axe Slash; Power Strike every 12.0 s (winds up 2.0 s); Battle Cry; Summon Goblin Minion.
-  Your next order against it is served at -6 to its save.
-The Goblin Overseer throws back his head and bellows a BATTLE CRY! ...
-> triplicate overseer
-You serve the Goblin Overseer with Form 27-B, in triplicate.
-The Goblin Overseer is above the law. The form half holds.
-...
-The Goblin Overseer draws his axe far back...
-> desist overseer
-You serve the Goblin Overseer with a notice to cease and desist. His Power Strike stops mid-motion.
-The Goblin Overseer is above the law. The notice half holds.
-...
-The Goblin Overseer's Vitality falls to half.
-> tape overseer
-You wind the Goblin Overseer in red tape. It is not going anywhere, and it is not calling anyone.
-The Goblin Overseer is above the law. The tape half holds.
-The Goblin Overseer draws breath to summon his minions, and is informed that a summons requires a second signature.
+> bolt boar
+You attack a wild boar.
+Your bolt of arcane force strikes a wild boar for 9 damage.
+The wild boar lowers its tusks and paws at the ground.
+> desist boar
+You serve a wild boar with a notice to cease and desist. Its Charge stops mid-motion.
+A wild boar's Charge stops mid-motion.
+The wild boar gores you.
+> triplicate boar
+You draw three sheets of paper and a carbon from a satchel...
+You serve a wild boar with Form 27-B, in triplicate. It begins, slowly, to look for the second copy.
+A wild boar slows, studying it.
+> bolt boar
+Your bolt of arcane force strikes a wild boar for 8 damage.
 ```
-The minion comes ten seconds later than it would have.
+The Charge (22 to 38 damage on a 58-Vitality character) never lands, and the boar may not Charge again for ten seconds. Missed by a second, the same fight costs the caster about half their Vitality: that is what the set piece in section 10 measures.
 
 ### 12.4 A creature above your level: "ignores your authority"
 A level 5 Bureaucrat serves a Boar Brute (level 7: two above; resistance 8%, so a save chance of 8 + 20 - 9 = 19%):
@@ -501,36 +665,51 @@ The boar brute ignores your authority. The order holds for half its term.
 ```
 
 ## 13. Help text
-`help bureaucrat`: "BUREAUCRAT (the Clerk of the Chancery). A Mage who has taken the Chancery's seal at the Chancery in Oakenfell, through the inner door of City Hall. Control, not damage: slow, bar, interrupt, delay, and mark. Leans on Insight, then Resolve. Weapons: dagger, staff. Armor: light. You keep every Mage skill. The seal is for life. {cmd}ask registrar about pledge{/}."
+**None before the class is held.** `help bureaucrat`, `help restrain` and every other word of the class answer as any unknown word does ("There is no help on that."), for everyone who does not hold the class, including wizards below level 10. For a holder:
+`help bureaucrat`: "BUREAUCRAT (the Clerk of the Chancery). A Mage who has taken the Chancery's seal. Control, not damage: slow, bar, interrupt, delay, and mark. Leans on Insight, then Resolve. Weapons: dagger, staff. Armor: light. You keep every Mage skill. The seal is for life."
 `help restrain`: "RESTRAIN (Restraining Order), Bureaucrat level 6. For 10 seconds the creature cannot make a melee attack against you. It may use a ranged attack, or turn on someone else, or wait. Your own spells do not break it; your own staff does. Bosses are above the law and the order half holds; a creature above your level may ignore your authority. See {cmd}help control{/}."
-`help control` (new, one paragraph): "Orders, slows, bars and holds are served on creatures. A creature may resist: a creature above your level resists more ('ignores your authority'), and a boss is above the law: for a boss an order holds for half its term, or not at all. A creature served the same order twice in a minute resists it more. The better of your Insight and Resolve lowers its chance to resist."
-`help pledge` (a short entry for the verb).
+`help control` (one paragraph, shown to anyone, as it names no class): "Orders, slows, bars and holds are served on creatures. A creature may resist: a creature above your level resists more ('ignores your authority'), and a boss is above the law: for a boss an order holds for half its term, or not at all. A creature served the same order twice in a minute resists it more. The better of your Insight and Resolve lowers its chance to resist." (It is shipped with the tags-and-saves work; nothing in it names the class.)
+There is no `help pledge`: the verb exists only at the Registrar, at the end of the quest.
 
 ## 14. Chronicle, Renown and the website
-- **Chronicle.** The pledge reports the existing event `class.advanced` ("First {class}": a server first, renown 10 to the participant, 100 for the first) with the class name "Clerk of the Chancery"; the first one reads "The First Clerk of the Chancery. On {date}, {name} chose the path of the Clerk of the Chancery and was the first in Hollowmere to walk it." No other Chronicle entry is created. Wizards make no history (the event service drops them).
-- **Renown:** none beyond the event. The class does not change a Renown title.
-- **The website** `/classes` page: if it lists advanced classes from the class files it lists this one with its tagline; check `src/LesMudOS.Api` when building (it reads the repository's class data or a copy; I did not find an item or class page that lists advanced classes today, and the forbidden-terms scan is unaffected).
+- **Chronicle.** Taking the class reports **`class.hidden`**, subject `bureaucrat`, never `class.advanced` (hidden-classes.md section 7, item 7). It scores as a routine event: counted, no entry, no rumour, no Renown. A refusal reports nothing. Wizards make no history. So there is no "First Clerk of the Chancery".
+- **Renown:** none. The class does not change a Renown title. The quest awards no Renown.
+- **The website:** `class.hidden` is in `hiddenEventPrefixes` of `publicfilter.json`; the Heroes page shows a character's class only if it is in the new `publicClasses` list, which never names `bureaucrat`; the roster copy written by `deploy/setup-website.sh` must not hold the id (hidden-classes.md section 9). The `/classes` page (copy in `web/content/world.json`) does not list it. This document is public in the repository; the owner accepts that.
+- **Lint (hidden-classes.md section 10), a finding:** `bureaucrat` appears as the stem of the word "bureaucratic" in two public strings today (`mudlib/factions/assembly.cs` and `mudlib/domains/greenvale/oakenfell/guild/npc/envoy_assembly.cs`). The lint check must match whole words, not substrings, or it fails on text that has nothing to do with the class.
 - **Rumours:** none.
 
 ## 15. Tests
-**`tests/bureaucrat_test.py`** (the driver's test client, in the style of `tests/class_test.py`): the class file (resources and formulas at level 5 and 10 against section 3's table; the skills given by level: nothing at 4, Forms at 5, Restraining Order at 6, and so on, with the "You have learned..." line); `pledge`: below level 5, not a Mage, already has a class, too poor, the first `pledge` (nothing changes), the second within 60 seconds (the fee, the class, the Chronicle event, the ceremony lines, the room's line), the second after 60 seconds (the first again), a refused `ApplyClass` returns the fee; the Registrar's ranks (`ranks`, `train triplicate`) and a Bureaucrat still buying Arcane Bolt ranks from Ilsabet; the Chancery, the Staff, the Seal (WornBy; Authority +2; tags in `look`/`appraise`); every spell: Preparation, Recovery and Focus cost at ranks I to V against the tables of section 6; Focus Efficiency applied; the save outcomes with fixed dice (`SetTestRolls`) for an ordinary target, an above-level target, an elite and a boss, with the exact lines; the half durations; each spell's own rules: Forms (the factor, the x2.0 cap), Restraining Order (a rat waits; a creature with a declared ranged action uses it; a second enemy is attacked instead; the lapse on a staff blow and not on a bolt; a Webbed Spit is not barred; a Battle Cry is not barred), Cease and Desist (the refusal when nothing is prepared; the cancel of the Overseer's Power Strike; the bar; the Half's push-back), Red Tape (the summon is delayed, the flag not spent), Audit (the lines; the mark consumed by the first order; the out-of-combat search bonus), Application Denied (one charge refused, the second blow lands; rank III two; before the dodge; a special action not refused), Per My Last Letter (the stack and its reset), Stamp, Take a Number, Summons (a creature behind a closed door is not summoned; a boss never), Due Process (three strikes; the time limit); the repeat window and the flood guard across spells; a sandbox creature cannot be served; nothing is saved; a Mage that is not a Bureaucrat has none of it.
-**`tests/class_test.py`:** the level-gated skill grant; the trainer's advanced class. **`tests/lint_area.py`:** the Chancery room and NPC (the usual checks) and the tag lines of the new items. **`tests/sandbox_test.py`:** a wizard's object cannot call `BarAction`, `RestrainMelee`, `GrantWard`, `InterruptPreparation` or `HoldUntilStruck` on a real creature. **`tests/balance_sim.py`:** section 8.3; `check` compares the class numbers and the spells' Focus costs and durations with the files.
+**`tests/bureaucrat_test.py`** (the driver's test client, in the style of `tests/class_test.py`; the summons is served with the wizard `hidden grant` and the roll left closed).
+- **The class file:** resources and formulas at levels 5 and 10 against section 3's table; skills by level (nothing at 4, Forms at 5, Restraining Order at 6, and so on), the "You have learned..." line, and a character who takes the class at level 8 holding four skills at once.
+- **The summons text:** the exact text of 2.2 with serial, date and name; no forbidden word (class, path, seal, bureaucrat, clerk of the chancery); `read` and `look` as specified; the bound lines.
+- **The door:** the without-summons texts of 2.3 are byte for byte what City Hall printed before the change (capture them once from the unchanged file and store them in the test); `in`, `enter`, `knock`, `open door` print "What?"; with the summons they work; a decliner and a released character get "What?".
+- **The quest, one character, the whole case, in order:** knock, the Registrar's entry line, `quests` shows "Jury Duty" and the progress note; `oath` before a ticket (refused), `take number`, `oath`, the badge, the east door (refused before the badge, open with it); `ask pruett`, `ask tilda` before the order (the interruption), `restrain pruett`, `ask tilda about goose`, `desist tilda` in time and out of time and with no window; `search pigeonholes`, the goose takes the Roll, `take roll` refused, `triplicate goose`, `take roll`; `ask tilda` first and `search table` (the chit), the chit before Tilda has spoken (not found); `submit roll`, `submit chit`, `submit` a stranger item; the verdict `y`, `n`, a wrong line twice; the return, the badge, the fee and experience, the closing lines for all six verdict and exhibit combinations; the offer.
+- **The ending:** `pledge` twice within a minute (the class, the seal, the Chronicle count unchanged, `score`), after a minute, with no offer (What?), below level 5 impossible, with an ordinary advanced class taken meanwhile (the release line and the fee); `decline` twice (the certificate, the door closed for good, the register shows declined, no event); neither (the offer persists across a logout and a restart).
+- **Resuming:** quit at every stage and return; the notes, the roll, the badge and the chit are as left; the goose does not take the Roll twice.
+- **Concurrency:** two jurors in the court at once, each with their own notes.
+- **Cannot be abandoned:** `abandon jury-duty` is refused with the journal's own message.
+- **Leaks:** nothing in the Hall, Maude, Barnaby or any hallmaster answers `ask` about the class's words; `help bureaucrat` as a non-holder; the exits line of City Hall; `search` in City Hall.
+- **Every spell:** Preparation, Recovery and Focus cost at ranks I to V against the tables of section 6; Focus Efficiency; the save outcomes with fixed dice (`SetTestRolls`) for ordinary, above-level, elite and boss targets with the exact lines; each spell's own rules as in the first spec (Forms: the factor and the x2.0 cap; Restraining Order: a rat waits, a ranged action is used, a second enemy is attacked, the lapse on a staff blow and not on a bolt; Cease and Desist: the refusal when nothing is prepared, the cancel, the bar, the Half's push-back; Red Tape: the summon is delayed, the flag not spent; Audit: the lines, the mark consumed by the first order, the out-of-combat search bonus; Application Denied: one charge, rank III two, before the dodge; Per My Last Letter: the stack and its reset; Stamp, Take a Number, Summons (a creature behind a closed door is not summoned; a boss never), Due Process); the repeat window and the flood guard across spells; a sandbox creature cannot be served; nothing is saved.
+- **The trial orders** are separate from the spells: `restrain`, `desist`, `triplicate` in the court cost no Focus and need no skill; outside the court, "What?"; a Bureaucrat in the court gets their own spell.
+**`tests/class_test.py`:** the level-gated skill grant; the trainer's advanced class; the `hidden` requirement kind. **`tests/lint_area.py`:** the new rooms and NPCs (the usual checks), the tag lines of the new items, Check 17 including the whole-word rule. **`tests/sandbox_test.py`:** a wizard's object cannot call `BarAction`, `RestrainMelee`, `GrantWard`, `InterruptPreparation` or `HoldUntilStruck`, or any register method. **`tests/balance_sim.py`:** section 8.3 and 10; `check` compares the class numbers and the spells' Focus costs and durations with the files.
 
 ## 16. Build order
-Each stage is shippable; nothing changes for players before Stage 3.
-1. **Tags and saves Stages 1 to 4** (tags-and-saves.md section 17): tags, reach, wording, the control daemon.
-2. **Engine and framework:** 7.1 (a skill at a level), 7.2 (the trainer), `/std/pledger`, the 7.3 hooks; tests of each with test classes and creatures in fixtures. No content.
-3. **The class, the place and the first spell:** `bureaucrat.cs`, the Chancery, the Registrar, the Staff and Seal, the pledge, Forms in Triplicate, the Overseer-file edits, the hallmaster and clerk topics, `help`. The standard test at level 5.
-4. **The other five launch spells** (Restraining Order, Cease and Desist, Red Tape, Audit, Application Denied) with their engine bits; the simulator's full Bureaucrat table; the numbers of 8.3 settled by the owner.
-5. **Later (not built at launch):** Per My Last Letter, Stamp of Approval, Take a Number, Summons, Due Process, as the owner asks and the simulator allows; the Adventurer parent (2.4).
+Each stage is shippable; nothing changes for players before Stage 5.
+1. **Tags and saves, Stages 1 to 4** (tags-and-saves.md section 17): tags, reach, wording, the control daemon.
+2. **The shared hidden-class engine** (hidden-classes.md section 14, stage 1), and this spec's engine pieces: 7.1 (a skill at a level), 7.2 (the trainer), the 7.3 hooks, 7.7 (`ProgressNote`, `submit`); tests of each with a fixture class and fixture creatures. No content, nothing visible.
+3. **The class, the place and the people, with the roll closed:** `bureaucrat.cs`, the Chancery rooms, the five people, the items, the summons text, the quest, Forms in Triplicate and the trial verbs, the Overseer-file edits (7.5), `help`. The owner plays it through with `hidden grant`; the standard checks of section 10 at levels 5 to 6.
+4. **The other five launch spells** (Restraining Order, Cease and Desist, Red Tape, Audit, Application Denied) with their engine bits; the simulator's full table; the numbers of 8.3 and 10 settled by the owner.
+5. **The roll opens** (hidden-classes.md section 14, stage 3), **not before Stage 4**: the quest shows the class's orders, and a Mage should not be offered a class whose spells are missing.
+6. **Later (not built at launch):** Per My Last Letter, Stamp of Approval, Take a Number, Summons, Due Process, as the owner asks and the simulator allows; the Adventurer parent (2.6).
 
 ## Out of scope / future
-- The other fourteen advanced classes (docs/CLASS_SYSTEM.md section 9): only the shared pieces (`SkillAt`, the trainer, `/std/pledger`, the event report) are built here. The hallmasters' "the rite is not yet open" stays true for them.
-- Subclasses, prestige classes, a second advanced class, un-pledging.
+- The other four hidden classes (hidden-classes.md section 12 is a sketch); the other ten advanced classes of docs/CLASS_SYSTEM.md section 9, and the Hall's open rite, which stays "not yet open" for them.
+- Subclasses, prestige classes, a second advanced class, un-pledging, a second summons.
 - A party system (Stamp of Approval and the queue are written to need none).
 - Allies and pets of a Bureaucrat; a "Notary" prestige path.
 - A guild (the `chancery` guild id is recorded; no guild content).
-- Quest content for the Chancery (a Chronicle-worthy errand, a first Chancery quest: a good later hook is the Assembly and the boundary rolls in City Hall).
+- More Chancery quests (a Chronicle-worthy errand; a good later hook is the Assembly and the boundary rolls in City Hall). Case variety for the same summons: one case only.
 - Rank unlocks beyond level and gold; thematic prices.
-- Effects on players by Chancery creatures; a creature's use of these spells on players (a "Bureaucrat" monster) is not designed.
+- Creatures that use these spells on players (a "Bureaucrat" monster).
 - The Mental Resistance's other users (fear, charm); the tags that would let a spell read a creature's nature.
+- An NPC outside the Chancery who knows of it (a rumour of "a clerk's seal"): an owner-chosen later decision.
