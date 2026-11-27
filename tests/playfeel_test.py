@@ -1425,7 +1425,7 @@ def run_prompt(wiz):
 # ===== the fixes from a real play session: a fresh line after the prompt, the wording of blows, "You dodge a ..." =====
 
 LF_BOW = (("graze", ""), ("shoot", ""), ("shoot", " squarely"), ("shoot", " clean through"))
-LF_BLOW = (("scratch", ""), ("hit", ""), ("hit", " hard"), ("smash", " brutally"))
+LF_BLOW = (("nick", ""), ("cut", ""), ("slash", " deeply"), ("cleave", " to the bone"))   # a sword is slashing: its own ladder (/secure/blows)
 
 
 def lf_tier(share):
@@ -1486,7 +1486,7 @@ def run_logfix(wiz):
         for target, vit in LF_TARGETS:
             wiz.command("clone " + TEST + target)
             a.drain(wiz, 0.3)
-            m = lf_blow(wiz, "kill " + target, r"You (graze|shoot|scratch|hit|smash) a " + target + r"( squarely| clean through| hard| brutally)?\.[^\n]*\(\+(\d+) damage\)")
+            m = lf_blow(wiz, "kill " + target, r"You (graze|shoot|nick|cut|slash|cleave) a " + target + r"( squarely| clean through| deeply| to the bone)?\.[^\n]*\(\+(\d+) damage\)")
             wiz.command("slay " + target)
             a.drain(wiz, 0.3)
             if m is None:
