@@ -600,6 +600,13 @@ def run(root, flt):
             if value is None or value <= 0:
                 report(p, 13, ERROR, f"{call} price {price!r} is not a positive number")
 
+        # Check 17: HidesFromWho (docs/specs/who-and-visibility.md section 5) belongs to armour and is `true` or `false`.
+        for m in re.finditer(r"\bHidesFromWho\s*(=|=>)\s*([^;]*);", src.text):
+            if src.inherit != "/std/armor":
+                report(p, 17, ERROR, "HidesFromWho is set on something that does not inherit /std/armor")
+            if m.group(2).strip() not in ("true", "false"):
+                report(p, 17, ERROR, f"HidesFromWho is {m.group(2).strip()!r}, not true or false")
+
         if is_room:
             short_ok = bool(assignments(src.toks, "ShortDesc"))
             long_found = assignments(src.toks, "LongDesc")

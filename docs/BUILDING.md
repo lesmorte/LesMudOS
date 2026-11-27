@@ -661,6 +661,17 @@ With neither, the category decides, as always. An advanced class, subclass or pr
 
 Applied in the Hollow: the Leather Jerkin (`NotWornBy.Add("mage")`) and the Scholar's Robe (`WornBy.Add("mage")`, `WornBy.Add("priest")`).
 
+### A piece that hides its wearer from `who`
+
+A wearable may keep its wearer off the `who` list of everyone who is not a wizard (docs/specs/who-and-visibility.md section 5): set `HidesFromWho = true;` in `Create()` (it is `false` unless you say so; it is a `protected virtual bool` on `/std/armor`, so a class may also override it).
+
+```csharp
+Slot = "head";
+HidesFromWho = true;
+```
+
+That is **all** it does. The wearer is still in the room's list, still seen by `look`, still hears `tell` from anyone who knows the name, still shown link-dead if their connection drops, and still named when they speak. Wizards see them on `who` marked "(hidden)". The wearer's `score` says "You are keeping out of sight of the who list." and taking the piece off shows them again at once. Give such a piece a price that makes it a choice (the Deep Traveler's Hood, head slot, armour 0, costs 120 gold at Corwin Dray's in Southgate: a helm is cheaper and protects). `tests/lint_area.py` check 17 reports `HidesFromWho` on anything that does not inherit `/std/armor` and any value other than `true` or `false`.
+
 ### A consumable
 
 `eat`, `drink` or `quaff` it. `UseVerb` is `"eat"` or `"drink"`; `HealAmount` is restored; `UseMessage` is shown to the user. The item is used up. Using it is a combat action like any other: its `Recovery` (default 0.5 time units) is part of the time before the user can act again, and a user who is still recovering has it queued for the next Ready Time (`stop` cancels). For anything stranger, override `OnUse(ObjectRef user)`.

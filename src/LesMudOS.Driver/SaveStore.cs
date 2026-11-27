@@ -43,6 +43,21 @@ internal sealed class SaveStore
         File.Move(temp, file, overwrite: true);
     }
 
+    /// <summary>The names (without ".json", lower case as stored) of the files directly in one save directory, in name order. Nothing else is read.</summary>
+    public IReadOnlyList<string> Names(string mudDir)
+    {
+        var dir = _root + mudDir;
+        if (!Directory.Exists(dir)) return Array.Empty<string>();
+        var names = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(dir, "*.json"))
+        {
+            var name = Path.GetFileNameWithoutExtension(file);
+            if (name.Length > 0 && !name.StartsWith('.')) names.Add(name);
+        }
+        names.Sort(StringComparer.Ordinal);
+        return names;
+    }
+
     public bool Restore(MudObject instance, string mudPath)
     {
         var file = FileFor(mudPath);

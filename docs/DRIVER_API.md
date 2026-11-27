@@ -186,6 +186,7 @@ A call-out must be this object's own code, as for `AddAction`: an object cannot 
 |---|---|
 | `bool SaveObject(string path)` | Write this object's `[Saved]` fields to `save/<path>.json`. Throws unless `master.ValidWrite` allows it. |
 | `bool RestoreObject(string path)` | Read them back. False if there is no file. Throws unless `master.ValidRead` allows it. |
+| `IReadOnlyList<string> SaveNames(string dir)` | The names (lower case, without `.json`) of the save files in one directory of the save root (`/players`), in name order; names only. Needs `ValidOperation("save-names")` (arg: dir): the master allows `/secure/roster` for `/players` and nothing else, never restricted code. Behind `all-players`. |
 
 ```csharp
 [Saved] private string title = "the newcomer";

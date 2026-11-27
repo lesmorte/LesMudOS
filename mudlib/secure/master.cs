@@ -14,16 +14,18 @@ public class Master : MudObject, IMaster
     private const string LegacyVault = "/secure/vault";  // the old name of the lost-property save file, read once by the upgrade
     private const string Publish = "/secure/publish";
     private const string PlayerProgram = "/std/player";
+    private const string Roster = "/secure/roster";
 
     public ObjectRef Connect() => CloneObject("/secure/login");
 
     public override void Create() => SetHeartBeat(true); // the workshop invariant, below
 
-    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/crafting", "/secure/comm", "/secure/channels", "/secure/roomids", "/secure/gmcp", Publish, Throttle, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
+    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/crafting", "/secure/comm", "/secure/channels", "/secure/roomids", "/secure/gmcp", Roster, Publish, Throttle, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
 
     // Save files: player bodies own /players/*, the wizard registry owns its own file. Restricted code owns none, and a character in
     // the workshop is never written.
-    public bool ValidRead(string path, ObjectRef caller) => RestrictedCaller() == null && OwnsSaveFile(path, caller);
+    public bool ValidRead(string path, ObjectRef caller)
+        => RestrictedCaller() == null && (OwnsSaveFile(path, caller) || (IsRoster(caller) && path.StartsWith("/players/")));
     public bool ValidWrite(string path, ObjectRef caller)
         => RestrictedCaller() == null && OwnsSaveFile(path, caller) && !(IsPlayerBody(caller) && InWorkshop(caller));
 
@@ -57,6 +59,9 @@ public class Master : MudObject, IMaster
     // Only the registry blueprint counts. A clone of it has no authority.
     private static bool IsWizList(ObjectRef ob) => !ob.IsClone && ob.Domain == "" && ob.ProgramPath == WizList;
 
+    // The roster blueprint (docs/specs/who-and-visibility.md section 4): it may read the player saves into its own few fields (never write them) and list their names.
+    private static bool IsRoster(ObjectRef ob) => !ob.IsClone && ob.Domain == "" && ob.ProgramPath == Roster;
+
     // The publication register blueprint (docs/SANDBOX.md section 4) reads anywhere, and writes and compiles under /domains only.
     private static bool IsPublisher(ObjectRef ob) => !ob.IsClone && ob.Domain == "" && ob.ProgramPath == Publish;
 
@@ -80,6 +85,7 @@ public class Master : MudObject, IMaster
             case "address-tag":
             case "throttle-log":
             case "throttle-setting": return !caller.IsClone && caller.Domain == "" && caller.ProgramPath == Throttle;
+            case "save-names": return IsRoster(caller) && arg == "/players";
             case "get-dir":
                 return IsPlayerBody(caller) || IsClassRegistry(caller, arg) || IsCraftingDaemon(caller, arg) || IsChannelDaemon(caller, arg) || IsPublisher(caller);
             case "read-file": return IsPlayerBody(caller) || IsPublisher(caller);
@@ -318,6 +324,7 @@ public class Master : MudObject, IMaster
         ["/secure/chronicle"] = new() { "YearLength", "DateFor", "DateText", "DateOfTimestamp", "DateCommand" },
         ["/secure/events"] = new() { "PreviewEss", "ClassName", "Describe" },
         ["/secure/ranks"] = new() { "PriceFor" },
+        ["/secure/roster"] = new() { "Visible" }, // answers "visible" to a direct call from sandbox code (docs/specs/who-and-visibility.md section 6)
     };
 
     private static bool ReadOnly(string function)

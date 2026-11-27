@@ -22,6 +22,7 @@ public class SgOutfitterCorwin : Shopkeeper
         AddTopic("ration,rations,food", "Trail rations: biscuit, dried apple, salted meat. Six gold. They'll keep you on your feet for a day.");
         AddTopic("rope,tinderbox,tinder,gear", "Rope for climbing, tinder for fires. Cheap, useful and rarely thought of until you're in the dark.");
         AddTopic("tool,tools,knife,kit,sickle,skinning,bleeding,harvest,gather,gathering", "A skinning knife, a bleeding kit and a harvest sickle, for taking hides, blood and plants. Carry them, don't wield them. Eight, ten and seven gold; the Hollow's prices are a little lower, as usual. {cmd}browse{/}.");
+        AddTopic("hood,hoods,cowl,unseen,hide,hiding,unlisted,lists", "A deep traveler's hood: heavy wool, no use against a blade, and its wearer is left off the lists the criers keep of who is abroad. A hundred and twenty gold, and I do not say who buys one. {cmd}buy hood{/}.");
         AddTopic("village,hollow,vincent", "I've met a few of Vincent's Hollow folk. Good people. Their prices are lower and their shelves emptier.");
         AddEmote("Corwin Dray adjusts his spectacles and checks a ledger.", 8);
         AddEmote("Corwin Dray straightens a row of lanterns that was already straight.", 6);
@@ -33,5 +34,6 @@ public class SgOutfitterCorwin : Shopkeeper
         AddStock("/domains/hollow/obj/craft/skinning_knife", 8);
         AddStock("/domains/hollow/obj/craft/bleeding_kit", 10);
         AddStock("/domains/hollow/obj/craft/harvest_sickle", 7);
+        AddStock("/domains/greenvale/oakenfell/southgate/obj/deep_hood", 120);
     }
 }

@@ -598,9 +598,9 @@ public abstract class Room : MudObject
         {
             // Only those who have found the way know which way it was.
             foreach (var other in AllInventory())
-                if (other != who && Living(other)) TellObject(other, $"{name} leaves {(Found(other, direction) ? direction : "somewhere")}.\n");
+                if (other != who && Living(other) && SeenBy(other, who)) TellObject(other, $"{name} leaves {(Found(other, direction) ? direction : "somewhere")}.\n");
         }
-        else TellRoom(Self, leaving ? $"{name} leaves.\n" : $"{name} leaves {direction}.\n", who);
+        else TellRoomOf(who, leaving ? $"{name} leaves.\n" : $"{name} leaves {direction}.\n");
         try { MoveObject(who, destination); }
         catch (MudRuntimeException refusal)
         {
@@ -612,11 +612,29 @@ public abstract class Room : MudObject
         light.Call("RoomChanged", Self);
         light.Call("RoomChanged", destination);
         var arriving = destination.Call<string>("QueryLightState") == "dark";
-        TellRoom(destination, arriving ? $"{(Interactive(who) ? "Someone" : "Something")} arrives.\n" : $"{who.Call<string>("QueryName") ?? "Someone"} arrives.\n", who);
+        TellRoomOf(who, arriving ? $"{(Interactive(who) ? "Someone" : "Something")} arrives.\n" : $"{who.Call<string>("QueryName") ?? "Someone"} arrives.\n", destination);
         who.Call("Look");
         if (arriving && Interactive(who)) TellObject(who, "{yellow}It is pitch black here. You will want a light.{/}" + (who.Call<string>("QueryUnlitLightHint") ?? "") + "\n");
         WarnIfDangerous(who, destination);
         return true;
+    }
+
+    /// <summary>Can this one in the room see that character (an invisible wizard is not seen by those below their level: docs/specs/who-and-visibility.md)?</summary>
+    private bool SeenBy(ObjectRef viewer, ObjectRef who) => !Interactive(who) || LoadObject("/secure/roster").Call<bool>("Visible", viewer, who);
+
+    /// <summary>A line about a character coming or going, told to the room (default: this one) except those who cannot see the character.</summary>
+    private void TellRoomOf(ObjectRef who, string text, ObjectRef? room = null)
+    {
+        room ??= Self;
+        foreach (var other in AllInventory(room))
+            if (other != who && other.IsAlive && Living(other) && SeenBy(other, who)) TellObject(other, text);
+    }
+
+    /// <summary>A line about what a character does here, told to the others in the room; those who cannot see an invisible wizard read "Someone" for the name.</summary>
+    private void TellDeed(ObjectRef who, string name, string text)
+    {
+        foreach (var other in AllInventory())
+            if (other != who && other.IsAlive && Living(other)) TellObject(other, SeenBy(other, who) ? text : text.Replace(name, "Someone"));
     }
 
     /// <summary>Entering ground whose band starts two or more levels above the character, from ground that did not, earns one line.</summary>
@@ -678,7 +696,7 @@ public abstract class Room : MudObject
                 if (state == "locked") { TellObject(player, $"The {door.Name} {where} is locked.\n"); return true; }
                 if (!daemon.Call<bool>("Open", door.Key)) { TellObject(player, $"The {door.Name} {where} will not open.\n"); return true; }
                 TellObject(player, $"You open the {door.Name} {where}.\n");
-                TellRoom(Self, $"{name} opens the {door.Name} {where}.\n", player);
+                TellDeed(player, name, $"{name} opens the {door.Name} {where}.\n");
                 TellPartner(door, "swings open");
                 player.Call("Disturbed", "open"); // loud: it ends sneaking and wakes the room
                 return true;
@@ -686,7 +704,7 @@ public abstract class Room : MudObject
                 if (state != "open") { TellObject(player, $"The {door.Name} {where} is already closed.\n"); return true; }
                 if (!daemon.Call<bool>("Close", door.Key)) { TellObject(player, $"The {door.Name} {where} will not close.\n"); return true; }
                 TellObject(player, $"You close the {door.Name} {where}.\n");
-                TellRoom(Self, $"{name} closes the {door.Name} {where}.\n", player);
+                TellDeed(player, name, $"{name} closes the {door.Name} {where}.\n");
                 TellPartner(door, "is pushed shut");
                 return true;
             case "unlock":
@@ -695,7 +713,7 @@ public abstract class Room : MudObject
                 if (Present(door.KeyId, player) is not { } unlocking) { TellObject(player, $"You have nothing that fits the lock of the {door.Name} {where}.\n"); return true; }
                 if (!daemon.Call<bool>("Unlock", door.Key)) { TellObject(player, $"The lock of the {door.Name} {where} will not turn.\n"); return true; }
                 TellObject(player, $"You unlock the {door.Name} {where} with {unlocking.Call<string>("Short") ?? "the key"}.\n");
-                TellRoom(Self, $"{name} unlocks the {door.Name} {where}.\n", player);
+                TellDeed(player, name, $"{name} unlocks the {door.Name} {where}.\n");
                 return true;
             default:
                 if (door.KeyId == "") { TellObject(player, $"The {door.Name} {where} has no lock.\n"); return true; }
@@ -704,7 +722,7 @@ public abstract class Room : MudObject
                 if (Present(door.KeyId, player) is not { } locking) { TellObject(player, $"You have nothing that fits the lock of the {door.Name} {where}.\n"); return true; }
                 if (!daemon.Call<bool>("Lock", door.Key)) { TellObject(player, $"The lock of the {door.Name} {where} will not turn.\n"); return true; }
                 TellObject(player, $"You lock the {door.Name} {where} with {locking.Call<string>("Short") ?? "the key"}.\n");
-                TellRoom(Self, $"{name} locks the {door.Name} {where}.\n", player);
+                TellDeed(player, name, $"{name} locks the {door.Name} {where}.\n");
                 return true;
         }
     }
@@ -753,7 +771,7 @@ public abstract class Room : MudObject
             TellObject(who, (ob.Call<string>("QueryFoundLine") is { Length: > 0 } line ? line : "You find something hidden here.") + "\n");
             count++;
         }
-        if (count > 0) TellRoom(Self, $"{who.Call<string>("QueryName") ?? "Someone"} finds something.\n", who);
+        if (count > 0) TellDeed(who, who.Call<string>("QueryName") ?? "Someone", $"{who.Call<string>("QueryName") ?? "Someone"} finds something.\n");
         return count > 0 ? count : empty ? -1 : 0;
     }
 
@@ -848,11 +866,13 @@ public abstract class Room : MudObject
         var floor = new Dictionary<string, (string single, int n)>();
         var sitting = new List<string>();
         var sentences = new List<string>();
+        var roster = LoadObject("/secure/roster");
         foreach (var ob in AllInventory())
         {
             if (ob == viewer) continue;
             var desc = ob.Call<string>("Short");
             if (desc == null) continue;
+            if (Interactive(ob) && !roster.Call<bool>("Visible", viewer, ob)) continue; // an invisible wizard is not in the room for those who cannot see them
             // A find that this viewer has taken from (or found empty) lists itself as a sentence of its own ("A long oilcloth wrapping lies folded open here.").
             if (!Living(ob) && ob.Call<string>("QueryHereLine") is { Length: > 0 } hereLine) { sentences.Add(hereLine); continue; }
             if (!Living(ob) && ob.Call<int>("QueryQuantity") > 0)

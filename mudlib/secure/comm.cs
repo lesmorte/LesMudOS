@@ -55,12 +55,18 @@ public class Comm : MudObject
 
     private static string Esc(string text) => text.Replace("{", "{{");
 
-    /// <summary>Can the viewer see this character? Invisible wizards (if the body says it is invisible) are seen by wizards of at least their level.</summary>
-    private bool CanSee(ObjectRef viewer, ObjectRef who)
+    private const string RosterFile = "/secure/roster";
+
+    /// <summary>Can the viewer see this character? An invisible wizard is seen by wizards of at least their level (/secure/roster holds who is invisible).</summary>
+    private bool CanSee(ObjectRef viewer, ObjectRef who) => viewer == who || LoadObject(RosterFile).Call<bool>("Visible", viewer, who);
+
+    /// <summary>May this viewer address that character by name: they can see them, or the wizard has spoken to them in this session?</summary>
+    private bool CanReach(ObjectRef viewer, ObjectRef who) => CanSee(viewer, who) || LoadObject(RosterFile).Call<bool>("Spoke", who, viewer);
+
+    /// <summary>A wizard speaks to someone: they may answer by name from now on, until the wizard changes their state or either leaves.</summary>
+    private void Spoke(ObjectRef speaker, ObjectRef target)
     {
-        if (viewer == who || !who.Call<bool>("QueryInvisible")) return true;
-        var mine = WizLevel(viewer);
-        return mine >= 1 && mine >= WizLevel(who);
+        if (WizLevel(speaker) >= 1) LoadObject(RosterFile).Call("NoteSpoke", speaker, target);
     }
 
     /// <summary>The name of a character as this viewer sees it: the capitalised name, or "Someone" for a wizard they cannot see.</summary>
@@ -215,7 +221,7 @@ public class Comm : MudObject
         if (name == "" || text == "") return "Usage: {cmd}tell{/} PLAYER MESSAGE\n";
         var target = FindPlayer(name);
         if (target == null && CannotHear(speaker, name, false) is { } deaf) return deaf;
-        if (target == null || !CanSee(speaker, target)) return "No one by that name is in the world.\n";
+        if (target == null || !CanReach(speaker, target)) return "No one by that name is in the world.\n";
         return TellTo(speaker, target, text);
     }
 
@@ -240,6 +246,7 @@ public class Comm : MudObject
         var myName = speaker.Call<string>("QueryName")!;
         if (target == speaker) return "You cannot tell yourself anything.\n";
         var targetName = NameFor(speaker, target);
+        Spoke(speaker, target);
         // A room that blocks tells binds everyone in it, in both directions, but a wizard at either end is not bound.
         if (WizLevel(speaker) < 1 && WizLevel(target) < 1)
         {
@@ -265,7 +272,7 @@ public class Comm : MudObject
     {
         if (name == "") return null;
         var found = FindPlayer(name);
-        return found != null && found != speaker && Environment(found) == Environment(speaker) && CanSee(speaker, found) ? found : null;
+        return found != null && found != speaker && Environment(found) == Environment(speaker) && CanReach(speaker, found) ? found : null;
     }
 
     /// <summary>"whisper message to name", or "whisper name message".</summary>
@@ -307,6 +314,7 @@ public class Comm : MudObject
 
         var myName = speaker.Call<string>("QueryName")!;
         var targetName = NameFor(speaker, target);
+        Spoke(speaker, target);
         TellObject(speaker, $"You whisper to {targetName}: {Esc(text)}\n");
         var ignored = target.Call<bool>("QueryIgnores", myName.ToLowerInvariant());
         if (!ignored) TellObject(target, $"{NameFor(target, speaker)} whispers to you: {Esc(text)}\n");

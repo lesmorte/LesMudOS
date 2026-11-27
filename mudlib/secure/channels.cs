@@ -176,18 +176,22 @@ public class Channels : MudObject
             if (!Belongs(d, user)) continue;
             if (user != speaker && d.CanMute && user.Call<bool>("QueryChannelOff", d.Id)) continue;
             if (user != speaker && user.Call<bool>("QueryIgnores", name.ToLowerInvariant())) continue;
-            TellObject(user, $"[{d.Id}] {Seen(user, speaker)}: {Esc(text)}\n");
-            if (GmcpActive(user)) LoadObject("/secure/gmcp").Call("Channel", user, d.Id, Seen(user, speaker), text); // GMCP: Comm.Channel.Text
+            var shown = Seen(user, speaker, d);
+            TellObject(user, $"[{d.Id}] {shown}: {Esc(text)}\n");
+            if (GmcpActive(user)) LoadObject("/secure/gmcp").Call("Channel", user, d.Id, shown, text); // GMCP: Comm.Channel.Text
         }
         return "";
     }
 
-    private string Seen(ObjectRef viewer, ObjectRef who)
+    /// <summary>
+    /// The speaker's name as this listener reads it. A channel for wizards (member level 1 or more) names its speaker to every member, who are
+    /// all entitled to know it; on a public channel an invisible wizard is "Someone" to those who cannot see them (docs/specs/who-and-visibility.md).
+    /// </summary>
+    private string Seen(ObjectRef viewer, ObjectRef who, Def d)
     {
         var name = who.Call<string>("QueryName") ?? "Someone";
-        if (viewer == who || !who.Call<bool>("QueryInvisible")) return name;
-        var mine = WizLevel(viewer.Call<string>("QueryName") ?? "");
-        return mine >= 1 && mine >= WizLevel(name) ? name : "Someone";
+        if (viewer == who || d.MemberLevel >= 1 || LoadObject("/secure/roster").Call<bool>("Visible", viewer, who)) return name;
+        return "Someone";
     }
 
     // ------------------------------------------------------------------

@@ -910,6 +910,40 @@ public abstract class Adventurer : QuestJournal
         }
     }
 
+    // ---- Visibility (docs/specs/who-and-visibility.md) ----
+
+    /// <summary>True for a wizard who has made themselves invisible (/std/player keeps it). Nothing outside this body can read it: /secure/roster holds the set the others ask.</summary>
+    protected virtual bool WizUnseen() => false;
+
+    /// <summary>
+    /// A line to the others in the room. From an invisible wizard, the ones who cannot see them read the same line with the wizard's name
+    /// replaced by "Someone" (as in the dark); movement, login and logout are not said at all (their own code decides that).
+    /// </summary>
+    protected new void Say(string message)
+    {
+        if (!WizUnseen()) { base.Say(message); return; }
+        var room = Environment();
+        if (room == null) return;
+        var roster = LoadObject("/secure/roster");
+        var unnamed = message.Replace(Name, "Someone");
+        foreach (var other in AllInventory(room))
+            if (other.IsAlive && other != Self && Living(other)) TellObject(other, roster.Call<bool>("Visible", other, Self) ? message : unnamed);
+    }
+
+    /// <summary>A line about this character arriving, leaving or logging in or out: told to the room, and for an invisible wizard only to those who can see them.</summary>
+    protected void SayToSeers(string message)
+    {
+        if (!WizUnseen()) { base.Say(message); return; }
+        var room = Environment();
+        if (room == null) return;
+        var roster = LoadObject("/secure/roster");
+        foreach (var other in AllInventory(room))
+            if (other.IsAlive && other != Self && Living(other) && roster.Call<bool>("Visible", other, Self)) TellObject(other, message);
+    }
+
+    /// <summary>True while a worn item hides its wearer from the who list (an item's `HidesFromWho`). It does nothing else.</summary>
+    public bool QueryHiddenFromWho() => QueryEquipment().Any(item => item.IsAlive && item.Call<bool>("QueryHidesFromWho"));
+
     /// <summary>Bind the gameplay commands, start the heartbeat and bring the carried items back.</summary>
     protected void BeginAdventure()
     {
@@ -943,6 +977,7 @@ public abstract class Adventurer : QuestJournal
         AddAction("read", CmdRead);
         AddAction("score", CmdScore);
         AddAction("sc", CmdScore);
+        AddAction("stats", CmdStats);
         AddAction("vitality", CmdVitality);
         AddAction("hp", CmdVitality); // OBSOLETE name of the command, kept as an alias; help shows vitality
         AddAction("verbose", CmdVerbose);
@@ -2191,7 +2226,7 @@ public abstract class Adventurer : QuestJournal
         text.Append(sheet.Call<string>("Box", (Short() ?? Name).Replace("{{", "{"), renownTitle));
         if (WorkshopNote() is { Length: > 0 } note) text.Append(note.Trim() + "\n"); // in the workshop: nothing here is saved
         var calling = archetypeName == "" ? "No calling yet" : archetypeName;
-        text.Append($"\n{calling}" + (advancedClass != "" || subclass != "" || prestigeClass != "" ? $" • Class {classTitle}" : "") + $" • Level {Level}\n");
+        text.Append($"\n{calling}" + (advancedClass != "" || subclass != "" || prestigeClass != "" ? $" • Class {classTitle}" : "") + $" • Level {Level}" + (WizUnseen() ? " (invisible)" : "") + "\n");
         if (wizard == 0) text.Append(sheet.Call<string>("RankLine", QueryName()));
         text.Append($"\nVitality   {Vitality}/{QueryMaxVitality()}\nEndurance  {QueryEndurance()}/{QueryMaxEndurance()}\nFocus      {QueryFocus()}/{QueryMaxFocus()}\n\n");
         text.Append(sheet.Call<string>("Standing", QueryName(), wizard) + "\n");
@@ -2237,6 +2272,50 @@ public abstract class Adventurer : QuestJournal
             var sneakSkill = LoadObject("/skills/sneak");
             var notice = sneakSkill.Call<int>("QueryNoticeAt", sneakRank);
             text.Append(sheet.Call<string>("Wrap", $"You are sneaking (rank {Skill.Roman(sneakRank)}): each room costs {sneakSkill.Call<int>("QueryRoomCostAt", sneakRank)} Endurance" + (notice != 0 ? $", and creatures notice you {-notice} points less often" : "") + $". ({{cmd}}sneak off{{/}} to stop)"));
+        }
+        if (WizUnseen()) text.Append(sheet.Call<string>("Wrap", "You are invisible: mortals and lower wizards cannot see you. ({cmd}vis{/} to be seen)"));
+        if (QueryHiddenFromWho()) text.Append("You are keeping out of sight of the who list.\n");
+        Write(text.ToString());
+        return true;
+    }
+
+    /// <summary>
+    /// "stats": the numbers of `score` and nothing else, in two columns of label and value, 12 rows and 48 columns at most, plain ASCII
+    /// (docs/specs/who-and-visibility.md section 7). A wizard's own; another object's numbers are `stat THING`.
+    /// </summary>
+    private bool CmdStats(string args)
+    {
+        var derived = QueryStatDisplay().ToDictionary(s => s.name, s => s.value);
+        var cells = new List<(string label, string value)>();
+        foreach (var a in AttributeNames)
+        {
+            var total = QueryAttribute(a);
+            var basis = QueryBaseAttribute(a);
+            cells.Add((AttributeTitle(a), total + (total != basis ? $" ({basis})" : "")));
+        }
+        var attributeRows = (cells.Count + 1) / 2;
+        var power = QueryStat("physical_power");
+        cells.AddRange(new (string, string)[]
+        {
+            ("Vitality", $"{Vitality}/{QueryMaxVitality()}"), ("Damage", $"{QueryDamageMin()}-{QueryDamageMax()}"),
+            ("Endurance", $"{QueryEndurance()}/{QueryMaxEndurance()}"), ("To hit", $"+{QueryAttack()}"),
+            ("Focus", $"{QueryFocus()}/{QueryMaxFocus()}"), ("Defense", QueryDefense().ToString()),
+            ("Armor", QueryArmor().ToString()), ("Dodge", $"{QueryDodge()}%"),
+            ("Block", $"{QueryBlock()}%"), ("Critical", $"{Pct(QueryCrit())}%"),
+            ("Reaction", Num(QueryReaction())), ("Attack Time", $"{Num(QueryTypicalDelay())} s"),
+            ("Mental Res", derived.GetValueOrDefault("Mental Resistance").ToString()), ("Physical Res", derived.GetValueOrDefault("Physical Resistance").ToString()),
+            ("Carry", $"{QueryCarryCapacity()} lb"),
+        });
+        var calling = archetypeName == "" ? "No calling yet" : archetypeName;
+        var text = new StringBuilder();
+        text.Append($"{Name} - {calling}" + (advancedClass != "" || subclass != "" || prestigeClass != "" ? $" - {classTitle}" : "") + $" - Level {Level}" + (WizUnseen() ? " (invisible)" : "") + "\n");
+        for (var i = 0; i < cells.Count; i += 2)
+        {
+            if (i == attributeRows * 2 && QueryAttributePoints() > 0) text.Append($"Points to place: {QueryAttributePoints()} ({{cmd}}improve{{/}} ATTRIBUTE)\n");
+            var left = cells[i];
+            var row = left.label.PadRight(11) + " " + left.value.PadRight(10);
+            if (i + 1 < cells.Count) row += " " + cells[i + 1].label.PadRight(12) + " " + cells[i + 1].value;
+            text.Append(row.TrimEnd() + "\n");
         }
         Write(text.ToString());
         return true;
@@ -2299,7 +2378,8 @@ public abstract class Adventurer : QuestJournal
         ObjectRef destination;
         try
         {
-            var player = Users().FirstOrDefault(u => string.Equals(u.Call<string>("QueryName"), args, StringComparison.OrdinalIgnoreCase));
+            var roster = LoadObject("/secure/roster");
+            var player = Users().FirstOrDefault(u => string.Equals(u.Call<string>("QueryName"), args, StringComparison.OrdinalIgnoreCase) && roster.Call<bool>("Visible", Self, u)); // a wizard you cannot see is not a name here
             var place = player == null ? null : Environment(player);
             destination = place ?? LoadObject(ResolvePath(args));
         }
@@ -2308,9 +2388,9 @@ public abstract class Adventurer : QuestJournal
             Write(Esc(problem.Message) + "\n");
             return true;
         }
-        Say($"{Name} vanishes in a puff of smoke.\n");
+        SayToSeers($"{Name} vanishes in a puff of smoke.\n"); // an invisible wizard is seen to come and go only by those who can see them
         MoveObject(destination);
-        Say($"{Name} appears in a puff of smoke.\n");
+        SayToSeers($"{Name} appears in a puff of smoke.\n");
         Look();
         return true;
     }

@@ -137,10 +137,8 @@ public class Poster : Item
 }
 '''
 TEST_PLAYER_ADDITIONS = '''
-    // test only: raise the level, vanish, become idle
-    private bool vanished;
+    // test only: raise the level, become idle (invisibility is the game's own `invis` and `vis`)
     private bool testIdle;
-    public bool QueryInvisible() => vanished;
 '''
 TEST_IDLE = '''    public bool QueryIdle() => testIdle;
 '''
@@ -152,7 +150,6 @@ def patch_player(mudlib):
     anchor = '        AddAction("channels", a => ToChannels("Listing", ""));'
     assert anchor in src
     actions = ('        AddAction("lv", a => { Level = int.Parse(a); return true; });\n'
-               '        AddAction("vanish", a => { vanished = !vanished; Write(vanished ? "vanished\\n" : "visible\\n"); return true; });\n'
                '        AddAction("idleme", a => { testIdle = !testIdle; Write(testIdle ? "idle\\n" : "active\\n"); return true; });\n')
     src = src.replace(anchor, actions + anchor, 1)
     add = TEST_PLAYER_ADDITIONS
@@ -518,7 +515,7 @@ def run(work, mudlib):
     bob.command("unignore carol")
 
     # ---- invisible wizards ----
-    check("invisible: Mina vanishes", mina.command("vanish"), "vanished")
+    check("invisible: Mina vanishes", mina.command("invis"), "You are invisible")
     check("invisible: a tell to her by a player gets the answer for a name that does not exist", alice.command("tell mina hello"), "No one by that name is in the world.")
     check("invisible: the same as for a nonexistent name", str(alice.command("tell mina hello") == alice.command("tell nobodyatall hello").replace("nobodyatall", "mina")), "True")
     check("invisible: her tell shows her as Someone", mina.command("tell alice you cannot see me"), "You tell Alice: you cannot see me")
@@ -531,7 +528,7 @@ def run(work, mudlib):
     check("invisible: a level 10 wizard may tell her", warden.command("tell mina yes we see you"), "You tell Mina: yes we see you")
     check("invisible: a wizard sees her say as Mina", (mina.command("say i am here"), heard(warden, "i am here"))[1], "Mina says: i am here")
     check("invisible: a player hears Someone say it", heard(alice, "i am here"), "Someone says: i am here", absent=("Mina says",))
-    check("invisible: she is visible again", mina.command("vanish"), "visible")
+    check("invisible: she is visible again", mina.command("vis"), "You are visible again")
     check("invisible: tell works again", alice.command("tell mina welcome back"), "You tell Mina: welcome back")
     heard(mina, "welcome back")
 
