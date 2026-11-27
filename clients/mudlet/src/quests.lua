@@ -5,8 +5,11 @@
 -- every login.
 -- Mudlet functions and objects used: Geyser.Container:new, Geyser.Label:new (:setStyleSheet, :echo, :setClickCallback, :show,
 -- :hide), Geyser.MiniConsole:new (:clear, :cecho, :setFontSize, :enableAutoWrap, :show, :hide), setBorderRight, getMainWindowSize,
--- registerAnonymousEventHandler, killAnonymousEventHandler, tempTimer, cecho; the events gmcp.Char.Quests.List,
+-- registerAnonymousEventHandler, killAnonymousEventHandler, tempTimer, cecho, and for hiding the panel tempAlias, killAlias,
+-- getMudletHomeDir, table.save, table.load (each used only if present, inside pcall); the events gmcp.Char.Quests.List,
 -- gmcp.Char.Quests.Log, gmcp.Char.Status, sysDisconnectionEvent and the table gmcp. Needs gauges.lua (loaded before this file).
+-- The panel can be hidden: click its "Quests" header, or type qpanel. Hidden, it gives its width back to the main window and leaves
+-- a small "Quests" button in the top right corner; click that, or type qpanel again, to bring it back. The choice is remembered.
 -- Written for Lua 5.1.
 
 Hollowmere = Hollowmere or {}
@@ -17,6 +20,7 @@ local Q = H.quests
 
 Q.width = 380            -- the panel, in pixels, taken from the right of the main window
 Q.tabHeight = 24
+Q.buttonWidth = 120      -- the small button left in the corner while the panel is hidden
 Q.rowHeight = 20
 Q.pageSize = 6           -- quests listed at a time in Active (the buttons below page through more)
 Q.waitSeconds = 5        -- after the game says who you are, how long to wait for a journal before saying the game does not send one
@@ -244,7 +248,12 @@ function Q.build()
   ui.box = Geyser.Container:new({ name = "HollowmereQuests", x = windowWidth - width, y = 0, width = width, height = height })
   ui.top = Geyser.Label:new({ name = "HollowmereQuestsTop", x = 0, y = 0, width = "100%", height = Q.tabHeight }, ui.box)
   ui.top:setStyleSheet(tabOn)
-  ui.top:echo("Quests")
+  ui.top:echo("Quests   [click to hide]")
+  ui.top:setClickCallback(function() Q.setHidden(true) end)
+  ui.button = Geyser.Label:new({ name = "HollowmereQuestsButton", x = windowWidth - Q.buttonWidth, y = 0, width = Q.buttonWidth, height = Q.tabHeight })
+  ui.button:setStyleSheet(tabOn)
+  ui.button:setClickCallback(function() Q.setHidden(false) end)
+  ui.button:hide()
   ui.tabs = {}
   for i, state in ipairs(Q.tabs) do
     local label = Geyser.Label:new({ name = "HollowmereQuestsTab_" .. state, x = (i - 1) * (width / 3), y = Q.tabHeight, width = width / 3, height = Q.tabHeight }, ui.box)
@@ -276,7 +285,7 @@ function Q.build()
     if console.enableAutoWrap then pcall(console.enableAutoWrap, console) end
   end
   Q.ui = ui
-  Q.refresh()
+  if Q.loadHidden() then Q.setHidden(true, true) else Q.refresh() end
 end
 
 local function show(widget, on)
@@ -308,6 +317,10 @@ end
 function Q.refresh()
   local ui = Q.ui
   if not ui then return end
+  if Q.hidden then
+    ui.button:echo("Quests (" .. Q.counts().active .. ")")
+    return
+  end
   local tab = Q.data.tab
   for _, state in ipairs(Q.tabs) do
     ui.tabs[state]:setStyleSheet(state == tab and tabOn or tabStyle)
@@ -343,6 +356,60 @@ function Q.refresh()
     ui.summary:cecho(text)
   end
 end
+
+-- ---------- hiding and showing ----------
+
+local function prefsFile()
+  if type(getMudletHomeDir) ~= "function" then return nil end
+  return getMudletHomeDir() .. "/hollowmere_quests.lua"
+end
+
+-- Whether the player left the panel hidden last time. Any trouble reading the file means "shown".
+function Q.loadHidden()
+  local file = prefsFile()
+  if not file or type(table.load) ~= "function" then return false end
+  local prefs = {}
+  local ok = pcall(table.load, file, prefs)
+  return ok and prefs.hidden == true
+end
+
+local function saveHidden(hidden)
+  local file = prefsFile()
+  if not file or type(table.save) ~= "function" then return end
+  pcall(table.save, file, { hidden = hidden })
+end
+
+-- Hide the panel (the main window gets its width back and a small button stays in the corner) or bring it back.
+function Q.setHidden(hidden, quiet)
+  local ui = Q.ui
+  if not ui then return end
+  hidden = hidden and true or false
+  Q.hidden = hidden
+  if hidden then
+    setBorderRight(0)
+    ui.top:hide()
+    for _, state in ipairs(Q.tabs) do ui.tabs[state]:hide() end
+    for _, row in ipairs(ui.rows) do row:hide() end
+    ui.prev:hide()
+    ui.next:hide()
+    ui.pageText:hide()
+    ui.detail:hide()
+    ui.summary:hide()
+    ui.button:show()
+  else
+    setBorderRight(Q.width)
+    ui.button:hide()
+    ui.top:show()
+    for _, state in ipairs(Q.tabs) do ui.tabs[state]:show() end
+  end
+  Q.refresh()
+  if not quiet then
+    saveHidden(hidden)
+    if hidden then say("the quests panel is hidden. Click the Quests button in the top right corner, or type qpanel, to bring it back.") end
+  end
+end
+
+function Q.toggle() Q.setHidden(not Q.hidden) end
 
 function Q.showTab(state)
   if not Q.states[state] then return end
@@ -383,6 +450,12 @@ function Q.install()
     registerAnonymousEventHandler("gmcp.Char.Status", function() Q.onStatus() end),
     registerAnonymousEventHandler("sysDisconnectionEvent", function() Q.onDisconnect() end),
   }
+  if Q.aliasId and type(killAlias) == "function" then pcall(killAlias, Q.aliasId) end
+  Q.aliasId = nil
+  if type(tempAlias) == "function" then
+    local made, id = pcall(tempAlias, "^qpanel$", function() Q.toggle() end)
+    if made then Q.aliasId = id end
+  end
   local ok, err = pcall(Q.build)
   if not ok then say("could not build the quests panel: " .. tostring(err)) end
 end

@@ -39,7 +39,7 @@ local function tab(state) return S.labels["HollowmereQuestsTab_" .. state] end
 
 -- ---------- the panel is built, and waits ----------
 check("the panel is built when the script loads", ui ~= nil and S.labels.HollowmereQuestsTop ~= nil and S.borderRight == Q.width)
-check("it has a Quests tab and three sections", S.labels.HollowmereQuestsTop.text == "Quests" and tab("active").text == "Active (0)" and tab("completed").text == "Completed (0)" and tab("abandoned").text == "Abandoned (0)")
+check("it has a Quests tab and three sections", has(S.labels.HollowmereQuestsTop.text, "Quests") and tab("active").text == "Active (0)" and tab("completed").text == "Completed (0)" and tab("abandoned").text == "Abandoned (0)")
 check("before anything arrives it says it waits", has(summary().text, "Waiting for the game's quest journal."), summary().text)
 check("the handlers are registered for the two packages, the status and a disconnection", (function()
   local n = 0
@@ -192,6 +192,29 @@ Q.reset()
 deliver("Char.Quests.List", { quests = {} })
 S.fire("gmcp.Char.Status")
 check("a game that has sent its journal is never called old", not has(summary().text, "older version"))
+
+-- ---------- hiding and showing the panel ----------
+local button = S.labels.HollowmereQuestsButton
+check("a hide button exists and is not shown while the panel is", button ~= nil and button.visible == false and Q.hidden ~= true)
+check("the header says how to hide", has(S.labels.HollowmereQuestsTop.text, "click to hide"))
+S.labels.HollowmereQuestsTop:press()
+check("clicking the header hides the panel and gives the width back", Q.hidden == true and S.borderRight == 0 and S.labels.HollowmereQuestsTop.visible == false and tab("active").visible == false and detail().visible == false and summary().visible == false and row(1).visible == false)
+check("a small Quests button is left, with the number of active quests", button.visible == true and has(button.text, "Quests (" .. Q.counts().active .. ")"), button.text)
+check("the choice is remembered", (S.files[getMudletHomeDir() .. "/hollowmere_quests.lua"] or {}).hidden == true)
+Q.refresh()
+check("a refresh while hidden shows nothing", tab("active").visible == false and detail().visible == false and summary().visible == false and row(1).visible == false)
+button:press()
+check("clicking the button brings the panel back", Q.hidden == false and S.borderRight == Q.width and button.visible == false and S.labels.HollowmereQuestsTop.visible == true and tab("active").visible == true and (detail().visible or summary().visible))
+check("and that is remembered too", S.files[getMudletHomeDir() .. "/hollowmere_quests.lua"].hidden == false)
+local alias
+for _, a in pairs(S.aliases) do if a.pattern == "^qpanel$" then alias = a end end
+check("typing qpanel toggles it", alias ~= nil and (function() alias.fn() local was = Q.hidden alias.fn() return was == true and Q.hidden == false end)())
+S.files[getMudletHomeDir() .. "/hollowmere_quests.lua"] = { hidden = true }
+Q.ui = nil
+Q.hidden = nil
+Q.build()
+check("a panel left hidden starts hidden next time", Q.hidden == true and S.borderRight == 0 and S.labels.HollowmereQuestsButton.visible == true and S.labels.HollowmereQuestsTop.visible == false)
+Q.setHidden(false)
 
 -- ---------- the package asks for it ----------
 S.sent = {}

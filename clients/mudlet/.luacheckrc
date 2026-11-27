@@ -9,6 +9,7 @@ read_globals = {
   "setRoomCoordinates", "getRoomCoordinates", "getRoomsByPosition", "setRoomEnv",
   "setExit", "setExitStub", "addSpecialExit", "getSpecialExitsSwap", "setDoor", "centerview", "updateMap",
   "getMainWindowSize", "setBorderBottom", "setBorderRight",
+  "getMudletHomeDir", "tempAlias", "killAlias", table = { fields = { "save", "load" } },
 }
 
 -- The stand-in for Mudlet defines Mudlet's functions as globals on purpose.

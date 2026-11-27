@@ -49,6 +49,13 @@ function killAnonymousEventHandler(id) S.handlers[id] = nil return true end
 function getMainWindowSize() return 800, 600 end
 function setBorderBottom(n) S.border = n end
 function setBorderRight(n) S.borderRight = n end
+function getMudletHomeDir() return S.home or "/tmp" end
+S.files = {}
+function table.save(file, t) local copy = {} for k, v in pairs(t) do copy[k] = v end S.files[file] = copy end
+function table.load(file, into) local t = S.files[file] if not t then error("no such file") end for k, v in pairs(t) do into[k] = v end end
+S.aliases = {}
+function tempAlias(pattern, fn) local id = #S.aliases + 1 S.aliases[id] = { pattern = pattern, fn = fn } return id end
+function killAlias(id) S.aliases[id] = nil return true end
 
 -- Geyser: containers and gauges that remember what they were told
 Geyser = { Container = {}, Gauge = {} }

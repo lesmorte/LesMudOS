@@ -15,7 +15,7 @@ from xml.sax.saxutils import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PACKAGE = "Hollowmere"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 # In the order they load: the map needs the layout.
 SCRIPTS = [("layout", "layout.lua"), ("map", "map.lua"), ("gauges", "gauges.lua"), ("quests", "quests.lua")]
 CONFIG = f'''mpackage = "{PACKAGE}"
