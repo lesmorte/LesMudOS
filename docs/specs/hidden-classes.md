@@ -225,6 +225,7 @@ Everything of the archetype is kept: skills, traits, weapons and armour. An adva
 | `mudlib/std/trainer.cs` | `CallingOf` by advanced class (bureaucrat.md 7.2) |
 | `mudlib/std/hiddengiver.cs` (new) | section 7 |
 | `mudlib/events/class.cs` | the new routine event `class.hidden` |
+| `mudlib/std/questjournal.cs` | a virtual `ProgressNote(questId, who)` on the giver, appended under the objectives of an active quest (null by default); the journal has one text per state today and the quest needs one per stage |
 | `web/LesMudOS.Web/publicfilter.json` | `"class.hidden"` in `hiddenEventPrefixes`; `"publicClasses"` list (the fifteen ordinary ids) |
 | `web/LesMudOS.Web/Data/PublicFilter.cs`, `GameData.cs`, `SaveReader.cs` | `PublicClasses`; a hero's class is shown only if listed; `roster.json` reading unchanged |
 | `deploy/setup-website.sh` | the sync writes `"class": ""` for any class not in a list the script reads from `publicfilter.json` (belt and braces: the web layer is the authority, the roster copy should not even hold the id) |
@@ -243,7 +244,7 @@ The `hidden` wizard command (level 10, in `adventurer.cs` beside the others): `h
 - `docs/*.md` other than `docs/specs/` (the specs are public and say so; the owner accepts it).
 A string that begins with a path prefix (`/domains/`, `/std/` ...) is not shown to anyone and is exempt (that is how a City Hall exit can name the Chancery's room).
 
-**ERROR** if a public string contains, case-insensitively and with punctuation ignored, any of: the class id; its `Title` or `ClassName`; its quest id with the hyphen as a space ("jury duty") **unless** the string is in the class's own files; the name of any of its skills; the first line of its `Tagline`. **ERROR** if the `GateKey` equals or contains the class id or title. **ERROR** if `class.hidden` is missing from `hiddenEventPrefixes`, or `class.advanced` is called anywhere in a file under the class's `OwnPaths`. **ERROR** if the class id is in `publicClasses`. **WARN** if a hidden class has no `OwnPaths`, or a file under `OwnPaths` has a topic key (`AddTopic`) that is also a topic key of a Hall hallmaster.
+Matching is by **whole words** (a public string containing "bureaucratic", as two do today in `mudlib/factions/assembly.cs` and the Assembly envoy's topic, must not trip a class whose id is `bureaucrat`). **ERROR** if a public string contains, case-insensitively, with punctuation ignored and on whole words, any of: the class id; its `Title` or `ClassName`; its quest id with the hyphen as a space ("jury duty") **unless** the string is in the class's own files; the name of any of its skills; the first line of its `Tagline`. **ERROR** if the `GateKey` equals or contains the class id or title. **ERROR** if `class.hidden` is missing from `hiddenEventPrefixes`, or `class.advanced` is called anywhere in a file under the class's `OwnPaths`. **ERROR** if the class id is in `publicClasses`. **WARN** if a hidden class has no `OwnPaths`, or a file under `OwnPaths` has a topic key (`AddTopic`) that is also a topic key of a Hall hallmaster.
 
 The check needs no list of hidden names: it finds them in the class files. A fixture directory in `tests/` holds a deliberately leaky class and expects each ERROR.
 
