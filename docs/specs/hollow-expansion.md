@@ -11,7 +11,7 @@ Owner's requests (19 November 2026): "A scout should be able to play as a sniper
 
 ## 1. Archery
 - **Bows are ranged weapons.** When a character wielding a bow starts a fight, the target has to close the distance: its first action is delayed by a further 2 seconds on top of its Reaction Time. This applies to every calling that may wield a bow, once per fight, and not when the creature starts the fight.
-- **Aimed Shot (`aim`)**, a new Scout skill from level 1, bow only: 30 Endurance, Preparation 1.0, Recovery 1.0, +3 to hit, damage x1.75; as the action that starts the fight, damage x2.5. Being hit while preparing it spoils the shot (the Endurance is spent). Ranks follow `docs/specs/skill-ranks.md`: II at level 5 (x2.0 / x3.0), III at level 10 (x2.25 / x3.5).
+- **Aimed Shot (`aim`)**, a new Scout skill from level 1, bow only: 35 Endurance (30 until 26 Nov 2026), Preparation 1.0, Recovery 1.0, +3 to hit, damage x1.75; as the action that starts the fight, damage x2.5. Being hit while preparing it spoils the shot (the Endurance is spent). Ranks follow `docs/specs/skill-ranks.md`: II at level 5 (x2.0 / x3.0), III at level 10 (x2.25 / x3.5).
 - **Precision Strike** stays as it is and works with any weapon, so the Scout has a melee line and an archery line. The Evasion and Tracking features are unchanged.
 - **Ammunition:** none. Arrows are not tracked.
 - **Shooting into the next room** (true sniping) is left for later: it needs line of sight, a rule for creatures that come after you, and protection for players in safe rooms.

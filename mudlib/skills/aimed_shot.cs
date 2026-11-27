@@ -1,14 +1,14 @@
 // @inherit /std/skill
 
 /// <summary>
-/// Scout skill (docs/specs/hollow-expansion.md section 1). A bow shot taken with care: 30 Endurance, a wind-up of 2 seconds and 2 seconds of
+/// Scout skill (docs/specs/hollow-expansion.md section 1). A bow shot taken with care: 35 Endurance (the owner raised it from 30 on 26 Nov 2026), a wind-up of 2 seconds and 2 seconds of
 /// recovery, +3 to hit and 1.75 times the weapon's damage; as the action that starts the fight, 2.5 times. Being hit while the shot is
 /// being aimed spoils it, and the Endurance stays spent. It needs a bow in the hands, a target, and a target that is not already fighting
 /// someone else (it is the shot of the one who chooses the fight).
 ///
 /// Ranks (the table's x2.0 / x3.0 and x2.25 / x3.5; IV and V continue by +0.25 and +0.5 a rank, and the engine goes no further because
 /// no price exists for a rank VI): factor 1.75 / 2.0 / 2.25 / 2.5 / 2.75, as opener 2.5 / 3.0 / 3.5 / 4.0 / 4.5. The Endurance cost
-/// follows the default step (30, 35, 41, 47, 53). The to-hit bonus is +3 at every rank.
+/// follows the default step (35, 40, 46, 53, 61). The to-hit bonus is +3 at every rank.
 /// </summary>
 public class AimedShotSkill : Skill
 {
@@ -17,7 +17,7 @@ public class AimedShotSkill : Skill
         Title = "Aimed Shot";
         Command = "aim";
         Summary = "A shot at +3 to hit for 1.75 times the bow's damage, 2.5 times as the shot that starts the fight. The opener never takes more than part of the target's full Vitality unless you are three levels above it. A blow that lands while you aim spoils it. Needs a bow; not at one that is fighting someone else.";
-        EnduranceCost = 30;
+        EnduranceCost = 35;
         Preparation = 1.0;
         Recovery = 1.0;
         WindUp = "draws a long breath and takes aim";

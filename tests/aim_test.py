@@ -479,7 +479,7 @@ def step_aim(chief):
     s.command("wield evenbow")
     s.command("verbose on")
     to(s, "arena")
-    check("a Scout has Aimed Shot from level 1, with its numbers", skill_line(s, "(Aimed Shot)"), "aim", "(Aimed Shot)", "[30 Endurance", "wind-up 2.0 s",
+    check("a Scout has Aimed Shot from level 1, with its numbers", skill_line(s, "(Aimed Shot)"), "aim", "(Aimed Shot)", "[35 Endurance", "wind-up 2.0 s",
           "+3 to hit", "1.75 times the bow's damage", "2.5 times as the shot that starts the fight", "(rank II at level 5)")
     check("the Precision Strike line is as it was", skill_line(s, "Precision Strike"), "+4 to hit with a 15% chance", "[25 Endurance")
     # Rank I numbers: even bow 10 (Might 5 at level 1: no bonus). Mid-fight 1.75 -> 18 (a critical 27); the opener 2.5 -> 25 (a critical 38).
@@ -561,7 +561,7 @@ def step_aim(chief):
     s.command("agold 40")
     out = s.command("train aim")
     check("Aimed Shot II bought on level and gold alone", out, "You pay Wenna Farrow 40 gold.", "Aimed Shot II", "It answers to aim")
-    check("the skills line at rank II", skill_line(s, "(Aimed Shot II)"), "[35 Endurance", "2 times the bow's damage", "3 times as the shot that starts the fight", "(rank III at level 10)")
+    check("the skills line at rank II", skill_line(s, "(Aimed Shot II)"), "[40 Endurance", "2 times the bow's damage", "3 times as the shot that starts the fight", "(rank III at level 10)")
     check("Wenna no longer says the lesson is not ready", s.command("ask wenna about aimed shot"), "aimed shot", absent=("not ready", "Ask me again soon"))
     check("Wenna says what the opener and the spoiling are", s.command("ask wenna about aim"), "two and a half times", "spoils it")
     check("Wenna on the opening: only for the one who chooses the fight", s.command("ask wenna about opening"), "two seconds more", "chooses the fight")
@@ -585,7 +585,7 @@ def step_aim(chief):
     out = s.command("ranks")
     check("Veyla lists Aimed Shot III", out, "Veyla teaches", "Aimed Shot III", "150 gold")
     check("Aimed Shot III bought", s.command("train aim"), "Aimed Shot III")
-    check("the skills line at rank III", skill_line(s, "(Aimed Shot III)"), "[39 Endurance", "2.25 times the bow's damage", "3.5 times as the shot that starts the fight", "(rank IV at level 15)")
+    check("the skills line at rank III", skill_line(s, "(Aimed Shot III)"), "[46 Endurance", "2.25 times the bow's damage", "3.5 times as the shot that starts the fight", "(rank IV at level 15)")
     check("Veyla's words mention the aimed shot", s.command("ask veyla about ranks"), "aimed shot")
     s.command("quit")
     # Numbers by rank, the helper's, through the data the simulator holds.

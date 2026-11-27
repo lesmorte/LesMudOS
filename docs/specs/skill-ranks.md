@@ -135,3 +135,10 @@ Owner: "slow cap to aimed shot". When an Aimed Shot is the action that starts a 
 - It applies only to this opener (hidden or not, the engine knows no difference: the x2.5 shot at the start of a fight). Not to an ordinary Aimed Shot (x1.75, a shot at a second creature in a fight), not to Precision Strike's ambush, not to any other attack.
 - When the cap really lowers the damage the shooter is told so ("The shot is true, but the creature twists away at the last moment and takes only part of it."); verbose damage shows the damage dealt.
 - Built in `Skill.QueryOpenerCapPercent` (0: no cap) overridden by `AimedShotSkill`, applied in `Living.Attack`; tests in `tests/aim_test.py`.
+
+## Aimed Shot: 35 Endurance (Owner's decision, 26 Nov 2026)
+
+Aimed Shot costs 35 Endurance at rank I (it was 30), and by the default step 40 / 46 / 53 / 61 at ranks II to V. The reason: the archer Scout
+wins the standard test about ten points more often than the other callings, the lead is Aimed Shot itself, and neither the opener's cap nor
+light and darkness brings it down (docs/BALANCE_SCOUT.md, docs/BALANCE_LIGHT.md). The measurements there tried 40, 45 and 50; the owner chose
+a smaller step, 35, to be played before going further.

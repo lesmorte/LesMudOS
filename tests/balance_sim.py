@@ -92,7 +92,7 @@ SKILL_RANKS = {
     "tracking": dict(base=dict(endurance=5, range=1), rows={2: dict(range=2)}, max=2),
     # Aimed Shot (docs/specs/hollow-expansion.md section 1): x1.75 / 2.0 / 2.25 (IV 2.5, V 2.75 by +0.25) and, as the shot that starts the fight,
     # x2.5 / 3.0 / 3.5 (IV 4.0, V 4.5 by +0.5). Costs by the default step. The to-hit bonus is +3 at every rank. Rank VI is not offered.
-    "aimed_shot": dict(base=dict(endurance=30, tohit=3, factor=1.75, opener=2.5),
+    "aimed_shot": dict(base=dict(endurance=35, tohit=3, factor=1.75, opener=2.5),
                        rows={2: dict(factor=2.0, opener=3.0), 3: dict(factor=2.25, opener=3.5), 4: dict(factor=2.5, opener=4.0), 5: dict(factor=2.75, opener=4.5)},
                        max=5, fixed={"tohit"}),
 }
