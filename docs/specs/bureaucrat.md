@@ -4,6 +4,13 @@ Owner's idea (27 November 2026): "a funny class 'Bureaucrat', it would be a cast
 
 This is built on [tags-and-saves.md](tags-and-saves.md): it needs the `melee` and `ranged` tags (Part A) and the saving-throw rule (Part B: "above the law" for bosses, "ignores your authority" for higher level). Every number is a starting value for `tests/balance_sim.py` and play-testing; nothing here has been run in the game. "Today" means the files in the repository on 27 November 2026.
 
+
+> **Owner's decisions, 27 Nov 2026 (after this spec was written; they override what follows where they differ):**
+> 1. **This is a HIDDEN class.** It has no obvious trainer or pledger: nothing in the Hall of Legends, no banner, no hallmaster's remark and no help page points to it, and the website never lists it. It is found. How it is found is not yet designed: decision 4 (the Chancery behind City Hall's inner door, with a Registrar who offers the pledge) and decision 5 must be reworked before this is built.
+> 2. **Each path gets one hidden class.** The Bureaucrat is the Mage's. The other four are not designed.
+> 3. **The Overseer is not this class's fight** ("A bureaucrat probably isn't fighting the Overseer anyway"): the class starts at level 5 in Oakenfell, so the standard Overseer test is not its balance yardstick. A yardstick for levels 5 to 10 is needed before the spells are tuned.
+> 4. Tags and saves (docs/specs/tags-and-saves.md) are being built first.
+
 ## Decisions for the owner
 Each has a recommendation and the alternative. The spec is written as if you accept every recommendation.
 
