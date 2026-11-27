@@ -30,6 +30,7 @@ public class CmForestPanther : Monster
         Ids.Add("forest panther");
         Ids.Add("cat");
         ShortDesc = "a forest panther";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("claw");
         LongDesc = "A black panther, sleek and silent, lies along a ledge above the path with its tail twitching slowly. Its golden eyes do not blink and its shoulders flex with the promise of a spring. It looks like a piece of the night that has decided to hunt.";
         Level = 10;
         MaxVitality = 120;

@@ -21,6 +21,7 @@ public class CmGoblinScout : Monster
         Ids.Add("scout");
         Ids.Add("goblin scout");
         ShortDesc = "a goblin scout";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("dagger");
         LongDesc = "A thin, grey-green goblin crouches in a cloak of leaves, a bent dagger in one hand and a string of bird skulls at his belt. His large ears twitch at every sound and his eyes dart from tree to tree. He is plainly counting how many of you there are, and how far it is to cover.";
         Level = 7;
         MaxVitality = 80;

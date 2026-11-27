@@ -30,6 +30,7 @@ public class CmThornWoodling : Monster
         Ids.Add("thorn woodling");
         Ids.Add("tree");
         ShortDesc = "a thorn woodling";
+        Tags.Add("plant"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("lash");
         LongDesc = "A figure of knotted wood and thorny vine, roughly the height of a man, stands among the saplings so still that you do not notice the pale green light in its hollow eyes until you are close. Its branches are hung with red berries that are not berries. Thorns as long as daggers jut from its arms.";
         Level = 9;
         MaxVitality = 53;
@@ -41,7 +42,7 @@ public class CmThornWoodling : Monster
         Aggressive = false;
         BaseReaction = 4;
         AddCombatAction("lash", "Branch Lash", preparation: 0, recovery: 1.5);
-        AddCombatAction("thorns", "Thorn Barrage", preparation: 0.5, recovery: 1.5, windUp: "draws its branches taut, thorns bristling", strike: "whips its barbed branches across the path!");
+        AddCombatAction("thorns", "Thorn Barrage", preparation: 0.5, recovery: 1.5, windUp: "draws its branches taut, thorns bristling", strike: "whips its barbed branches across the path!", reach: "ranged", damage: "piercing", tagKind: "thorns");
     }
 
     /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>

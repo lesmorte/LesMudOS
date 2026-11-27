@@ -13,6 +13,7 @@ public class WoodcutterAxe : Weapon
         ReactionMod = 1.0;
         Recovery = 1.5;
         Category = "axe";
+        Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("axe"); Tags.Add("iron");
         Value = 18;
     }
 }

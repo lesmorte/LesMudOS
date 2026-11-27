@@ -14,6 +14,7 @@ public class LeatherCap : Armor
         Slot = "head";
         ReactionMod = 0.0;
         Category = "light";
+        Tags.Add("light"); Tags.Add("leather");
         Value = 25;
     }
 }

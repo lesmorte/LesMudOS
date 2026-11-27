@@ -30,8 +30,22 @@ public class Armor : Item
     /// <summary>The access category: "shield" and "trinket" by slot, otherwise light, medium or heavy.</summary>
     public string QueryCategory() => Slot == "shield" || Slot == "trinket" ? Slot : Category;
 
+    protected override string TagCarrier() => "armour";
+
+    private static readonly string[] ArmourTypes = { "light", "medium", "heavy", "shield", "trinket" };
+
+    /// <summary>A piece whose file states no armour tag has its access category as its tag.</summary>
+    protected override void CollectTags(List<string> tags)
+    {
+        var category = QueryCategory();
+        if (category != "" && !tags.Any(t => ArmourTypes.Contains(t))) tags.Add(category);
+    }
+
+    /// <summary>" (leather)" for a piece with a material, else "".</summary>
+    private string MaterialWords() => QueryTagIn("material") is { Length: > 0 } m ? $" ({m})" : "";
+
     public override string Appraisal() =>
-        $"{Cap(Short() ?? Name)}: {(QueryCategory() == "" ? "armor" : QueryCategory() + (Slot == "shield" || Slot == "trinket" ? "" : " armor"))}, slot {Slot}. Armor {ArmorValue}, max Vitality +{MaxVitalityBonus}, reaction modifier {Num(ReactionMod)}. Worth {QueryValue()} gold." + AppraisalQuality() +
+        $"{Cap(Short() ?? Name)}: {(QueryCategory() == "" ? "armor" : QueryCategory() + (Slot == "shield" || Slot == "trinket" ? "" : " armor") + MaterialWords())}, slot {Slot}. Armor {ArmorValue}, max Vitality +{MaxVitalityBonus}, reaction modifier {Num(ReactionMod)}. Worth {QueryValue()} gold." + AppraisalQuality() +
         (Magic != "" ? $" Magical property: {Magic}." : " It holds no magic.") +
         (CarryBonus != 0 ? $" Carry capacity +{CarryBonus} (no effect yet: nothing limits what you carry)." : "") + "\n";
 

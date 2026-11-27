@@ -14,6 +14,7 @@ public class LargeRat : Monster
         Name = "Large Rat";
         Ids.Add("rat");
         ShortDesc = "a large rat";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A rat the size of a small cat, with matted fur, yellow teeth and a long scabby tail. It watches you with red, hungry eyes.";
         BaseReaction = 2.0;
         AddCombatAction("bite", "Bite", preparation: 0, recovery: 0.5);

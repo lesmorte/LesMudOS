@@ -13,6 +13,7 @@ public class YewLongbow : Weapon
         ShortDesc = "a yew longbow";
         LongDesc = "A tall bow of seasoned yew, heartwood on the inside of the stave and sapwood on the outside, waxed dark by use. It draws harder than a hunting bow, and Wenna Farrow strings every one herself.";
         Category = "bow";
+        Tags.Add("ranged"); Tags.Add("piercing"); Tags.Add("bow"); Tags.Add("wood");
         DamageMin = 11;
         DamageMax = 16;
         ToHit = 1;

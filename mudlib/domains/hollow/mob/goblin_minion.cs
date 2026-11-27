@@ -15,6 +15,7 @@ public class GoblinMinion : Monster
         Ids.Add("minion");
         Ids.Add("goblin");
         ShortDesc = "a goblin minion";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("dagger");
         LongDesc = "A scrawny, wide-eyed goblin in a scrap of armor, clutching a notched blade and plainly more afraid of its master than of you.";
         BaseReaction = 2.5;
         AddCombatAction("stab", "Stab", preparation: 0, recovery: 0.5);

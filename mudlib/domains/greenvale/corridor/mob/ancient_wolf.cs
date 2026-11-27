@@ -27,6 +27,7 @@ public class CmAncientWolf : Monster
         Ids.Add("wolf");
         Ids.Add("ancient wolf");
         ShortDesc = "an ancient wolf";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A huge wolf, grey to the point of white about the muzzle, lies in its dell as though the hollow had been shaped around it. One ear is gone and an old scar runs the length of its flank. It lifts its great head and meets your eyes as if it had been expecting you.";
         Level = 9;
         MaxVitality = 69;

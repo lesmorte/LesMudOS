@@ -30,6 +30,7 @@ public class CmRogueBandit : Monster
         Ids.Add("rogue");
         Ids.Add("rogue bandit");
         ShortDesc = "a rogue bandit";
+        Tags.Add("human"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword");
         LongDesc = "A broad man in mismatched leather, his face half hidden by a scarf and his sword hand scarred, who has plainly been cast out by every band he ever joined. He fights as he lives: for himself, and dirty. A cudgel hangs at one hip beside the sword.";
         Level = 8;
         MaxVitality = 60;
@@ -43,7 +44,7 @@ public class CmRogueBandit : Monster
         Aggressive = true;
         BaseReaction = 3;
         AddCombatAction("slash", "Slash", preparation: 0, recovery: 1);
-        AddCombatAction("pommel", "Pommel Strike", preparation: 0, recovery: 1.5);
+        AddCombatAction("pommel", "Pommel Strike", preparation: 0, recovery: 1.5, reach: "melee", damage: "blunt", tagKind: "club");
         FindAction("pommel")!.DamageFactor = 0.5;
         AddLoot("/domains/hollow/obj/rusty_sword", 15);
         AddLoot("/domains/hollow/obj/healing_potion", 5);

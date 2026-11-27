@@ -14,6 +14,7 @@ public class TrainingSpear : Weapon
         Recovery = 1.0;
         ToHit = 1;
         Category = "spear";
+        Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("spear"); Tags.Add("wood");
         Value = 8;
     }
 }

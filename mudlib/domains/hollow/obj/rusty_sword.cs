@@ -13,6 +13,7 @@ public class RustySword : Weapon
         ReactionMod = 0.5;
         Recovery = 1.0;
         Category = "sword";
+        Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword"); Tags.Add("iron");
         Value = 10;
     }
 }

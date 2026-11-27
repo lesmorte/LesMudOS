@@ -13,6 +13,7 @@ public class CaptainsSabre : Weapon
         ShortDesc = "a captain's sabre";
         LongDesc = "A curved sabre with a brass guard worn smooth by a long-dead hand. Somebody once carried it at the head of a company, and the edge still has the memory of a drill ground in it.";
         Category = "sword";
+        Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword"); Tags.Add("steel");
         DamageMin = 14;
         DamageMax = 20;
         ReactionMod = 1.0;

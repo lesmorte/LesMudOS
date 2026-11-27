@@ -428,7 +428,8 @@ public class Item : Thing
     {
         var note = QualityNote();
         var calling = QueryCallingNote();
-        return base.Long() + (note == "" ? "" : note + "\n") + (calling == "" ? "" : calling + "\n");
+        var tags = TagSentence();
+        return base.Long() + (note == "" ? "" : note + "\n") + (tags == "" ? "" : tags + "\n") + (calling == "" ? "" : calling + "\n");
     }
 
     /// <summary>Skills this item grants while it is equipped (ids in /skills). None by default; a builder overrides it.</summary>

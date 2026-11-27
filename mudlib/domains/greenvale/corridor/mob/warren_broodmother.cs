@@ -33,6 +33,7 @@ public class CmWarrenBroodmother : Monster
         Ids.Add("warren broodmother");
         Ids.Add("mother");
         ShortDesc = "the Warren Broodmother";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A swollen, pale creature the size of a cart squats in the heart of the warren, its many-jointed legs folded beneath a bloated body. Its jaws drip a greasy fluid, and the walls around it are thick with webbing and egg sacs. It lifts its head to the sound of your steps with a slow, wet hiss.";
         Level = 10;
         MaxVitality = 80;
@@ -46,7 +47,7 @@ public class CmWarrenBroodmother : Monster
         DeathMessage = "The Warren Broodmother shudders, curls her legs inward, and goes still.";
         BaseReaction = 4;
         AddCombatAction("fang", "Venom Fang", preparation: 0, recovery: 1);
-        AddCombatAction("spit", "Webbed Spit", preparation: 0.5, recovery: 1.5, windUp: "rears up, mandibles clicking");
+        AddCombatAction("spit", "Webbed Spit", preparation: 0.5, recovery: 1.5, windUp: "rears up, mandibles clicking", reach: "ranged", damage: "blunt", tagKind: "spit");
         FindAction("spit")!.DamageFactor = 0.75;
         AddCombatAction("brood", "Call the Brood", preparation: 0.5, recovery: 1, windUp: "scrapes at the egg sacs with a foreleg", kind: "summon");
     }

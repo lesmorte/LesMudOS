@@ -14,6 +14,7 @@ public class GoblinWarSpear : Weapon
         ShortDesc = "a goblin war-spear";
         LongDesc = "A heavy spear of black ash, its leaf-shaped head hammered out of a human sword and riveted to the shaft. Crude crow feathers are tied under the head. It is ugly, and it is well balanced, and that is the worst thing about it.";
         Category = "spear";
+        Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("spear"); Tags.Add("wood");
         DamageMin = 13;
         DamageMax = 18;
         ToHit = 1;

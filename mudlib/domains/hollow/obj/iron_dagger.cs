@@ -14,6 +14,7 @@ public class IronDagger : Weapon
         Recovery = 0.5;
         ToHit = 1;
         Category = "dagger";
+        Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("dagger"); Tags.Add("iron");
         Value = 6;
     }
 }

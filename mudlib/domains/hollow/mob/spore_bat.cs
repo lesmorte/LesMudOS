@@ -14,6 +14,7 @@ public class SporeBat : Monster
         Name = "Spore Bat";
         Ids.Add("bat");
         ShortDesc = "a spore bat";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A bat with leathery wings the colour of old mould and a glowing blue dust clinging to its fur. It flits in and out of the light, so that you are never quite sure where its next bite will come from.";
         BaseReaction = 1.5;
         AddCombatAction("swoop", "Swoop", preparation: 0, recovery: 0.5);

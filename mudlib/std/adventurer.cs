@@ -1246,7 +1246,7 @@ public abstract class Adventurer : QuestJournal
         var skill = LoadObject("/skills/sneak");
         var adjust = skill.Call<int>("QueryNoticeAt", Math.Max(1, QuerySkillRank("sneak")));
         var lightAdjust = Environment() is { } here ? LoadObject("/secure/light").Call<int>("NoticeAdjust", here, Self, creature) : 0;
-        var chance = daemon.Call<int>("NoticeChance", QueryAttribute("grace"), Level, creature.Call<int>("QueryLevel"), creature.Call<bool>("QueryAlert"), adjust, lightAdjust);
+        var chance = daemon.Call<int>("NoticeChance", QueryAttribute("grace"), Level, creature.Call<int>("QueryLevel"), creature.Call<bool>("HasTag", "alert"), adjust, lightAdjust);
         return daemon.Call<bool>("Notices", chance, half);
     }
 
@@ -1274,7 +1274,7 @@ public abstract class Adventurer : QuestJournal
         if (!sneaking) return -1;
         SyncSneakRoom();
         if (spotters.Contains(creature)) return 1;
-        if (creature.Call<bool>("QueryBoss") || NoticeRoll(creature, false)) { Spotted(creature); return 1; }
+        if (creature.Call<bool>("HasTag", "boss") || NoticeRoll(creature, false)) { Spotted(creature); return 1; }
         if (!unaware.Contains(creature)) unaware.Add(creature);
         ArmSneakBeat();
         CallOut(() => { if (!Dead && unaware.Contains(creature)) Tell($"{Cap(creature.Call<string>("QueryLabel") ?? "it")} has not noticed you.\n"); }, 0);

@@ -16,6 +16,7 @@ public class GuildHelm : Armor
         Slot = "head";
         ReactionMod = 0.0;
         Category = "light";
+        Tags.Add("light"); Tags.Add("iron");
         Value = 15;
     }
 }

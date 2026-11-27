@@ -20,6 +20,7 @@ public class CmGreyFox : Monster
         Ids.Add("fox");
         Ids.Add("grey fox");
         ShortDesc = "a grey fox";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A lean grey fox with a rust-coloured throat and a black-tipped brush slips along the hedgerow. Its narrow yellow eyes follow every movement and its feet barely trouble the grass. It darts and snaps rather than standing to fight.";
         Level = 4;
         MaxVitality = 26;

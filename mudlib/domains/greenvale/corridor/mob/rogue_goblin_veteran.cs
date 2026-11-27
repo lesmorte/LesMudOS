@@ -30,6 +30,7 @@ public class CmRogueGoblinVeteran : Monster
         Ids.Add("veteran");
         Ids.Add("rogue goblin veteran");
         ShortDesc = "a rogue goblin veteran";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("mace");
         LongDesc = "A scarred, gap-toothed goblin in a patchwork of looted plate swings a heavy flanged mace with the ease of long practice. Dozens of notches on the haft count his kills. He has outlived every warband that ever employed him.";
         Level = 9;
         MaxVitality = 53;
@@ -42,7 +43,7 @@ public class CmRogueGoblinVeteran : Monster
         GoldMax = 16;
         Aggressive = true;
         BaseReaction = 3.5;
-        AddCombatAction("slash", "Slash", preparation: 0, recovery: 1);
+        AddCombatAction("slash", "Mace Blow", preparation: 0, recovery: 1);
         AddCombatAction("daze", "Dazing Blow", preparation: 0, recovery: 1.5);
         FindAction("daze")!.DamageFactor = 0.75;
         AddLoot("/domains/hollow/obj/healing_potion", 7);

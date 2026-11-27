@@ -25,6 +25,7 @@ public class CmBoarBrute : Monster
         Ids.Add("brute");
         Ids.Add("boar brute");
         ShortDesc = "a boar brute";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("gore");
         LongDesc = "A boar of monstrous size, its back scarred by old spear wounds and its tusks as long as a man's forearm, snorts in the shade. The ground shivers a little when it shifts its weight. The musk that clings to it is thick enough to taste.";
         Level = 7;
         MaxVitality = 45;
@@ -36,7 +37,7 @@ public class CmBoarBrute : Monster
         Aggressive = false;
         BaseReaction = 4.5;
         AddCombatAction("gore", "Gore", preparation: 0, recovery: 1.5);
-        AddCombatAction("trample", "Trample", preparation: 1, recovery: 2, windUp: "rears its great head and stamps the ground", damageMultiplier: 2, strike: "thunders down on its victim!");
+        AddCombatAction("trample", "Trample", preparation: 1, recovery: 2, windUp: "rears its great head and stamps the ground", damageMultiplier: 2, strike: "thunders down on its victim!", reach: "melee", damage: "blunt", tagKind: "slam");
     }
 
     /// <summary>The once-only triggers first (by Vitality), then the opening actions, then the cycle, round and round.</summary>

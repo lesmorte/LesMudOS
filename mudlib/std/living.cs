@@ -36,6 +36,12 @@ public class CombatAction
     public int CritChance = -1;
     /// <summary>Multiplier on the damage roll as a fraction (Shield Bash does 0.5). Applied after the integer multiplier.</summary>
     public double DamageFactor = 1.0;
+    /// <summary>The reach tag of an attack action ("melee", "ranged", "thrown"); empty means the attacker's own (the wielded weapon's, else the creature's). docs/specs/tags-and-saves.md.</summary>
+    public string Reach = "";
+    /// <summary>The damage type of an attack action ("blunt", "slashing", "piercing"); empty means the attacker's own.</summary>
+    public string Damage = "";
+    /// <summary>The kind tag of an attack action ("bite", "club", "slam", ...: the wording and the weapon word it stands for); empty means the attacker's own.</summary>
+    public string TagKind = "";
     /// <summary>The skill or spell file behind this action, if any. Its OnHit, OnMiss and Resolve are called.</summary>
     public ObjectRef? Skill;
     /// <summary>The consumable of a "use" action.</summary>
@@ -76,13 +82,6 @@ public abstract class Living : Thing
 {
     private const int ForgetMs = 30000; // an enemy that stays out of the room this long is forgotten
     private const int UnitMs = 2000; // one time unit of the brief is 2 seconds
-    private static readonly string[] HitYou = { "scratch", "hit", "hit", "smash" };
-    private static readonly string[] HitThem = { "scratches", "hits", "hits", "smashes" };
-    private static readonly string[] HitHow = { "", "", " hard", " brutally" };
-    // A bow does not smash: its own words, by the same four tiers of damage.
-    private static readonly string[] ShotYou = { "graze", "shoot", "shoot", "shoot" };
-    private static readonly string[] ShotThem = { "grazes", "shoots", "shoots", "shoots" };
-    private static readonly string[] ShotHow = { "", "", " squarely", " clean through" };
 
     [Saved] protected int Level = 1;
     protected int MaxVitality = 10;
@@ -270,6 +269,33 @@ public abstract class Living : Thing
     /// <summary>The category of the wielded weapon ("sword"), or "" when unarmed.</summary>
     public string QueryWeaponCategory() => QueryEquipped("weapon") is { } w ? w.Call<string>("QueryCategory") ?? "" : "";
 
+    // ---- What an attack is: reach, damage type and kind (docs/specs/tags-and-saves.md sections 4 and 7) ----
+    // The wielded weapon's tag if it has one, else the creature's own (a creature's tags describe its basic attack). A player's own tags are
+    // empty, so an unarmed player has none and the readers below answer with their defaults.
+
+    private string AttackTag(string family)
+    {
+        if (QueryEquipped("weapon") is { } w && w.Call<string>("QueryTagIn", family) is { Length: > 0 } fromWeapon) return fromWeapon;
+        return QueryTagIn(family);
+    }
+
+    /// <summary>"melee", "ranged" or "thrown": the wielded weapon's reach, else the creature's own; "melee" for anything without one (a player's fists).</summary>
+    public string QueryAttackReach() => AttackTag("reach") is { Length: > 0 } r ? r : "melee";
+
+    /// <summary>"blunt", "slashing" or "piercing": the wielded weapon's, else the creature's own; "blunt" for fists.</summary>
+    public string QueryAttackDamage() => AttackTag("damage") is { Length: > 0 } d ? d : "blunt";
+
+    /// <summary>The kind of the wielded weapon ("sword"), else the creature's own ("bite"); "" for an unarmed player.</summary>
+    public string QueryAttackKind() => AttackTag("kind");
+
+    /// <summary>Does the attack come from a distance (a ranged or a thrown weapon)? Where "the wielded weapon is a bow" was asked.</summary>
+    public bool QueryAtRange() => QueryAttackReach() is "ranged" or "thrown";
+
+    /// <summary>Does the wielded weapon carry this tag? Skills that need a certain kind of weapon ask it (Aimed Shot: "ranged").</summary>
+    public bool QueryWeaponHasTag(string tag) => QueryEquipped("weapon") is { } w && w.Call<bool>("HasTag", tag);
+
+    private bool ActionAtRange(CombatAction action) => action.Reach != "" ? action.Reach is "ranged" or "thrown" : QueryAtRange();
+
     public bool QueryHasShield() => QueryEquipped("shield") != null;
 
     /// <summary>
@@ -403,6 +429,7 @@ public abstract class Living : Thing
             "spell_power" => SpellPctPerInsight * Above("insight") + SpellPctPerSpirit * Above("spirit"),
             "healing_power" => HealPctPerSpirit * Above("spirit") + HealPctPerInsight * Above("insight"),
             "mental_resistance" => ResistPctPerPoint * (Above("spirit") + Above("resolve")),
+            "authority" => Math.Max(Above("insight"), Above("resolve")),   // one point for each point above 5: lowers a target's save against a control effect (/secure/control); shown nowhere to players
             "physical_resistance" => ResistPctPerPoint * (Above("vigor") + Above("resolve")),
             "carry_capacity" => CarryBase + CarryPerMight * QueryAttribute("might"),
             "gathering" => GatherPerPoint * (Above("grace") + Above("insight")),
@@ -669,9 +696,15 @@ public abstract class Living : Thing
     /// <summary>The product of all active haste and slow effects (and the traits that speed their owner). 1.0 when there are none.</summary>
     public double QuerySpeedFactor()
     {
+        // Haste multiplies as it always did; the product of all the slows is held to 2.0, so no pile of slows stops a creature (docs/specs/tags-and-saves.md section 13).
         var factor = ExtraSpeedFactor();
-        foreach (var effect in LiveEffects()) factor *= effect.SpeedFactor;
-        return factor;
+        var slow = 1.0;
+        foreach (var effect in LiveEffects())
+        {
+            if (effect.SpeedFactor > 1.0) slow *= effect.SpeedFactor;
+            else factor *= effect.SpeedFactor;
+        }
+        return factor * Math.Min(2.0, slow);
     }
 
     /// <summary>A speed factor that does not come from a timed effect (a trait such as Battle Fury). 1.0 for none.</summary>
@@ -906,12 +939,14 @@ public abstract class Living : Thing
     /// A creature with no declared action uses the plain attack of its weapon (or its fists).
     /// </summary>
     protected CombatAction AddCombatAction(string id, string name, double preparation = 0, double recovery = 0.5,
-        string windUp = "", int damageMultiplier = 1, double reactionMod = 0, string strike = "", string kind = "attack")
+        string windUp = "", int damageMultiplier = 1, double reactionMod = 0, string strike = "", string kind = "attack",
+        string reach = "", string damage = "", string tagKind = "")
     {
         var action = new CombatAction
         {
             Id = id, Name = name, Preparation = preparation, Recovery = recovery, WindUp = windUp,
             DamageMultiplier = damageMultiplier, ReactionMod = reactionMod, Strike = strike, Kind = kind,
+            Reach = reach, Damage = damage, TagKind = tagKind,
         };
         actions.Add(action);
         return action;
@@ -1012,7 +1047,7 @@ public abstract class Living : Thing
         var wasInCombat = QueryInCombat();
         if (drawn && !wasInCombat) DelayFirstAction();
         AddEnemyCore(enemy);
-        openingShot = chosen && !drawn && fresh && !wasInCombat && QueryWeaponCategory() == "bow";
+        openingShot = chosen && !drawn && fresh && !wasInCombat && QueryAtRange();
         surprising = chosen && !drawn && fresh && !wasInCombat && OpeningUnseen();
         try { enemy.Call("AddEnemy", Self); }
         finally { openingShot = false; surprising = false; }
@@ -1380,6 +1415,19 @@ public abstract class Living : Thing
     /// </summary>
     public string QueryStrikingSkill() => strikingSkill;
 
+    /// <summary>
+    /// The words of a blow (docs/specs/tags-and-saves.md section 6, /secure/blows): the ladder is chosen from the action's own reach, damage type and
+    /// kind, else the attacker's (the wielded weapon's, else the creature's own); fists and an attack with no tags keep the plain words.
+    /// </summary>
+    private (string you, string them, string how) BlowWords(CombatAction action, int tier)
+    {
+        var blows = LoadObject("/secure/blows");
+        var ladder = blows.Call<string>("QueryLadder", action.TagKind != "" ? action.TagKind : AttackTag("kind"), action.Reach != "" ? action.Reach : AttackTag("reach"),
+            action.Damage != "" ? action.Damage : AttackTag("damage")) ?? "plain";
+        var parts = (blows.Call<string>("QueryWords", ladder, tier) ?? "hit|hits|").Split('|');
+        return (parts[0], parts.Length > 1 ? parts[1] : parts[0] + "s", parts.Length > 2 ? parts[2] : "");
+    }
+
     private void Attack(ObjectRef target, CombatAction action)
     {
         var room = Environment();
@@ -1405,7 +1453,7 @@ public abstract class Living : Thing
         // 2. d20 + Attack against 10 + Armor + Defense. A natural 20 always hits, a natural 1 always misses.
         var roll = Random(20) + 1;
         var need = 10 + target.Call<int>("QueryArmor") + target.Call<int>("QueryDefense");
-        var lightPenalty = lightLevel >= 1 ? 0 : light.Call<int>("ToHitPenalty", lightLevel, QueryWeaponCategory() == "bow", QueryDarkSight());
+        var lightPenalty = lightLevel >= 1 ? 0 : light.Call<int>("ToHitPenalty", lightLevel, ActionAtRange(action), QueryDarkSight());
         var hit = roll == 20 || (roll != 1 && roll + QueryAttack() + action.ToHitBonus + lightPenalty >= need);
         if (!hit)
         {
@@ -1446,8 +1494,7 @@ public abstract class Living : Thing
         var tier = share < 10 ? 0 : share < 25 ? 1 : share < 40 ? 2 : 3;
         var mine = DamageNote(applied, true);
         var theirNote = target.Call<string>("DamageNote", applied, false) ?? "";
-        var shot = QueryWeaponCategory() == "bow";
-        var (youWord, themWord, how) = shot ? (ShotYou[tier], ShotThem[tier], ShotHow[tier]) : (HitYou[tier], HitThem[tier], HitHow[tier]);
+        var (youWord, themWord, how) = BlowWords(action, tier);
         Tell($"You {youWord} {theirs}{how}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + mine + "\n");
         TellObject(target, $"{label} {themWord} you{how}." + (critical ? " A critical hit!" : "") + (blocked ? " You block part of the blow." : "") + theirNote + "\n");
         TellRoom(room, $"{label} {themWord} {theirs}{how}." + (critical ? " A critical hit!" : "") + (blocked ? $" {Cap(theirs)} blocks part of the blow." : "") + "\n", Self, target);
@@ -1693,9 +1740,17 @@ public abstract class Living : Thing
 
     // ---- Combat: what stat shows ----
 
+    /// <summary>The reach, damage type and kind an attack action has: its own, else the attacker's (empty parts left out). "" for an action that is not an attack.</summary>
+    private string ActionTagWords(CombatAction a) =>
+        a.Kind != "attack" ? "" : string.Join(" ", new[] { a.Reach != "" ? a.Reach : AttackTag("reach"), a.Damage != "" ? a.Damage : AttackTag("damage"), a.TagKind != "" ? a.TagKind : AttackTag("kind") }.Where(x => x != ""));
+
+    /// <summary>For stat and tests: one entry per declared action, "id|name|action kind|reach damage kind" (the last part empty for an action that is not an attack).</summary>
+    public List<string> QueryActionTags() => actions.Select(a => $"{a.Id}|{a.Name}|{a.Kind}|{ActionTagWords(a)}").ToList();
+
     private string ActionLine(CombatAction a) =>
         $"    {a.Name}: preparation {Num(a.Preparation)}, recovery {Num(a.Recovery)}, modifier {Num(a.ReactionMod)}, delay {Num(QueryDelay(a))} s" +
-        (a.WindUp != "" ? $", wind-up \"{a.WindUp}\"" : "") + (a.DamageMultiplier > 1 ? $", damage x{a.DamageMultiplier}" : "") + "\n";
+        (a.WindUp != "" ? $", wind-up \"{a.WindUp}\"" : "") + (a.DamageMultiplier > 1 ? $", damage x{a.DamageMultiplier}" : "") +
+        (ActionTagWords(a) is { Length: > 0 } words ? $", {words}" : "") + "\n";
 
     private string TimingStat()
     {

@@ -20,6 +20,7 @@ public class CmTunnelRat : Monster
         Ids.Add("rat");
         Ids.Add("tunnel rat");
         ShortDesc = "a tunnel rat";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A rat as long as a forearm scrabbles along the tunnel wall, its tail hairless and glistening with the damp of the roots. Its fur is pale from a life away from daylight and its eyes are small and red. It chitters shrilly when it sees you.";
         Level = 7;
         MaxVitality = 40;

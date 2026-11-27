@@ -25,6 +25,7 @@ public class CmGoblinTunneler : Monster
         Ids.Add("tunneler");
         Ids.Add("goblin tunneler");
         ShortDesc = "a goblin tunneler";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("pick");
         LongDesc = "A squat, soot-black goblin in a miner's leather cap wields a short-hafted pick, his huge hands scarred by years of digging. He smells of damp earth and lamp-oil. He grips the pick like someone who has already decided to keep this tunnel.";
         Level = 8;
         MaxVitality = 60;

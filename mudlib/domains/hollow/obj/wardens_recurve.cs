@@ -13,6 +13,7 @@ public class WardensRecurve : Weapon
         ShortDesc = "a warden's recurve";
         LongDesc = "A short, deeply curved bow of horn and yew glued up in the old style, its grip wrapped in green cord. It has outlived whoever carried it, and it pulls like it remembers him.";
         Category = "bow";
+        Tags.Add("ranged"); Tags.Add("piercing"); Tags.Add("bow"); Tags.Add("wood");
         DamageMin = 13;
         DamageMax = 19;
         ToHit = 1;

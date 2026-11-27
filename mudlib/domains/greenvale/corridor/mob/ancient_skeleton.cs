@@ -24,6 +24,7 @@ public class CmAncientSkeleton : Monster
         Ids.Add("skeleton");
         Ids.Add("ancient skeleton");
         ShortDesc = "an ancient skeleton";
+        Tags.Add("undead"); Tags.Add("melee"); Tags.Add("slashing"); Tags.Add("sword");
         LongDesc = "A skeleton in the remnants of bronze scale armor shambles upright, its jaw hanging a little open and a corroded blade still held in bony fingers. A faint green light pools in its eye sockets. It makes a dry clicking sound as it moves, like old shells shifting.";
         Level = 9;
         MaxVitality = 54;

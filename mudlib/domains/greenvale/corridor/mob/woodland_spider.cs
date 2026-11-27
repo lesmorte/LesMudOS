@@ -29,6 +29,7 @@ public class CmWoodlandSpider : Monster
         Ids.Add("spider");
         Ids.Add("woodland spider");
         ShortDesc = "a woodland spider";
+        Tags.Add("beast"); Tags.Add("melee"); Tags.Add("piercing"); Tags.Add("bite");
         LongDesc = "A dark, long-legged spider with mottled green markings clings to the underside of a branch, forelegs raised and trembling. Its body is the size of a ham and its legs could span the path. Strands of silk glisten around it and trail down into the gloom.";
         Level = 8;
         MaxVitality = 91;

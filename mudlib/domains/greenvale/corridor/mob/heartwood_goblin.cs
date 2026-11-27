@@ -25,6 +25,7 @@ public class CmHeartwoodGoblin : Monster
         Ids.Add("warrior");
         Ids.Add("goblin warrior");
         ShortDesc = "a goblin warrior";
+        Tags.Add("goblin"); Tags.Add("melee"); Tags.Add("blunt"); Tags.Add("club");
         LongDesc = "A goblin in a rusted breastplate bound with bark twine, a spiked club in his fist and a dented round shield on his arm, keeps watch over the old way. The moss on his armor says he has stood in one place for days. His eyes are fixed on you and he is not afraid.";
         Level = 8;
         MaxVitality = 56;
@@ -38,7 +39,7 @@ public class CmHeartwoodGoblin : Monster
         Aggressive = true;
         Alert = true;
         BaseReaction = 3;
-        AddCombatAction("slash", "Slash", preparation: 0, recovery: 1);
+        AddCombatAction("slash", "Club Swing", preparation: 0, recovery: 1);
         AddCombatAction("heavy", "Heavy Swing", preparation: 0.5, recovery: 1.5, windUp: "hauls the club back over his shoulder", damageMultiplier: 2, strike: "brings the club down with all his weight!");
         AddLoot("/domains/hollow/obj/training_spear", 15);
         AddLoot("/domains/hollow/obj/iron_dagger", 15);
