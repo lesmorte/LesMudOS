@@ -362,7 +362,7 @@ def step_restraint(w, war, mage):
     check("the player reads a clear message: it may not strike it in melee, and for how long", got, "You may not strike Passive in melee for")
     check("and the message is not repeated every round (at most one in six seconds)", str(count(got, "You may not strike") <= 2), "True")
     check("no blow lands while it holds", str(state(mage, "passive")["vit"] == before), "True")
-    got = collect(mage, 9)[0]
+    got = collect(mage, 30)[0]  # several of the player's swings: one may miss
     after = state(mage, "passive")["vit"]
     check("when it ends the player's blows land again", str(after < before), "True")
     clear(w, mage)
