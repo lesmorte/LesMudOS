@@ -144,6 +144,26 @@ public class SiteTests
     }
 
     [Fact]
+    public async Task A_class_that_is_not_on_the_public_list_is_never_printed_on_the_heroes_page()
+    {
+        // A hidden class is never in publicClasses (the filter file would have to name it). A hero who holds an unlisted class is shown without one.
+        var dir = Paths.CopyToTemp(Paths.Fixture("mixed"));
+        var f = Path.Combine(dir, "players", "mira.json");
+        var text = File.ReadAllText(f);
+        Assert.Contains("\"advancedClass\": \"knight\"", text);
+        File.WriteAllText(f, text.Replace("\"advancedClass\": \"knight\"", "\"advancedClass\": \"zzunlisted\""));
+        using var site = new Site(dir);
+        var (_, html, _) = await site.Get("/heroes");
+        Assert.Contains("Mira", html);
+        Assert.DoesNotContain("Zzunlisted", html);
+        Assert.DoesNotContain("zzunlisted", html);
+        Assert.Contains("Druid", html);   // the other hero's listed class is still shown
+        // and the filter says so itself: class.hidden is a hidden prefix, and nothing hidden is listed
+        var filter = File.ReadAllText(Path.Combine(Paths.ProjectDir, "publicfilter.json"));
+        Assert.Contains("\"class.hidden\"", filter);
+    }
+
+    [Fact]
     public async Task The_home_page_strip_shows_only_real_numbers()
     {
         using var site = Open("mixed");

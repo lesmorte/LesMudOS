@@ -337,6 +337,14 @@ public static class Attacks
         T("d.chronicle.AddEntry", () => ((ObjectRef)e("load", new object?[] { "/secure/chronicle" })!).Call("AddEntry", new Dictionary<string, string> { ["headline"] = "HACKTEXT" }));
         T("d.rumors.AddRumor", () => ((ObjectRef)e("load", new object?[] { "/secure/rumors" })!).Call("AddRumor", "greenvale", "HACKTEXT"));
         T("d.finds.Claim", () => ((ObjectRef)e("load", new object?[] { "/secure/finds" })!).Call("Claim", pat, 100, 0, 0, false, 0));
+        T("d.hidden.RollOnLoot", () => ((ObjectRef)e("load", new object?[] { "/secure/hidden" })!).Call("RollOnLoot", pat, 7, false, 50, false));
+        T("d.hidden.Admits", () => ((ObjectRef)e("load", new object?[] { "/secure/hidden" })!).Call("Admits", pat, "inner-door"));
+        T("d.hidden.Advance", () => ((ObjectRef)e("load", new object?[] { "/secure/hidden" })!).Call("Advance", pat, "bureaucrat", 5));
+        T("d.hidden.Answer", () => ((ObjectRef)e("load", new object?[] { "/secure/hidden" })!).Call("Answer", pat, "bureaucrat", 1));
+        T("d.hidden.Grant", () => ((ObjectRef)e("load", new object?[] { "/secure/hidden" })!).Call("Grant", "pat", "bureaucrat"));
+        T("d.hidden.SetTestRolls", () => ((ObjectRef)e("load", new object?[] { "/secure/hidden" })!).Call("SetTestRolls", "roll:0"));
+        T("d.hidden.QueryRecord", () => ((ObjectRef)e("load", new object?[] { "/secure/hidden" })!).Call("QueryRecord", pat, "bureaucrat"));
+        T("d.classes.HiddenIds", () => ((ObjectRef)e("load", new object?[] { "/secure/classes" })!).Call("HiddenIds"));
         T("d.lost.Record", () => ((ObjectRef)e("load", new object?[] { "/secure/lost_property" })!).Call("Record", "pat", "x", new List<string> { "/domains/sbtest/relic" }, 999));
         T("d.wizlist.Promote", () => ((ObjectRef)e("load", new object?[] { "/secure/wizlist" })!).Call("Promote", "wren", 10));
         T("d.wizlist.Bootstrap", () => ((ObjectRef)e("load", new object?[] { "/secure/wizlist" })!).Call("Bootstrap", "correct horse battery staple"));

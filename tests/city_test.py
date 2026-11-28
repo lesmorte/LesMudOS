@@ -357,7 +357,7 @@ class Walker:
         w = self.w
         stock = self.stock(person)
         out = self.say(w, "browse")
-        listed = re.findall(r"^\s+(.+?)\s{2,}(\d+) gold\s*$", out.replace("\r", ""), re.M)
+        listed = re.findall(r"^\s+(.+?)\s{2,}(\d+) gold(?:  \([^)]*\))?\s*$", out.replace("\r", ""), re.M)
         want = [(cap(item.short), str(price)) for _, item, price in stock]
         R.ok(listed == want, f"shops: browse at {person.name} ({path}) lists exactly the stock at the file's prices", f"file:   {want}\nbrowse: {listed}")
         self.ensure_gold(sum(p for _, _, p in stock) + 10)

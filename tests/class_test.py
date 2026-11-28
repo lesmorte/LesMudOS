@@ -866,7 +866,7 @@ def run(work, mudlib):
     check("the granted trait changes the numbers (critical 100%)", a.score_of(ar)["text"], "Critical 100%")
     check("the experience modifier 1.25 raises the next level (level 6: 1.25 x 5400 = 6750)",
           a.score_of(ar)["text"], f"Experience {xp_for(5)} ({xp_for(6, 1.25) - xp_for(5)} more for level 6)")
-    check("a class cannot be taken twice", ar.command("pledge zealot_test"), "REFUSED: You already have a advanced class.")
+    check("a class cannot be taken twice", ar.command("pledge zealot_test"), "REFUSED: You already have an advanced class.")
     ar.command("setlevel 50")
     a.drain(ar, 0.5)
     check("the class's attack rate (0.99) replaces the archetype's: attack 50 - 0 sword bonus = 50 -> round(49.5) = 50",

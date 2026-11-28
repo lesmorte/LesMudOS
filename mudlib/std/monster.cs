@@ -20,6 +20,8 @@ public class Monster : Npc
     /// <summary>Joins a fight when another monster in the room is attacked.</summary>
     protected bool Assist = true;
     protected int XpValue;
+    /// <summary>A creature that must never carry a hidden class's summons (a spawner a builder adds that can be farmed). No creature has it now.</summary>
+    protected bool NoSummons;
     protected int GoldMin;
     protected int GoldMax;
     /// <summary>The line the room sees on death.</summary>
@@ -68,6 +70,8 @@ public class Monster : Npc
     }
 
     public bool QueryBoss() => HasTag("boss");
+    public int QueryXpValue() => XpValue;
+    public bool QueryNoSummons() => NoSummons;
     public bool QueryAlert() => HasTag("alert");
     public bool QueryAggressive() => Aggressive;
 

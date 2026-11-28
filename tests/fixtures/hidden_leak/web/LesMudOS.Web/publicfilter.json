@@ -1,0 +1,5 @@
+{
+  "hiddenEventPrefixes": ["discover.hidden"],
+  "publicEvents": ["class.advanced"],
+  "publicClasses": ["knight", "leaky"]
+}

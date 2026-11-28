@@ -18,6 +18,18 @@ renown=10
 renown_first=100
 headline=The First {class}
 text=On {date}, {participants} chose the path of the {class} and was the first in Hollowmere to walk it.",
+        // A hidden class taken: routine, so it is counted and never written, never a rumour, never Renown. It is also on the website's
+        // hidden prefixes (publicfilter.json) as a second lock. The subject is empty: nothing about which class is recorded.
+        @"id=class.hidden
+title=A calling taken
+kind=Milestone
+chron=Renown
+category=0
+first=no
+once=no
+repeat=same
+renown=0
+text=On {date}, {participants} took a seat in {area}.",
         @"id=class.prestige
 title=First prestige {class}
 kind=Milestone

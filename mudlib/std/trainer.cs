@@ -196,6 +196,9 @@ public class Trainer : Shopkeeper
     private string? CallingOf(ObjectRef who, out string refusal)
     {
         refusal = "";
+        // An advanced class this trainer teaches comes first, so a holder still buys the calling's skills from the calling's trainers.
+        var advanced = who.Call<string>("QueryClassOfTier", "advanced") ?? "";
+        if (advanced != "" && QueryRankCallings().Contains(advanced)) return advanced;
         var calling = who.Call<string>("QueryArchetype") ?? "";
         if (QueryRankCallings().Contains(calling)) return calling;
         if (calling != "" && AnotherTeaches(calling)) return null;
@@ -207,10 +210,13 @@ public class Trainer : Shopkeeper
 
     private static string Article(string word) => ("AEIOU".IndexOf(char.ToUpper(word[0])) >= 0 ? "an " : "a ") + word;
 
+    /// <summary>May this trainer teach this player at all? A trainer of a hidden class answers only its holders; anyone else gets the unknown-command answer.</summary>
+    protected virtual bool TeachesTo(ObjectRef who) => true;
+
     private bool CmdRanks(string args)
     {
         var who = ThisPlayer();
-        if (who == null) return false;
+        if (who == null || !TeachesTo(who)) return false;
         var calling = CallingOf(who, out var refusal);
         if (calling == null) return false;
         if (calling == "") { Write(refusal + "\n"); return true; }
@@ -225,7 +231,9 @@ public class Trainer : Shopkeeper
             Ranks.Call<bool>("RecordIfMet", who, o.Skill, o.Rank, o.Requirements);
             var state = Ranks.Call<List<string>>("OfferState", who, Self.ProgramPath, o.Skill, o.Rank, o.Requirements) ?? new List<string>();
             var allMet = state.All(l => l.StartsWith("1|"));
-            var status = held < 1 ? "not one of your skills"
+            var skillLevel = ClassFile(calling)?.Call<int>("QuerySkillLevel", o.Skill) ?? 0;
+            var status = held < 1 && skillLevel > who.Call<int>("QueryLevel") ? $"at level {skillLevel}"
+                : held < 1 ? "not one of your skills"
                 : held >= o.Rank ? "you know it"
                 : held < o.Rank - 1 ? $"learn {skill.Call<string>("QueryTitleAt", o.Rank - 1)} first"
                 : allMet ? "you can learn it now" : "locked";
@@ -252,7 +260,7 @@ public class Trainer : Shopkeeper
     private bool CmdTrain(string args)
     {
         var who = ThisPlayer();
-        if (who == null) return false;
+        if (who == null || !TeachesTo(who)) return false;
         var calling = CallingOf(who, out var refusal);
         if (calling == null) return false;
         if (calling == "") { Write(refusal + "\n"); return true; }

@@ -7,7 +7,8 @@
     "discover.hidden",
     "discover.secret_dungeon",
     "discover.great_stump",
-    "craft.discover_"
+    "craft.discover_",
+    "class.hidden"
   ],
 
   // The only event types that may be shown. A trailing * matches a prefix. Anything not listed here is hidden,
@@ -27,6 +28,13 @@
     "quest.story",
     "renown.*",
     "travel.pass"
+  ],
+
+  // The only advanced and prestige classes the Heroes page may name: a hero whose class is not listed here is shown without one. A class that
+  // is not listed is therefore never printed, and this file never names a hidden class (a blacklist would have to).
+  "publicClasses": [
+    "knight", "berserker", "monk", "ranger", "rogue", "bard", "cleric", "templar",
+    "oracle", "druid", "necromancer", "spellblade", "beastmaster", "artificer", "mage"
   ],
 
   // An entry that contains any of these words anywhere in its headline, text, significance, place, tags or event id is hidden

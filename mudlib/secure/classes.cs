@@ -52,9 +52,19 @@ public class ClassRegistry : MudObject
         foreach (var id in ClassIds())
         {
             var cls = Class(id);
-            if (cls != null && cls.Call<bool>("QueryEnabled") && cls.Call<string>("QueryTier") == tier) found.Add((cls.Call<int>("QuerySortOrder"), id));
+            if (cls != null && cls.Call<bool>("QueryEnabled") && !cls.Call<bool>("QueryHidden") && cls.Call<string>("QueryTier") == tier) found.Add((cls.Call<int>("QuerySortOrder"), id));
         }
         return found.OrderBy(f => f.Order).ThenBy(f => f.Id, StringComparer.Ordinal).Select(f => f.Id).ToList();
+    }
+
+    /// <summary>The ids of the hidden classes (enabled or not), for the register, the lint and the level-10 command. Refuses restricted code.</summary>
+    public List<string> HiddenIds()
+    {
+        var result = new List<string>();
+        if (RestrictedCaller() != null) return result;
+        foreach (var id in ClassIds())
+            if (Class(id)?.Call<bool>("QueryHidden") == true) result.Add(id);
+        return result;
     }
 
     /// <summary>

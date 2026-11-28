@@ -14,6 +14,12 @@ public class Item : Thing
     protected int Value;
     /// <summary>Quest items cannot be sold or given away.</summary>
     protected bool QuestItem;
+    /// <summary>
+    /// A bound item stays with its holder (docs/specs/hidden-classes.md section 5.6): it cannot be dropped or given, a death leaves it on
+    /// the character, and it is also a quest item so no shop takes it. BoundLine is what the holder is told when they try.
+    /// </summary>
+    protected bool Bound;
+    protected string BoundLine = "";
     /// <summary>If set, "read <thing>" shows this text.</summary>
     protected string? ReadText;
     /// <summary>A magical property, in words, that Magical Lore and Appraise reveal ("raises maximum Vitality by 5"). Empty for none.</summary>
@@ -133,7 +139,10 @@ public class Item : Thing
 
     public bool QueryQuestItem() => QuestItem;
 
-    public string? QueryReadText() => ReadText;
+    public virtual string? QueryReadText() => ReadText;
+
+    public bool QueryBound() => Bound;
+    public virtual string QueryBoundLine() => BoundLine != "" ? BoundLine : "It is not a thing one parts with.";
 
     public bool QueryStackable() => Stackable;
 

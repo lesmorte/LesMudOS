@@ -539,6 +539,7 @@ public class Player : Adventurer
     {
         // Crafting and gathering topics ("help crafting", "help skin"): answered by the crafting daemon.
         if (args.Trim() != "" && CraftHelp(args) is { } craftTopic) { Write(craftTopic); return true; }
+        if (HeldHelp(args) is { } heldTopic) { Write(heldTopic); return true; }
         if (args.Trim().ToLowerInvariant() is "light" or "lights" or "dark" or "darkness" or "torch" or "torches" or "lantern" or "glow")
         {
             Write("Light: every room is lit, dim or dark. {cmd}look{/} tells you when it is not ({cmd}score{/} too, and the prompt token {cmd}light{/}).\n" +

@@ -40,6 +40,45 @@ public abstract class PlayerClass : MudObject
     /// <summary>True if the class adds the right to carry a shield.</summary>
     protected bool Shield;
 
+    // ---- Hidden classes (docs/specs/hidden-classes.md section 4). A hidden class is an ordinary advanced class that is never listed,
+    // never offered and found only through a summons. Everything below is data; the register (/secure/hidden) and the quest giver
+    // (/std/hiddengiver) do the work. Nothing from here may be shown to a character who does not hold the class.
+    /// <summary>True for a hidden class: never listed by the class registry, no help page until it is held.</summary>
+    protected bool Hidden;
+    /// <summary>The paper that is served (a path in /domains).</summary>
+    protected string SummonsItem = "";
+    /// <summary>The quest journal id of the quest that ends with the offer.</summary>
+    protected string QuestId = "";
+    /// <summary>Opaque key of the gated door; never the class id or title.</summary>
+    protected string GateKey = "";
+    /// <summary>Path prefixes of every file that may speak of the class (the lint's allowance and the register's callers).</summary>
+    protected List<string> OwnPaths = new();
+    /// <summary>False closes the roll for this class (nothing is ever served).</summary>
+    protected bool SummonsOpen = true;
+    /// <summary>The roll: no roll up to the floor, then base percent plus step per further eligible loot, certain on the guarantee-th.</summary>
+    protected int SummonsFloor = 10;
+    protected double SummonsBase = 2.0;
+    protected double SummonsStep = 0.5;
+    protected int SummonsGuarantee = 50;
+    /// <summary>The lowest character level of the roll (a class may name more than its level requirement).</summary>
+    protected int SummonsMinLevel = 5;
+    /// <summary>What the player reads: the line when the paper is served, the paper itself ({serial}, {date}, {Name}), the door's lines.</summary>
+    protected string SummonsFound = "";
+    protected string SummonsText = "";
+    protected string BoundLine = "";
+    protected string GateKnock = "";
+    protected string GateAgain = "";
+    protected string GateOpen = "";
+    protected string GateLook = "";
+    protected string GateReissue = "";
+    /// <summary>The first number of a reference on the paper (the register's serial is added to it).</summary>
+    protected int SerialBase;
+    /// <summary>The level at which each skill is given (docs/specs/bureaucrat.md section 7.1); a skill not named here is given at once.</summary>
+    protected Dictionary<string, int> SkillLevels = new();
+
+    /// <summary>A skill that the class gives only when the character reaches this level (and at once, at rank I, if the class is taken later).</summary>
+    protected void SkillAt(string skillId, int level) => SkillLevels[skillId] = level;
+
     // The resources (docs/ATTRIBUTES.md section 2): maximum = base + per-level x Level + attributes. An archetype names all six;
     // a later class may name its own. -1 means the class names none: the previous class's number stands, and an archetype that
     // names none has the Adventurer's (10 / 8, 50 / 2, 50 / 2).
@@ -94,6 +133,26 @@ public abstract class PlayerClass : MudObject
     public string QueryDescription() => Description;
     public string QueryGuild() => Guild;
     public bool QueryEnabled() => Enabled;
+    public bool QueryHidden() => Hidden;
+    public string QuerySummonsItem() => Hidden ? SummonsItem : "";
+    public string QueryQuestId() => QuestId;
+    public string QueryGateKey() => GateKey;
+    public List<string> QueryOwnPaths() => new(OwnPaths);
+    public bool QuerySummonsOpen() => Hidden && SummonsOpen;
+    public int QuerySummonsFloor() => SummonsFloor;
+    public double QuerySummonsBase() => SummonsBase;
+    public double QuerySummonsStep() => SummonsStep;
+    public int QuerySummonsGuarantee() => SummonsGuarantee;
+    public int QuerySummonsMinLevel() => SummonsMinLevel;
+    public int QuerySerialBase() => SerialBase;
+    /// <summary>One of the class's own lines by name (found, text, bound, knock, again, open, look); "" for none.</summary>
+    public string QueryLine(string which) => which switch
+    {
+        "found" => SummonsFound, "text" => SummonsText, "bound" => BoundLine, "knock" => GateKnock, "again" => GateAgain,
+        "open" => GateOpen, "look" => GateLook, "reissue" => GateReissue, _ => "",
+    };
+    /// <summary>The level at which the class gives a skill: 0 (at once) for a skill it names no level for.</summary>
+    public int QuerySkillLevel(string skillId) => SkillLevels.GetValueOrDefault(skillId ?? "", 0);
     public int QuerySortOrder() => SortOrder;
     public double QueryExpModifier() => ExpModifier;
     public double QueryAttackRate() => AttackRate;
@@ -141,6 +200,9 @@ public abstract class PlayerClass : MudObject
                 return Present(value, who) != null ? null : "You are not carrying what this needs.";
             case "class":
                 return who.Call<bool>("QueryHasClass", value) ? null : "You do not have the class this needs.";
+            case "hidden":
+                // The offer of a hidden class is open: the register says the character has done the quest and not yet answered.
+                return LoadObject("/secure/hidden").Call<bool>("OfferIsOpen", who, value) ? null : "You are not offered this.";
             default:
                 return "This class has a requirement the game does not know yet.";
         }
