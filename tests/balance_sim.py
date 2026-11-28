@@ -4347,7 +4347,7 @@ def ranks_report(runs=3000, parts=()):
 
 
 # ======================================================================================================================================
-# The hidden class and the yardstick for levels 5 to 9 (docs/BALANCE_HIDDEN.md; python3 tests/balance_sim.py hidden)
+# The hidden class and the yardstick for levels 5 to 9 (docs/specs/balance-hidden.md; python3 tests/balance_sim.py hidden)
 #
 # docs/specs/bureaucrat.md sections 3 to 6 and 8 to 10, docs/specs/hidden-classes.md section 11. The five callings are played as the pace model plays them
 # (GEAR, default ranks, the Corridor creatures, haven and potions) but by the HUMAN model (HUMAN_MID: typing delay, skipped skills, potions at 25-35%, flight),
