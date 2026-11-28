@@ -199,9 +199,23 @@ def parse_build_document():
     return rooms
 
 
+def hidden_own_paths():
+    """The path prefixes of every file that belongs to a hidden class (its OwnPaths): a secret place is in no public build document and has no exit from the
+    city's map, so the walk of the city leaves it out (tests/jury_test.py walks it)."""
+    found = []
+    folder = os.path.join(MUDLIB, "classes")
+    for name in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+        text = open(os.path.join(folder, name), encoding="utf-8").read()
+        if re.search(r"\bHidden\s*=\s*true\s*;", text):
+            statements = [m.group(0) for m in re.finditer(r"OwnPaths\.[^;]*;", text, re.S)]
+            found.extend(x for st in statements for x in re.findall(r'"(/[^"]*)"', st))
+    return found
+
+
 def source_files(*subdirs):
     """Every .cs file under the given directories of domains/greenvale: ({path: Source} for rooms, {path: Source} for everything else)."""
     rooms, others = {}, {}
+    secret = hidden_own_paths()
     for sub in subdirs:
         base = os.path.join(MUDLIB, "domains", "greenvale", sub)
         for folder, _, names in os.walk(base):
@@ -209,6 +223,8 @@ def source_files(*subdirs):
                 if not name.endswith(".cs"):
                     continue
                 path = "/" + os.path.relpath(os.path.join(folder, name), MUDLIB)[:-3].replace(os.sep, "/")
+                if any(path.startswith(p) for p in secret):
+                    continue
                 src = Source(path)
                 (rooms if src.base == "/std/room" else others)[path] = src
     return rooms, others
