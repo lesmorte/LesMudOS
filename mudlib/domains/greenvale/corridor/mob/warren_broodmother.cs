@@ -57,9 +57,9 @@ public class CmWarrenBroodmother : Monster
     {
         for (var i = 0; i < triggerVitality.Length; i++)
         {
-            if ((fired & (1 << i)) == 0 && Vitality * 100 <= triggerVitality[i] * QueryMaxVitality())
+            // A trigger is spent when its action really happens (Special), not when it is chosen: a barred or interrupted call for help comes back.
+            if ((fired & (1 << i)) == 0 && Vitality * 100 <= triggerVitality[i] * QueryMaxVitality() && !QueryActionBarred(FindAction(triggerAction[i])!.Kind))
             {
-                fired |= 1 << i;
                 chosen = triggerAction[i];
                 return FindAction(chosen)!;
             }
@@ -75,6 +75,7 @@ public class CmWarrenBroodmother : Monster
         if (room == null) return;
         if (action.Id == "brood")
         {
+            for (var i = 0; i < triggerAction.Length; i++) if (triggerAction[i] == action.Id) fired |= 1 << i;
             TellRoom(room, "The egg sacs burst, and a tunnel rat scrambles out to defend its mother!\n");
             var helper = CloneObject("/domains/greenvale/corridor/mob/tunnel_rat");
             MoveObject(helper, room);

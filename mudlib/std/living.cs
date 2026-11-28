@@ -1164,6 +1164,7 @@ public abstract class Living : Thing
         if (enemies.Count > 0 || !wasFighting) return;
         wasFighting = false;
         actionsTaken = 0;
+        ClearFightBars();
         FightEnded();
     }
 
@@ -1330,7 +1331,9 @@ public abstract class Living : Thing
             action = ChooseAction(target);
             actionsTaken++;
         }
-        Begin(action, target);
+        var chosen = action;
+        if (!ApplyBars(ref chosen, ref target)) return;
+        Begin(chosen, target);
     }
 
     /// <summary>Start an action now: announce the wind-up, resolve at once if there is none, and set the Ready Time.</summary>
@@ -1347,6 +1350,7 @@ public abstract class Living : Thing
         var now = TimeMs();
         if (action.WaitSeconds > 0 && action.Skill != null) skillWaits[action.Id] = now + action.WaitSeconds * 1000L;
         var prep = PrepMs(action);
+        lastActionId = action.Id; lastActionName = action.Name; lastActionAt = now; lastActionSpecial = actions.Count > 1 && actions[0] != action && actions.Contains(action);
         current = action;
         currentTarget = target;
         actionStart = now;
@@ -1384,6 +1388,17 @@ public abstract class Living : Thing
                 if (action.Preparation > 0) TellRoom(room, $"{Cap(QueryLabel())}'s blow finds nothing to hit.\n");
                 PruneEnemies();
                 return;
+            }
+            if (ActionReach(action) == "melee")
+            {
+                if (QueryRestrainedFrom(target!))
+                {
+                    // A melee bar placed while the blow was winding up still holds: the blow does not fall.
+                    var line = $"You may not strike {target!.Call<string>("QueryLabel")} in melee.";
+                    if (IsPlayerCharacter()) Tell(line + "\n"); else TellRoom(room, $"{Cap(QueryLabel())} starts toward {target!.Call<string>("QueryLabel")}, stops, and holds back.\n");
+                    return;
+                }
+                target!.Call("LapseRestraintFrom", Self); // striking in person lifts a bar the other put on this one
             }
             if (action.Strike != "") TellRoom(room, $"{Cap(QueryLabel())} {action.Strike}\n");
             strikingSkill = action.Skill?.Call<string>("QueryId") ?? "";
@@ -1439,6 +1454,9 @@ public abstract class Living : Thing
         var label = dark ? "Something" : Cap(QueryLabel());
         var self_ = dark ? "something" : QueryLabel();
         var theirs = dark ? "something" : target.Call<string>("QueryLabel") ?? "it";
+
+        // 0. A ward on the defender refuses the blow before anything is rolled.
+        if (target.Call<bool>("ConsumeWard", Self)) return;
 
         // 1. The defender's dodge, before the hit roll.
         if (target.Call<bool>("RollDodge"))
@@ -1591,6 +1609,275 @@ public abstract class Living : Thing
         return true;
     }
 
+    // ---- Combat: bars, restraints, wards and interrupts ----
+    // Generic effects of a binding kind (docs/specs/bureaucrat.md section 7.3; tests/effects_test.py). A skill from a real object applies them,
+    // after /secure/control.Resolve has said how strongly: they are kept here, on the creature they bind, never saved, and no object from the
+    // workshop (restricted code, a creature with a domain) can set, read for effect, or clear any of them on a real creature.
+
+    private static readonly string[] EffectTrees = { "/std/", "/secure/", "/domains/", "/classes/", "/skills/", "/events/" };
+    private readonly Dictionary<string, long> barredActions = new();                      // an action id or a kind -> until (ms)
+    private readonly List<(ObjectRef from, long until, string wording)> restraints = new(); // cannot melee these, until
+    private int wardCharges;
+    private long wardUntil;
+    private string wardWording = "";
+    private long moveBarUntil;
+    private string moveBarWording = "";
+    private long lastBarLine;                // the last "holds back" line (at most one in six seconds)
+    private string lastActionId = "", lastActionName = "";
+    private long lastActionAt;
+    private bool lastActionSpecial;
+
+    /// <summary>Is the caller real code (not the workshop's) in a trusted tree, with no restricted code anywhere on the stack?</summary>
+    private bool TrustedEffectCaller()
+    {
+        var caller = PreviousObject();
+        return caller != null && caller.IsAlive && caller.Domain == "" && EffectTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)) && RestrictedCaller() == null;
+    }
+
+    private void PruneBars()
+    {
+        var now = TimeMs();
+        if (barredActions.Count > 0) foreach (var key in barredActions.Where(kv => kv.Value <= now).Select(kv => kv.Key).ToList()) barredActions.Remove(key);
+        if (restraints.Count > 0) restraints.RemoveAll(r => r.until <= now || !r.from.IsAlive || r.from.Call<bool>("IsDead"));
+        if (wardCharges > 0 && wardUntil <= now) wardCharges = 0;
+    }
+
+    private void ClearFightBars() { barredActions.Clear(); restraints.Clear(); }
+
+    private static string Fill(string text, params (string key, string value)[] values)
+    {
+        foreach (var (key, value) in values) text = text.Replace("{" + key + "}", value);
+        return text.Length == 0 ? text : char.ToUpper(text[0]) + text.Substring(1);
+    }
+
+    /// <summary>The reach of an action: its own, else the attacker's (a weapon's, else melee).</summary>
+    private string ActionReach(CombatAction action) => action.Reach != "" ? action.Reach : QueryAttackReach();
+
+    /// <summary>
+    /// Bar an action for this many seconds: by its id ("power"), or by its kind ("summon" for any call for help). A barred action is never begun: a
+    /// creature takes another (the first declared action that is not barred, else its plain attack, else it waits), a player is refused at the
+    /// command. 0 seconds lifts the bar; a second bar keeps the longer. True if the bar was set.
+    /// </summary>
+    public bool BarAction(string idOrKind, int seconds)
+    {
+        if (Dead || !Self.IsAlive || !TrustedEffectCaller() || string.IsNullOrEmpty(idOrKind) || idOrKind.Length > 40 || seconds < 0 || seconds > 600) return false;
+        if (seconds == 0) return barredActions.Remove(idOrKind);
+        var until = TimeMs() + seconds * 1000L;
+        barredActions[idOrKind] = barredActions.TryGetValue(idOrKind, out var old) && old > until ? old : until;
+        return true;
+    }
+
+    /// <summary>Whole seconds (rounded up) left on the bar on this action id or kind; 0 if there is none.</summary>
+    public int QueryBarLeft(string idOrKind)
+    {
+        if (idOrKind == null || !barredActions.TryGetValue(idOrKind, out var until)) return 0;
+        var left = until - TimeMs();
+        if (left <= 0) { barredActions.Remove(idOrKind); return 0; }
+        return (int)((left + 999) / 1000);
+    }
+
+    /// <summary>Is this action id (or kind) barred now? Content that chooses its own special actions asks this ("summon").</summary>
+    public bool QueryActionBarred(string idOrKind) => QueryBarLeft(idOrKind) > 0;
+
+    private bool ActionBarred(CombatAction action) => QueryBarLeft(action.Id) > 0 || QueryBarLeft(action.Kind) > 0;
+
+    /// <summary>
+    /// Bar this creature from making melee attacks against one creature (the one that served it) for this many seconds. The bar ends if that creature
+    /// dies or leaves, when the fight ends, or at once if that creature strikes this one in melee. wording is optional: "line to the striker|line to the
+    /// room" for the lapse, with {target} and {caster} for the two names. 0 seconds releases it. A second bar from the same creature keeps the longer.
+    /// </summary>
+    public bool RestrainMelee(ObjectRef from, int seconds, string wording = "")
+    {
+        if (Dead || !Self.IsAlive || from == null || from == Self || !from.IsAlive || !TrustedEffectCaller() || seconds < 0 || seconds > 600) return false;
+        var old = restraints.FirstOrDefault(r => r.from == from);
+        restraints.RemoveAll(r => r.from == from);
+        if (seconds == 0) return old.from != null;
+        var until = Math.Max(TimeMs() + seconds * 1000L, old.from != null ? old.until : 0);
+        restraints.Add((from, until, (wording ?? "").Length > 400 ? "" : wording ?? ""));
+        return true;
+    }
+
+    /// <summary>Is this creature barred from melee attacks against that one, now (and is that one here and alive)?</summary>
+    public bool QueryRestrainedFrom(ObjectRef who)
+    {
+        if (who == null || restraints.Count == 0) return false;
+        PruneBars();
+        return restraints.Any(r => r.from == who) && who.IsAlive && Environment(who) == Environment();
+    }
+
+    /// <summary>Whole seconds left on the melee bar against that creature, 0 for none.</summary>
+    public int QueryRestraintLeft(ObjectRef who)
+    {
+        if (who == null || !QueryRestrainedFrom(who)) return 0;
+        var left = restraints.First(r => r.from == who).until - TimeMs();
+        return left <= 0 ? 0 : (int)((left + 999) / 1000);
+    }
+
+    /// <summary>The striker's own call, from its own blow: a melee blow against a creature that has this creature barred from it lifts the bar at once.</summary>
+    public bool LapseRestraintFrom(ObjectRef striker)
+    {
+        if (striker == null || PreviousObject() != striker || !striker.IsAlive || striker.Domain != "") return false;
+        var bar = restraints.FirstOrDefault(r => r.from == striker);
+        if (bar.from == null) return false;
+        restraints.RemoveAll(r => r.from == striker);
+        var words = bar.wording.Split('|');
+        var names = new[] { ("target", QueryLabel()), ("caster", striker.Call<string>("QueryLabel") ?? "it") };
+        TellObject(striker, (words[0] != "" ? Fill(words[0], names) : $"Your hold on {QueryLabel()} lapses: you struck it in person.") + "\n");
+        if (Environment() is { } room) TellRoom(room, (words.Length > 1 && words[1] != "" ? Fill(words[1], names) : $"{Cap(striker.Call<string>("QueryLabel") ?? "Someone")}'s hold on {QueryLabel()} lapses.") + "\n", striker);
+        return true;
+    }
+
+    /// <summary>
+    /// A ward on this creature: the next attacks (this many, each a blow rolled to hit through Attack) made against it are refused, until the seconds
+    /// run out, whichever comes first. A ward replaces any ward it has (it never stacks). wording is optional: "line to the attacker|line to the bearer|line
+    /// to the room" with {bearer} and {attacker}. What it does not stop: a spell that needs no hit roll (Arcane Bolt), a creature's special actions that are
+    /// not attacks, damage over time. A blow of an action with several hits is refused one blow at a time.
+    /// </summary>
+    public bool GrantWard(int attacks, int seconds, string wording = "")
+    {
+        if (Dead || !Self.IsAlive || !TrustedEffectCaller() || attacks < 0 || attacks > 20 || seconds < 0 || seconds > 600) return false;
+        wardCharges = seconds == 0 ? 0 : attacks;
+        wardUntil = TimeMs() + seconds * 1000L;
+        wardWording = (wording ?? "").Length > 400 ? "" : wording ?? "";
+        return true;
+    }
+
+    /// <summary>Attacks the ward will still refuse (0 if none or lapsed).</summary>
+    public int QueryWard()
+    {
+        PruneBars();
+        return wardCharges;
+    }
+
+    /// <summary>
+    /// The attacker's own call, from its Attack, before the dodge and the hit roll: true if the blow is refused (one charge used; the refusal is told to
+    /// all three). Nothing else can use a charge.
+    /// </summary>
+    public bool ConsumeWard(ObjectRef attacker)
+    {
+        if (Dead || !Self.IsAlive || wardCharges <= 0 || attacker == null || PreviousObject() != attacker || !attacker.IsAlive || attacker.Domain != "") return false;
+        if (wardUntil <= TimeMs()) { wardCharges = 0; return false; }
+        wardCharges--;
+        var room = Environment();
+        var dark = room != null && room.Call<string>("QueryLightState") == "dark";
+        var mine = dark ? "something" : QueryLabel();
+        var theirs = dark ? "something" : attacker.Call<string>("QueryLabel") ?? "it";
+        var words = wardWording.Split('|');
+        var names = new[] { ("bearer", mine), ("attacker", theirs) };
+        TellObject(attacker, (words[0] != "" ? Fill(words[0], names) : $"{Cap(mine)} is warded: your attack is refused.") + "\n");
+        TellObject(Self, (words.Length > 1 && words[1] != "" ? Fill(words[1], names) : $"{Cap(theirs)}'s attack on you is refused.") + "\n");
+        if (room != null) TellRoom(room, (words.Length > 2 && words[2] != "" ? Fill(words[2], names) : $"{Cap(theirs)}'s attack on {mine} is refused.") + "\n", attacker, Self);
+        return true;
+    }
+
+    /// <summary>Bar this creature from moving or fleeing for this many seconds (wording: the line it reads when it tries; 0 lifts it). The room's exits and flee ask QueryMovementBarred.</summary>
+    public bool BarMovement(int seconds, string wording = "")
+    {
+        if (Dead || !Self.IsAlive || !TrustedEffectCaller() || seconds < 0 || seconds > 600) return false;
+        moveBarUntil = seconds == 0 ? 0 : TimeMs() + seconds * 1000L;
+        moveBarWording = (wording ?? "").Length > 200 ? "" : wording ?? "";
+        return true;
+    }
+
+    /// <summary>Whole seconds left on the bar on moving and fleeing; 0 if free to go.</summary>
+    public int QueryMovementBarred()
+    {
+        var left = moveBarUntil - TimeMs();
+        return left <= 0 ? 0 : (int)((left + 999) / 1000);
+    }
+
+    /// <summary>What this creature reads when it tries to leave under that bar.</summary>
+    public string QueryMovementBarLine() => moveBarWording != "" ? moveBarWording : "You are held fast and cannot leave.";
+
+    /// <summary>The name of the action this creature is preparing now ("" if none): a skill that interrupts reads it for its own lines.</summary>
+    public string QueryPreparing() => phase == "preparing" && current != null ? current.Name : "";
+
+    /// <summary>The id of the action in preparation ("" if none).</summary>
+    public string QueryPreparingId() => phase == "preparing" && current != null ? current.Id : "";
+
+    /// <summary>"id|name" of the last special (not the first declared) action this creature began in the last this-many seconds, or "".</summary>
+    public string QueryRecentSpecial(int seconds) => lastActionSpecial && TimeMs() - lastActionAt <= seconds * 1000L ? lastActionId + "|" + lastActionName : "";
+
+    /// <summary>
+    /// An interrupt that rolls nothing (the skill's own save has been rolled through /secure/control): the action in its Preparation is cancelled, what it
+    /// cost is NOT refunded, half its Recovery is still paid, the Ready Time is pushed back by pushSeconds more, and that action is barred for barSeconds.
+    /// The one interrupted reads that it was stopped. Returns true if an action was interrupted. A stagger (Physical Resistance, half the cost back) is a
+    /// different thing and unchanged.
+    /// </summary>
+    public bool InterruptPreparation(ObjectRef by, double pushSeconds, int barSeconds = 0)
+    {
+        if (Dead || !Self.IsAlive || !TrustedEffectCaller() || phase != "preparing" || current == null || pushSeconds < 0 || pushSeconds > 60 || barSeconds < 0 || barSeconds > 600) return false;
+        var action = current;
+        var now = TimeMs();
+        var halfRecovery = Math.Max(0, readyAt - resolveAt) / 2;
+        paidEndurance = 0;
+        paidFocus = 0;
+        phase = "recovering";
+        current = null;
+        currentTarget = null;
+        readyAt = now + halfRecovery + (long)Math.Round(pushSeconds * 1000);
+        if (barSeconds > 0) barredActions[action.Id] = now + barSeconds * 1000L;
+        var who = by != null && by.IsAlive ? by.Call<string>("QueryLabel") ?? "Something" : "Something";
+        Tell($"{Cap(who)} stops your {action.Name.ToLowerInvariant()} mid-motion.\n");
+        Schedule(readyAt);
+        return true;
+    }
+
+    /// <summary>
+    /// Before an action begins: apply the bars (a creature takes another action, a player's queued one is dropped) and the melee bar (a creature uses a
+    /// declared ranged action on the same target, else turns on another enemy it is hostile to, else waits a Reaction Time, never longer than the bar and
+    /// never losing its enemies). False if it waited instead and nothing is to begin.
+    /// </summary>
+    private bool ApplyBars(ref CombatAction action, ref ObjectRef? target)
+    {
+        if (barredActions.Count == 0 && restraints.Count == 0) return true;
+        PruneBars();
+        var player = IsPlayerCharacter();
+        if (ActionBarred(action))
+        {
+            var left = Math.Max(QueryBarLeft(action.Id), QueryBarLeft(action.Kind));
+            var replacement = player ? null : actions.FirstOrDefault(a => !ActionBarred(a));
+            if (replacement == null) { var basic = BasicAttack(); if (!ActionBarred(basic)) replacement = basic; }
+            if (player) Tell($"You cannot use {action.Name} for {left} more second{(left == 1 ? "" : "s")}.\n");
+            if (replacement == null) { WaitOut(target, 1000L * Math.Max(1, left), ""); return false; }
+            action = replacement;
+        }
+        if (action.Kind == "attack" && target != null && QueryRestrainedFrom(target) && ActionReach(action) == "melee")
+        {
+            if (!player)
+            {
+                var ranged = actions.FirstOrDefault(a => a.Kind == "attack" && (a.Reach is "ranged" or "thrown") && !ActionBarred(a));
+                if (ranged != null) { action = ranged; return true; }
+                var room = Environment();
+                var current_ = target;
+                var other = enemies.FirstOrDefault(e => e != current_ && e.IsAlive && !e.Call<bool>("IsDead") && Environment(e) == room && !QueryRestrainedFrom(e));
+                if (other != null) { target = other; return true; }
+            }
+            WaitOut(target, QueryRestraintLeft(target) * 1000L, $"You may not strike {target.Call<string>("QueryLabel")} in melee for {QueryRestraintLeft(target)} more second{(QueryRestraintLeft(target) == 1 ? "" : "s")}.");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>Do nothing for one Reaction Time, or until the bar ends if that is sooner; at most one line in six seconds.</summary>
+    private void WaitOut(ObjectRef? target, long barLeftMs, string playerLine)
+    {
+        var now = TimeMs();
+        var wait = Math.Max(1, (long)Math.Round(QueryReaction() * UnitMs));
+        if (barLeftMs > 0) wait = Math.Min(wait, Math.Max(1, barLeftMs));
+        phase = "recovering";
+        current = null;
+        currentTarget = null;
+        readyAt = now + wait;
+        if (now - lastBarLine >= 6000)
+        {
+            lastBarLine = now;
+            if (IsPlayerCharacter()) { if (playerLine != "") Tell(playerLine + "\n"); }
+            else if (target != null && Environment() is { } room) TellRoom(room, $"{Cap(QueryLabel())} starts toward {target.Call<string>("QueryLabel")}, stops, and holds back.\n");
+        }
+        Schedule(readyAt);
+    }
+
     // ---- Combat: skill waits ----
     // A skill may name a wait (Minor Heal: 15 seconds) before the same creature may use it again. The wait is kept here, on the creature that
     // used it (not on the target, not saved, so it ends when the character leaves), and only Begin sets it: no other object can set or clear it.
@@ -1630,6 +1917,7 @@ public abstract class Living : Thing
     {
         if (Dead) return "You are in no state to do that.";
         if (SkillWaitRefusal(skill.Call<string>("QueryId") ?? "", skill.Call<string>("QueryTitle") ?? "that") is { } waiting) return waiting;
+        if (QueryBarLeft(skill.Call<string>("QueryId") ?? "") is > 0 and var barred) return $"You cannot use {skill.Call<string>("QueryTitle") ?? "that"} for {barred} more second{(barred == 1 ? "" : "s")}.";
         var isSpell = skill.Call<string>("QueryKind") == "spell";
         if (isSpell && QueryMod("nospell") > 0) return "You cannot cast spells like this.";
         // Every number comes from the skill at the rank this creature holds (docs/specs/skill-ranks.md): the skill's one helper reads it.

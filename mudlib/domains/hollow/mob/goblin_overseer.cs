@@ -57,11 +57,8 @@ public class GoblinOverseer : Monster
     protected override CombatAction ChooseAction(ObjectRef target)
     {
         if (ActionsTaken() == 0) return FindAction("cry")!;
-        if (!summoned && Vitality * 2 <= QueryMaxVitality())
-        {
-            summoned = true;
-            return FindAction("summon")!;
-        }
+        // The summons is spent when it really happens (Special), not when it is chosen: a barred or interrupted call for help comes back.
+        if (!summoned && Vitality * 2 <= QueryMaxVitality() && !QueryActionBarred("summon")) return FindAction("summon")!;
         attacks++;
         return FindAction(attacks % 3 == 0 ? "power" : "slash")!;
     }
@@ -77,6 +74,7 @@ public class GoblinOverseer : Monster
         }
         else if (action.Kind == "summon" && target != null)
         {
+            summoned = true;
             TellRoom(room, "The Goblin Overseer snarls an order, and a goblin minion scrambles out of the shadows!\n");
             var minion = CloneObject(MinionPath);
             MoveObject(minion, room);

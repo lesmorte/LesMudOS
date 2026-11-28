@@ -38,6 +38,7 @@ public class ControlRules : MudObject
     }
 
     private readonly Dictionary<ObjectRef, Record> records = new();
+    private readonly Dictionary<(ObjectRef caster, ObjectRef target), (int Points, long Until)> penalties = new();
     private int fixedRoll = -1;
     private long clockShiftMs;
 
@@ -125,6 +126,27 @@ public class ControlRules : MudObject
         return record.Applied.Count(t => t > cutoff);
     }
 
+    /// <summary>
+    /// Mark a target for the caster's next control effect: that effect's save chance is lowered by this many points (the 5% floor still holds) when the
+    /// caster next calls Resolve on this target within the seconds given, whether it holds or not; one mark per caster and target (a new one replaces the
+    /// old). The mark is not a control effect: no save, no record against the flood guard. Refused (false) for a caller that is not real code, with
+    /// restricted code on the stack, or a caster or target that is not a real living creature. 0 points or 0 seconds clears it.
+    /// </summary>
+    public bool AddSavePenalty(ObjectRef caster, ObjectRef target, int points, int seconds)
+    {
+        var caller = PreviousObject();
+        if (Self.IsClone || caller == null || caller.Domain != "" || !TrustedTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)) || RestrictedCaller() != null) return false;
+        if (!RealCreature(caster) || !RealCreature(target) || points < 0 || points > 50 || seconds < 0 || seconds > 600) return false;
+        Prune();
+        if (points == 0 || seconds == 0) { penalties.Remove((caster, target)); return true; }
+        penalties[(caster, target)] = (points, Now() + seconds * 1000L);
+        return true;
+    }
+
+    /// <summary>The points the caster's next effect on this target will have off its save chance (0 for none or lapsed). Read-only.</summary>
+    public int QuerySavePenalty(ObjectRef caster, ObjectRef target) =>
+        caster != null && target != null && penalties.TryGetValue((caster, target), out var p) && p.Until > Now() ? p.Points : 0;
+
     private long Now() => TimeMs() + clockShiftMs;
 
     private static string Cap(string text) => text.Length == 0 ? text : char.ToUpper(text[0]) + text.Substring(1);
@@ -133,6 +155,7 @@ public class ControlRules : MudObject
 
     private void Prune()
     {
+        if (penalties.Count > 0) foreach (var key in penalties.Where(kv => kv.Value.Until <= Now() || !kv.Key.caster.IsAlive || !kv.Key.target.IsAlive).Select(kv => kv.Key).ToList()) penalties.Remove(key);
         if (records.Count == 0) return;
         foreach (var dead in records.Keys.Where(k => !k.IsAlive).ToList()) records.Remove(dead);
         if (records.Count > 200)
@@ -175,6 +198,8 @@ public class ControlRules : MudObject
         var boss = rank == "boss";
         var resistance = (int)Math.Round(target.Call<double>("QueryStat", kind + "_resistance"));
         var authority = QueryAuthority((int)Math.Round(caster.Call<double>("QueryStat", "authority")), skillRank);
+        var penalty = penalties.Remove((caster, target), out var marked) && marked.Until > now ? marked.Points : 0; // the mark is used up by this resolution, hit or not
+        authority += penalty;
         var chance = QuerySaveChance(resistance, targetLevel - casterLevel, rank == "elite", authority);
         var roll = Roll();
         var made = roll < chance * 10;

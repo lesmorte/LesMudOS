@@ -622,6 +622,7 @@ public abstract class Room : MudObject
         if (path == null && gates.TryGetValue(direction, out var gate)) path = gate.Path;
         if (secret && Found(who, direction)) path = hidden[direction].Path;
         if (path == null || !who.IsAlive || Environment(who) != Self) return false;
+        if (who.Call<int>("QueryMovementBarred") > 0) { TellObject(who, who.Call<string>("QueryMovementBarLine") + "\n"); return false; } // a binding effect holds it here
         if (!gates.ContainsKey(direction) && !CanUseExit(who, direction))
         {
             TellObject(who, (doors.ContainsKey(direction) && DoorShut(direction) ? DoorRefusal(direction) : locks[direction].Refusal) + "\n");
