@@ -215,6 +215,9 @@ public abstract class Skill : MudObject
     public string QueryCommand() => Command;
     public string QueryKind() => Kind;
     public string QuerySummary() => Summary;
+    /// <summary>Longer help for the skill ("help COMMAND"); shown only to a character who has the skill through a hidden class. "" for none.</summary>
+    protected string HelpText = "";
+    public virtual string QueryHelpText() => HelpText;
     public int QueryEnduranceCost() => EnduranceCost;
     public int QueryFocusCost() => FocusCost;
 

@@ -410,7 +410,18 @@ public abstract class Adventurer : QuestJournal
             Tell($"You have reached level {Level}! You feel stronger and fully healed. Maximum Vitality is now {QueryMaxVitality()}.\n" +
                  $"You have {PointsText(QueryAttributePoints())} to place in your attributes: {{cmd}}improve{{/}} ATTRIBUTE.\n");
             if (Level is 10 or 25 or 50 or 75 or 100) ReportEvent("level.milestone", Level.ToString(), new Dictionary<string, string> { ["level"] = Level.ToString() });
+            LearnClassSkills();
         }
+    }
+
+    /// <summary>A class gives some skills at a level (docs/specs/bureaucrat.md section 7.1): work out what the classes give now and tell the player of any new skill.</summary>
+    private void LearnClassSkills()
+    {
+        var before = classSkills.ToList();
+        RefreshClasses();
+        BindSkillCommands();
+        foreach (var skill in classSkills.Where(k => !before.Contains(k)))
+            Tell($"You have learned {skill.Call<string>("QueryTitle")}: {{cmd}}{skill.Call<string>("QueryCommand")}{{/}}.\n");
     }
 
     // Signposts to the Adventurers Guild (docs/specs/play-feel.md, section 15): for a mortal who has never taken a quest, up to level 10.
@@ -442,19 +453,43 @@ public abstract class Adventurer : QuestJournal
     /// <summary>True if the character has no calling yet (or its class file is gone) and must choose at login.</summary>
     public bool NeedsArchetype() => !adventureBegun && (archetype == "" || ClassFile(archetype) == null);
 
-    /// <summary>The ids of the character's classes, archetype first.</summary>
-    public List<string> QueryClassIds() => new[] { archetype, advancedClass, subclass, prestigeClass }.Where(c => c != "").ToList();
+    private List<string> RawClassIds() => new[] { archetype, advancedClass, subclass, prestigeClass }.Where(c => c != "").ToList();
+
+    private bool IsHiddenClass(string id) => id != "" && ClassFile(id)?.Call<bool>("QueryHidden") == true;
+
+    /// <summary>
+    /// The ids of the character's classes, archetype first. A hidden class is left out when the asker is restricted code (a wizard's
+    /// object can never detect one: docs/specs/hidden-classes.md section 2); the game's own code, which asks through the same call,
+    /// sees it. Anything shown to another player must go through QueryVisibleClassIds.
+    /// </summary>
+    public List<string> QueryClassIds()
+    {
+        var ids = RawClassIds();
+        return RestrictedCaller() != null ? ids.Where(c => !IsHiddenClass(c)).ToList() : ids;
+    }
+
+    /// <summary>The class ids that this viewer may be told of: all of them for the character themselves and for a level 10 wizard, the unhidden ones for everyone else.</summary>
+    public List<string> QueryVisibleClassIds(ObjectRef? viewer)
+    {
+        var ids = RawClassIds();
+        if (viewer == Self || (viewer != null && viewer.IsAlive && viewer.Call<int>("QueryWizLevel") >= 10 && viewer.Domain == "" && RestrictedCaller() == null)) return ids;
+        return ids.Where(c => !IsHiddenClass(c)).ToList();
+    }
 
     public bool QueryHasClass(string id) => id != "" && QueryClassIds().Contains(id);
 
     /// <summary>The class a character has in a tier ("archetype", "advanced", "subclass" or "prestige"), or "".</summary>
-    public string QueryClassOfTier(string tier) => tier switch
+    public string QueryClassOfTier(string tier)
     {
-        "archetype" => archetype, "advanced" => advancedClass, "subclass" => subclass, "prestige" => prestigeClass, _ => "",
-    };
+        var id = tier switch
+        {
+            "archetype" => archetype, "advanced" => advancedClass, "subclass" => subclass, "prestige" => prestigeClass, _ => "",
+        };
+        return id != "" && RestrictedCaller() != null && IsHiddenClass(id) ? "" : id;
+    }
 
     /// <summary>The title of the highest class the character has ("Warrior", later "Knight").</summary>
-    public string QueryClassTitle() => classTitle;
+    public string QueryClassTitle() => RestrictedCaller() != null && IsHiddenClass(advancedClass) ? archetypeName : classTitle;
 
     private ObjectRef? ClassFile(string id)
     {
@@ -488,7 +523,7 @@ public abstract class Adventurer : QuestJournal
         var known = false;
         ObjectRef? archetypeClass = null;
         int vb = 10, vp = 8, eb = 50, ep = 2, fb = 50, fp = 2; // the Adventurer's, for an archetype that names none
-        foreach (var id in QueryClassIds())
+        foreach (var id in RawClassIds())
         {
             var cls = ClassFile(id);
             if (cls == null || (!cls.Call<bool>("QueryEnabled") && cls.Call<string>("QueryTier") != "archetype")) continue;
@@ -505,7 +540,7 @@ public abstract class Adventurer : QuestJournal
             foreach (var a in cls.Call<List<string>>("QueryArmorTypes") ?? new List<string>()) armorAccess.Add(a);
             if (cls.Call<bool>("QueryShield")) shieldAccess = true;
             foreach (var sid in cls.Call<List<string>>("QuerySkills") ?? new List<string>())
-                if (SkillFile(sid) is { } skill && !classSkills.Contains(skill)) classSkills.Add(skill);
+                if (cls.Call<int>("QuerySkillLevel", sid) <= Level && SkillFile(sid) is { } skill && !classSkills.Contains(skill)) classSkills.Add(skill); // a skill given at a level waits for it
             foreach (var tid in cls.Call<List<string>>("QueryTraits") ?? new List<string>())
                 if (SkillFile(tid) is { } trait && !classTraits.Contains(trait)) classTraits.Add(trait);
             if (cls.Call<string>("QueryTier") == "archetype")
@@ -571,7 +606,7 @@ public abstract class Adventurer : QuestJournal
         if (!cls.Call<bool>("QueryEnabled")) return "That class is not open.";
         var tier = cls.Call<string>("QueryTier") ?? "";
         if (tier == "archetype") return "A calling cannot be changed.";
-        if (QueryClassOfTier(tier) != "") return $"You already have a {tier} class.";
+        if (QueryClassOfTier(tier) != "") return $"You already have {(tier == "advanced" ? "an" : "a")} {tier} class.";
         var parent = cls.Call<string>("QueryParent") ?? "";
         if (parent != "" && !QueryHasClass(parent)) return "You do not have the calling this class builds on.";
         var problem = cls.Call<string>("CheckRequirements", Self);
@@ -583,10 +618,13 @@ public abstract class Adventurer : QuestJournal
             case "prestige": prestigeClass = id; break;
             default: return "That class cannot be given.";
         }
+        var had = classSkills.ToList();
         RefreshClasses();
         CheckLevelUp();
         BindSkillCommands();
         Tell($"You are now a {classTitle}.\n");
+        foreach (var skill in classSkills.Where(k => !had.Contains(k) && k.Call<string>("QueryKind") != "trait" && k.Call<string>("QueryCommand") != ""))
+            Tell($"You have learned {skill.Call<string>("QueryTitle")}: {{cmd}}{skill.Call<string>("QueryCommand")}{{/}}.\n");
         PersistNow();
         return null;
     }
@@ -704,6 +742,40 @@ public abstract class Adventurer : QuestJournal
         }
         Write(text.ToString());
         return true;
+    }
+
+    /// <summary>
+    /// What "help NAME" says for a class this character holds (not the calling) or for a skill of a hidden class they hold; null for any
+    /// other word, so that a character without the class gets the answer given to any word the game does not know.
+    /// </summary>
+    protected string? HeldHelp(string topic)
+    {
+        topic = (topic ?? "").Trim().ToLowerInvariant();
+        if (topic == "") return null;
+        foreach (var id in RawClassIds())
+        {
+            var cls = ClassFile(id);
+            if (cls == null || cls.Call<string>("QueryTier") == "archetype") continue;
+            var title = (cls.Call<string>("QueryTitle") ?? "").ToLowerInvariant();
+            if (topic == id || topic == title || topic == (cls.Call<string>("QueryClassName") ?? "").ToLowerInvariant())
+            {
+                var text = new StringBuilder($"{cls.Call<string>("QueryTitle")}\n{cls.Call<string>("QueryDescription")}\n");
+                foreach (var sid in cls.Call<List<string>>("QuerySkills") ?? new List<string>())
+                    if (cls.Call<int>("QuerySkillLevel", sid) <= Level && SkillFile(sid) is { } have) text.Append("  " + SkillLine(have) + "\n");
+                foreach (var sid in cls.Call<List<string>>("QuerySkills") ?? new List<string>())
+                    if (cls.Call<int>("QuerySkillLevel", sid) > Level && SkillFile(sid) is { } later)
+                        text.Append($"  {later.Call<string>("QueryTitle")} (at level {cls.Call<int>("QuerySkillLevel", sid)})\n");
+                return text.ToString();
+            }
+            if (!cls.Call<bool>("QueryHidden")) continue;
+            foreach (var sid in cls.Call<List<string>>("QuerySkills") ?? new List<string>())
+            {
+                if (cls.Call<int>("QuerySkillLevel", sid) > Level || SkillFile(sid) is not { } skill) continue;
+                if (topic == (skill.Call<string>("QueryCommand") ?? "").ToLowerInvariant() || topic == (skill.Call<string>("QueryTitle") ?? "").ToLowerInvariant())
+                    return skill.Call<string>("QueryHelpText") is { Length: > 0 } help ? help + "\n" : SkillLine(skill) + "\n";
+            }
+        }
+        return null;
     }
 
     private string SkillLine(ObjectRef skill)
@@ -1004,6 +1076,7 @@ public abstract class Adventurer : QuestJournal
         AddAction("slay", CmdSlay);
         AddAction("speed", CmdSpeed);
         AddAction("setlevel", CmdSetLevel);
+        AddAction("hidden", CmdHidden);
 
         SetHeartBeat(true);
         adventureBegun = true;
@@ -1480,7 +1553,7 @@ public abstract class Adventurer : QuestJournal
         var corpse = CloneObject("/std/corpse");
         MoveObject(corpse, room);
         foreach (var slot in new[] { "weapon", "shield", "body", "head", "trinket" }) Unequip(slot);
-        foreach (var item in AllInventory()) MoveObject(item, corpse);
+        foreach (var item in AllInventory()) if (!item.Call<bool>("QueryBound")) MoveObject(item, corpse); // a bound item stays with its holder
         if (fee > 0)
         {
             var coins = CloneObject("/std/coins");
@@ -1661,6 +1734,7 @@ public abstract class Adventurer : QuestJournal
         foreach (var (item, n) in plan)
         {
             var description = Describe(item, n);
+            if (item.Call<bool>("QueryBound")) { Write(item.Call<string>("QueryBoundLine") + "\n"); continue; }
             if (MovePortion(item, n, room) == null)
             {
                 // The one rule of a wizard's workshop that a drop can meet (docs/SANDBOX.md).
@@ -1698,6 +1772,8 @@ public abstract class Adventurer : QuestJournal
         var plan = FromInventory(count, all, noun, out var refusal);
         if (plan == null) { NotifyFail(all && noun == "" ? "You have nothing to give." : $"You have no '{Esc(noun)}'."); return false; }
         if (refusal != null) { Write(refusal + "\n"); return true; }
+        var boundOne = plan.FirstOrDefault(p => p.item.Call<bool>("QueryBound"));
+        if (boundOne.item != null) { Write(boundOne.item.Call<string>("QueryBoundLine") + "\n"); plan = plan.Where(p => !p.item.Call<bool>("QueryBound")).ToList(); if (plan.Count == 0) return true; }
         var important = plan.Where(p => p.item.Call<bool>("QueryQuestItem")).ToList();
         if (important.Count > 0 && !all) { Write($"You cannot give away {Describe(important[0].item, important[0].n)}; it is too important.\n"); return true; }
         foreach (var (item, _) in important) Write($"You keep {item.Call<string>("Short")}; it is too important to give away.\n");
@@ -2470,6 +2546,43 @@ public abstract class Adventurer : QuestJournal
         Vitality = QueryMaxVitality();
         FillResources();
         Write($"You are now level {Level} with {xp} experience; the next level needs {(Level >= MaxLevel ? 0 : QueryXpForLevel(Level + 1))}.\n");
+        return true;
+    }
+
+    /// <summary>
+    /// "hidden": level 10 only, to anyone else not a command. Lists the hidden classes with their counts, the people for one, serves a summons to a
+    /// mortal who is playing (a test aid), clears a record, sets the loot counter, fixes the dice and runs the roll's formula many times.
+    /// Everything is the register's (/secure/hidden), which checks the level again.
+    /// </summary>
+    private bool CmdHidden(string args)
+    {
+        if (!IsWizard(10)) return false;
+        var reg = LoadObject("/secure/hidden");
+        var w = args.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        const string usage = "Usage: {cmd}hidden{/} | {cmd}hidden{/} CLASS | {cmd}hidden grant{/} NAME CLASS | {cmd}hidden reset{/} NAME CLASS | {cmd}hidden count{/} NAME CLASS N | {cmd}hidden dice{/} N|random | {cmd}hidden simulate{/} CLASS TRIALS | {cmd}hidden refusals{/}\n";
+        if (w.Length == 0 || (w.Length == 1 && w[0] != "refusals" && w[0] != "dice"))
+        {
+            var lines = reg.Call<List<string>>("Report", w.Length == 0 ? "" : w[0]) ?? new List<string>();
+            Write(lines.Count == 0 ? "No hidden classes" + (w.Length == 0 ? "" : " by that name") + ".\n" : string.Join("\n", lines) + "\n");
+            return true;
+        }
+        string? answer = null;
+        switch (w[0])
+        {
+            case "grant" when w.Length == 3: answer = reg.Call<string>("Grant", w[1], w[2]); Write(answer == "" ? $"A summons is served to {w[1]}.\n" : answer + "\n"); return true;
+            case "reset" when w.Length == 3: answer = reg.Call<string>("Reset", w[1], w[2]); Write(answer == "" ? $"The record of {w[1]} is cleared.\n" : answer + "\n"); return true;
+            case "count" when w.Length == 4 && int.TryParse(w[3], out var n): answer = reg.Call<string>("SetLooted", w[1], w[2], n); Write(answer == "" ? "Counted.\n" : answer + "\n"); return true;
+            case "dice" when w.Length == 1: Write($"Dice: {reg.Call<string>("DiceMode")}\n"); return true;
+            case "dice" when w.Length == 2: Write(reg.Call<bool>("SetTestRolls", w[1] == "random" ? "random" : "roll:" + w[1]) ? $"Dice: {reg.Call<string>("DiceMode")}\n" : "Not set.\n"); return true;
+            case "simulate" when w.Length == 3 && int.TryParse(w[2], out var trials):
+                var sims = reg.Call<List<int>>("Simulate", w[1], trials) ?? new List<int>();
+                if (sims.Count == 0) { Write("There is no such hidden class.\n"); return true; }
+                var sorted = sims.OrderBy(x => x).ToList();
+                Write($"{sims.Count} trials: mean {sims.Average():0.0}, median {sorted[sorted.Count / 2]}, 90th {sorted[(int)(sorted.Count * 0.9)]}, never {sorted[0]} before, longest {sorted[^1]}\n");
+                return true;
+            case "refusals": Write(string.Join("\n", reg.Call<List<string>>("Refusals") ?? new List<string>()) + "\n"); return true;
+        }
+        Write(usage);
         return true;
     }
 

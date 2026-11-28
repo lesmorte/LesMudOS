@@ -21,11 +21,14 @@ public sealed class PublicFilter
     public IReadOnlyList<string> PublicEvents { get; }
     public IReadOnlyList<string> ForbiddenTerms { get; }
     public IReadOnlyList<string> PublicPlaces { get; }
+    /// <summary>The only advanced or prestige class ids a page may name. A class not listed is never shown (a hidden class is never listed).</summary>
+    public IReadOnlyList<string> PublicClasses { get; }
     public bool Loaded { get; }
     private readonly string[] _terms;
 
-    public PublicFilter(IEnumerable<string> hiddenPrefixes, IEnumerable<string> publicEvents, IEnumerable<string> forbiddenTerms, IEnumerable<string> publicPlaces, bool loaded = true)
+    public PublicFilter(IEnumerable<string> hiddenPrefixes, IEnumerable<string> publicEvents, IEnumerable<string> forbiddenTerms, IEnumerable<string> publicPlaces, bool loaded = true, IEnumerable<string>? publicClasses = null)
     {
+        PublicClasses = (publicClasses ?? Array.Empty<string>()).Select(s => s.Trim().ToLowerInvariant()).Where(s => s != "").ToList();
         HiddenEventPrefixes = hiddenPrefixes.Select(s => s.Trim().ToLowerInvariant()).Where(s => s != "").ToList();
         PublicEvents = publicEvents.Select(s => s.Trim().ToLowerInvariant()).Where(s => s != "").ToList();
         ForbiddenTerms = forbiddenTerms.Select(s => s.Trim()).Where(s => s != "").ToList();
@@ -47,7 +50,7 @@ public sealed class PublicFilter
             var root = doc.RootElement;
             List<string> List(string name) => root.TryGetProperty(name, out var e) && e.ValueKind == JsonValueKind.Array
                 ? e.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!).ToList() : new List<string>();
-            return new PublicFilter(List("hiddenEventPrefixes"), List("publicEvents"), List("forbiddenTerms"), List("publicPlaces"));
+            return new PublicFilter(List("hiddenEventPrefixes"), List("publicEvents"), List("forbiddenTerms"), List("publicPlaces"), publicClasses: List("publicClasses"));
         }
         catch (Exception ex)
         {
@@ -55,6 +58,9 @@ public sealed class PublicFilter
             return ClosedFilter;
         }
     }
+
+    /// <summary>May a page print this class id? Only if the filter lists it.</summary>
+    public bool ClassIsPublic(string? id) => !string.IsNullOrWhiteSpace(id) && PublicClasses.Contains(id.Trim().ToLowerInvariant());
 
     /// <summary>Lower-case, every run of non-letters and non-digits becomes one space.</summary>
     public static string Normalize(string? s)

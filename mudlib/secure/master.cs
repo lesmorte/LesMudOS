@@ -20,7 +20,7 @@ public class Master : MudObject, IMaster
 
     public override void Create() => SetHeartBeat(true); // the workshop invariant, below
 
-    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/crafting", "/secure/comm", "/secure/channels", "/secure/roomids", "/secure/gmcp", Roster, Publish, Throttle, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
+    public IEnumerable<string> Preload() => new[] { WizList, LostProperty, "/secure/chronicle", "/secure/renown", "/secure/rumors", "/secure/events", "/secure/finds", "/secure/hidden", "/secure/crafting", "/secure/comm", "/secure/channels", "/secure/roomids", "/secure/gmcp", Roster, Publish, Throttle, "/std/void", "/domains/town/square", "/domains/hollow/village/square", "/domains/hollow/village/guest_rooms" };
 
     // Save files: player bodies own /players/*, the wizard registry owns its own file. Restricted code owns none, and a character in
     // the workshop is never written.
@@ -36,7 +36,7 @@ public class Master : MudObject, IMaster
         if (path == LostProperty || path == LegacyVault) return !caller.IsClone && caller.ProgramPath == LostProperty;
         // The history daemons (and the register of finds, the register of room numbers and the publication register) each own the
         // save file of their own name.
-        if (path is "/secure/chronicle" or "/secure/renown" or "/secure/rumors" or "/secure/events" or "/secure/finds" or "/secure/roomids" or Publish) return !caller.IsClone && caller.ProgramPath == path;
+        if (path is "/secure/chronicle" or "/secure/renown" or "/secure/rumors" or "/secure/events" or "/secure/finds" or "/secure/hidden" or "/secure/roomids" or Publish) return !caller.IsClone && caller.ProgramPath == path;
         return path.StartsWith("/players/") && IsPlayerBody(caller);
     }
 

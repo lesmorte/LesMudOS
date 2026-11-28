@@ -112,7 +112,7 @@ public sealed class GameData
                     : _renown.Titles.TryGetValue(key, out var list) && list.Count > 0 ? list[^1] : "";
                 Character? ch = roster != null && roster.TryGetValue(key, out var found) ? found : null;
                 var calling = ch is { Calling: not "" } ? Cap(ch.Calling) : null;
-                var cls = ch is { AdvancedClass: not "" } ? Cap(ch.AdvancedClass) : null;
+                var cls = ch is { AdvancedClass: not "" } && _filter.ClassIsPublic(ch.AdvancedClass) ? Cap(ch.AdvancedClass) : null; // a class not on the whitelist is never printed
                 heroes.Add(new Hero(Cap(key), value, TierOf(value), title, calling, cls));
             }
         }

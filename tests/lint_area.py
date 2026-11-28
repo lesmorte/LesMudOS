@@ -180,6 +180,16 @@ def exits_in(toks):
     return out
 
 
+def gated_exits_in(toks):
+    """(direction, destination) for every `GatedExit("dir", "/path", ...)` with plain literals (docs/specs/hidden-classes.md section 6)."""
+    out = []
+    for k in range(len(toks)):
+        if (is_id(toks[k], "GatedExit") and is_op(at(toks, k + 1), "(") and is_str(at(toks, k + 2)) and is_op(at(toks, k + 3), ",")
+                and is_str(at(toks, k + 4)) and not toks[k + 2][1].interp and not toks[k + 4][1].interp):
+            out.append((toks[k + 2][1].raw, toks[k + 4][1].raw))
+    return out
+
+
 def doors_in(toks):
     """The direction of every `AddDoor("dir", ...)` with a plain literal."""
     out = []
@@ -762,6 +772,158 @@ def lint_hidden(lib, p, src, exits, report):
             break
 
 
+# ---- Check 20: hidden classes (docs/specs/hidden-classes.md section 10) ----
+
+def norm_words(text):
+    """Lower case, every run of non-letters and non-digits one space, with a space at each end, for whole-word matching."""
+    return " " + re.sub(r"[^a-z0-9]+", " ", text.lower()).strip() + " "
+
+
+def string_values(toks, name):
+    """Every string literal in the statements that mention `name` (e.g. Skills.Add("x"), Skills.AddRange(new[] { "x", "y" }))."""
+    out = []
+    k = 0
+    while k < len(toks):
+        if is_id(toks[k], name) and is_op(at(toks, k + 1), "."):
+            j = k
+            while j < len(toks) and not is_op(toks[j], ";"):
+                if is_str(toks[j]):
+                    out.append(toks[j][1].raw)
+                j += 1
+            k = j
+        k += 1
+    return out
+
+
+class HiddenClassInfo:
+    """What the lint needs to know of one hidden class, read from its class file and skill files."""
+
+    def __init__(self, lib, path):
+        src = lib.source(path)
+        t = src.toks
+        self.path = path
+        self.id = path.rsplit("/", 1)[1]
+
+        def first(name):
+            for lits, ok in assignments(t, name):
+                if ok:
+                    return "".join(l.raw for l in lits)
+            return ""
+        self.title, self.name, self.tagline = first("Title"), first("ClassName"), first("Tagline")
+        self.quest, self.gate = first("QuestId"), first("GateKey")
+        self.own = [x for x in string_values(t, "OwnPaths") if x]
+        self.skill_ids = string_values(t, "Skills")
+        self.skill_paths = ["/skills/" + sid for sid in self.skill_ids]
+        self.skill_titles = []
+        for sp in self.skill_paths:
+            if lib.is_file(sp):
+                title = ""
+                for lits, ok in assignments(lib.source(sp).toks, "Title"):
+                    if ok:
+                        title = "".join(l.raw for l in lits)
+                        break
+                if title:
+                    self.skill_titles.append(title)
+        # Words that may not appear in public text. The quest id, hyphen as a space, only counts outside the class's own files.
+        self.words = [w for w in {self.id, self.title, self.name, *self.skill_ids, *self.skill_titles, self.tagline.split("\n")[0].split(". ")[0]} if len(w.strip()) >= 3]
+        self.quest_words = [self.quest.replace("-", " ")] if self.quest else []
+
+    def is_own(self, mudpath):
+        if mudpath == self.path or mudpath in self.skill_paths:
+            return True
+        return any(mudpath.startswith(o) for o in self.own)
+
+    def hits(self, text, with_quest):
+        n = norm_words(text)
+        found = [w for w in self.words if norm_words(w) in n]
+        if with_quest:
+            found += [w for w in self.quest_words if norm_words(w) in n]
+        return found
+
+
+def repo_root_of(lib):
+    return os.path.dirname(lib.root)
+
+
+PUBLIC_TEXT_EXT = (".md", ".json", ".html", ".htm", ".js", ".css", ".txt", ".lua", ".xml", ".sh", ".py", ".razor", ".cshtml", ".yml", ".yaml", ".toml", ".service", ".timer", ".conf")
+SKIP_DIRS = {"bin", "obj", ".git", "node_modules", "__pycache__", "wwwroot-lib"}
+
+
+def public_files(root):
+    """(relative path, absolute path) of every file a visitor or a player could be shown something from, outside the mudlib: web, clients, deploy, README and docs/*.md except docs/specs."""
+    for top in ("web", "clients", "deploy"):
+        base = os.path.join(root, top)
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+            for fn in filenames:
+                yield os.path.relpath(os.path.join(dirpath, fn), root).replace(os.sep, "/"), os.path.join(dirpath, fn)
+    for fn in sorted(os.listdir(root)) if os.path.isdir(root) else []:
+        if fn.endswith(".md"):
+            yield fn, os.path.join(root, fn)
+    docs = os.path.join(root, "docs")
+    for fn in sorted(os.listdir(docs)) if os.path.isdir(docs) else []:
+        if fn.endswith(".md"):
+            yield "docs/" + fn, os.path.join(docs, fn)
+
+
+def lint_secret(lib, everything, report):
+    classes = []
+    for p in everything:
+        if not p.startswith("/classes/"):
+            continue
+        text = lib.source(p).text
+        if re.search(r"\bHidden\s*=\s*true\s*;", text):
+            classes.append(HiddenClassInfo(lib, p))
+    if not classes:
+        return
+    root = repo_root_of(lib)
+    flt_path = os.path.join(root, "web", "LesMudOS.Web", "publicfilter.json")
+    flt_text = open(flt_path, encoding="utf-8", errors="replace").read() if os.path.isfile(flt_path) else ""
+    flt_clean = re.sub(r"(?m)^\s*//.*$", "", flt_text)
+    for c in classes:
+        here = c.path
+        if not c.own:
+            report(here, 20, WARN, "a hidden class has no OwnPaths (the files that may speak of it)")
+        if c.gate and (norm_words(c.id) in norm_words(c.gate) or (c.title and norm_words(c.title) in norm_words(c.gate)) or norm_words(c.gate).strip() in norm_words(c.id)):
+            report(here, 20, ERROR, f'the gate key "{c.gate}" contains the class id or title (it appears in a public room file)')
+        if re.search(r'"class\.hidden"', flt_clean) is None:
+            report(here, 20, ERROR, 'class.hidden is missing from hiddenEventPrefixes in publicfilter.json')
+        m = re.search(r'"publicClasses"\s*:\s*\[(.*?)\]', flt_clean, re.S)
+        if m and re.search(r'"' + re.escape(c.id) + r'"', m.group(1)):
+            report(here, 20, ERROR, f'the class id "{c.id}" is in publicClasses')
+        # Strings in the mudlib: every literal (comments are dropped by the lexer), except in the class's own files.
+        for p in everything:
+            if c.is_own(p):
+                continue
+            src = lib.source(p)
+            for kind, val in src.toks:
+                if kind != "str":
+                    continue
+                raw = val.raw
+                if raw.startswith(PATH_PREFIXES):
+                    continue
+                for w in c.hits(raw, True):
+                    report(p, 20, ERROR, f'a string shows the hidden class ({w!r}): {raw[:60]!r}')
+        for p in everything:
+            if any(p.startswith(o) for o in c.own) and re.search(r'"class\.advanced"', lib.source(p).text):
+                report(p, 20, ERROR, 'a file of the hidden class reports class.advanced (use class.hidden)')
+        for rel, absp in public_files(root):
+            try:
+                text = open(absp, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            if rel.endswith(".cs"):
+                toks = lex(text)
+                strings = [v.raw for k, v in toks if k == "str"]
+                text = "\n".join(strings)
+            elif not rel.endswith(PUBLIC_TEXT_EXT):
+                continue
+            elif rel.endswith("publicfilter.json"):
+                text = flt_clean
+            for w in c.hits(text, True):
+                report("/" + rel, 20, ERROR, f'public text shows the hidden class ({w!r})')
+
+
 def run(root, flt):
     lib = Mudlib(root)
     everything = lib.all_paths()
@@ -790,6 +952,7 @@ def run(root, flt):
         is_room = src.inherit == "/std/room"
         is_npc = "npc" in parts[:-1]
         exits = exits_in(src.toks)
+        gated = gated_exits_in(src.toks)
 
         # Check 4: the inherit line.
         if src.inherit is None:
@@ -798,14 +961,14 @@ def run(root, flt):
             report(p, 4, ERROR, f"inherits {src.inherit}, which does not exist")
 
         # Check 1: every exit names an existing file.
-        for direction, dest in exits:
+        for direction, dest in exits + gated:
             if not lib.is_file(dest):
                 report(p, 1, ERROR, f'exit "{direction}" leads to {dest}, which does not exist')
 
         # Check 2: every exit has a way back (a warning: one-way exits are sometimes deliberate).
-        for direction, dest in exits:
+        for direction, dest in exits + gated:
             if lib.is_file(dest):
-                back = [d for _, d in exits_in(lib.source(dest).toks)]
+                back = [d for _, d in exits_in(lib.source(dest).toks) + gated_exits_in(lib.source(dest).toks)]
                 if p not in back:
                     report(p, 2, WARN, f'exit "{direction}" to {dest} has no exit back to {p}')
 
@@ -943,6 +1106,8 @@ def run(root, flt):
     # Checks 17 and 18: tags, and what names and descriptions say about weapons (they read the registry's text; a mudlib without one skips them).
     lint_tags(lib, everything, report)
     lint_words(lib, everything, report)
+    # Check 20: a hidden class is named nowhere a player without it, or a visitor to the site, can read.
+    lint_secret(lib, everything, report)
 
     shown = [r for r in problems if flt in r[0]]
     shown.sort(key=lambda r: (r[0], r[1], r[3]))

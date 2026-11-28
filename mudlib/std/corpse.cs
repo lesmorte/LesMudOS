@@ -48,6 +48,14 @@ public class Corpse : Thing
     private long diedAtMs;
     private static readonly string[] TrustedTrees = { "/std/", "/secure/", "/domains/", "/classes/", "/skills/", "/events/" };
 
+    // What the hidden-class roll needs to know of the dead creature (docs/specs/hidden-classes.md section 5): only a creature of the real game
+    // that itself sets the corpse up can make it count; a wizard's creature, a player's corpse and a corpse made by anything else cannot.
+    private bool summonable;
+    private bool creatureBoss;
+    private int creatureXp;
+    private bool noSummons;
+    private readonly HashSet<string> rolled = new();
+
     private ObjectRef? setupBy;
     private readonly HashSet<string> entitled = new();
 
@@ -115,6 +123,10 @@ public class Corpse : Thing
         var chronicle = deceased.Call<string>("get_ChronicleKind") ?? "";
         creatureKind = chronicle != "" ? chronicle : file;
         creatureLevel = deceased.Call<int>("QueryLevel");
+        summonable = true;
+        creatureBoss = deceased.Call<bool>("QueryBoss");
+        creatureXp = deceased.Call<int>("QueryXpValue");
+        noSummons = deceased.Call<bool>("QueryNoSummons");
         skinKind = Clean(deceased.Call<string>("get_Skin"));
         bloodKind = Clean(deceased.Call<string>("get_Blood"));
         spawnRoom = deceased.Call<ObjectRef>("QuerySpawnRoom");
@@ -280,6 +292,7 @@ public class Corpse : Thing
             left -= n;
         }
         Hand(plan, taker);
+        RollForSummons(taker);
         AfterTaking();
         return null;
     }
@@ -293,6 +306,7 @@ public class Corpse : Thing
         var items = Contents();
         if (items.Count == 0) return $"There is nothing in {Short()}.";
         Hand(items.Select(i => (i, QuantityOf(i))).ToList(), taker);
+        RollForSummons(taker);
         AfterTaking();
         return null;
     }
@@ -322,6 +336,31 @@ public class Corpse : Thing
             if (room != null) TellRoom(room, $"{taker.Call<string>("QueryName")} takes {description} from {Short()}.\n", taker);
             foreach (var held in g.held.Distinct()) held.Call("Taken", taker);
         }
+    }
+
+    /// <summary>
+    /// A character who shared in the kill has taken something: count the loot for the hidden classes and, if a summons is served, put it in
+    /// their pack and tell them alone. The register decides everything (who is eligible, the counter, the dice); this only asks, once per
+    /// character per corpse, and only for a creature of the real game. A character who gets nothing is told nothing.
+    /// </summary>
+    private void RollForSummons(ObjectRef taker)
+    {
+        if (!summonable || playerCorpse || Self.Domain != "") return;
+        var name = NameOfPlayer(taker);
+        if (name == "" || (name != killerName && !entitled.Contains(name)) || rolled.Count >= 50 || !rolled.Add(name)) return;
+        string id;
+        try { id = LoadObject("/secure/hidden").Call<string>("RollOnLoot", taker, creatureLevel, creatureBoss, creatureXp, noSummons) ?? ""; }
+        catch (MudRuntimeException) { return; }
+        if (id == "") return;
+        try
+        {
+            var cls = LoadObject("/secure/classes").Call<ObjectRef>("Class", id);
+            var path = cls?.Call<string>("QuerySummonsItem") ?? "";
+            if (path != "") MoveObject(CloneObject(path), taker); // a broken file: the record stands and the door re-issues the paper
+            var line = cls?.Call<string>("QueryLine", "found") ?? "";
+            if (line != "") TellObject(taker, line.Replace("{corpse}", Short()) + "\n");
+        }
+        catch (MudRuntimeException) { }
     }
 
     private void AfterTaking()

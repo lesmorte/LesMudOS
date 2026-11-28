@@ -118,7 +118,7 @@ say "Installing the sync job"
 cat > "$SYNC_BIN" <<'SYNC'
 #!/usr/bin/env python3
 """Copies what the public website may read out of the game's save directory. Runs as the game's user.
-Usage: lesmudos-web-sync SAVE_DIR DATA_DIR
+Usage: lesmudos-web-sync SAVE_DIR DATA_DIR [FILTER_FILE]
 Copies chronicle.json, renown.json and wizlist.json (only if they are whole JSON) and writes roster.json with, for each
 character, name, level, calling and advanced class. Password hashes and everything else in a character file are never read
 into the output."""
@@ -126,6 +126,17 @@ import json, os, re, sys, tempfile
 
 save, data = sys.argv[1], sys.argv[2]
 NAME = re.compile(r"^[a-z]{2,16}$")
+
+# The classes a page may name (publicClasses in publicfilter.json). A class that is not listed is written to roster.json as "": the
+# copy the website reads never holds the id of a hidden class (the page checks the list too; two locks). No list, no class.
+public_classes = set()
+if len(sys.argv) > 3:
+    try:
+        with open(sys.argv[3]) as f:
+            text = re.sub(r"(?m)^\s*//.*$", "", f.read())
+        public_classes = {c.strip().lower() for c in json.loads(text).get("publicClasses", []) if isinstance(c, str)}
+    except Exception as e:
+        print(f"filter unreadable, no class will be copied: {e}", file=sys.stderr)
 
 def write(name, payload):
     fd, tmp = tempfile.mkstemp(dir=data, prefix="." + name + ".")
@@ -169,7 +180,7 @@ for entry in sorted(os.listdir(players)) if os.path.isdir(players) else []:
         level = c.get("Level", 1)
         roster[name] = {"level": level if isinstance(level, int) else 1,
                         "calling": c["archetype"] if isinstance(c.get("archetype"), str) else "",
-                        "class": c["advancedClass"] if isinstance(c.get("advancedClass"), str) else ""}
+                        "class": c["advancedClass"] if isinstance(c.get("advancedClass"), str) and c["advancedClass"].lower() in public_classes else ""}
     except Exception as e:
         print(f"skipped character {name}: {e}", file=sys.stderr)
         if name in previous:
@@ -188,7 +199,7 @@ Type=oneshot
 User=$GAME_USER
 Group=$WEB_USER
 UMask=0027
-ExecStart=$SYNC_BIN $SAVE_DIR $DATA_DIR
+ExecStart=$SYNC_BIN $SAVE_DIR $DATA_DIR $WEB_DIR/publicfilter.json
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

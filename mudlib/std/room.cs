@@ -141,6 +141,52 @@ public abstract class Room : MudObject
         ArmReset();
     }
 
+    // ---- Gated exits (docs/specs/hidden-classes.md section 6) ----
+    // A gated exit is not in Exits: it is not listed, not in QueryExits and not found by Tracking. The room binds its verbs for everyone,
+    // and the handler asks the hidden-class register whether this character may pass; if not it returns false without a word, so the
+    // command falls through to the answer any unknown command gets.
+
+    private readonly Dictionary<string, (string Path, string Key, string[] Verbs)> gates = new();
+    private readonly List<string> gateDetails = new();
+
+    /// <summary>
+    /// An exit that exists only for a character the register of hidden classes admits (the gate key names the class, opaquely). verbs are
+    /// the words that open it (the direction is always one). The class's own lines are printed; this file holds none of them.
+    /// </summary>
+    protected void GatedExit(string direction, string destination, string gateKey, params string[] verbs)
+        => gates[direction] = (destination, gateKey, verbs.Append(direction).Distinct().ToArray());
+
+    /// <summary>Detail names (as in AddDetail) to which the gate's own "look" line is added for a character who may pass.</summary>
+    protected void GateDetail(string names) => gateDetails.AddRange(Names(names));
+
+    public bool HasGate(string key) => gates.Values.Any(g => g.Key == key);
+
+    private bool GateAdmits(ObjectRef? who, string key) => who != null && LoadObject("/secure/hidden").Call<bool>("Admits", who, key);
+
+    private bool GateVerb(string args)
+    {
+        var who = ThisPlayer();
+        var verb = QueryVerb();
+        if (who == null) return false;
+        var gate = gates.FirstOrDefault(g => g.Value.Verbs.Contains(verb));
+        if (gate.Key == null || !GateAdmits(who, gate.Value.Key)) return false;
+        if (verb == "open" && args.Trim() != "" && !(Names("door,inner door,the door,the inner door").Contains(args.Trim().ToLowerInvariant()))) return false;
+        if (verb == "knock" && args.Trim() != "" && !(Names("door,inner door,on door,on the door,on the inner door,at the door").Contains(args.Trim().ToLowerInvariant()))) return false;
+        if (who.Call<bool>("QueryInCombat"))
+        {
+            TellObject(who, "You are in the middle of a fight and cannot just walk away. Try {cmd}flee{/} (or {cmd}flee{/} DIRECTION).\n");
+            return true;
+        }
+        var register = LoadObject("/secure/hidden");
+        var stage = register.Call<int>("GateStage", who, gate.Value.Key);
+        var held = register.Call<string>("GateLine", who, gate.Value.Key, "open") ?? "";
+        var line = stage >= 9 || stage == 0 ? held : register.Call<string>("GateLine", who, gate.Value.Key, stage <= 1 ? "knock" : "again") ?? "";
+        if (stage >= 1 && stage < 9 && register.Call<bool>("Reissue", who, gate.Value.Key) && register.Call<string>("GateLine", who, gate.Value.Key, "reissue") is { Length: > 0 } lost) line = lost + "\n" + line;
+        if (line != "") TellObject(who, line + "\n");
+        MoveThrough(who, gate.Key);
+        return true;
+    }
+
     /// <summary>The exit can only be used by someone carrying an object that answers to keyId.</summary>
     protected void LockExit(string direction, string keyId, string refusal)
     {
@@ -375,7 +421,14 @@ public abstract class Room : MudObject
 
     public string QueryRegionName() => FindArea()?.Call<string>("QueryRegionName") ?? "";
 
-    public virtual string? QueryDetail(string name) => details.GetValueOrDefault(Names(name).FirstOrDefault() ?? "") ?? DoorDetail(name);
+    public virtual string? QueryDetail(string name)
+    {
+        var text = details.GetValueOrDefault(Names(name).FirstOrDefault() ?? "") ?? DoorDetail(name);
+        if (text != null && gateDetails.Count > 0 && gateDetails.Contains(Names(name).FirstOrDefault() ?? "") && ThisPlayer() is { } who)
+            foreach (var gate in gates.Values)
+                if (LoadObject("/secure/hidden").Call<string>("GateLine", who, gate.Key, "look") is { Length: > 0 } extra) text += "\n" + extra;
+        return text;
+    }
 
     /// <summary>"look at door", "look at iron gate": what a door looks like and what state it is in. Only if no detail has the name.</summary>
     private string? DoorDetail(string name)
@@ -495,6 +548,7 @@ public abstract class Room : MudObject
         foreach (var spawn in spawns) text.Append($"  Spawn {spawn.Path} x{spawn.Count}: {spawn.Handles.Count(h => h.IsAlive)} alive\n");
         foreach (var encounter in encounters) text.Append($"  Encounter {encounter.Path} {encounter.Percent}%\n");
         foreach (var exit in Exits) text.Append($"  Exit {exit.Key} -> {exit.Value}{(locks.ContainsKey(exit.Key) ? " (locked)" : "")}\n");
+        foreach (var gate in gates) text.Append($"  Gated exit {gate.Key} -> {gate.Value.Path} (gate {gate.Value.Key})\n");
         foreach (var door in doors) text.Append($"  Door {door.Key}: {door.Value.Name}, {QueryDoorState(door.Key)}, key '{door.Value.KeyId}', closes on reset {door.Value.ClosesOnReset}\n");
         foreach (var exit in hidden) text.Append($"  Hidden exit {exit.Key} -> {exit.Value.Path} (difficulty {exit.Value.Difficulty}{(exit.Value.Difficulty > 0 ? $", {5 * (21 - Math.Clamp(exit.Value.Difficulty, 2, 20))}% for Insight 5" : ", by detail only")}{(exit.Value.Landmark ? ", landmark" : "")}, detail '{string.Join(",", exit.Value.Hints)}'{(locks.ContainsKey(exit.Key) ? ", locked" : "")})\n");
         foreach (var thing in hiddenThings.Values)
@@ -511,6 +565,7 @@ public abstract class Room : MudObject
         var who = ThisPlayer();
         if (who == null || !Interactive(who)) return;
         var bound = new HashSet<string>();
+        foreach (var gate in gates.Values) foreach (var verb in gate.Verbs) if (bound.Add(verb)) AddAction(verb, GateVerb);
         foreach (var direction in Exits.Keys.Concat(locks.Keys).Concat(hidden.Keys).Distinct().ToList())
         {
             AddAction(direction, GoExit);
@@ -564,9 +619,10 @@ public abstract class Room : MudObject
     {
         var secret = !Exits.ContainsKey(direction) && hidden.ContainsKey(direction);
         string? path = Exits.GetValueOrDefault(direction);
+        if (path == null && gates.TryGetValue(direction, out var gate)) path = gate.Path;
         if (secret && Found(who, direction)) path = hidden[direction].Path;
         if (path == null || !who.IsAlive || Environment(who) != Self) return false;
-        if (!CanUseExit(who, direction))
+        if (!gates.ContainsKey(direction) && !CanUseExit(who, direction))
         {
             TellObject(who, (doors.ContainsKey(direction) && DoorShut(direction) ? DoorRefusal(direction) : locks[direction].Refusal) + "\n");
             return false;
@@ -857,6 +913,7 @@ public abstract class Room : MudObject
         var wizard = viewer != null && viewer.Call<int>("QueryWizLevel") >= 1;
         // Hidden exits are listed for a character who has found them; a wizard sees all of them, marked.
         var ways = Exits.Keys.Concat(hidden.Keys.Where(d => !Exits.ContainsKey(d) && viewer != null && (wizard || Found(viewer, d)))).ToList();
+        foreach (var gate in gates) if (!ways.Contains(gate.Key) && GateAdmits(viewer, gate.Value.Key)) ways.Add(gate.Key);
         text.Append(ways.Count == 0 ? "There are no obvious exits.\n" : "Obvious exits: " + string.Join(", ", ways.Select(d => "{cmd}" + d + "{/}" + DoorExitNote(d) + (wizard && hidden.ContainsKey(d) && !Exits.ContainsKey(d) ? " (hidden)" : "") + (detailed ? ExitNote(d, viewer!) : ""))) + "\n");
 
         // Identical shorts are merged: "Two giant rats are here." Things lying about (not creatures) are listed the same way as

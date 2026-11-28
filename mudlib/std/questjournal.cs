@@ -452,6 +452,15 @@ public abstract class QuestJournal : Living
         return result;
     }
 
+    /// <summary>The giver's own line about how far this character has got in an active quest (its ProgressNote), or "". The giver is trusted code; anything else gives none.</summary>
+    private string ProgressNoteOf(string id)
+    {
+        var path = Fld(id, "giverpath");
+        if (path == "" || !TrustedPath(path)) return "";
+        try { return Clean(LoadObject(path).Call<string>("QueryProgressNote", id, Self) ?? "", 240); }
+        catch (MudRuntimeException) { return ""; }
+    }
+
     private string ProgressKey(string id) => string.Join(",", Objectives(id).Select(o => o.have));
 
     private static string ProgressText(List<(string text, int have, int need)> objectives)
@@ -648,6 +657,7 @@ public abstract class QuestJournal : Living
                 foreach (var o in objectives)
                     text.Append(Wrapped($"[{(o.have >= o.need ? "x" : " ")}] {Escaped(o.text)}" + (o.need > 1 ? $" ({o.have} of {o.need})" : ""), "  "));
             }
+            if (ProgressNoteOf(id) is { Length: > 0 } progressNote) text.Append(Wrapped(Escaped(progressNote)));
             text.Append("Conversation:\n");
             var log = LogOf(id);
             if (Fld(id, "trimmed") == "1") text.Append(Wrapped(GapText, "  "));
@@ -847,6 +857,7 @@ public abstract class QuestJournal : Living
                 d["objective"] = string.Join("; ", objectives.Select(o => o.text));
                 d["progress"] = ProgressText(objectives);
                 d["objectives"] = objectives.Select(o => (object?)new Dictionary<string, object?> { ["text"] = o.text, ["have"] = o.have, ["need"] = o.need }).ToList();
+                if (ProgressNoteOf(id) is { Length: > 0 } progressNote) d["note"] = Plain(progressNote);
                 d["entries"] = LogOf(id).Count;
                 d["seq"] = (int)Num(id, "seq");
             }

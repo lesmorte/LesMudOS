@@ -63,6 +63,9 @@ public class Npc : Living
         };
     }
 
+    /// <summary>One line about how far this character has got in an active quest of this giver, shown by the journal under the objectives; null for none (docs/specs/bureaucrat.md section 7.7).</summary>
+    public virtual string? QueryProgressNote(string questId, ObjectRef who) => null;
+
     /// <summary>What this NPC says of one of its quests (title, area, completed, abandoned, items, objectives, abandonable, giver), or null. The journal reads it.</summary>
     public Dictionary<string, string>? QueryQuestDefinition(string id) => questDefs.TryGetValue(id, out var d) ? new Dictionary<string, string>(d) : null;
 
