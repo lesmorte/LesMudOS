@@ -376,6 +376,10 @@ class Fighter:
         self.strike_ambush = False  # the Precision Strike in progress is the blow that starts the fight from hiding
         self.n_act = 0              # actions this player has begun in the current fight (BALANCE_SCOUT.md: a creature killed by the first one)
         self.dmg_in = 0             # Vitality this player has lost to blows (not to potions) since it was reset
+        self.restrained_until = 0   # the hidden class's order: this creature may not melee the player until then (ms)
+        self.bars = {}              # barred action ids or kinds -> until (ms)
+        self.ward = (0, 0)          # (attacks the next of which are refused, until ms) on a player
+        self.ctl = None             # the hidden class's control module of this fight (None: nothing changes)
 
     def rank(self, skill):
         return self.ranks.get(skill, 1)
@@ -394,11 +398,15 @@ class Fighter:
         return sum(e[1].get(key, 0) for e in self.effects.values() if e[0] > t)
 
     def speed(self, t=0):
-        f = 1.0
+        """Final speed factor: hastes multiply, slows multiply and the product of the slows is held to x2.0 (Living.QuerySpeedFactor)."""
+        f, slow = 1.0, 1.0
         for e in self.effects.values():
             if e[0] > t:
-                f *= e[2]
-        return f
+                if e[2] > 1.0:
+                    slow *= e[2]
+                else:
+                    f *= e[2]
+        return f * min(2.0, slow)
 
     def attack(self, t=0):
         return rnd(self.rate * self.level) + self.to_hit + (self.bless_bonus[0] if t < self.bless_until else 0) + int(self.mod("tohit", t)) + stat(self.attrs, "precision")
@@ -566,6 +574,8 @@ def player_acts(p):
 
 def skill_cost(p, act_id):
     """(Endurance, Focus) an act costs this player at its rank, as Living.UseSkill: the rank's whole cost, then the spell cost modifier."""
+    if act_id in HID_ACTS:
+        return 0, hid_cost(p, act_id)
     sk = SKILL_OF.get(act_id)
     if sk is None:
         return 0, 0
@@ -622,6 +632,8 @@ def player_choice(p, t, living, potions, hard, state):
     target = living[0]
     if potions > 0 and p.hp <= p.max_hp * 0.35:
         return "potion"
+    if arch.name == "bureaucrat":
+        return p.ctl.pick(p, t, living, state, None)
     if arch.name == "priest":
         if p.hp <= p.max_hp * 0.5 and heal_ok(p, t):
             return "heal"
@@ -672,6 +684,10 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
     out = {"actions": 0, "boss_ms": None, "lost_at_kill": None}
     state = {}
     acts = player_acts(player)
+    ctl = player.ctl
+    if ctl is not None:
+        acts.update(ctl.acts())
+        ctl.begin(player, enemies, human)
     player.last_t = 0
     player.ready_at = 0
     player.heal_ready = heal_carry
@@ -760,7 +776,7 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
                     push(t + ent.delay_ms(act, t), "ready", ent)
                     ent.ready_at = t + ent.delay_ms(act, t)
                     continue
-                if choice in SKILL_OF:
+                if choice in SKILL_OF or choice in HID_ACTS:
                     end, foc = skill_cost(ent, choice)
                     ent.stamina -= end
                     ent.mana -= foc
@@ -771,11 +787,20 @@ def fight(player, enemies, potions=0, boss=False, on_kill=None, hard=None, human
                 act = choose(ent)
                 ent.taken += 1
                 target = player
+                if ctl is not None:   # bars, restraints and waits of the hidden class's orders
+                    act, target, wait = ctl.creature_turn(ent, act, player, t)
+                    if wait:
+                        ent.resolve_at = None
+                        ent.ready_at = t + wait
+                        push(ent.ready_at, "ready", ent)
+                        continue
             delay, prep = ent.delay_ms(act, t), ent.prep_ms(act, t)
             ent.ready_at = t + delay
             push(ent.ready_at, "ready", ent)
             if prep > 0:
                 ent.resolve_at = t + prep
+                if ctl is not None and not ent.is_player:
+                    ctl.note_windup(ent, act, t, t + prep)
                 push(t + prep, "resolve", ent, act, target)
             else:
                 ent.resolve_at = None
@@ -888,6 +913,14 @@ def do_hit(att, defn, t, to_hit_bonus=0, crit=5, factor=1.0, mult=1, bonus=0):
 def resolve(ent, act, target, t, player, enemies, out, on_kill, push, boss):
     if target.hp <= 0 and act.id not in ("heal", "bless"):
         return
+    ctl = player.ctl
+    if ctl is not None:
+        if ent.is_player and act.id in HID_ACTS:
+            return ctl.cast(ent, act, target, t, enemies, out, push, on_kill)
+        if not ent.is_player and ctl.refuse(ent, act, target, t):
+            return
+        if ent.is_player and act.id == "attack":
+            ctl.lapse(target)
     if not ent.is_player and getattr(ent.kind, "corridor", False):
         return resolve_corridor(ent, act, target, t, enemies, out, push)
     if act.id == "cry":
@@ -1146,6 +1179,8 @@ class HumanPolicy:
             return "aim"
         elif a == "scout" and not p.archer and can_pay(p, "strike"):
             return "strike"
+        elif a == "bureaucrat":
+            return p.ctl.pick(p, t, living, state, self)
         elif a == "mage" and can_pay(p, "bolt"):
             return "bolt"
         elif a == "adventurer" and DOUBLE_STRIKE and can_pay(p, "double"):
@@ -4311,9 +4346,504 @@ def ranks_report(runs=3000, parts=()):
          "climb": lambda: ranks_climb(max(100, runs // 10)), "aim": lambda: ranks_aim(runs), "wait": lambda: ranks_wait(runs), "aimfix": lambda: ranks_aimfix(runs), "healcost": lambda: ranks_healcost(runs), "selfheal": lambda: ranks_selfheal(runs), "sneak": lambda: ranks_sneak(runs)}[part]()
 
 
+# ======================================================================================================================================
+# The hidden class and the yardstick for levels 5 to 9 (docs/BALANCE_HIDDEN.md; python3 tests/balance_sim.py hidden)
+#
+# docs/specs/bureaucrat.md sections 3 to 6 and 8 to 10, docs/specs/hidden-classes.md section 11. The five callings are played as the pace model plays them
+# (GEAR, default ranks, the Corridor creatures, haven and potions) but by the HUMAN model (HUMAN_MID: typing delay, skipped skills, potions at 25-35%, flight),
+# fight by fight; the hidden class is played beside the Mage through the control rule's real numbers (the same functions `check` compares with
+# mudlib/secure/control.cs): saves, bosses, the level bonus, repeat steps, the flood guard, half the time. Nothing here changes a table above it.
+# ======================================================================================================================================
+
+HIDDEN = "bureaucrat"
+HIDDEN_ARCH = Arch("bureaucrat", (6, 7), 2.5, 0.96, (14, 1), (76, 4), (5, 5, 5, 9, 7, 5), 15, ("apprentice staff",), False, spell_cost_pct=-20, potions=1)
+# Five of the first eight points in Insight, three in Resolve (bureaucrat.md section 3: 8 points at level 5), the pattern going on after.
+PLACEMENT[HIDDEN] = ("insight", "insight", "resolve", "insight", "insight", "resolve", "insight", "resolve")
+
+# The spells, rank by rank (bureaucrat.md section 6; rank I..V). focus is before Focus Efficiency. Everything a variant may change is read through HidCtl.
+HID = {
+    "triplicate": dict(level=5, prep=0.5, rec=1.0, focus=(24, 28, 31, 35, 38), factor=(1.5, 1.5, 1.6, 1.6, 1.7), secs=(20, 25, 30, 35, 40), save="physical"),
+    "restrain": dict(level=6, prep=0.5, rec=1.0, focus=(26, 30, 34, 38, 42), secs=(10, 12, 14, 16, 18), save="mental"),
+    "desist": dict(level=7, prep=0.0, rec=1.5, focus=(28, 32, 36, 41, 45), secs=(10, 12, 14, 16, 18), push=(2, 2, 2, 2, 2), save="mental"),
+    "tape": dict(level=8, prep=0.5, rec=1.0, focus=(30, 35, 39, 44, 48), secs=(20, 24, 28, 32, 36), save="physical"),
+    "audit": dict(level=9, prep=0.5, rec=1.0, focus=(20, 23, 26, 29, 32), points=(6, 8, 10, 12, 14), secs=(30, 30, 30, 30, 30), save=None),
+    "deny": dict(level=10, prep=0.5, rec=1.0, focus=(32, 37, 42, 46, 51), attacks=(1, 1, 2, 2, 3), secs=(20, 24, 28, 32, 36), save=None),
+}
+HID_ACTS = frozenset(HID)
+# Creature actions that are ranged (reach tag "ranged": the mudlib files' AddCombatAction reach; `check` does not read them): a restrained creature uses these.
+RANGED_ACTS = {("thorn_woodling", "thorns"), ("warren_broodmother", "spit")}
+# What a variant may change: costs (x), durations (x), the repeat window (s), the repeat steps, the flood limit, rank held.
+HID_BASE = dict(focus=1.0, secs=1.0, window=CONTROL["window"], max_repeat=CONTROL["max_repeat"], flood=CONTROL["flood"], rank=None, off=(), authority=0, push=None)
+
+
+def hid_rank(p, spell):
+    return p.ranks.get(spell, 1)
+
+
+def hid_cost(p, act_id):
+    """Focus a hidden spell costs this player: the rank's, times the variant's, less Focus Efficiency (the Mage's 20%), at least 1."""
+    v = p.ctl.v if p.ctl is not None else HID_BASE
+    base = HID[act_id]["focus"][min(4, hid_rank(p, act_id) - 1)] * v["focus"]
+    return max(1, rnd(base * (100 + p.arch.spell_cost_pct) / 100.0))
+
+
+def hid_known(level, off=()):
+    return [s for s, d in HID.items() if d["level"] <= level and s not in off]
+
+
+class HidCtl:
+    """The hidden class's control module for one fight: the control rule (Resolve) with its repeat and flood records, the marks of Audit, the cast of each
+    spell, what a creature does under a bar or a restraint (bureaucrat.md 6.2, 7.3), and the human's policy. policy: "cautious" or "greedy"."""
+
+    def __init__(self, policy="greedy", variant=None):
+        self.policy = policy
+        self.v = dict(HID_BASE, **(variant or {}))
+        self.rec = {}          # id(target) -> {"fx": {effect: (last ms, count)}, "applied": [ms]}
+        self.marks = {}        # id(target) -> (points, until ms)
+        self.windup = {}       # id(creature) -> (start, resolve, act, seen)
+        self.human = None
+        self.casts = {}
+        self.outcomes = {}
+
+    def acts(self):
+        return {s: Act(s, d["prep"], d["rec"]) for s, d in HID.items()}
+
+    def begin(self, player, enemies, human):
+        self.human = human
+
+    # ---- the control rule
+    def resolve_save(self, caster, target, effect, kind, rank, t):
+        """/secure/control Resolve: 0 (None), 1 (Half) or 2 (Full). Records the application unless it is None."""
+        v = self.v
+        window = v["window"] * 1000
+        rec = self.rec.setdefault(id(target), {"fx": {}, "applied": []})
+        rec["applied"] = [x for x in rec["applied"] if x > t - window]
+        if len(rec["applied"]) >= v["flood"]:
+            return 0
+        boss = bool(getattr(target.kind, "boss", False))
+        elite = bool(getattr(target.kind, "elite", False))
+        authority = control_authority(caster.attrs[3], caster.attrs[5], rank) + v["authority"]
+        mark = self.marks.pop(id(target), None)
+        if mark is not None and mark[1] > t:
+            authority += mark[0]
+        chance = control_save_chance(creature_resistance(target.level), target.level - caster.level, elite, authority)
+        made = random.randrange(1000) < chance * 10
+        last = rec["fx"].get(effect)
+        steps = min(v["max_repeat"], last[1]) if last is not None and t - last[0] < window else 0
+        strength = max(0, 2 - (1 if boss else 0) - min(2, steps) - (1 if made else 0))
+        if strength > 0:
+            rec["fx"][effect] = (t, (last[1] if last is not None and t - last[0] < window else 0) + 1)
+            rec["applied"].append(t)
+        self.outcomes[effect] = self.outcomes.get(effect, [0, 0, 0])
+        self.outcomes[effect][strength] += 1
+        return strength
+
+    def term(self, spell, rank, strength):
+        d = HID[spell]
+        full = max(1, rnd(d["secs"][min(4, rank - 1)] * self.v["secs"]))
+        return full if strength == 2 else control_half_seconds(full)
+
+    # ---- casting
+    def cast(self, p, act, target, t, enemies, out, push, on_kill):
+        s, d = act.id, HID[act.id]
+        rank = hid_rank(p, s)
+        self.casts[s] = self.casts.get(s, 0) + 1
+        if s == "audit":
+            self.marks[id(target)] = (d["points"][min(4, rank - 1)], t + d["secs"][0] * 1000)
+            return
+        if s == "deny":
+            p.ward = (d["attacks"][min(4, rank - 1)], t + round(d["secs"][min(4, rank - 1)] * self.v["secs"]) * 1000)
+            return
+        strength = self.resolve_save(p, target, s, d["save"], rank, t)
+        if strength == 0:
+            return
+        secs = self.term(s, rank, strength)
+        if s == "triplicate":
+            target.add_effect("slow-forms", t, secs, {}, d["factor"][min(4, rank - 1)])
+        elif s == "restrain":
+            target.restrained_until = t + secs * 1000
+        elif s == "tape":
+            target.bars["summon"] = t + secs * 1000
+        elif s == "desist":
+            w = self.windup.get(id(target))
+            if w is None or w[1] <= t or target.resolve_at is None or target.resolve_at <= t:
+                return    # the game refuses it before any Focus is spent; the policy asks first, so this is a timing miss that cost its Focus
+            push_s = (self.v["push"] or d["push"][min(4, rank - 1)]) if strength == 2 else (self.v["push"] or d["push"][min(4, rank - 1)]) / 2.0
+            target.gen += 1
+            half = (target.ready_at - target.resolve_at) / 2
+            target.resolve_at = None
+            target.ready_at = round(t + half + push_s * 1000)
+            target.bars[w[2].id] = t + secs * 1000
+            self.windup.pop(id(target), None)
+            self.interrupted = getattr(self, "interrupted", 0) + 1
+            if getattr(target.kind, "pattern", None) is not None:   # a summons that was cut off comes back (the bosses' fix): the trigger is not spent
+                for i, (pct, aid) in enumerate(target.kind.pattern[2]):
+                    if aid == w[2].id:
+                        target.fired &= ~(1 << i)
+            push(target.ready_at, "ready", target)
+
+    def lapse(self, target):
+        """The caster strikes in melee: the order ends at once."""
+        if target.restrained_until:
+            target.restrained_until = 0
+
+    # ---- what a creature does (bureaucrat.md 7.3)
+    def note_windup(self, e, act, now, resolve_at):
+        seen = self.human.delay() if self.human is not None and hasattr(self.human, "delay") else 0
+        self.windup[id(e)] = (now, resolve_at, act, seen)
+
+    def barred(self, e, act, t):
+        return e.bars.get(act.id, 0) > t or e.bars.get(act.kind, 0) > t
+
+    def is_melee(self, e, act):
+        return act.kind == "attack" and (getattr(e.kind, "id", ""), act.id) not in RANGED_ACTS
+
+    def creature_turn(self, e, act, player, t):
+        """Returns (action, target, wait ms): the chosen action after the bars and the restraint."""
+        if not e.bars and not e.restrained_until:
+            return act, player, 0
+        if self.barred(e, act, t):
+            if getattr(e.kind, "pattern", None) is not None:
+                for i, (pct, aid) in enumerate(e.kind.pattern[2]):
+                    if aid == act.id and act.kind == "summon":
+                        e.fired &= ~(1 << i)    # the summons is not spent
+            repl = next((a for a in e.acts if not self.barred(e, a, t)), None)
+            if repl is None:
+                return act, player, max(1, round(e.reaction * e.speed(t) * UNIT_MS))
+            act = repl
+        if e.restrained_until > t and self.is_melee(e, act):
+            ranged = next((a for a in e.acts if a.kind == "attack" and (getattr(e.kind, "id", ""), a.id) in RANGED_ACTS and not self.barred(e, a, t)), None)
+            if ranged is not None:
+                return ranged, player, 0
+            wait = min(round(e.reaction * e.speed(t) * UNIT_MS), max(1, e.restrained_until - t))
+            return act, player, wait
+        return act, player, 0
+
+    def refuse(self, e, act, target, t):
+        """A creature's blow: refused by the order (it began winding up before the order) or by a ward."""
+        if act.kind != "attack":
+            return False
+        if e.restrained_until > t and self.is_melee(e, act):
+            return True
+        if target.ward[0] > 0 and t < target.ward[1]:
+            target.ward = (target.ward[0] - 1, target.ward[1])
+            return True
+        return False
+
+    # ---- the human's policy (bureaucrat.md 8.3; two rotations)
+    def pick(self, p, t, living, state, human):
+        tg = living[0]
+        known = hid_known(p.level, self.v["off"])
+        pol = self.policy
+        bolt_cost = skill_cost(p, "bolt")[1]
+
+        def pay(spell, reserve):
+            return can_pay(p, spell, reserve) if spell in SKILL_OF else (p.mana >= hid_cost(p, spell) + reserve)
+
+        reserve = bolt_cost * (1 if pol == "greedy" else 3)
+        slowed = tg.effects.get("slow-forms", (0,))[0] > t
+        window = self.v["window"] * 1000
+        rec = self.rec.get(id(tg), {"fx": {}, "applied": []})
+
+        def fresh(spell):
+            """The player has read 'has been served with that already' / 'has had notice': one repeat in the minute is Half, the next is nothing."""
+            last = rec["fx"].get(spell)
+            used = last[1] if last is not None and t - last[0] < window else 0
+            return used == 0 or (used == 1 and pol == "greedy")
+        flooded = len([x for x in rec["applied"] if x > t - window]) >= self.v["flood"]
+        # 1. the interrupt: a prepared action in its wind-up, seen, and still ahead of the cast (Cease and Desist has no wind-up of its own)
+        w = self.windup.get(id(tg))
+        if "desist" in known and w is not None and w[1] > t and t - w[0] >= w[3] and not self.barred(tg, w[2], t):
+            a = w[2]
+            worth = a.mult >= 2 or (pol == "greedy" and a.kind in ("buff", "summon"))
+            if worth and a.prep * UNIT_MS > 0 and pay("desist", bolt_cost if pol == "cautious" else 0):
+                return "desist"
+        threat = tg.level >= p.level or any(a.mult >= 2 for a in tg.acts) or len(living) > 1 or getattr(tg.kind, "boss", False)
+        hurt = p.hp < 0.6 * p.max_hp
+        # 2. Audit before the first order on a creature above the caster's level
+        if "audit" in known and tg.level > p.level and id(tg) not in self.marks and not getattr(self, "audited", None) and pay("audit", reserve) and (pol == "greedy" or threat):
+            self.audited = True
+            return "audit"
+        # 3. an order against a melee creature, when the player has not yet got it, and Forms on one that has more than half its life
+        melee_only = not any((getattr(tg.kind, "id", ""), a.id) in RANGED_ACTS for a in tg.acts)
+        if "restrain" in known and tg.restrained_until <= t and melee_only and fresh("restrain") and not flooded and pay("restrain", reserve) and (pol == "greedy" or (threat and hurt) or len(living) > 1):
+            return "restrain"
+        if "triplicate" in known and not slowed and fresh("triplicate") and not flooded and tg.hp * 2 > tg.max_hp and not getattr(tg.kind, "boss", False) and pay("triplicate", reserve) and (pol == "greedy" or threat):
+            return "triplicate"
+        if "tape" in known and getattr(tg.kind, "boss", False) and tg.bars.get("summon", 0) <= t and fresh("tape") and pay("tape", reserve) and any(a.kind == "summon" for a in tg.acts):
+            return "tape"
+        if "deny" in known and p.ward[0] <= 0 and threat and pay("deny", reserve) and any(a.mult >= 2 for a in tg.acts):
+            return "deny"
+        if can_pay(p, "bolt"):
+            return "bolt"
+        return "attack"
+
+
+def hplayer(who, level, ctl=None):
+    """A character of this calling (or the hidden class, `HIDDEN`) at this level with the Corridor gear and the ranks its level allows."""
+    if who == HIDDEN:
+        p = make_player(HIDDEN_ARCH, level, "iron dagger", False, GEAR_HP, armor_extra=GEAR_ARMOR,
+                        ranks=dict({"arcane_bolt": rank_cap(level)}, **{s: (ctl.v["rank"] or rank_cap(level)) if ctl is not None else rank_cap(level) for s in HID}))
+        p.ctl = ctl
+        return p
+    return cplayer(who, level)
+
+
+def hfight(who, level, key, model, rng, ctl=None, start=None, potions=CORRIDOR_POTIONS, partner=None):
+    """One fight against creature(s) `key` (a list for a pair): the player's result and what it used."""
+    p = hplayer(who, level, ctl)
+    if start:
+        p.stamina, p.mana = start
+    keys = key if isinstance(key, (list, tuple)) else [key]
+    es = [make_monster(k) for k in keys]
+    human = HumanPolicy(model, rng) if model is not None else None
+    s0, m0 = p.stamina, p.mana
+    r = fight(p, es, potions, boss=any(CKINDS[k].boss for k in keys), human=human)
+    p.regen(r["ms"])
+    killed = all(e.hp <= 0 for e in es)
+    return dict(win=killed and p.hp > 0, died=p.hp <= 0, fled=bool(r.get("fled")), ms=r["ms"], hp_lost=p.max_hp - max(0, p.hp), potions=r.get("potions_used", 0),
+                end_s=p.stamina, end_m=p.mana, used_s=s0 - p.stamina, used_m=m0 - p.mana, max_hp=p.max_hp)
+
+
+def hcell(who, level, keys, model=HUMAN_MID, runs=1500, seed=1, policy="greedy", variant=None, label=""):
+    """One calling at one level against one creature (or a pair, `keys` a list): means over `runs` fights, from the resources the recovery between
+    fights gives back (two passes, as pace_cell does), plus the cycle seconds and experience per hour of the pace model with the human's potions."""
+    keys = list(keys) if isinstance(keys, (list, tuple)) else [keys]
+    xp = sum(CKINDS[k].xp for k in keys)
+    a = HIDDEN_ARCH if who == HIDDEN else ARCHS[who]
+    walk = ROOMS_BETWEEN_KILLS * ROOM_SECONDS + LOOT_SECONDS
+    start = None
+    res = None
+    for pass_runs in (max(150, runs // 5), runs):
+        rng = random.Random(f"{seed}:{who}:{level}:{keys}:{policy}:{label}:{pass_runs}")
+        random.seed(rng.random())
+        n = wins = deaths = fled = 0
+        sec_w = sec_l = hp_w = hp_net = pots = used_s = used_m = end_s = end_m = 0.0
+        for _ in range(pass_runs):
+            ctl = HidCtl(policy, variant) if who == HIDDEN else None
+            r = hfight(who, level, keys if len(keys) > 1 else keys[0], model, rng, ctl, start)
+            n += 1
+            pots += r["potions"]
+            used_s += r["used_s"]
+            used_m += r["used_m"]
+            if r["win"]:
+                wins += 1
+                sec_w += r["ms"] / 1000.0
+                hp_w += r["hp_lost"] + POTION_HEAL * r["potions"]   # the damage taken, before the potions
+                hp_net += r["hp_lost"]
+                end_s += r["end_s"]
+                end_m += r["end_m"]
+            elif r["died"]:
+                deaths += 1
+                sec_l += r["ms"] / 1000.0
+            else:
+                fled += 1
+                sec_l += r["ms"] / 1000.0
+        w = wins / n
+        nw = wins or 1
+        net = hp_net / nw       # the Vitality still to recover after the fight's potions (per won fight)
+        h = HAVEN_SHARE[min(10, max(5, level))]
+        regen = resources(a, level)[5] / 10.0 * (1.5 if who == "adventurer" else 1.0)
+        t_place = max(0.0, net) / regen
+        t_haven = 2 * HAVEN_ROOMS * ROOM_SECONDS + max(0.0, net) / (3 * regen)
+        t_hp = (1 - h) * t_place + h * min(t_place, t_haven)
+        wait = t_hp + walk
+        _, mst, mma, rst, rma, _ = resources(a, level)
+        start = (min(mst, end_s / nw + rst * wait * (1 + h) / 10.0), min(mma, end_m / nw + rma * wait * (1 + h) / 10.0))
+        res = dict(win=w, death=deaths / n, flee=fled / n, fight=sec_w / nw, potions=pots / n, used_s=used_s / n, used_m=used_m / n, hp_lost=hp_w / nw, t_hp=t_hp,
+                   sec_l=sec_l / max(1, n - wins), n=n)
+    w = res["win"]
+    win_cycle = (res["fight"] + walk + res["t_hp"]) * (1 + RESUPPLY)
+    lose_cycle = res["sec_l"] + ROOMS_TO_PREY[min(10, max(5, level))] * ROOM_SECONDS + CORPSE_SECONDS
+    # a fled fight costs the fight and the walk back (no corpse); a death costs the corpse run
+    cycle = w * win_cycle + res["death"] * lose_cycle + res["flee"] * (res["sec_l"] + walk + 20.0)
+    res.update(cycle=cycle, xph=3600.0 * w * xp / cycle if cycle else 0.0, xp=xp, deaths_ph=3600.0 * res["death"] / cycle if cycle else 0.0,
+               potions_ph=3600.0 * res["potions"] / cycle if cycle else 0.0, kills_ph=3600.0 * w / cycle if cycle else 0.0)
+    return res
+
+
+XP_NEXT = {5: 4400, 6: 6600, 7: 9700, 8: 12400, 9: 15200}   # experience from level L to L+1 (mudlib/std/adventurer.cs XpTable: 1000, 5400, 12000, 21700, 34100, 49300)
+
+
+def hmix(who, level, model=HUMAN_MID, runs=1500, seed=1, policy="greedy", variant=None, label=""):
+    """The hunting mix of prey(level) in equal numbers: win rate, deaths and potions an hour, experience an hour, minutes a level, resources a fight."""
+    keys = [k.id for k in prey(level)]
+    cells = [hcell(who, level, k, model, runs, seed, policy, variant, label) for k in keys]
+    cycle = sum(c["cycle"] for c in cells)
+    xp = sum(c["win"] * CKINDS[k].xp for c, k in zip(cells, keys))
+    xph = 3600.0 * xp / cycle
+    n = len(cells)
+    return dict(xph=xph, win=sum(c["win"] for c in cells) / n, deaths_ph=3600.0 * sum(c["death"] for c in cells) / cycle, potions_ph=3600.0 * sum(c["potions"] for c in cells) / cycle,
+                minutes=XP_NEXT[level] / xph * 60.0, fight=sum(c["fight"] for c in cells) / n, used_s=sum(c["used_s"] for c in cells) / n, used_m=sum(c["used_m"] for c in cells) / n,
+                hp_lost=sum(c["hp_lost"] for c in cells) / n, cells=dict(zip(keys, cells)), cycle=cycle / n)
+
+
+# ---- the tables of `python3 tests/balance_sim.py hidden [runs] [parts]`
+FIVE = ("warrior", "scout", "priest", "mage", "adventurer")
+SEED = 20261127
+SET_PIECES = (("Wild Boar", 6, ["wild_boar"]), ("Boar Brute", 7, ["boar_brute"]), ("Thorn Woodling", 9, ["thorn_woodling"]),
+              ("Goblin Raider + Goblin Scout", 7, ["goblin_raider", "goblin_scout"]))
+BOSS_PIECES = (("Bandit Leader", 9, ["bandit_leader"]), ("Fallen Knight", 9, ["fallen_knight"]), ("Forest Panther", 9, ["forest_panther"]),
+               ("Warren Broodmother", 9, ["warren_broodmother"]), ("Barrow Guardian", 9, ["barrow_guardian"]))
+
+
+def hm(xs):
+    return len(xs) / sum(1 / x for x in xs) if all(x > 0 for x in xs) else 0.0
+
+
+def yard_rows(runs, levels=range(5, 10), seed=SEED, policies=("cautious", "greedy"), variant=None, model=HUMAN_MID):
+    """{(who, level): hmix} for the five callings and the hidden class under each policy (keyed "bureaucrat/cautious", ...)."""
+    out = {}
+    for lv in levels:
+        for who in FIVE:
+            out[(who, lv)] = hmix(who, lv, model, runs, seed)
+        for pol in policies:
+            out[(HIDDEN + "/" + pol, lv)] = hmix(HIDDEN, lv, model, runs, seed, pol, variant)
+    return out
+
+
+def print_yard(rows, levels=range(5, 10), hidden=("bureaucrat/cautious", "bureaucrat/greedy")):
+    names = list(FIVE) + list(hidden)
+    for title, key, fmt in (("experience an hour", "xph", "{:8.0f}"), ("minutes a level (experience to the next level / experience an hour)", "minutes", "{:8.0f}"),
+                            ("win rate a fight (%)", "win", "{:8.1f}"), ("deaths an hour", "deaths_ph", "{:8.2f}"), ("potions an hour", "potions_ph", "{:8.2f}"),
+                            ("seconds a won fight", "fight", "{:8.1f}"), ("Vitality lost a won fight (after potions)", "hp_lost", "{:8.1f}"),
+                            ("Focus used a fight", "used_m", "{:8.1f}"), ("Endurance used a fight", "used_s", "{:8.1f}")):
+        print(f"\n{title}")
+        print("level " + "".join(f"{n[:11]:>12}" for n in names) + "   mean of five   (harmonic)")
+        for lv in levels:
+            vals = [rows[(n, lv)][key] * (100 if key == "win" else 1) for n in names]
+            five = [rows[(n, lv)][key] * (100 if key == "win" else 1) for n in FIVE]
+            print(f"{lv:>5} " + "".join(f"{fmt.format(v):>12}" for v in vals) + f"{sum(five) / 5:12.1f}   {hm(five) if key in ('xph',) else 0:8.0f}")
+
+
+def verdict(rows, levels=range(5, 10), pol="bureaucrat/greedy"):
+    """The target of the brief: within 5 points of the Mage's survival and within 15% of its pace at levels 5 to 9; never the best of the six at killing
+    speed (seconds a fight); clearly the best at not being hit (Vitality lost a won fight)."""
+    lines = []
+    for lv in levels:
+        m, h = rows[("mage", lv)], rows[(pol, lv)]
+        six = [rows[(n, lv)] for n in list(FIVE) + [pol]]
+        surv_m, surv_h = 100 * (1 - m["deaths_ph"] * m["cycle"] / 3600.0), 100 * (1 - h["deaths_ph"] * h["cycle"] / 3600.0)
+        pace = h["xph"] / m["xph"] - 1
+        fastest = min(r["fight"] for r in six) == h["fight"]
+        leastlost = min(r["hp_lost"] for r in six) == h["hp_lost"]
+        lines.append(f"  level {lv}: survival {surv_h:5.1f}% vs Mage {surv_m:5.1f}% ({surv_h - surv_m:+5.1f})   pace {pace * 100:+6.1f}% of the Mage's   "
+                     f"{'FASTEST killer (bad)' if fastest else 'not the fastest killer'}   {'least Vitality lost of the six' if leastlost else 'not the least hit'}"
+                     f"   [{'in the band' if abs(surv_h - surv_m) <= 5 and abs(pace) <= 0.15 else 'OUT of the band'}]")
+    return lines
+
+
+def sets_table(runs, seed=SEED, variant=None, pieces=SET_PIECES, hidden=("cautious", "greedy"), model=HUMAN_MID):
+    print(f"{'set piece':30}{'lvl':>4}" + "".join(f"{n[:9]:>10}" for n in FIVE) + "".join(f"{'bur/' + h[:4]:>10}" for h in hidden) + "   (win %, then deaths % in the Vitality sense: died)")
+    res = {}
+    for name, lv, keys in pieces:
+        row = [hcell(w, lv, keys, model, runs, seed) for w in FIVE] + [hcell(HIDDEN, lv, keys, model, runs, seed, h, variant) for h in hidden]
+        res[name] = row
+        print(f"{name:30}{lv:>4}" + "".join(f"{c['win'] * 100:10.1f}" for c in row) + f"   mage {row[3]['win'] * 100:.0f}; hidden minus Mage: " +
+              ", ".join(f"{(c['win'] - row[3]['win']) * 100:+.1f}" for c in row[5:]))
+    return res
+
+
+ALT_VARIANTS = (("spec numbers", {}), ("Focus x0.75", {"focus": 0.75}), ("durations x1.5", {"secs": 1.5}), ("repeat window 30 s", {"window": 30}),
+                ("Focus x0.8 + durations x1.25 + window 30 s", {"focus": 0.8, "secs": 1.25, "window": 30}), ("interrupt push 3.5 s", {"push": 3.5}),
+                ("Focus x0.75 + durations x1.5", {"focus": 0.75, "secs": 1.5}),
+                ("durations x2", {"secs": 2.0}), ("Focus x0.75 + durations x2", {"focus": 0.75, "secs": 2.0}))
+
+
+def row_line(rows, who, levels):
+    m = [rows[("mage", lv)] for lv in levels]
+    h = [rows[(who, lv)] for lv in levels]
+    pace = [x["xph"] / y["xph"] - 1 for x, y in zip(h, m)]
+    surv = [(100 * (1 - x["deaths_ph"] * x["cycle"] / 3600.0)) - (100 * (1 - y["deaths_ph"] * y["cycle"] / 3600.0)) for x, y in zip(h, m)]
+    lost = [x["hp_lost"] / y["hp_lost"] - 1 for x, y in zip(h, m)]
+    return pace, surv, lost
+
+
+def alt_report(runs, levels=range(5, 10), base=None):
+    """Hidden class under each variant, both policies, against the Mage of the same seed: pace, survival (points), Vitality lost (percent of the Mage's)."""
+    print(f"{'variant / policy':50}" + "".join(f"  L{lv} pace  surv  hit" for lv in levels))
+    for name, var in ALT_VARIANTS:
+        if os.environ.get("ALT_ONLY") and os.environ["ALT_ONLY"] not in name:
+            continue
+        for pol in ("cautious", "greedy"):
+            rows = {("mage", lv): hmix("mage", lv, HUMAN_MID, runs, SEED) for lv in levels}
+            for lv in levels:
+                rows[(HIDDEN, lv)] = hmix(HIDDEN, lv, HUMAN_MID, runs, SEED, pol, var)
+            pace, surv, lost = row_line(rows, HIDDEN, levels)
+            print(f"{name[:38] + ' / ' + pol:50}" + "".join(f"  {p * 100:+6.1f}% {s:+5.1f} {l * 100:+4.0f}%" for p, s, l in zip(pace, surv, lost)))
+
+
+def ablate_hidden(runs, levels=range(5, 10), variant=None, pol="cautious"):
+    print(f"policy {pol}; each spell switched off in turn (the rest of the rotation unchanged); pace and Vitality lost against the Mage")
+    print(f"{'switched off':20}" + "".join(f"  L{lv} pace  surv  hit" for lv in levels))
+    mage = {lv: hmix("mage", lv, HUMAN_MID, runs, SEED) for lv in levels}
+    for off in [()] + [(s,) for s in HID] + [tuple(HID)]:
+        rows = {("mage", lv): mage[lv] for lv in levels}
+        for lv in levels:
+            rows[(HIDDEN, lv)] = hmix(HIDDEN, lv, HUMAN_MID, runs, SEED, pol, dict(variant or {}, off=off))
+        pace, surv, lost = row_line(rows, HIDDEN, levels)
+        print(f"{('none' if not off else 'all six' if len(off) > 1 else off[0]):20}" + "".join(f"  {p * 100:+6.1f}% {s:+5.1f} {l * 100:+4.0f}%" for p, s, l in zip(pace, surv, lost)))
+
+
+def spread_report(runs, levels=range(5, 10), seeds=(1, 2, 3, 4, 5), variant=None):
+    print(f"the same table at {len(seeds)} seeds ({', '.join(map(str, seeds))}), {runs} fights a cell: pace against the Mage, min to max")
+    for pol in ("cautious", "greedy"):
+        acc = {lv: [] for lv in levels}
+        for sd in seeds:
+            for lv in levels:
+                m, h = hmix("mage", lv, HUMAN_MID, runs, sd), hmix(HIDDEN, lv, HUMAN_MID, runs, sd, pol, variant)
+                acc[lv].append((h["xph"] / m["xph"] - 1) * 100)
+        print(f"  {pol:9}" + "".join(f"  L{lv} {sum(v) / len(v):+6.1f}% [{min(v):+.1f}..{max(v):+.1f}]" for lv, v in acc.items()))
+
+
+def bosses_report(runs, variant=None):
+    print(f"{'boss':30}{'lvl':>4}" + "".join(f"{n[:9]:>10}" for n in FIVE) + f"{'bur/caut':>10}{'bur/greed':>10}   (win %)")
+    for name, lv, keys in BOSS_PIECES + (("Goblin Overseer (hollow)", 5, ["goblin_overseer"]),):
+        if keys[0] not in CKINDS:
+            print(f"{name:30} (not in the sim's creature table)")
+            continue
+        row = [hcell(w, lv, keys, HUMAN_MID, runs, SEED) for w in FIVE] + [hcell(HIDDEN, lv, keys, HUMAN_MID, runs, SEED, h, variant) for h in ("cautious", "greedy")]
+        print(f"{name:30}{lv:>4}" + "".join(f"{c['win'] * 100:10.1f}" for c in row))
+
+
+def hidden_report(runs=1500, parts=()):
+    parts = parts or ("yard", "sets")
+    variant = None
+    for a in parts:
+        if a.startswith("variant="):
+            variant = dict(ALT_VARIANTS)[a[8:].replace("_", " ")] if a[8:].replace("_", " ") in dict(ALT_VARIANTS) else json.loads(a[8:])
+    if "yard" in parts:
+        print(f"== The yardstick: five callings and the hidden class, human-mid player, Corridor prey(level), {runs} fights a cell, seed {SEED} ==")
+        rows = yard_rows(runs, variant=variant)
+        print_yard(rows)
+        for pol in ("bureaucrat/cautious", "bureaucrat/greedy"):
+            print(f"\nverdict, {pol}:")
+            print("\n".join(verdict(rows, pol=pol)))
+    if "sets" in parts:
+        print(f"\n== Set pieces ({runs} fights a cell) ==")
+        sets_table(runs, variant=variant)
+    if "bosses" in parts:
+        print(f"\n== Bosses ({runs} fights a cell) ==")
+        bosses_report(runs, variant)
+    if "alt" in parts:
+        print(f"\n== Alternatives ({runs} fights a cell) ==")
+        alt_report(runs)
+    if "ablate" in parts:
+        print(f"\n== Spell by spell ({runs} fights a cell) ==")
+        for pol in ("cautious", "greedy"):
+            ablate_hidden(runs, variant=variant, pol=pol)
+    if "spread" in parts:
+        print(f"\n== Run-to-run spread ==")
+        spread_report(max(300, runs // 3), variant=variant)
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "check":
         sys.exit(0 if check_mudlib() else 1)
+    if len(sys.argv) > 1 and sys.argv[1] == "hidden":
+        runs = int(next((a for a in sys.argv[2:] if a.isdigit()), 1500))
+        hidden_report(runs, tuple(a for a in sys.argv[2:] if not a.isdigit()))
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "control":
         control_report()
         return

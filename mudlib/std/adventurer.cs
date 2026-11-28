@@ -2020,6 +2020,7 @@ public abstract class Adventurer : QuestJournal
                 direction = exits[Random(exits.Count)];
             }
         }
+        if (QueryMovementBarred() > 0) { Tell(QueryMovementBarLine() + "\n"); return true; }
         if (Random(4) == 0) { Tell("You try to flee, but cannot get away!\n"); return true; }
         // Told to this character directly (not to whoever the driver thinks is typing), and always before the new room is described.
         Tell($"You flee {direction}!\n");
