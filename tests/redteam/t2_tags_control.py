@@ -32,6 +32,23 @@ public class WrenMeddler : Item
         Try("settags", () => real?.Call("SetTags", "boss"));
         Try("registry", () => tags.Call("Family", "boss", "rank"));
         Try("records", () => control.Call<int>("QueryRecordCount"));
+        // the generic binding effects (bars, restraints, wards, interrupts, a movement bar, the save-penalty mark)
+        Try("barAction", () => real?.Call("BarAction", "slam", 30));
+        Try("restrain", () => real?.Call("RestrainMelee", me, 30, ""));
+        Try("ward", () => real?.Call("GrantWard", 5, 30, ""));
+        Try("moveBar", () => real?.Call("BarMovement", 30, ""));
+        Try("interrupt", () => real?.Call("InterruptPreparation", me, 2.0, 5));
+        Try("penalty", () => control.Call("AddSavePenalty", me, real, 20, 30));
+        Try("consume", () => me.Call("ConsumeWard", real));
+        Try("lapse", () => real?.Call("LapseRestraintFrom", me));
+        Try("selfWard", () => me.Call("GrantWard", 3, 30, ""));
+        Try("selfBar", () => me.Call("BarAction", "attack", 30));
+        Try("selfMove", () => me.Call("BarMovement", 30, ""));
+        Try("readBar", () => real?.Call<int>("QueryBarLeft", "slam"));
+        Try("readWard", () => real?.Call<int>("QueryWard"));
+        Try("readMove", () => real?.Call<int>("QueryMovementBarred"));
+        Try("readPenalty", () => control.Call<int>("QuerySavePenalty", me, real));
+        Try("readSelfWard", () => me.Call<int>("QueryWard"));
         Write("MEDDLE " + string.Join(" ", r) + "\n");
         return true;
     }
@@ -91,6 +108,11 @@ def main():
                     all(f"{k}=null" in got for k in ("settest", "clock", "forget", "resolve", "resolveself")), got[:300])
         rtlib.check("T2: it cannot change a real creature's tags or the registry", all(f"{k}=null" in got for k in ("addtag", "settags", "registry")), got[:300])
         rtlib.check("T2: the daemon holds no record", "records=0" in got, got[:300])
+        effects = ("barAction", "restrain", "ward", "moveBar", "interrupt", "penalty", "consume", "lapse", "selfWard", "selfBar", "selfMove")
+        rtlib.check("T2: a wizard's object cannot bar, restrain, ward, interrupt or hold a real creature or its own player, spend a ward, lift a restraint or mark a save",
+                    all(f"{k}=True" not in got for k in effects), got[:600])
+        rtlib.check("T2: and nothing was left on them (no bar, ward, movement bar, mark)",
+                    all(f"{k}=0" in got for k in ("readBar", "readWard", "readMove", "readPenalty", "readSelfWard")), got[:600])
         w.command("clone /wiz/wren/typo")
         w.command("clone /wiz/wren/bossy")
         print(w.command("wield typo").strip()[:150])

@@ -1627,11 +1627,16 @@ public abstract class Living : Thing
     private long lastActionAt;
     private bool lastActionSpecial;
 
-    /// <summary>Is the caller real code (not the workshop's) in a trusted tree, with no restricted code anywhere on the stack?</summary>
+    /// <summary>
+    /// May the caller bind this creature? A real creature only by real code in a trusted tree with no restricted code anywhere on the stack; a workshop's
+    /// creature also by an object of the same workshop (a wizard may try the effects on its own objects, and never on a real creature or a player).
+    /// </summary>
     private bool TrustedEffectCaller()
     {
         var caller = PreviousObject();
-        return caller != null && caller.IsAlive && caller.Domain == "" && EffectTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)) && RestrictedCaller() == null;
+        if (caller == null || !caller.IsAlive) return false;
+        if (Self.Domain != "" && caller.Domain == Self.Domain) return true;
+        return caller.Domain == "" && EffectTrees.Any(t => caller.ProgramPath.StartsWith(t, StringComparison.Ordinal)) && RestrictedCaller() == null;
     }
 
     private void PruneBars()
@@ -1716,7 +1721,7 @@ public abstract class Living : Thing
     /// <summary>The striker's own call, from its own blow: a melee blow against a creature that has this creature barred from it lifts the bar at once.</summary>
     public bool LapseRestraintFrom(ObjectRef striker)
     {
-        if (striker == null || PreviousObject() != striker || !striker.IsAlive || striker.Domain != "") return false;
+        if (striker == null || PreviousObject() != striker || !striker.IsAlive || striker.Domain != Self.Domain) return false;
         var bar = restraints.FirstOrDefault(r => r.from == striker);
         if (bar.from == null) return false;
         restraints.RemoveAll(r => r.from == striker);
@@ -1755,7 +1760,7 @@ public abstract class Living : Thing
     /// </summary>
     public bool ConsumeWard(ObjectRef attacker)
     {
-        if (Dead || !Self.IsAlive || wardCharges <= 0 || attacker == null || PreviousObject() != attacker || !attacker.IsAlive || attacker.Domain != "") return false;
+        if (Dead || !Self.IsAlive || wardCharges <= 0 || attacker == null || PreviousObject() != attacker || !attacker.IsAlive || attacker.Domain != Self.Domain) return false;
         if (wardUntil <= TimeMs()) { wardCharges = 0; return false; }
         wardCharges--;
         var room = Environment();
