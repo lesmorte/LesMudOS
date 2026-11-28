@@ -37,7 +37,7 @@ public class ChanceryCourt : Room
         AddDetail("straw", "It is straw. It is not decorative.");
 
         // The mason's chit, in the drawer of the left-hand table: found per character, only by a sworn juror who has heard Tilda Marrowby (SearchModifier, ThingFound).
-        HideClue("chit", 12, "table,tables,left-hand table,left table,drawer", "In the drawer of the left-hand table, under a stub of wax and a peppermint, is a slip of paper, curled with age. You take it.", "", "");
+        HideClue("chit", 12, "table,tables,left-hand table,left table,drawer", "In the drawer of the left-hand table, under a stub of wax and a peppermint, is a slip of paper, curled with age. You take it.", "inkwell,peppermint,wax,stub of wax", "An inkwell, dry; a stub of wax; and a peppermint of such age that it has become a matter of record. You decline it.");
 
         AddSpawn(Npcs + "clerk_crake");
         AddSpawn(Npcs + "pruett");
@@ -54,6 +54,7 @@ public class ChanceryCourt : Room
 
     protected override void ThingFound(ObjectRef who, string id)
     {
+        // A natural 20 finds it for a juror who has not yet heard Tilda: the find is recorded, so the juror is given the chit rather than losing it.
         if (id != "chit" || Stage(who) != 3 || Note(who, "chit") != 0) return;
         MoveObject(CloneObject(Obj + "mason_chit"), who);
         Register.Call<bool>("Note", who, Cls, "chit", 1);

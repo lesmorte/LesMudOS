@@ -54,10 +54,12 @@ public class BureaucratClass : PlayerClass
         SummonsItem = "/domains/greenvale/oakenfell/founders/obj/jury_summons";
         SummonsOpen = false; // CLOSED until the spells exist (bureaucrat.md section 16, stage 5)
         SummonsFloor = 10; SummonsBase = 2.0; SummonsStep = 0.5; SummonsGuarantee = 50; SummonsMinLevel = 5;
-        string F = "/domains/greenvale/oakenfell/founders/";
+        // Literal paths (the lint reads them): the Chancery's rooms, people, things, this file and the skill folder.
         OwnPaths.AddRange(new[]
         {
-            F + "chancery", F + "obj/", F + "npc/registrar_ashcombe", F + "npc/clerk_crake", F + "npc/pruett", F + "npc/marrowby", F + "npc/goose",
+            "/domains/greenvale/oakenfell/founders/chancery", "/domains/greenvale/oakenfell/founders/obj/",
+            "/domains/greenvale/oakenfell/founders/npc/registrar_ashcombe", "/domains/greenvale/oakenfell/founders/npc/clerk_crake",
+            "/domains/greenvale/oakenfell/founders/npc/pruett", "/domains/greenvale/oakenfell/founders/npc/marrowby", "/domains/greenvale/oakenfell/founders/npc/goose",
             "/classes/bureaucrat", "/skills/bureaucrat/",
         });
 

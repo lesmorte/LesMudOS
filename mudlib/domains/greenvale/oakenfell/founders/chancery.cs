@@ -38,7 +38,7 @@ public class ChanceryWaitingRoom : Room
         AddDetail("lamps,lamp,green lamps", "Green-shaded lamps on short brass arms. They burn all day. The Chancery has a view on daylight and has not yet shared it.");
 
         // The Boundary Roll: found per character, only by a juror who has been sworn and has not found it (SearchModifier, ThingFound). Hint: the filing rule on the pigeonholes.
-        HideClue("roll", 12, "pigeonholes,pigeonhole,rolls,holes", "In pigeonhole two hundred and twelve, between a notice of adjournment and a very old umbrella, is a long roll tied with green tape. You take it.", "", "");
+        HideClue("roll", 12, "pigeonholes,pigeonhole,rolls,holes", "In pigeonhole two hundred and twelve, between a notice of adjournment and a very old umbrella, is a long roll tied with green tape. You take it.", "umbrella,notice,notice of adjournment,adjournment", "A notice of adjournment, yellow with age: 'The matter is adjourned. The matter was always going to be adjourned.' The umbrella is only an umbrella.");
 
         AddSpawn("/domains/greenvale/oakenfell/founders/npc/registrar_ashcombe");
     }
@@ -55,7 +55,8 @@ public class ChanceryWaitingRoom : Room
 
     protected override void ThingFound(ObjectRef who, string id)
     {
-        if (id != "roll" || Stage(who) != 3 || Note(who, "roll") != 0) return;
+        // Only the dice can find it for anyone else (a natural 20 always succeeds): a juror who is not yet sworn is given it too, so that the record of the find is never wasted.
+        if (id != "roll" || Stage(who) is < 2 or > 3 || Note(who, "roll") != 0) return;
         MoveObject(CloneObject(Obj + "boundary_roll"), who);
         Register.Call<bool>("Note", who, Cls, "roll", 1);
     }
