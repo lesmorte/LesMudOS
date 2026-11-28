@@ -122,8 +122,12 @@ public class Shopkeeper : Npc
         return position <= same.Count ? same[position - 1] : null;
     }
 
+    /// <summary>May this character use the shop at all? A shop of a hidden class answers only its holders; anyone else gets the unknown-command answer (the verb returns false).</summary>
+    protected virtual bool SellsTo(ObjectRef who) => true;
+
     private bool CmdBrowse(string args)
     {
+        if (ThisPlayer() is { } looker && !SellsTo(looker)) return false;
         if (TooDark()) return true;
         var text = new StringBuilder($"{Name} has these for sale:\n");
         foreach (var entry in stock)
@@ -141,6 +145,7 @@ public class Shopkeeper : Npc
 
     private bool CmdBuy(string args)
     {
+        if (ThisPlayer() is { } customer && !SellsTo(customer)) return false;
         if (TooDark()) return true;
         if (args == "" || !ParseAmount(args, out var count, out var all, out var noun) || all) { NotifyFail("Buy what?"); return false; }
         var entry = Find(noun);
@@ -194,6 +199,7 @@ public class Shopkeeper : Npc
 
     private bool CmdSell(string args)
     {
+        if (ThisPlayer() is { } vendor && !SellsTo(vendor)) return false;
         if (TooDark()) return true;
         var seller = ThisPlayer();
         if (args == "" || seller == null || !ParseAmount(args, out var count, out var all, out var noun)) { NotifyFail("Sell what?"); return false; }
@@ -235,6 +241,7 @@ public class Shopkeeper : Npc
 
     private bool CmdValue(string args)
     {
+        if (ThisPlayer() is { } valuer && !SellsTo(valuer)) return false;
         if (TooDark()) return true;
         var asker = ThisPlayer();
         var item = args == "" || asker == null ? null : Present(args, asker);

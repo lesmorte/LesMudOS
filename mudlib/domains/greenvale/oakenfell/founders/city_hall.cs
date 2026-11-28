@@ -16,6 +16,9 @@ public class FdCityHall : Room
         AddDetail("queue,line,people,petitioners", "A line of petitioners shuffles toward the grille: a woman with a basket of eggs and a boundary dispute, a pair of brothers not speaking to one another, a man carrying a very large and very legal-looking scroll.");
         AddReadable("placard,hours,notice,sign", "On a placard beside the grille:\n\"CITY HALL. Open from the second bell to the sixth. Records of citizens, births, deaths and boundaries are kept within. Fees are posted. The clerks are not to be hurried.\"", "A small brass-framed placard hangs by the grille. You could {cmd}read{/} it.");
 
+        GatedExit("in", "/domains/greenvale/oakenfell/founders/chancery", "inner-door", "in", "enter", "knock", "open");
+        GateDetail("letters,lintel,motto,inner door,door,gilt");
+
         AddSpawn("/domains/greenvale/oakenfell/founders/npc/clerk_barnaby");
         AddSpawn("/domains/greenvale/oakenfell/founders/npc/clerk_maude");
     }

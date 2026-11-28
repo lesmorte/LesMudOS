@@ -76,8 +76,31 @@ public class Npc : Living
         if (who != null) RecordQuest(who, quests, "", line);
     }
 
+    /// <summary>
+    /// A line of narration (an action, not speech) as part of quests for one character: toYou is told to that character and written in their quest journal;
+    /// toRoom, if given, is what everyone else here is told (the character is left out).
+    /// </summary>
+    protected void NarrateTo(ObjectRef who, string quests, string toYou, string toRoom = "")
+    {
+        TellObject(who, toYou + "\n");
+        if (toRoom != "" && Environment() is { } room) TellRoom(room, toRoom + "\n", who);
+        RecordQuest(who, quests, "", toYou);
+    }
+
+    /// <summary>Does the asked topic name one of these keys (comma-separated)? Equal to a key, or containing it.</summary>
+    protected static bool TopicHas(string topic, string keys)
+    {
+        topic = (topic ?? "").ToLowerInvariant().Trim();
+        foreach (var raw in keys.Split(','))
+        {
+            var key = raw.Trim();
+            if (key != "" && (topic == key || topic.Contains(key))) return true;
+        }
+        return false;
+    }
+
     /// <summary>The one place quest speech is written down: the quest journal of the character it was said to (never of anyone else who heard it).</summary>
-    private void RecordQuest(ObjectRef who, string quests, string asked, string line)
+    protected void RecordQuest(ObjectRef who, string quests, string asked, string line)
     {
         if (quests == "" || who == null || !who.IsAlive || !Interactive(who)) return;
         who.Call("QuestHeard", quests, asked, Name, line);
@@ -112,7 +135,7 @@ public class Npc : Living
     /// <summary>Leave the game quietly (used by rooms for encounters).</summary>
     public void WanderOff() => Destruct();
 
-    private string Speech(string line) => $"{Name} says: \"{line}\"";
+    protected string Speech(string line) => $"{Name} says: \"{line}\"";
 
     /// <summary>Called by the "talk" command. Returns what is shown to the player.</summary>
     public string? Talk(ObjectRef who)

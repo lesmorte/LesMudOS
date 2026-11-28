@@ -46,6 +46,9 @@ public class HiddenGiver : Trainer
 
     protected override bool TeachesTo(ObjectRef who) => who.Call<bool>("QueryHasClass", HiddenId);
 
+    /// <summary>The shop, like the teaching, is for holders of the class only; for anyone else its words are the unknown-command answer.</summary>
+    protected override bool SellsTo(ObjectRef who) => who.Call<bool>("QueryHasClass", HiddenId);
+
     protected override void Noticed(ObjectRef other)
     {
         base.Noticed(other);
@@ -73,11 +76,17 @@ public class HiddenGiver : Trainer
             who.Call("SetQuest", QuestId, 1, QuestTitle);
             Begin(who);
         }
-        else if (stage == 5) QuestSay(who, QuestId, OfferLine.Replace("{name}", who.Call<string>("QueryName") ?? "you"));
+        else if (stage == 5) Speak(who, OfferLine.Replace("{name}", who.Call<string>("QueryName") ?? "you"));
         else Resume(who, stage);
     }
 
     protected string QuestId => ClassQuestId();
+
+    /// <summary>One of the giver's lines to a character, written in their quest journal. By default spoken as "NAME says: ...", to the room; a content file overrides it to narrate (print the line as it is, to the character).</summary>
+    protected virtual void Speak(ObjectRef who, string line) => QuestSay(who, QuestId, line);
+
+    /// <summary>Just before the class is applied, once the class's own requirements are known to pass: the ceremony of taking it. Does nothing here.</summary>
+    protected virtual void Ceremony(ObjectRef who) { }
 
     private string ClassQuestId()
     {
@@ -122,9 +131,11 @@ public class HiddenGiver : Trainer
     {
         var who = ThisPlayer();
         if (who == null || !OfferOpen(who)) return false;
-        if (!Confirm(who, "pledge")) { QuestSay(who, QuestId, PermanenceLine); return true; }
+        if (!Confirm(who, "pledge")) { Speak(who, PermanenceLine); return true; }
+        var cls = LoadObject("/secure/classes").Call<ObjectRef>("Class", HiddenId);
+        if (cls != null && cls.Call<string>("CheckRequirements", who) == null && (who.Call<string>("QueryClassOfTier", "advanced") ?? "") == "") Ceremony(who);
         var problem = who.Call<string>("ApplyClass", HiddenId); // the class file checks the level, the calling and that the offer is open
-        if (problem != null) { QuestSay(who, QuestId, problem); return true; }
+        if (problem != null) { Speak(who, problem); return true; }
         who.Call("SetQuest", QuestId, 2, QuestTitle, RewardTakenText);
         Register.Call<bool>("Answer", who, HiddenId, 1);
         Pay(who);
@@ -132,7 +143,7 @@ public class HiddenGiver : Trainer
         Keepsake(who, KeepsakeTaken);
         try { LoadObject("/secure/events").Call<string>("Report", "class.hidden", who, new List<ObjectRef> { who }, Environment(), "", new Dictionary<string, string>()); }
         catch (MudRuntimeException) { }
-        QuestSay(who, QuestId, AcceptedLine);
+        Speak(who, AcceptedLine);
         return true;
     }
 
@@ -140,20 +151,20 @@ public class HiddenGiver : Trainer
     {
         var who = ThisPlayer();
         if (who == null || !OfferOpen(who)) return false;
-        if (!Confirm(who, "decline")) { QuestSay(who, QuestId, DeclineWarning); return true; }
+        if (!Confirm(who, "decline")) { Speak(who, DeclineWarning); return true; }
         who.Call("SetQuest", QuestId, 2, QuestTitle, RewardDeclinedText);
         Register.Call<bool>("Answer", who, HiddenId, 2);
         Pay(who);
         Retain(who);
         Keepsake(who, KeepsakeDeclined);
-        QuestSay(who, QuestId, DeclinedLine);
+        Speak(who, DeclinedLine);
         return true;
     }
 
     private void Release(ObjectRef who)
     {
         who.Call("SetQuest", QuestId, 1, QuestTitle);
-        QuestSay(who, QuestId, ReleaseLine);
+        Speak(who, ReleaseLine);
         who.Call("SetQuest", QuestId, 2, QuestTitle, RewardReleasedText);
         Register.Call<bool>("Answer", who, HiddenId, 3);
         who.Call<bool>("AddGold", PayGold);
